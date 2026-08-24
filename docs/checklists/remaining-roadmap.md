@@ -37,42 +37,42 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 
 ## Principes de conception verrouillés
 
-- [ ] Une action `Create…` ouvre un prompt propre au type créé : projet,
+- [x] Une action `Create…` ouvre un prompt propre au type créé : projet,
   artwork vectoriel, matériau/fill, entité, animation, prefab, map ou scène.
-- [ ] Chaque prompt explique le document produit, propose des valeurs par
+- [x] Chaque prompt explique le document produit, propose des valeurs par
   défaut, valide en direct et affiche un résumé avant publication.
-- [ ] `Import…` choisit et normalise une source ; `Create…` produit un document
+- [x] `Import…` choisit et normalise une source ; `Create…` produit un document
   éditable ; `Add existing…` référence une ressource déjà enregistrée.
-- [ ] Le format vectoriel interne ne dépend ni du DOM SVG ni d’une
+- [x] Le format vectoriel interne ne dépend ni du DOM SVG ni d’une
   rasterisation persistante.
-- [ ] Le SVG importé peut rester lié et opaque ou être converti explicitement
+- [x] Le SVG importé peut rester lié et opaque ou être converti explicitement
   vers les primitives prises en charge ; le choix est visible et réversible
   tant que le document n’est pas publié.
-- [ ] Les images intégrées ou importées sont des ressources locales explicites.
+- [x] Les images intégrées ou importées sont des ressources locales explicites.
   Une forme peut les employer comme fill avec transform UV, mode de cadrage,
   opacité et clipping par le contour.
-- [ ] Les références externes d’un SVG ne sont jamais suivies silencieusement :
+- [x] Les références externes d’un SVG ne sont jamais suivies silencieusement :
   elles sont refusées ou copiées après choix explicite dans le prompt.
-- [ ] La spritesheet n’est pas un contrat requis par le personnalisateur,
+- [x] La spritesheet n’est pas un contrat requis par le personnalisateur,
   l’animation, Map Studio ou le runtime cible.
-- [ ] Toute mutation éditable passe par `CommandStack`, autosave et sauvegarde
+- [x] Toute mutation éditable passe par `CommandStack`, autosave et sauvegarde
   atomique ; les gestes continus fusionnent en une seule commande.
-- [ ] La timeline découvre les propriétés via un registre typé ; elle ne
+- [x] La timeline découvre les propriétés via un registre typé ; elle ne
   contient pas de `switch` métier par nom de propriété.
 
 ## Étape A — Recaler les contrats et l’architecture
 
-- [ ] Écrire un ADR qui remplace l’orientation sprite-first par l’authoring
+- [x] Écrire un ADR qui remplace l’orientation sprite-first par l’authoring
   vectoriel natif et documente le statut hérité d’ADR-0021.
-- [ ] Écrire un ADR pour le modèle `shape + fill + stroke + clip` et les images
+- [x] Écrire un ADR pour le modèle `shape + fill + stroke + clip` et les images
   contenues dans les formes.
-- [ ] Écrire un ADR pour les prompts de création typés et la séparation
+- [x] Écrire un ADR pour les prompts de création typés et la séparation
   `Create / Import / Add existing`.
-- [ ] Mettre à jour le C4 Container et les composants Asset Studio, format
+- [x] Mettre à jour le C4 Container et les composants Asset Studio, format
   projet et rendu avant le prochain changement structurel.
-- [ ] Définir la migration `VectorAsset v1 -> v2` sans perte : les SVG actuels
+- [x] Définir la migration `VectorAsset v1 -> v2` sans perte : les SVG actuels
   deviennent `sourceKind = linkedSvg`.
-- [ ] Décider par inventaire si Aseprite reste un import optionnel de calques et
+- [x] Décider par inventaire si Aseprite reste un import optionnel de calques et
   d’images ou devient entièrement obsolète.
 
 Gate : la documentation ne présente plus les sprites comme une fondation du
