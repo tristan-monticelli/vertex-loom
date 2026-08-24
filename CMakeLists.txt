@@ -111,6 +111,7 @@ target_link_libraries(fabric_render PRIVATE
 )
 
 add_library(fabric_editor STATIC
+    engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/project_session.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
@@ -189,6 +190,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
     add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)
+
+    add_executable(fabric_editor_foundations_tests
+        tests/cpp/editor_foundations_tests.cpp
+    )
+    target_link_libraries(fabric_editor_foundations_tests PRIVATE
+        fabric_editor
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_editor_foundations_tests
+             COMMAND fabric_editor_foundations_tests)
 
     add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
     target_link_libraries(fabric_render_tests PRIVATE fabric_render)

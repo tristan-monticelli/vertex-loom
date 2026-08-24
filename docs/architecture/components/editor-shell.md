@@ -44,5 +44,8 @@ C4Component
   historique de document.
 - La session expose undo, redo et dirty et ne marque clean qu’après une
   sauvegarde principale réussie.
+- `CommandStack::execute` accepte une commande possédée par la pile ;
+  `can_undo`, `can_redo`, `undo`, `redo`, `mark_clean` et `dirty` exposent son
+  état sans dépendance à Dear ImGui.
 - Une récupération plus récente est proposée à l’ouverture ; accepter charge
   son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
