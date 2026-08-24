@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+
+node .githooks/validate-project-config.mjs
+node .githooks/validate-ctxroute.mjs
+node .githooks/validate-architecture.mjs --all
+node .githooks/validate-docs.mjs --all
+node .githooks/validate-push.mjs

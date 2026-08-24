@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "status": "template",
+  "tooling": {
+    "runtime": "node",
+    "packageManager": "npm"
+  },
+  "decisions": {
+    "language": null,
+    "runtime": null,
+    "frontend": null,
+    "backend": null,
+    "storage": null,
+    "deployment": null,
+    "observability": null,
+    "security": null,
+    "performance": null
+  },
+  "commands": {
+    "test": "npm test",
+    "lint": null,
+    "typecheck": null,
+    "mutation": null,
+    "integration": null,
+    "build": null,
+    "mermaid": "npm run validate:docs"
+  },
+  "quality": {
+    "mutation": {
+      "decision": null,
+      "preCommit": false,
+      "prePush": false
+    }
+  },
+  "directories": {
+    "source": [],
+    "tests": ["tests/"],
+    "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/"]
+  },
+  "codeExtensions": [],
+  "architecture": {
+    "documents": [
+      "docs/architecture/context.md",
+      "docs/architecture/containers.md"
+    ]
+  },
+  "contracts": {
+    "patterns": [
+      "package.json",
+      "**/package.json",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+      "**/yarn.lock",
+      "**/bun.lock",
+      "**/pyproject.toml",
+      "**/requirements*.txt",
+      "**/Pipfile",
+      "**/poetry.lock",
+      "**/uv.lock",
+      "**/Cargo.toml",
+      "**/Cargo.lock",
+      "**/go.mod",
+      "**/go.sum",
+      "**/pom.xml",
+      "**/build.gradle",
+      "**/build.gradle.kts",
+      "**/composer.json",
+      "**/composer.lock",
+      "**/Gemfile",
+      "**/Gemfile.lock",
+      "**/*.proto",
+      "**/openapi*.yaml",
+      "**/openapi*.yml",
+      "**/openapi*.json",
+      "**/*.graphql",
+      "**/*.gql"
+    ]
+  },
+  "starter": {
+    "infrastructureRoots": [
+      ".codex/",
+      ".claude/",
+      ".githooks/",
+      ".github/",
+      ".project/",
+      "docs/",
+      "rules/"
+    ],
+    "rootFiles": [
+      ".gitignore",
+      ".gitmessage",
+      ".gitattributes",
+      "AGENTS.md",
+      "CLAUDE.md",
+      "CONTRIBUTING.md",
+      "LICENSE",
+      "NOTICE",
+      "README.md",
+      "SECURITY.md",
+      "THIRD_PARTY_NOTICES.md",
+      "ctxroute-config.json",
+      "package.json",
+      "package-lock.json"
+    ]
+  }
+}

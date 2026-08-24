@@ -1,0 +1,100 @@
+{
+  "description": "CTXRoute context injection and architecture-first project governance.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs session-inject.js --budget 0",
+            "additionalContextLimit": 0,
+            "statusMessage": "Loading project context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs codex-doc-inject.js --budget 0",
+            "additionalContextLimit": 0,
+            "statusMessage": "Routing relevant context"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/pre-tool-architecture.mjs",
+            "additionalContextLimit": 800,
+            "statusMessage": "Checking architecture policy"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs codex-doc-write-guard.js",
+            "statusMessage": "Checking routed documentation"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write|exec_command|Bash|Shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/post-tool-audit.mjs",
+            "additionalContextLimit": 1200,
+            "statusMessage": "Auditing generated changes"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/stop-review.mjs",
+            "additionalContextLimit": 1200,
+            "statusMessage": "Running final step audit"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs turn-count.js"
+          },
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs canary-check.js"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/ctxroute.mjs ctxroute-reset.js"
+          }
+        ]
+      }
+    ]
+  }
+}

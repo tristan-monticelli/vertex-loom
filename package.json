@@ -1,0 +1,32 @@
+{
+  "name": "ctxroute-blueprint",
+  "version": "1.0.0",
+  "description": "Architecture-first, stack-neutral GitHub template with CTXRoute-powered agent context.",
+  "private": true,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zenonlab/ctxroute-blueprint.git"
+  },
+  "homepage": "https://github.com/zenonlab/ctxroute-blueprint#readme",
+  "bugs": "https://github.com/zenonlab/ctxroute-blueprint/issues",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "setup": "node .githooks/setup.mjs",
+    "setup:check": "node .githooks/setup.mjs --check",
+    "test": "node --test tests/*.test.mjs",
+    "validate:architecture": "node .githooks/validate-architecture.mjs --all",
+    "validate:config": "node .githooks/validate-project-config.mjs",
+    "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
+    "validate:docs": "node .githooks/validate-docs.mjs",
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:architecture && npm run validate:docs -- --all && npm test"
+  },
+  "devDependencies": {
+    "@mermaid-js/mermaid-cli": "^11.12.0",
+    "ctxroute": "https://github.com/zenonlab/ctxroute/archive/a2a3f372c4426f8e1286a6fbb0cb33bdbc374145.tar.gz"
+  }
+}

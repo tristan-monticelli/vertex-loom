@@ -1,0 +1,5 @@
+{
+  "policyVersion": 1,
+  "projectConfig": ".project/project-config.json",
+  "supportedStatuses": ["template", "initialized"]
+}

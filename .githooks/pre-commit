@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+git diff --cached --check
+node .githooks/validate-staged.mjs
+node .githooks/validate-project-config.mjs --index
+node .githooks/validate-architecture.mjs
+node .githooks/validate-docs.mjs --index
+node .githooks/validate-push.mjs --pre-commit

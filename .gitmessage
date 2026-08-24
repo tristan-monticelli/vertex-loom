@@ -1,0 +1,5 @@
+<type>(<scope>): <short description>
+
+# Types: feat fix refactor test docs chore perf
+# One functional step per commit.
+# Explain why when the change is not self-evident.

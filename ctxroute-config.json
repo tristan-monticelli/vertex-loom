@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/zenonlab/ctxroute/a2a3f372c4426f8e1286a6fbb0cb33bdbc374145/ctxroute-config.schema.json",
+  "enabled": true,
+  "showNotification": true,
+  "mode": "smart",
+  "defaultThreshold": 4,
+  "defaultDriftUnit": "turn",
+  "frames": 1,
+  "filterMode": "none",
+  "filterList": []
+}
