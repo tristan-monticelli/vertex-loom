@@ -82,6 +82,8 @@ TEST_CASE("grid slicing uses stable row-major frame order") {
     REQUIRE(sliced.frames->size() == 4);
     CHECK((*sliced.frames)[0].name == "frame-0");
     CHECK((*sliced.frames)[0].duration_ms == 75);
+    CHECK((*sliced.frames)[0].input_bounds ==
+          fabric::render::SpriteRect{0, 0, 2, 1});
     CHECK(pixel((*sliced.frames)[0].image, 0, 0) ==
           Bytes{255, 0, 0, 255});
     CHECK(pixel((*sliced.frames)[1].image, 0, 0) ==
@@ -110,6 +112,8 @@ TEST_CASE("free slicing preserves names durations pivots and order") {
     CHECK((*sliced.frames)[0].name == "right");
     CHECK((*sliced.frames)[0].duration_ms == 90);
     CHECK((*sliced.frames)[0].pivot == fabric::render::AsepritePoint{0, 0});
+    CHECK((*sliced.frames)[0].input_bounds ==
+          fabric::render::SpriteRect{2, 0, 1, 1});
     CHECK(pixel((*sliced.frames)[0].image, 0, 0) ==
           Bytes{0, 0, 255, 255});
     CHECK((*sliced.frames)[1].name == "left");
@@ -141,6 +145,7 @@ TEST_CASE("MaxRects atlas and PNG output are deterministic and extruded") {
     CHECK(metadata.source_width == 3);
     CHECK(metadata.source_height == 2);
     CHECK(metadata.pivot == fabric::render::AsepritePoint{1, 1});
+    CHECK_FALSE(metadata.input_bounds.has_value());
     const auto& bounds = metadata.atlas_bounds;
     CHECK(pixel(first.atlas->image, bounds.x, bounds.y) ==
           Bytes{10, 20, 30, 255});

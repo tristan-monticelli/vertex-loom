@@ -26,6 +26,7 @@ struct SpriteSourceFrame {
     RasterImage image;
     std::uint32_t duration_ms{100};
     std::optional<AsepritePoint> pivot;
+    std::optional<SpriteRect> input_bounds;
 };
 
 struct SpriteAtlasFrame {
@@ -36,6 +37,7 @@ struct SpriteAtlasFrame {
     std::uint32_t source_height{};
     std::uint32_t duration_ms{};
     std::optional<AsepritePoint> pivot;
+    std::optional<SpriteRect> input_bounds;
 
     friend bool operator==(const SpriteAtlasFrame&, const SpriteAtlasFrame&) =
         default;

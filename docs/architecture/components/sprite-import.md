@@ -44,8 +44,12 @@ C4Component
 - `SpriteSheetDefinition` référence uniquement les chemins canoniques dérivés
   de son identifiant. Le JSON est publié en dernier et marque la ressource
   chargeable.
+- Chaque frame issue d’un PNG conserve aussi son rectangle `inputBounds` dans
+  la source ; la grille et les frames libres sont donc régénérables sans état
+  d’interface caché.
 - Une régénération valide entièrement le nouvel atlas et le nouveau document,
-  puis les remplace atomiquement ; la source originale reste inchangée.
+  puis remplace chacun atomiquement avec rollback de l’atlas si le document ne
+  peut pas être remplacé ; la source originale reste inchangée.
 
 ## Implementation
 

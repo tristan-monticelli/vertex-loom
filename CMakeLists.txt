@@ -250,6 +250,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(NAME fabric_project_session_editing_tests
              COMMAND fabric_project_session_editing_tests)
 
+    add_executable(fabric_sprite_import_session_tests
+        tests/cpp/sprite_import_session_tests.cpp
+    )
+    target_link_libraries(fabric_sprite_import_session_tests PRIVATE
+        fabric_editor
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_sprite_import_session_tests
+             COMMAND fabric_sprite_import_session_tests)
+
     add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
     target_link_libraries(fabric_render_tests PRIVATE fabric_render)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)

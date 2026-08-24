@@ -1,6 +1,7 @@
 #include "fabric/project/sprite_sheet.hpp"
 
 #include "asset_storage.hpp"
+#include "fabric/project/document_storage.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -217,13 +218,13 @@ std::uint32_t read_big_endian_u32(const std::uint8_t* bytes) {
 
 ValidationReport validate_atlas_header(const std::filesystem::path& path,
                                        const SpriteSize& expected) {
-    ValidationReport report;
     std::ifstream input(path, std::ios::binary);
     std::array<std::uint8_t, 24> header{};
     input.read(reinterpret_cast<char*>(header.data()),
                static_cast<std::streamsize>(header.size()));
     constexpr std::array<std::uint8_t, 8> signature{
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    ValidationReport report;
     if (input.gcount() != static_cast<std::streamsize>(header.size()) ||
         !std::equal(signature.begin(), signature.end(), header.begin()) ||
         std::memcmp(header.data() + 12, "IHDR", 4) != 0) {
@@ -237,6 +238,37 @@ ValidationReport validate_atlas_header(const std::filesystem::path& path,
                   "atlas PNG dimensions differ from the document");
     }
     return report;
+}
+
+ValidationReport validate_atlas_bytes(const std::string_view contents,
+                                      const SpriteSize& expected) {
+    ValidationReport report;
+    constexpr std::array<std::uint8_t, 8> signature{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
+    if (contents.size() < 24) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas does not contain a complete PNG IHDR");
+        return report;
+    }
+    const auto* header = reinterpret_cast<const std::uint8_t*>(contents.data());
+    if (!std::equal(signature.begin(), signature.end(), header) ||
+        std::memcmp(header + 12, "IHDR", 4) != 0) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas does not contain a complete PNG IHDR");
+        return report;
+    }
+    if (read_big_endian_u32(header + 16) != expected.width ||
+        read_big_endian_u32(header + 20) != expected.height) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlasSize",
+                  "atlas PNG dimensions differ from the document");
+    }
+    return report;
+}
+
+ValidationReport validate_serialized_sprite_sheet(
+    const ProjectManifest& manifest, const std::string_view contents) {
+    auto parsed = parse_sprite_sheet(manifest, contents);
+    return {.errors = std::move(parsed.errors)};
 }
 
 } // namespace
@@ -345,6 +377,21 @@ ValidationReport validate_sprite_sheet(
             add_error(report.errors, ErrorCode::invalid_asset,
                       field + ".durationMs", "duration must be positive");
         }
+        if (definition.source_kind == SpriteSourceKind::png) {
+            if (!frame.input_bounds.has_value() ||
+                frame.input_bounds->width == 0 ||
+                frame.input_bounds->height == 0 ||
+                frame.input_bounds->width > maximum_dimension ||
+                frame.input_bounds->height > maximum_dimension) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          field + ".inputBounds",
+                          "PNG frames require a bounded input rectangle");
+            }
+        } else if (frame.input_bounds.has_value()) {
+            add_error(report.errors, ErrorCode::invalid_asset,
+                      field + ".inputBounds",
+                      "Aseprite frames must not declare PNG input bounds");
+        }
     }
     std::set<std::string> tag_names;
     constexpr std::array directions{"forward", "reverse", "pingPong",
@@ -412,6 +459,9 @@ std::string serialize_sprite_sheet(const SpriteSheetDefinition& definition) {
                    {"durationMs", frame.duration_ms}};
         if (frame.pivot.has_value()) {
             value["pivot"] = point_json(*frame.pivot);
+        }
+        if (frame.input_bounds.has_value()) {
+            value["inputBounds"] = rect_json(*frame.input_bounds);
         }
         frames.push_back(std::move(value));
     }
@@ -528,7 +578,7 @@ SpriteSheetResult parse_sprite_sheet(const ProjectManifest& manifest,
                     value,
                     {"name", "atlasBounds", "sourceBounds", "sourceSize",
                      "durationMs"},
-                    {"pivot"}, field, result.errors)) {
+                    {"pivot", "inputBounds"}, field, result.errors)) {
                 continue;
             }
             SpriteFrameDefinition frame;
@@ -546,6 +596,13 @@ SpriteSheetResult parse_sprite_sheet(const ProjectManifest& manifest,
                 if (parse_point(value["pivot"], pivot, field + ".pivot",
                                 result.errors)) {
                     frame.pivot = pivot;
+                }
+            }
+            if (value.contains("inputBounds")) {
+                SpriteRect input_bounds;
+                if (parse_rect(value["inputBounds"], input_bounds,
+                               field + ".inputBounds", result.errors)) {
+                    frame.input_bounds = input_bounds;
                 }
             }
             definition.frames.push_back(std::move(frame));
@@ -759,6 +816,88 @@ SpriteSheetResult publish_sprite_sheet(
     return load_sprite_sheet(
         project_root, manifest,
         sprite_sheet_document_path(manifest, definition.document.id));
+}
+
+SpriteSheetResult regenerate_sprite_sheet(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest,
+    const SpriteSheetDefinition& definition,
+    const std::span<const std::uint8_t> atlas_png) {
+    SpriteSheetResult result;
+    auto validation = validate_sprite_sheet(manifest, definition);
+    if (!validation.ok()) {
+        result.errors = std::move(validation.errors);
+        return result;
+    }
+    const auto document_path =
+        sprite_sheet_document_path(manifest, definition.document.id);
+    auto current = load_sprite_sheet(project_root, manifest, document_path);
+    if (!current.ok()) {
+        return current;
+    }
+    if (current.asset->source != definition.source ||
+        current.asset->source_kind != definition.source_kind) {
+        add_error(result.errors, ErrorCode::invalid_asset, "source",
+                  "regeneration cannot change the preserved source");
+        return result;
+    }
+    const std::string atlas_contents(
+        reinterpret_cast<const char*>(atlas_png.data()), atlas_png.size());
+    auto atlas_validation =
+        validate_atlas_bytes(atlas_contents, definition.atlas_size);
+    if (!atlas_validation.ok()) {
+        result.errors = std::move(atlas_validation.errors);
+        return result;
+    }
+
+    std::error_code filesystem_error;
+    const auto old_atlas_size = std::filesystem::file_size(
+        project_root / current.asset->atlas, filesystem_error);
+    if (filesystem_error || old_atlas_size > 256U * 1024U * 1024U) {
+        add_error(result.errors, ErrorCode::io_error, "atlas",
+                  "current atlas is inaccessible or too large for rollback");
+        return result;
+    }
+    std::ifstream old_atlas_input(project_root / current.asset->atlas,
+                                  std::ios::binary);
+    const std::string old_atlas{
+        std::istreambuf_iterator<char>{old_atlas_input},
+        std::istreambuf_iterator<char>{}};
+    if (!old_atlas_input && !old_atlas_input.eof()) {
+        add_error(result.errors, ErrorCode::io_error, "atlas",
+                  "cannot preserve the current atlas for rollback");
+        return result;
+    }
+    auto atlas_save = save_document_atomic(
+        project_root, definition.atlas, atlas_contents,
+        [&definition](const std::string_view contents) {
+            return validate_atlas_bytes(contents, definition.atlas_size);
+        });
+    if (!atlas_save.ok()) {
+        result.errors = std::move(atlas_save.errors);
+        return result;
+    }
+
+    const std::string serialized = serialize_sprite_sheet(definition);
+    auto document_save = save_document_atomic(
+        project_root, document_path, serialized,
+        [&manifest](const std::string_view contents) {
+            return validate_serialized_sprite_sheet(manifest, contents);
+        });
+    if (!document_save.ok()) {
+        auto rollback = save_document_atomic(
+            project_root, current.asset->atlas, old_atlas,
+            [&current](const std::string_view contents) {
+                return validate_atlas_bytes(contents,
+                                            current.asset->atlas_size);
+            });
+        result.errors = std::move(document_save.errors);
+        result.errors.insert(result.errors.end(),
+                             std::make_move_iterator(rollback.errors.begin()),
+                             std::make_move_iterator(rollback.errors.end()));
+        return result;
+    }
+    return load_sprite_sheet(project_root, manifest, document_path);
 }
 
 } // namespace fabric::project

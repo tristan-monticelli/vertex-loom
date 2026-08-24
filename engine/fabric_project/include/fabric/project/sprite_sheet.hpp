@@ -60,6 +60,7 @@ struct SpriteFrameDefinition {
     SpriteSize source_size;
     std::uint32_t duration_ms{};
     std::optional<SpritePoint> pivot;
+    std::optional<SpriteRect> input_bounds;
 
     friend bool operator==(const SpriteFrameDefinition&,
                            const SpriteFrameDefinition&) = default;
@@ -144,6 +145,11 @@ struct SpriteSheetResult {
     const ProjectManifest& manifest,
     const SpriteSheetDefinition& definition,
     const std::filesystem::path& validated_source,
+    std::span<const std::uint8_t> atlas_png);
+[[nodiscard]] SpriteSheetResult regenerate_sprite_sheet(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest,
+    const SpriteSheetDefinition& definition,
     std::span<const std::uint8_t> atlas_png);
 
 } // namespace fabric::project

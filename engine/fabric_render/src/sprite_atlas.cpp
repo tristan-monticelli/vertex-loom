@@ -332,6 +332,7 @@ SpriteFramesResult slice_sprite_grid(const RasterImage& source,
                 .name = "frame-" + std::to_string(frames.size()),
                 .image = extract(source, bounds),
                 .duration_ms = grid.duration_ms,
+                .input_bounds = bounds,
             });
             const std::uint64_t next = static_cast<std::uint64_t>(x) +
                 grid.frame_width + grid.spacing_x;
@@ -385,6 +386,7 @@ SpriteFramesResult slice_sprite_regions(
             .image = extract(source, region.bounds),
             .duration_ms = region.duration_ms,
             .pivot = region.pivot,
+            .input_bounds = region.bounds,
         });
     }
     return {.frames = std::move(frames)};
@@ -524,6 +526,7 @@ SpriteAtlasResult build_sprite_atlas(
             .source_height = source.height,
             .duration_ms = frames[input.index].duration_ms,
             .pivot = frames[input.index].pivot,
+            .input_bounds = frames[input.index].input_bounds,
         };
     }
     auto png = encode_png(atlas.image);

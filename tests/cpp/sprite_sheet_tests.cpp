@@ -90,6 +90,9 @@ Fixture fixture(const fabric::project::ProjectManifest& manifest,
             .source_size = {packed.source_width, packed.source_height},
             .duration_ms = packed.duration_ms,
             .pivot = fabric::project::SpritePoint{1, 0},
+            .input_bounds = kind == fabric::project::SpriteSourceKind::png
+                ? std::optional<fabric::project::SpriteRect>{{0, 0, 2, 1}}
+                : std::nullopt,
         }},
         .tags = {{.name = "idle",
                   .from_frame = 0,

@@ -12,10 +12,13 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <cstddef>
 #include <filesystem>
 #include <iostream>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -34,6 +37,33 @@ enum class PreviewKind {
     none,
     texture,
     vector,
+    sprite,
+};
+
+struct FreeSpriteFrameFields {
+    std::array<char, 129> name{};
+    int x{};
+    int y{};
+    int width{1};
+    int height{1};
+    int duration_ms{100};
+    bool has_pivot{};
+    int pivot_x{};
+    int pivot_y{};
+};
+
+struct SpriteImportFields {
+    bool free_frames{};
+    int frame_width{16};
+    int frame_height{16};
+    int offset_x{};
+    int offset_y{};
+    int spacing_x{};
+    int spacing_y{};
+    int duration_ms{100};
+    std::vector<FreeSpriteFrameFields> frames{1};
+    bool attempted{};
+    std::string local_error;
 };
 
 struct AssetPreview {
@@ -89,6 +119,81 @@ bool import_vector(fabric::editor::ProjectSession& session,
     }
     upload_preview(preview, session.imported_vector()->preview);
     preview.kind = PreviewKind::vector;
+    return true;
+}
+
+bool import_aseprite(fabric::editor::ProjectSession& session,
+                     AssetPreview& preview) {
+    preview.attempted = true;
+    if (!session.import_aseprite(preview.path.data(),
+                                 {.value = preview.id.data()},
+                                 preview.name.data())) {
+        return false;
+    }
+    upload_preview(preview, session.imported_sprite_sheet()->atlas);
+    preview.kind = PreviewKind::sprite;
+    return true;
+}
+
+bool import_sprite_png(fabric::editor::ProjectSession& session,
+                       AssetPreview& preview,
+                       SpriteImportFields& fields) {
+    preview.attempted = true;
+    fields.attempted = true;
+    fields.local_error.clear();
+    bool imported = false;
+    if (!fields.free_frames) {
+        if (fields.frame_width <= 0 || fields.frame_height <= 0 ||
+            fields.offset_x < 0 || fields.offset_y < 0 ||
+            fields.spacing_x < 0 || fields.spacing_y < 0 ||
+            fields.duration_ms <= 0) {
+            fields.local_error =
+                "Grid sizes and duration must be positive; offsets and spacing cannot be negative.";
+            return false;
+        }
+        imported = session.import_png_sprite_grid(
+            preview.path.data(), {.value = preview.id.data()},
+            preview.name.data(),
+            {.frame_width = static_cast<std::uint32_t>(fields.frame_width),
+             .frame_height = static_cast<std::uint32_t>(fields.frame_height),
+             .offset_x = static_cast<std::uint32_t>(fields.offset_x),
+             .offset_y = static_cast<std::uint32_t>(fields.offset_y),
+             .spacing_x = static_cast<std::uint32_t>(fields.spacing_x),
+             .spacing_y = static_cast<std::uint32_t>(fields.spacing_y),
+             .duration_ms = static_cast<std::uint32_t>(fields.duration_ms)});
+    } else {
+        std::vector<fabric::render::SpriteRegion> regions;
+        regions.reserve(fields.frames.size());
+        for (const auto& frame : fields.frames) {
+            if (frame.x < 0 || frame.y < 0 || frame.width <= 0 ||
+                frame.height <= 0 || frame.duration_ms <= 0) {
+                fields.local_error =
+                    "Free frame positions cannot be negative; sizes and durations must be positive.";
+                return false;
+            }
+            fabric::render::SpriteRegion region{
+                .name = frame.name.data(),
+                .bounds = {static_cast<std::uint32_t>(frame.x),
+                           static_cast<std::uint32_t>(frame.y),
+                           static_cast<std::uint32_t>(frame.width),
+                           static_cast<std::uint32_t>(frame.height)},
+                .duration_ms = static_cast<std::uint32_t>(frame.duration_ms),
+            };
+            if (frame.has_pivot) {
+                region.pivot = fabric::render::AsepritePoint{
+                    frame.pivot_x, frame.pivot_y};
+            }
+            regions.push_back(std::move(region));
+        }
+        imported = session.import_png_sprite_regions(
+            preview.path.data(), {.value = preview.id.data()},
+            preview.name.data(), regions);
+    }
+    if (!imported) {
+        return false;
+    }
+    upload_preview(preview, session.imported_sprite_sheet()->atlas);
+    preview.kind = PreviewKind::sprite;
     return true;
 }
 
@@ -224,10 +329,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     std::array<char, 1024>& path_buffer,
                     ProjectCreationFields& creation,
                     AssetPreview& preview,
+                    SpriteImportFields& sprite_fields,
                     bool& request_create,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
+                    bool& request_aseprite,
+                    bool& request_sprite_png,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -256,6 +364,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::Button("Import SVG", {-1.0F, 0.0F})) {
             preview.attempted = false;
             request_svg = true;
+        }
+        if (ImGui::Button("Import Aseprite", {-1.0F, 0.0F})) {
+            preview.attempted = false;
+            request_aseprite = true;
+        }
+        if (ImGui::Button("Import sprite PNG", {-1.0F, 0.0F})) {
+            preview.attempted = false;
+            request_sprite_png = true;
         }
     }
     ImGui::End();
@@ -291,7 +407,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                      image_size, {0.0F, 1.0F}, {1.0F, 0.0F});
     } else {
         const char* preview_message = session.has_project()
-                                          ? "Import a PNG or SVG to begin"
+                                          ? "Import a PNG, SVG or sprite to begin"
                                           : "Open a project to begin";
         const ImVec2 text_size = ImGui::CalcTextSize(preview_message);
         draw_list->AddText({origin.x + (available.x - text_size.x) * 0.5F,
@@ -323,9 +439,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextWrapped("%s", session.project_root().string().c_str());
         if (preview.texture != 0U) {
             ImGui::SeparatorText(
-                preview.kind == PreviewKind::vector
-                    ? "Imported vector"
-                    : "Imported texture");
+                preview.kind == PreviewKind::vector ? "Imported vector"
+                : preview.kind == PreviewKind::sprite ? "Imported sprite"
+                                                      : "Imported texture");
             ImGui::Text("%u x %u RGBA8", preview.width, preview.height);
             if (preview.kind == PreviewKind::texture &&
                 session.imported_texture()) {
@@ -346,6 +462,25 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     session.imported_vector()->asset.document.id.value.c_str());
                 ImGui::TextWrapped("%s",
                     session.imported_vector()->asset.source.generic_string().c_str());
+            }
+            if (preview.kind == PreviewKind::sprite &&
+                session.imported_sprite_sheet()) {
+                const auto& sprite = session.imported_sprite_sheet()->asset;
+                ImGui::TextUnformatted(sprite.document.name.c_str());
+                ImGui::TextDisabled("%s", sprite.document.id.value.c_str());
+                ImGui::Text("%zu frame(s), %zu tag(s)", sprite.frames.size(),
+                            sprite.tags.size());
+                ImGui::TextWrapped("%s", sprite.source.generic_string().c_str());
+                if (ImGui::Button("Regenerate atlas", {-1.0F, 0.0F})) {
+                    const auto sprite_id = sprite.document.id;
+                    if (session.regenerate_sprite_sheet(sprite_id)) {
+                        upload_preview(preview,
+                                       session.imported_sprite_sheet()->atlas);
+                        status = "Sprite atlas regenerated.";
+                    } else {
+                        status = "Sprite regeneration failed; inspect diagnostics.";
+                    }
+                }
             }
         }
     } else {
@@ -402,6 +537,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         request_svg = false;
     }
+    if (request_aseprite) {
+        preview.attempted = false;
+        if (choose_asset_file(window, "Aseprite sprite", "ase,aseprite",
+                              preview.path, status)) {
+            ImGui::OpenPopup("Import Aseprite");
+        }
+        request_aseprite = false;
+    }
+    if (request_sprite_png) {
+        preview.attempted = false;
+        sprite_fields.attempted = false;
+        sprite_fields.local_error.clear();
+        if (choose_asset_file(window, "PNG sprite sheet", "png", preview.path,
+                              status)) {
+            ImGui::OpenPopup("Import sprite PNG");
+        }
+        request_sprite_png = false;
+    }
 
     if (ImGui::BeginPopupModal("Import PNG", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -457,6 +610,144 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::CloseCurrentPopup();
         }
         if (preview.attempted && !session.errors().empty()) {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Import failed");
+            draw_diagnostics(session);
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Import Aseprite", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Aseprite source file");
+        ImGui::TextWrapped("%s", preview.path.data());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", preview.name.data(), preview.name.size());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Resource ID", preview.id.data(), preview.id.size());
+        ImGui::TextDisabled(
+            "The source is preserved and a deterministic PNG atlas is generated.");
+        if (ImGui::Button("Import", {110.0F, 0.0F})) {
+            if (import_aseprite(session, preview)) {
+                status = "Aseprite imported: " +
+                    session.imported_sprite_sheet()->asset.document.id.value;
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Aseprite import failed; inspect the diagnostics.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (preview.attempted && !session.errors().empty()) {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Import failed");
+            draw_diagnostics(session);
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Import sprite PNG", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("PNG sprite sheet source");
+        ImGui::TextWrapped("%s", preview.path.data());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", preview.name.data(), preview.name.size());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Resource ID", preview.id.data(), preview.id.size());
+        ImGui::SeparatorText("Slicing");
+        if (ImGui::RadioButton("Grid", !sprite_fields.free_frames)) {
+            sprite_fields.free_frames = false;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Free frames", sprite_fields.free_frames)) {
+            sprite_fields.free_frames = true;
+        }
+        if (!sprite_fields.free_frames) {
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Frame width", &sprite_fields.frame_width);
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Frame height", &sprite_fields.frame_height);
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Offset X", &sprite_fields.offset_x);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Offset Y", &sprite_fields.offset_y);
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Spacing X", &sprite_fields.spacing_x);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Spacing Y", &sprite_fields.spacing_y);
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputInt("Duration (ms)", &sprite_fields.duration_ms);
+        } else {
+            std::optional<std::size_t> remove_frame;
+            for (std::size_t index = 0; index < sprite_fields.frames.size();
+                 ++index) {
+                auto& frame = sprite_fields.frames[index];
+                ImGui::PushID(static_cast<int>(index));
+                ImGui::SeparatorText(
+                    ("Frame " + std::to_string(index)).c_str());
+                ImGui::SetNextItemWidth(360.0F);
+                ImGui::InputText("Frame name", frame.name.data(),
+                                 frame.name.size());
+                ImGui::SetNextItemWidth(120.0F);
+                ImGui::InputInt("X", &frame.x);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120.0F);
+                ImGui::InputInt("Y", &frame.y);
+                ImGui::SetNextItemWidth(120.0F);
+                ImGui::InputInt("Width", &frame.width);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(120.0F);
+                ImGui::InputInt("Height", &frame.height);
+                ImGui::SetNextItemWidth(160.0F);
+                ImGui::InputInt("Duration (ms)", &frame.duration_ms);
+                ImGui::Checkbox("Pivot", &frame.has_pivot);
+                if (frame.has_pivot) {
+                    ImGui::SetNextItemWidth(120.0F);
+                    ImGui::InputInt("Pivot X", &frame.pivot_x);
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(120.0F);
+                    ImGui::InputInt("Pivot Y", &frame.pivot_y);
+                }
+                if (sprite_fields.frames.size() > 1 &&
+                    ImGui::Button("Remove frame")) {
+                    remove_frame = index;
+                }
+                ImGui::PopID();
+            }
+            if (remove_frame.has_value()) {
+                sprite_fields.frames.erase(
+                    sprite_fields.frames.begin() +
+                    static_cast<std::ptrdiff_t>(*remove_frame));
+            }
+            if (ImGui::Button("Add frame")) {
+                sprite_fields.frames.emplace_back();
+            }
+        }
+        ImGui::TextDisabled(
+            "One pixel of edge extrusion and one pixel of padding are generated.");
+        if (ImGui::Button("Import", {110.0F, 0.0F})) {
+            if (import_sprite_png(session, preview, sprite_fields)) {
+                status = "Sprite PNG imported: " +
+                    session.imported_sprite_sheet()->asset.document.id.value;
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Sprite PNG import failed; inspect the diagnostics.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (!sprite_fields.local_error.empty()) {
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
+                               sprite_fields.local_error.c_str());
+        }
+        if (sprite_fields.attempted && sprite_fields.local_error.empty() &&
+            !session.errors().empty()) {
             ImGui::Spacing();
             ImGui::SeparatorText("Import failed");
             draw_diagnostics(session);
@@ -611,10 +902,13 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     std::array<char, 1024> path_buffer{};
     ProjectCreationFields creation;
     AssetPreview preview;
+    SpriteImportFields sprite_fields;
     bool request_create = false;
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
+    bool request_aseprite = false;
+    bool request_sprite_png = false;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -667,6 +961,14 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                                     session.has_project())) {
                     request_svg = true;
                 }
+                if (ImGui::MenuItem("Import Aseprite...", nullptr, false,
+                                    session.has_project())) {
+                    request_aseprite = true;
+                }
+                if (ImGui::MenuItem("Import sprite PNG...", nullptr, false,
+                                    session.has_project())) {
+                    request_sprite_png = true;
+                }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
                     running = false;
@@ -686,7 +988,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 }
                 ImGui::EndMenu();
             }
-            ImGui::TextDisabled("Phase 2 - resilient authoring foundation");
+            ImGui::TextDisabled("Phase 3 - sprite import and atlas pipeline");
             ImGui::EndMainMenuBar();
         }
         const auto& io = ImGui::GetIO();
@@ -725,8 +1027,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             status = "Change redone.";
         }
 
-        draw_workspace(session, window, path_buffer, creation, preview, request_create,
-                       request_open, request_png, request_svg, status);
+        draw_workspace(session, window, path_buffer, creation, preview,
+                       sprite_fields, request_create, request_open, request_png,
+                       request_svg, request_aseprite, request_sprite_png,
+                       status);
 
         const auto autosave_status = session.update_autosave();
         if (autosave_status == fabric::editor::AutosaveStatus::saved) {
