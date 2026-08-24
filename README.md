@@ -31,7 +31,7 @@ Requirements: CMake 3.24+, a C++20 compiler, Node.js 22+, npm 10+, and OpenGL
 development files. On Ubuntu, install them with:
 
 ```sh
-sudo apt-get install libgl1-mesa-dev libsdl2-dev
+sudo apt-get install libgl1-mesa-dev libgtk-3-dev libsdl2-dev
 ```
 
 ```sh

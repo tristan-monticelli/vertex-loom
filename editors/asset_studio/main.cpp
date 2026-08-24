@@ -6,6 +6,8 @@
 #include <imgui.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
+#include <nfd.h>
+#include <nfd_sdl2.h>
 
 #include <algorithm>
 #include <array>
@@ -107,6 +109,55 @@ void copy_path_to_buffer(const std::filesystem::path& path,
     std::snprintf(buffer.data(), buffer.size(), "%s", value.c_str());
 }
 
+template <std::size_t Size>
+bool choose_folder(SDL_Window* window, std::array<char, Size>& destination,
+                   std::string& status) {
+    nfdu8char_t* selected_path = nullptr;
+    nfdpickfolderu8args_t arguments{};
+    NFD_GetNativeWindowFromSDLWindow(window, &arguments.parentWindow);
+    const nfdresult_t result = NFD_PickFolderU8_With(
+        &selected_path, &arguments);
+    if (result == NFD_CANCEL) {
+        return false;
+    }
+    if (result == NFD_ERROR) {
+        status = "Native folder dialog failed: " +
+            std::string(NFD_GetError() == nullptr ? "unknown error"
+                                                   : NFD_GetError());
+        return false;
+    }
+    copy_path_to_buffer(std::filesystem::path{selected_path}, destination);
+    NFD_FreePathU8(selected_path);
+    return true;
+}
+
+template <std::size_t Size>
+bool choose_asset_file(SDL_Window* window, const char* label,
+                       const char* extension,
+                       std::array<char, Size>& destination,
+                       std::string& status) {
+    nfdu8char_t* selected_path = nullptr;
+    const nfdu8filteritem_t filters[]{{label, extension}};
+    nfdopendialogu8args_t arguments{};
+    arguments.filterList = filters;
+    arguments.filterCount = 1;
+    NFD_GetNativeWindowFromSDLWindow(window, &arguments.parentWindow);
+    const nfdresult_t result = NFD_OpenDialogU8_With(
+        &selected_path, &arguments);
+    if (result == NFD_CANCEL) {
+        return false;
+    }
+    if (result == NFD_ERROR) {
+        status = "Native file dialog failed: " +
+            std::string(NFD_GetError() == nullptr ? "unknown error"
+                                                   : NFD_GetError());
+        return false;
+    }
+    copy_path_to_buffer(std::filesystem::path{selected_path}, destination);
+    NFD_FreePathU8(selected_path);
+    return true;
+}
+
 void apply_studio_style() {
     ImGui::StyleColorsDark();
     auto& style = ImGui::GetStyle();
@@ -169,6 +220,7 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
 }
 
 void draw_workspace(fabric::editor::ProjectSession& session,
+                    SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
                     ProjectCreationFields& creation,
                     AssetPreview& preview,
@@ -304,37 +356,49 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (request_create) {
         creation.attempted = false;
-        ImGui::OpenPopup("New project");
+        if (choose_folder(window, creation.path, status)) {
+            ImGui::OpenPopup("New project");
+        }
         request_create = false;
     }
     if (request_open) {
-        ImGui::OpenPopup("Open project");
+        if (choose_folder(window, path_buffer, status)) {
+            if (session.open(path_buffer.data())) {
+                clear_asset_preview(preview);
+                status = "Project opened: " + session.manifest()->name;
+            } else {
+                status = "Project rejected; inspect the diagnostics.";
+            }
+        }
         request_open = false;
     }
     if (request_png) {
         preview.attempted = false;
-        ImGui::OpenPopup("Import PNG");
+        if (choose_asset_file(window, "PNG image", "png", preview.path,
+                              status)) {
+            ImGui::OpenPopup("Import PNG");
+        }
         request_png = false;
     }
     if (request_svg) {
         preview.attempted = false;
-        ImGui::OpenPopup("Import SVG");
+        if (choose_asset_file(window, "SVG image", "svg", preview.path,
+                              status)) {
+            ImGui::OpenPopup("Import SVG");
+        }
         request_svg = false;
     }
 
     if (ImGui::BeginPopupModal("Import PNG", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("PNG source file");
-        ImGui::SetNextItemWidth(560.0F);
-        const bool submitted = ImGui::InputText(
-            "##png-path", preview.path.data(), preview.path.size(),
-            ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::TextWrapped("%s", preview.path.data());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", preview.name.data(), preview.name.size());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Resource ID", preview.id.data(), preview.id.size());
         ImGui::TextDisabled("The PNG and its versioned document are copied into assets/textures.");
-        if (submitted || ImGui::Button("Import", {110.0F, 0.0F})) {
+        if (ImGui::Button("Import", {110.0F, 0.0F})) {
             if (import_texture(session, preview)) {
                 status = "PNG imported: " +
                     session.imported_texture()->asset.document.id.value;
@@ -358,17 +422,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     if (ImGui::BeginPopupModal("Import SVG", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("SVG source file");
-        ImGui::SetNextItemWidth(560.0F);
-        const bool submitted = ImGui::InputText(
-            "##svg-path", preview.path.data(), preview.path.size(),
-            ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::TextWrapped("%s", preview.path.data());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", preview.name.data(), preview.name.size());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Resource ID", preview.id.data(), preview.id.size());
         ImGui::TextDisabled(
             "The SVG and its versioned document are copied into assets/vectors.");
-        if (submitted || ImGui::Button("Import", {110.0F, 0.0F})) {
+        if (ImGui::Button("Import", {110.0F, 0.0F})) {
             if (import_vector(session, preview)) {
                 status = "SVG imported: " +
                     session.imported_vector()->asset.document.id.value;
@@ -393,8 +454,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a versioned Vertex Loom project");
         ImGui::Spacing();
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Destination", creation.path.data(), creation.path.size());
+        ImGui::TextUnformatted("Destination");
+        ImGui::TextWrapped("%s", creation.path.data());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", creation.name.data(), creation.name.size());
         ImGui::SetNextItemWidth(560.0F);
@@ -430,35 +491,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
-    if (ImGui::BeginPopupModal("Open project", nullptr,
-                               ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Vertex Loom project directory");
-        ImGui::SetNextItemWidth(560.0F);
-        const bool submitted = ImGui::InputText("##project-path", path_buffer.data(),
-                                                path_buffer.size(),
-                                                ImGuiInputTextFlags_EnterReturnsTrue);
-        if (submitted || ImGui::Button("Open", {110.0F, 0.0F})) {
-            if (path_buffer.front() == '\0') {
-                status = "A project directory is required.";
-            } else if (session.open(path_buffer.data())) {
-                clear_asset_preview(preview);
-                status = "Project opened: " + session.manifest()->name;
-                ImGui::CloseCurrentPopup();
-            } else {
-                status = "Project rejected; inspect the diagnostics.";
-            }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
-            ImGui::CloseCurrentPopup();
-        }
-        if (!session.errors().empty()) {
-            ImGui::Spacing();
-            ImGui::SeparatorText("Validation failed");
-            draw_diagnostics(session);
-        }
-        ImGui::EndPopup();
-    }
 }
 
 int run_asset_studio(const std::filesystem::path& initial_project) {
@@ -495,9 +527,20 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     }
     SDL_SetWindowMinimumSize(window, 900, 600);
 
+    if (NFD_Init() != NFD_OKAY) {
+        std::cerr << "native file dialog initialization failed: "
+                  << (NFD_GetError() == nullptr ? "unknown error"
+                                                : NFD_GetError())
+                  << '\n';
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+
     SDL_GLContext gl_context = SDL_GL_CreateContext(window);
     if (gl_context == nullptr) {
         std::cerr << "OpenGL context creation failed: " << SDL_GetError() << '\n';
+        NFD_Quit();
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
@@ -521,6 +564,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
         ImGui::DestroyContext();
         SDL_GL_DeleteContext(gl_context);
+        NFD_Quit();
         SDL_DestroyWindow(window);
         SDL_Quit();
         return 1;
@@ -608,7 +652,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             running = false;
         }
 
-        draw_workspace(session, path_buffer, creation, preview, request_create,
+        draw_workspace(session, window, path_buffer, creation, preview, request_create,
                        request_open, request_png, request_svg, status);
 
         ImGui::Render();
@@ -629,6 +673,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
     SDL_GL_DeleteContext(gl_context);
+    NFD_Quit();
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 0;

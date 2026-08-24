@@ -6,6 +6,8 @@ option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
 option(FABRIC_BUILD_TESTS "Build the C++ test suite" ON)
 
+include(CTest)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -17,6 +19,16 @@ FetchContent_Declare(
     URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.15.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+endif()
 
 add_library(fabric_core STATIC
     engine/fabric_core/src/log.cpp
@@ -105,13 +117,21 @@ target_compile_features(fabric_editor PUBLIC cxx_std_20)
 target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render)
 
 if(FABRIC_BUILD_EDITORS)
+    set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(NFD_INSTALL OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        native_file_dialog
+        GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+        GIT_TAG v1.3.0
+        GIT_SHALLOW TRUE
+    )
     FetchContent_Declare(
         imgui_source
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
         GIT_TAG v1.92.9
         GIT_SHALLOW TRUE
     )
-    FetchContent_MakeAvailable(imgui_source)
+    FetchContent_MakeAvailable(native_file_dialog imgui_source)
     find_package(OpenGL REQUIRED)
 
     add_library(fabric_imgui STATIC
@@ -131,7 +151,12 @@ if(FABRIC_BUILD_EDITORS)
 
     add_executable(asset_studio editors/asset_studio/main.cpp)
     target_compile_definitions(asset_studio PRIVATE SDL_MAIN_HANDLED)
-    target_link_libraries(asset_studio PRIVATE fabric_editor fabric_imgui fabric_render)
+    target_link_libraries(asset_studio PRIVATE
+        fabric_editor
+        fabric_imgui
+        fabric_render
+        nfd
+    )
     add_executable(map_studio editors/map_studio/main.cpp)
     target_link_libraries(map_studio PRIVATE fabric_project)
 endif()
@@ -141,7 +166,6 @@ if(FABRIC_BUILD_RUNTIME)
     target_link_libraries(game_runtime PRIVATE fabric_project)
 endif()
 
-include(CTest)
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_core_smoke tests/cpp/core_smoke.cpp)
     target_link_libraries(fabric_core_smoke PRIVATE fabric_core nlohmann_json::nlohmann_json)

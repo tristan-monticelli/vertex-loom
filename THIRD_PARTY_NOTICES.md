@@ -58,3 +58,23 @@ distributed under the zlib License. Its rasterizer also incorporates work from
 Sean Barrett's `stb_truetype` rasterizer.
 
 Source: https://github.com/memononen/nanosvg
+
+## Catch2
+
+Catch2 is copyright its contributors and is distributed under the Boost
+Software License 1.0.
+
+Source: https://github.com/catchorg/Catch2
+
+The CMake-fetched source includes its complete license text. Catch2 is used by
+new C++ test executables and is not linked into shipped applications.
+
+## Native File Dialog Extended
+
+Native File Dialog Extended is copyright Michael Labbe, Bernard Teo and its
+contributors and is distributed under the zlib License.
+
+Source: https://github.com/btzy/nativefiledialog-extended
+
+The CMake-fetched source includes its complete license text. The library is not
+relicensed by this repository's Apache-2.0 license.
