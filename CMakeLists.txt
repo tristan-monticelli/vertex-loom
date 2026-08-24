@@ -202,6 +202,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
     add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)
+    set_tests_properties(fabric_editor_tests PROPERTIES TIMEOUT 120)
 
     add_executable(fabric_editor_foundations_tests
         tests/cpp/editor_foundations_tests.cpp

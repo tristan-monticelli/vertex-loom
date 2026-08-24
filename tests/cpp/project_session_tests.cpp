@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -257,13 +258,29 @@ void failed_svg_import_preserves_the_previous_vector() {
 } // namespace
 
 int main() {
+    std::cerr << "[ RUN      ] session_opens_a_valid_project\n" << std::flush;
     session_opens_a_valid_project();
+    std::cerr << "[       OK ] session_opens_a_valid_project\n" << std::flush;
+    std::cerr << "[ RUN      ] session_creates_and_opens_a_project\n" << std::flush;
     session_creates_and_opens_a_project();
+    std::cerr << "[       OK ] session_creates_and_opens_a_project\n" << std::flush;
+    std::cerr << "[ RUN      ] failed_open_preserves_the_active_project\n" << std::flush;
     failed_open_preserves_the_active_project();
+    std::cerr << "[       OK ] failed_open_preserves_the_active_project\n" << std::flush;
+    std::cerr << "[ RUN      ] failed_creation_preserves_the_active_project\n" << std::flush;
     failed_creation_preserves_the_active_project();
+    std::cerr << "[       OK ] failed_creation_preserves_the_active_project\n" << std::flush;
+    std::cerr << "[ RUN      ] session_imports_a_valid_png_persistently\n" << std::flush;
     session_imports_a_valid_png_persistently();
+    std::cerr << "[       OK ] session_imports_a_valid_png_persistently\n" << std::flush;
+    std::cerr << "[ RUN      ] failed_import_writes_no_asset_and_preserves_the_previous_import\n" << std::flush;
     failed_import_writes_no_asset_and_preserves_the_previous_import();
+    std::cerr << "[       OK ] failed_import_writes_no_asset_and_preserves_the_previous_import\n" << std::flush;
+    std::cerr << "[ RUN      ] session_imports_a_valid_svg_persistently\n" << std::flush;
     session_imports_a_valid_svg_persistently();
+    std::cerr << "[       OK ] session_imports_a_valid_svg_persistently\n" << std::flush;
+    std::cerr << "[ RUN      ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;
     failed_svg_import_preserves_the_previous_vector();
+    std::cerr << "[       OK ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;
     return 0;
 }

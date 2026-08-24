@@ -67,7 +67,8 @@ TEST_CASE("editable documents replace atomically") {
     const TemporaryDirectory project;
     std::filesystem::create_directories(project.path() / "entities");
     {
-        std::ofstream output(project.path() / "entities/hero.json");
+        std::ofstream output(project.path() / "entities/hero.json",
+                             std::ios::binary);
         output << "old\n";
     }
 
@@ -86,7 +87,8 @@ TEST_CASE("validation failure preserves the previous document") {
     const TemporaryDirectory project;
     std::filesystem::create_directories(project.path() / "entities");
     {
-        std::ofstream output(project.path() / "entities/hero.json");
+        std::ofstream output(project.path() / "entities/hero.json",
+                             std::ios::binary);
         output << "old\n";
     }
 
