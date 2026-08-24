@@ -59,6 +59,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/resource_registry.cpp
+    engine/fabric_project/src/sprite_sheet.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
 )
@@ -213,6 +214,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_document_storage_tests
              COMMAND fabric_document_storage_tests)
+
+    add_executable(fabric_sprite_sheet_tests
+        tests/cpp/sprite_sheet_tests.cpp
+    )
+    target_link_libraries(fabric_sprite_sheet_tests PRIVATE
+        fabric_project
+        fabric_render
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_sprite_sheet_tests COMMAND fabric_sprite_sheet_tests)
 
     add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)

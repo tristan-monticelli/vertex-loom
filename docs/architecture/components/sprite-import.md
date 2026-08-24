@@ -54,3 +54,5 @@ C4Component
   cels et la composition CPU déterministe.
 - `fabric/render/sprite_atlas.hpp` expose découpage et génération d’atlas ;
   `fabric_render/src/sprite_atlas.cpp` porte MaxRects, extrusion et PNG.
+- `fabric/project/sprite_sheet.hpp` expose `SpriteSheetDefinition v1` et
+  `fabric_project/src/sprite_sheet.cpp` porte son JSON et sa publication.
