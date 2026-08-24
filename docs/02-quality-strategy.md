@@ -50,3 +50,9 @@ valeur par défaut `pixelsPerUnit = 100` et le rejet des valeurs non finies ou
 non positives. Le registre couvre résolution typée, doublons, documents
 manquants et cycles, puis le validateur headless applique ces contrôles à tous
 les documents de ressources connus sans créer de fenêtre.
+La pile de commandes couvre exécution, échec, fusion continue, undo, redo,
+branche divergente et point dirty. Le stockage couvre remplacement atomique,
+refus avant écriture et conservation du principal en cas d’échec. L’autosave
+couvre les seuils de 2 secondes d’inactivité et 30 secondes maximum, les
+chemins miroir, les versions absentes, invalides ou anciennes et les décisions
+de récupération acceptée ou refusée sans interface graphique.

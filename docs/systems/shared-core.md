@@ -9,6 +9,9 @@ la sérialisation JSON, les migrations, la création sans écrasement, les
 contrats `DocumentHeader`, `ResourceReference`, `TextureAsset` et
 `VectorAsset`, le registre de ressources, le chargement validé du dossier
 projet et la publication atomique des documents.
+`fabric_editor` fournit l’historique réversible et la planification des
+autosaves ; `fabric_project` fournit leur stockage atomique validé et leur
+chargement contrôlé.
 
 ## Entrées et sorties
 
@@ -40,6 +43,9 @@ projet et la publication atomique des documents.
   identifiants dupliqués, références absentes, types incompatibles et cycles.
 - Le remplacement de `project.json` se fait depuis un fichier temporaire
   adjacent et complet.
+- Les documents éditables et leurs miroirs autosave sont remplacés depuis un
+  fichier temporaire adjacent après validation par le même parseur.
+- Une récupération ne remplace jamais automatiquement le document principal.
 - Aucun journal n'est envoyé hors de la machine.
 
 ## Dépendances

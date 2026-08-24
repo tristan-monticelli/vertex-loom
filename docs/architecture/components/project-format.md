@@ -8,7 +8,8 @@ C4Component
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
-        Component(storage, "Atomic JSON storage", "C++20 / filesystem", "Écrit un fichier adjacent puis publie manifestes et documents d'asset")
+        Component(storage, "Atomic document storage", "C++20 / filesystem", "Remplace les documents éditables validés et publie les imports sans remplacement")
+        Component(autosave, "Autosave storage", "C++20 / filesystem", "Écrit un miroir validé sous .vertex-loom/autosave et sélectionne les récupérations récentes")
         Component(validator, "Project validator", "C++20", "Valide versions, chemins, documents puis le graphe complet des ressources")
         Component(creator, "Project creator", "C++20 / filesystem", "Crée l'arborescence standard uniquement dans un emplacement absent ou vide")
     }
@@ -24,6 +25,8 @@ C4Component
     Rel(storage, validator, "Valide avant écriture")
     Rel(validator, files, "Inspecte")
     Rel(storage, files, "Remplace atomiquement project.json")
+    Rel(autosave, storage, "Réutilise le remplacement atomique")
+    Rel(autosave, files, "Lit le principal et écrit son miroir")
     Rel(creator, validator, "Valide avant création")
     Rel(creator, storage, "Sauvegarde le manifeste")
     Rel(creator, files, "Crée les répertoires")
@@ -67,3 +70,9 @@ C4Component
 - `ResourceRegistry` est instancié par chargement de projet, sans singleton ;
   `register_resource`, `resolve` et `validate` restent utilisables dans les
   tests et futurs chargeurs sans interface graphique.
+- Un document éditable est validé par son parseur avant remplacement atomique.
+  Les imports continuent à utiliser une publication séparée sans remplacement.
+- Un autosave reproduit le chemin relatif du document sous
+  `.vertex-loom/autosave/`. Il est récupérable seulement s’il est valide et
+  strictement plus récent que le principal ; sa lecture ne modifie aucun
+  fichier.

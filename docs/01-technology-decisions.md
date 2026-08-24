@@ -13,6 +13,8 @@
 | Native dialogs | Native File Dialog Extended 1.3.0 | Sélecteurs Cocoa, Win32 et GTK derrière une API C portable. | ADR-0017 |
 | Common contracts | Types C++ partagés + ProjectManifest v2 | Unités, transforms, en-têtes et références identiques dans tous les modules. | ADR-0018 |
 | Resource graph | ResourceRegistry déterministe | Résolution headless et refus des doublons, absences et cycles. | ADR-0019 |
+| Editor history | CommandStack réversible avec fusion | Undo/redo testable sans UI et point dirty explicite. | ADR-0020 |
+| Recovery | Autosave atomique en miroir | Récupération locale validée et jamais appliquée automatiquement. | ADR-0020 |
 | Backend | none | Produit local hors ligne. | — |
 | Storage | JSON + assets sur disque | Métadonnées diffables et ressources lourdes séparées. | ADR-0006 |
 | Deployment | archives desktop | Distribution locale au début. | — |

@@ -9,6 +9,8 @@ C4Component
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre les imports PNG/SVG et expose les erreurs de la dernière opération")
+        Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
+        Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
     }
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
@@ -17,6 +19,9 @@ C4Component
     Rel(project_ui, session, "Demande la création ou l'ouverture")
     Rel(project_ui, dialogs, "Sélectionne dossiers et fichiers")
     Rel(session, project, "Crée ou charge")
+    Rel(session, history, "Porte les mutations éditables")
+    Rel(session, scheduler, "Signale les modifications")
+    Rel(scheduler, project, "Demande un autosave validé")
     Rel(project, files, "Lit et écrit")
 ```
 
@@ -34,3 +39,10 @@ C4Component
   l'aperçu ; un échec conserve le dernier import réussi.
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
+- Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
+  qui créent des ressources immuables sans remplacement, restent hors de cet
+  historique de document.
+- La session expose undo, redo et dirty et ne marque clean qu’après une
+  sauvegarde principale réussie.
+- Une récupération plus récente est proposée à l’ouverture ; accepter charge
+  son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
