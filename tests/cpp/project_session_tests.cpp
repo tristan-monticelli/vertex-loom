@@ -69,6 +69,26 @@ void session_opens_a_valid_project() {
     require(session.errors().empty(), "successful open retained errors");
 }
 
+void session_creates_and_opens_a_project() {
+    const TemporaryDirectory parent{"create"};
+    const auto project_root = parent.path() / "new-project";
+    const fabric::project::ProjectManifest manifest{
+        .schema_version = fabric::project::current_schema_version,
+        .id = {.value = "new-project"},
+        .name = "New Project",
+        .directories = {},
+    };
+
+    fabric::editor::ProjectSession session;
+    require(session.create(project_root, manifest),
+            "session could not create a project");
+    require(session.has_project(), "created project is not active");
+    require(session.project_root() == project_root,
+            "created project has the wrong active path");
+    require(session.manifest()->id.value == "new-project",
+            "created project has the wrong active manifest");
+}
+
 void failed_open_preserves_the_active_project() {
     const TemporaryDirectory valid{"valid"};
     const TemporaryDirectory invalid{"invalid"};
@@ -83,10 +103,37 @@ void failed_open_preserves_the_active_project() {
     require(!session.errors().empty(), "failed open produced no diagnostics");
 }
 
+void failed_creation_preserves_the_active_project() {
+    const TemporaryDirectory valid{"valid-before-create"};
+    const TemporaryDirectory occupied{"occupied"};
+    write_valid_project(valid.path());
+    {
+        std::ofstream sentinel(occupied.path() / "keep.txt", std::ios::binary);
+        sentinel << "keep";
+    }
+    const fabric::project::ProjectManifest requested{
+        .schema_version = fabric::project::current_schema_version,
+        .id = {.value = "replacement"},
+        .name = "Replacement",
+        .directories = {},
+    };
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "initial project did not open");
+    require(!session.create(occupied.path(), requested),
+            "session created a project in an occupied destination");
+    require(session.project_root() == valid.path(),
+            "failed creation replaced the active project");
+    require(session.manifest()->id.value == "studio-project",
+            "failed creation replaced the active manifest");
+}
+
 } // namespace
 
 int main() {
     session_opens_a_valid_project();
+    session_creates_and_opens_a_project();
     failed_open_preserves_the_active_project();
+    failed_creation_preserves_the_active_project();
     return 0;
 }

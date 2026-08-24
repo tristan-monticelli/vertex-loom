@@ -150,6 +150,56 @@ void complete_project_directory_is_accepted() {
             "validated project returned the wrong manifest");
 }
 
+void project_creation_builds_a_loadable_structure() {
+    const TemporaryProject parent;
+    const auto project_root = parent.root() / "created-project";
+    const auto expected = example_manifest();
+
+    const auto created = fabric::project::create_project(project_root, expected);
+    require(created.ok(), "project creation failed");
+    require(*created.manifest == expected,
+            "project creation returned the wrong manifest");
+    require(std::filesystem::is_regular_file(project_root / "project.json"),
+            "project creation did not write project.json");
+    for (const auto* directory : {"assets", "entities", "maps", "scenes", "schemas"}) {
+        require(std::filesystem::is_directory(project_root / directory),
+                "project creation omitted a required directory");
+    }
+}
+
+void project_creation_never_overwrites_a_nonempty_destination() {
+    const TemporaryProject parent;
+    const auto project_root = parent.root() / "occupied";
+    std::filesystem::create_directory(project_root);
+    {
+        std::ofstream sentinel(project_root / "keep.txt", std::ios::binary);
+        sentinel << "keep";
+    }
+
+    const auto rejected = fabric::project::create_project(
+        project_root, example_manifest());
+    require(!rejected.ok(), "nonempty destination was accepted");
+    require(contains_error(rejected.errors, ErrorCode::directory_not_empty,
+                           "project"),
+            "nonempty destination produced the wrong error");
+    require(std::filesystem::is_regular_file(project_root / "keep.txt"),
+            "project creation removed an existing file");
+    require(!std::filesystem::exists(project_root / "project.json"),
+            "project creation overwrote the occupied destination");
+}
+
+void invalid_project_creation_writes_nothing() {
+    const TemporaryProject parent;
+    const auto project_root = parent.root() / "invalid-project";
+    auto invalid = example_manifest();
+    invalid.id.value = "Invalid ID";
+
+    const auto rejected = fabric::project::create_project(project_root, invalid);
+    require(!rejected.ok(), "invalid project was created");
+    require(!std::filesystem::exists(project_root),
+            "invalid manifest created a destination directory");
+}
+
 void atomic_save_preserves_the_previous_valid_manifest() {
     const TemporaryProject project;
     const auto original = example_manifest();
@@ -175,6 +225,9 @@ int main() {
     legacy_manifest_is_migrated();
     invalid_contracts_are_rejected();
     complete_project_directory_is_accepted();
+    project_creation_builds_a_loadable_structure();
+    project_creation_never_overwrites_a_nonempty_destination();
+    invalid_project_creation_writes_nothing();
     atomic_save_preserves_the_previous_valid_manifest();
     return 0;
 }

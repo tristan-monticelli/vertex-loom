@@ -7,6 +7,13 @@ sequenceDiagram
     participant Migration as Registre de migrations
     participant Files as Système de fichiers
 
+    Caller->>Project: Créer un projet
+    Project->>Project: Valider le manifeste
+    Project->>Files: Vérifier que la destination est absente ou vide
+    Project->>Files: Créer la racine et les répertoires déclarés
+    Project->>Files: Sauvegarder project.json atomiquement
+    Project-->>Caller: Manifeste chargé ou erreur structurée
+
     Caller->>Project: Charger le dossier projet
     Project->>Files: Lire project.json
     Project->>Migration: Migrer vers le schéma courant
@@ -23,5 +30,8 @@ sequenceDiagram
 ```
 
 Une erreur de parsing, migration, validation ou accès disque arrête le flux et
-retourne un `ValidationReport`. En mode `--json`, la CLI transforme chaque
-erreur en événement JSON Lines avec son code et son champ source.
+retourne un `ValidationReport`. La création n'écrase jamais une destination
+non vide ; une erreur d'accès peut laisser les seuls répertoires nouvellement
+créés, mais aucun nettoyage destructif n'est tenté automatiquement. En mode
+`--json`, la CLI transforme chaque erreur en événement JSON Lines avec son code
+et son champ source.

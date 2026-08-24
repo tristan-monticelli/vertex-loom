@@ -20,6 +20,13 @@ constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
+struct ProjectCreationFields {
+    std::array<char, 1024> path{};
+    std::array<char, 129> id{};
+    std::array<char, 256> name{};
+    bool attempted{false};
+};
+
 void copy_path_to_buffer(const std::filesystem::path& path,
                          std::array<char, 1024>& buffer) {
     const std::string value = path.string();
@@ -89,6 +96,9 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
 
 void draw_workspace(fabric::editor::ProjectSession& session,
                     std::array<char, 1024>& path_buffer,
+                    ProjectCreationFields& creation,
+                    bool& request_create,
+                    bool& request_open,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -101,6 +111,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
     draw_project_tree(session);
+    if (!session.has_project()) {
+        ImGui::Spacing();
+        if (ImGui::Button("Create project", {-1.0F, 0.0F})) {
+            request_create = true;
+        }
+        if (ImGui::Button("Open project", {-1.0F, 0.0F})) {
+            request_open = true;
+        }
+    }
     ImGui::End();
 
     ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
@@ -157,6 +176,56 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                       ImGuiWindowFlags_NoScrollbar);
     ImGui::TextUnformatted(status.c_str());
     ImGui::End();
+
+    if (request_create) {
+        creation.attempted = false;
+        ImGui::OpenPopup("New project");
+        request_create = false;
+    }
+    if (request_open) {
+        ImGui::OpenPopup("Open project");
+        request_open = false;
+    }
+
+    if (ImGui::BeginPopupModal("New project", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Create a versioned Vertex Loom project");
+        ImGui::Spacing();
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Destination", creation.path.data(), creation.path.size());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", creation.name.data(), creation.name.size());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Resource ID", creation.id.data(), creation.id.size());
+        ImGui::TextDisabled("Lowercase letters, digits, dots, underscores or hyphens.");
+        ImGui::Spacing();
+        if (ImGui::Button("Create", {110.0F, 0.0F})) {
+            creation.attempted = true;
+            const fabric::project::ProjectManifest manifest{
+                .schema_version = fabric::project::current_schema_version,
+                .id = {.value = creation.id.data()},
+                .name = creation.name.data(),
+                .directories = {},
+            };
+            if (session.create(creation.path.data(), manifest)) {
+                status = "Project created: " + session.manifest()->name;
+                copy_path_to_buffer(session.project_root(), path_buffer);
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Project creation failed; inspect the diagnostics.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (creation.attempted && !session.errors().empty()) {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Creation failed");
+            draw_diagnostics(session);
+        }
+        ImGui::EndPopup();
+    }
 
     if (ImGui::BeginPopupModal("Open project", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -255,6 +324,9 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
     fabric::editor::ProjectSession session;
     std::array<char, 1024> path_buffer{};
+    ProjectCreationFields creation;
+    bool request_create = false;
+    bool request_open = false;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -284,11 +356,14 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("New project...", "Ctrl+N")) {
+                    request_create = true;
+                }
                 if (ImGui::MenuItem("Open project...", "Ctrl+O")) {
                     if (session.has_project()) {
                         copy_path_to_buffer(session.project_root(), path_buffer);
                     }
-                    ImGui::OpenPopup("Open project");
+                    request_open = true;
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
@@ -301,13 +376,17 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
         const auto& io = ImGui::GetIO();
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false)) {
-            ImGui::OpenPopup("Open project");
+            request_open = true;
+        }
+        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) {
+            request_create = true;
         }
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
             running = false;
         }
 
-        draw_workspace(session, path_buffer, status);
+        draw_workspace(session, path_buffer, creation, request_create,
+                       request_open, status);
 
         ImGui::Render();
         int drawable_width = 0;

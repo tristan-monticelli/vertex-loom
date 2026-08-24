@@ -27,7 +27,8 @@ précédent lorsqu'une sauvegarde invalide est refusée.
 La journalisation vérifie la structure JSON Lines et l'échappement des données
 non fiables. Le validateur headless vérifie ses sorties humaine et structurée.
 La session projet des éditeurs est testée sans fenêtre : ouverture valide,
-diagnostics d'échec et conservation du dernier projet valide. La coquille
+création complète, refus d'une destination occupée, diagnostics d'échec et
+conservation du dernier projet valide. La coquille
 graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
 n'est configuré. `npm run validate` regroupe les validations documentaires,

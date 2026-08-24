@@ -22,6 +22,7 @@ enum class ErrorCode {
     invalid_path,
     missing_file,
     missing_directory,
+    directory_not_empty,
 };
 
 struct Error {
@@ -82,6 +83,9 @@ struct MigrationResult {
 [[nodiscard]] std::string serialize_manifest(const ProjectManifest& manifest);
 [[nodiscard]] ManifestResult load_manifest(const std::filesystem::path& project_root);
 [[nodiscard]] ManifestResult load_project(const std::filesystem::path& project_root);
+[[nodiscard]] ManifestResult create_project(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest);
 [[nodiscard]] ValidationReport save_manifest_atomic(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest);

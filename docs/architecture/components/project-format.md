@@ -9,6 +9,7 @@ C4Component
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(storage, "Atomic manifest storage", "C++20 / filesystem", "Écrit un fichier adjacent puis remplace project.json")
         Component(validator, "Project validator", "C++20", "Valide versions, identifiants, chemins et structure du dossier")
+        Component(creator, "Project creator", "C++20 / filesystem", "Crée l'arborescence standard uniquement dans un emplacement absent ou vide")
     }
     Container(cli, "fabric_project_validate", "C++20 CLI", "Valide un projet sans ouvrir de fenêtre")
     ContainerDb(files, "Project Files", "JSON + assets", "project.json et ressources locales")
@@ -20,6 +21,9 @@ C4Component
     Rel(storage, validator, "Valide avant écriture")
     Rel(validator, files, "Inspecte")
     Rel(storage, files, "Remplace atomiquement project.json")
+    Rel(creator, validator, "Valide avant création")
+    Rel(creator, storage, "Sauvegarde le manifeste")
+    Rel(creator, files, "Crée les répertoires")
 ```
 
 ## Contracts
@@ -37,3 +41,6 @@ C4Component
   explicitement vers `v1`; ce format legacy est accepté en lecture uniquement.
 - La sauvegarde valide le manifeste avant de créer un fichier temporaire dans
   le dossier projet, puis remplace `project.json` par renommage atomique.
+- La création refuse un emplacement existant non vide et ne remplace aucun
+  fichier. Elle crée les répertoires déclarés avant la sauvegarde atomique du
+  manifeste.

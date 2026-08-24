@@ -21,6 +21,7 @@ first native Asset Studio workspace.
 - Human-readable and JSON Lines diagnostics.
 - Headless project validation.
 - Native SDL2/OpenGL/Dear ImGui Asset Studio shell with project inspection.
+- Safe project creation in a new or empty destination.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test

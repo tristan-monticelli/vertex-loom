@@ -4,8 +4,8 @@
 
 `fabric_core` fournit les identifiants de ressources, la version du moteur et
 la journalisation JSON Lines locale. `fabric_project` fournit le manifeste,
-la sérialisation JSON, les migrations, le chargement validé du dossier projet
-et la sauvegarde atomique.
+la sérialisation JSON, les migrations, la création sans écrasement, le
+chargement validé du dossier projet et la sauvegarde atomique.
 
 ## Entrées et sorties
 
@@ -24,6 +24,8 @@ et la sauvegarde atomique.
 - Tous les chemins du manifeste sont portables, relatifs et restent dans le
   dossier projet après résolution.
 - Un manifeste invalide n'est jamais écrit.
+- Une création accepte uniquement une destination absente ou vide et produit
+  tous les répertoires déclarés.
 - Le remplacement de `project.json` se fait depuis un fichier temporaire
   adjacent et complet.
 - Aucun journal n'est envoyé hors de la machine.
@@ -41,5 +43,6 @@ npm run validate:cpp
 ```
 
 CTest couvre le round-trip JSON, la migration `v0` vers `v1`, les versions
-futures, les chemins invalides, la sauvegarde atomique, les dossiers complets,
-le logger et les sorties du validateur headless.
+futures, les chemins invalides, la création sans écrasement, la sauvegarde
+atomique, les dossiers complets, le logger et les sorties du validateur
+headless.

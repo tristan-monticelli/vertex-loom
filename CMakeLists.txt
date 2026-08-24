@@ -30,6 +30,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/atomic_save.cpp
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/migrations.cpp
+    engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)

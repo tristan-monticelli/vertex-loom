@@ -10,6 +10,8 @@ namespace fabric::editor {
 
 class ProjectSession {
 public:
+    [[nodiscard]] bool create(const std::filesystem::path& project_root,
+                              const project::ProjectManifest& manifest);
     [[nodiscard]] bool open(const std::filesystem::path& project_root);
 
     [[nodiscard]] bool has_project() const noexcept;
