@@ -46,3 +46,9 @@ C4Component
   chargeable.
 - Une régénération valide entièrement le nouvel atlas et le nouveau document,
   puis les remplace atomiquement ; la source originale reste inchangée.
+
+## Implementation
+
+- `fabric/render/aseprite.hpp` expose le document décodé sans type zlib.
+- `fabric_render/src/aseprite.cpp` contient le lecteur borné, la résolution des
+  cels et la composition CPU déterministe.

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(VertexLoom VERSION 0.1.0 LANGUAGES CXX)
+project(VertexLoom VERSION 0.1.0 LANGUAGES C CXX)
 
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
@@ -19,6 +19,18 @@ FetchContent_Declare(
     URL_HASH SHA256=d6c65aca6b1ed68e7a182f4757257b107ae403032760ed6ef121c9d55e81757d
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
+set(ZLIB_INSTALL OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    zlib
+    GIT_REPOSITORY https://github.com/madler/zlib.git
+    GIT_TAG v1.3.2
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(zlib)
 
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     FetchContent_Declare(
@@ -102,6 +114,7 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(SDL2 SDL2_image)
 
 add_library(fabric_render STATIC
+    engine/fabric_render/src/aseprite.cpp
     engine/fabric_render/src/raster_image.cpp
 )
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
@@ -109,6 +122,7 @@ target_compile_features(fabric_render PUBLIC cxx_std_20)
 target_link_libraries(fabric_render PRIVATE
     SDL2::SDL2-static
     SDL2_image::SDL2_image-static
+    ZLIB::ZLIBSTATIC
 )
 
 add_library(fabric_editor STATIC
@@ -227,6 +241,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
     target_link_libraries(fabric_render_tests PRIVATE fabric_render)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
+
+    add_executable(fabric_aseprite_tests tests/cpp/aseprite_tests.cpp)
+    target_link_libraries(fabric_aseprite_tests PRIVATE
+        fabric_render
+        ZLIB::ZLIBSTATIC
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_aseprite_tests COMMAND fabric_aseprite_tests)
 
     add_test(
         NAME project_validator_accepts_valid_project
