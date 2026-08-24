@@ -117,6 +117,15 @@ std::optional<std::filesystem::path> resolve_document_path(
     const bool is_file = std::filesystem::is_regular_file(
         canonical_document, filesystem_error);
     if (filesystem_error) {
+        if (filesystem_error ==
+            std::make_error_code(std::errc::no_such_file_or_directory)) {
+            if (required) {
+                add_error(errors, ErrorCode::missing_file,
+                          std::string(field),
+                          "document is not a readable regular file");
+            }
+            return std::nullopt;
+        }
         add_error(errors, ErrorCode::io_error, std::string(field),
                   "cannot inspect the document");
         return std::nullopt;
