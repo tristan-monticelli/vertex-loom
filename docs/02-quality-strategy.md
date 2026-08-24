@@ -22,7 +22,7 @@ requis avant une release ou une modification du renderer. Les tests Node de
 gouvernance restent exécutés par `npm test`. Le contrat projet couvre le
 round-trip JSON, les versions non prises en charge, les chemins traversants et
 le comportement du validateur headless sur des fixtures valides et invalides.
-Il couvre aussi la migration `v0` vers `v1` et la conservation du manifeste
+Il couvre aussi les migrations `v0` vers `v1` puis `v2` et la conservation du manifeste
 précédent lorsqu'une sauvegarde invalide est refusée.
 La journalisation vérifie la structure JSON Lines et l'échappement des données
 non fiables. Le validateur headless vérifie ses sorties humaine et structurée.

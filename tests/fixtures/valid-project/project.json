@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "valid-project",
   "name": "Valid Project",
+  "pixelsPerUnit": 100.0,
   "directories": {
     "assets": "assets",
     "entities": "entities",

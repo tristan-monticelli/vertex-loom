@@ -43,6 +43,11 @@ void migrate_v0_to_v1(Json& document) {
     document.erase("assetsPath");
 }
 
+void migrate_v1_to_v2(Json& document) {
+    document["pixelsPerUnit"] = default_pixels_per_unit;
+    document["schemaVersion"] = 2;
+}
+
 } // namespace
 
 MigrationResult migrate_manifest(const std::string_view json_text) {
@@ -74,6 +79,10 @@ MigrationResult migrate_manifest(const std::string_view json_text) {
         case 0:
             migrate_v0_to_v1(document);
             version = 1;
+            break;
+        case 1:
+            migrate_v1_to_v2(document);
+            version = 2;
             break;
         default:
             add_error(result.errors, ErrorCode::unsupported_schema_version,

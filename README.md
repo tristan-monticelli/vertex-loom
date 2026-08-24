@@ -16,7 +16,7 @@ first native Asset Studio workspace.
 
 - Versioned JSON project manifests shared by tools and runtime.
 - Strict resource identifiers and portable local asset paths.
-- Explicit schema migration from the prototype format to version 1.
+- Sequential schema migration from prototype v0 and project v1 to version 2.
 - Atomic manifest replacement on macOS, Linux, and Windows.
 - Human-readable and JSON Lines diagnostics.
 - Headless project validation.

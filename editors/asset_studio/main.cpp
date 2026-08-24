@@ -310,6 +310,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextDisabled("%s", session.manifest()->id.value.c_str());
         ImGui::Separator();
         ImGui::Text("Schema version: %u", session.manifest()->schema_version);
+        ImGui::Text("Pixels per unit: %.2f",
+                    session.manifest()->pixels_per_unit);
         ImGui::TextWrapped("%s", session.project_root().string().c_str());
         if (preview.texture != 0U) {
             ImGui::SeparatorText(

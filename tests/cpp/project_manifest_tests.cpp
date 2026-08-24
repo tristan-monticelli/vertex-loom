@@ -90,7 +90,7 @@ void legacy_manifest_is_migrated() {
         "assetsPath": "content"
     })");
     require(migrated.ok(), "legacy manifest did not migrate");
-    require(migrated.manifest->schema_version == 1,
+    require(migrated.manifest->schema_version == 2,
             "legacy manifest has the wrong target version");
     require(migrated.manifest->id.value == "legacy-project",
             "legacy project ID was not migrated");
@@ -100,6 +100,8 @@ void legacy_manifest_is_migrated() {
             "legacy assets path was not migrated");
     require(migrated.manifest->directories.entities == "entities",
             "migration did not add current directory defaults");
+    require(migrated.manifest->pixels_per_unit == 100.0,
+            "migration did not add the default unit scale");
 }
 
 void invalid_contracts_are_rejected() {

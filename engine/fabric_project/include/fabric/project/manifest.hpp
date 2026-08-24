@@ -11,7 +11,8 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_schema_version = 1;
+inline constexpr std::uint32_t current_schema_version = 2;
+inline constexpr double default_pixels_per_unit = 100.0;
 
 enum class ErrorCode {
     io_error,
@@ -49,6 +50,7 @@ struct ProjectManifest {
     std::uint32_t schema_version{current_schema_version};
     core::ResourceId id;
     std::string name;
+    double pixels_per_unit{default_pixels_per_unit};
     ProjectDirectories directories;
 
     friend bool operator==(const ProjectManifest&, const ProjectManifest&) = default;

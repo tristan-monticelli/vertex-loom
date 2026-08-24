@@ -175,6 +175,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_project_tests PRIVATE fabric_project)
     add_test(NAME fabric_project_tests COMMAND fabric_project_tests)
 
+    add_executable(fabric_project_foundations_tests
+        tests/cpp/project_foundations_tests.cpp
+    )
+    target_link_libraries(fabric_project_foundations_tests PRIVATE
+        fabric_project
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_project_foundations_tests
+             COMMAND fabric_project_foundations_tests)
+
     add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
     add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)

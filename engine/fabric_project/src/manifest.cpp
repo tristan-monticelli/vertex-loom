@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include <array>
+#include <cmath>
 #include <limits>
 #include <string_view>
 #include <utility>
@@ -27,6 +28,18 @@ bool read_string(const Json& object, const char* key, std::string& destination,
         return false;
     }
     destination = iterator->get<std::string>();
+    return true;
+}
+
+bool read_number(const Json& object, const char* key, double& destination,
+                 std::vector<Error>& errors) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_number()) {
+        add_error(errors, ErrorCode::invalid_manifest, key,
+                  "expected a JSON number");
+        return false;
+    }
+    destination = iterator->get<double>();
     return true;
 }
 
@@ -68,7 +81,7 @@ ValidationReport validate_manifest(const ProjectManifest& manifest) {
     ValidationReport report;
     if (manifest.schema_version != current_schema_version) {
         add_error(report.errors, ErrorCode::unsupported_schema_version,
-                  "schemaVersion", "only schema version 1 is supported");
+                  "schemaVersion", "only schema version 2 is supported");
     }
     if (!core::ResourceId::is_valid(manifest.id.value)) {
         add_error(report.errors, ErrorCode::invalid_resource_id, "id",
@@ -77,6 +90,11 @@ ValidationReport validate_manifest(const ProjectManifest& manifest) {
     if (manifest.name.empty()) {
         add_error(report.errors, ErrorCode::invalid_manifest, "name",
                   "must not be empty");
+    }
+    if (!std::isfinite(manifest.pixels_per_unit) ||
+        manifest.pixels_per_unit <= 0.0) {
+        add_error(report.errors, ErrorCode::invalid_manifest,
+                  "pixelsPerUnit", "must be finite and greater than zero");
     }
 
     const std::array directories{
@@ -121,6 +139,8 @@ ManifestResult parse_manifest(const std::string_view json_text) {
 
     read_string(document, "id", manifest.id.value, result.errors);
     read_string(document, "name", manifest.name, result.errors);
+    read_number(document, "pixelsPerUnit", manifest.pixels_per_unit,
+                result.errors);
 
     const auto directories = document.find("directories");
     if (directories == document.end() || !directories->is_object()) {
@@ -152,6 +172,7 @@ std::string serialize_manifest(const ProjectManifest& manifest) {
         {"schemaVersion", manifest.schema_version},
         {"id", manifest.id.value},
         {"name", manifest.name},
+        {"pixelsPerUnit", manifest.pixels_per_unit},
         {"directories", {
             {"assets", manifest.directories.assets.generic_string()},
             {"entities", manifest.directories.entities.generic_string()},

@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-08-24
+- Note: le contrat courant v1 est étendu à v2 par ADR-0018.
 
 ## Context
 

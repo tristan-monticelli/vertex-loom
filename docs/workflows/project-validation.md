@@ -17,7 +17,7 @@ sequenceDiagram
     Caller->>Project: Charger le dossier projet
     Project->>Files: Lire project.json
     Project->>Migration: Migrer vers le schéma courant
-    Migration-->>Project: JSON v1 ou erreur structurée
+    Migration-->>Project: JSON v2 ou erreur structurée
     Project->>Project: Valider identifiant et chemins
     Project->>Files: Résoudre et vérifier les dossiers
     Project-->>Caller: Manifeste valide ou erreurs

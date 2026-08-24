@@ -2,8 +2,9 @@
 
 ## Responsabilités
 
-`fabric_core` fournit les identifiants de ressources, la version du moteur et
-la journalisation JSON Lines locale. `fabric_project` fournit le manifeste,
+`fabric_core` fournit `Vec2`, `Color`, `Rect`, `Transform`, les identifiants de
+ressources, la version du moteur et la journalisation JSON Lines locale.
+`fabric_project` fournit le manifeste,
 la sérialisation JSON, les migrations, la création sans écrasement, les
 contrats `AssetDocument`, `TextureAsset` et `VectorAsset`, le chargement validé du dossier
 projet et la publication atomique des documents.
@@ -50,7 +51,7 @@ bibliothèque JSON.
 npm run validate:cpp
 ```
 
-CTest couvre le round-trip JSON, la migration `v0` vers `v1`, les versions
+CTest couvre le round-trip JSON, les migrations `v0` vers `v1` puis `v2`, les versions
 futures, les chemins invalides, les documents de texture et de vecteur, la création sans
 écrasement, la sauvegarde atomique, les dossiers complets, le logger et les
 sorties du validateur headless.
