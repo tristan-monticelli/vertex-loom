@@ -37,3 +37,18 @@ Source: https://github.com/ocornut/imgui
 
 The CMake-fetched source includes its complete license text. Dear ImGui is not
 relicensed by this repository's Apache-2.0 license.
+
+## SDL2_image
+
+SDL2_image is copyright its contributors and is distributed under the zlib
+License.
+
+Source: https://github.com/libsdl-org/SDL_image
+
+The CMake-fetched source includes its complete license text. SDL2_image is not
+relicensed by this repository's Apache-2.0 license.
+
+SDL2_image's enabled PNG backend includes `stb_image`, copyright Sean Barrett
+and contributors, available under the MIT License or public-domain dedication.
+
+Source: https://github.com/nothings/stb

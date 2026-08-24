@@ -1,4 +1,5 @@
 #include "fabric/editor/project_session.hpp"
+#include "fabric/render/raster_image.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -26,6 +27,45 @@ struct ProjectCreationFields {
     std::array<char, 256> name{};
     bool attempted{false};
 };
+
+struct TexturePreview {
+    GLuint texture{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::array<char, 1024> path{};
+    std::string error;
+    bool attempted{false};
+};
+
+bool load_texture_preview(TexturePreview& preview) {
+    const auto loaded = fabric::render::load_png(preview.path.data());
+    preview.attempted = true;
+    if (!loaded.ok()) {
+        preview.error = std::string(fabric::render::to_string(loaded.error->code)) +
+                        ": " + loaded.error->message;
+        return false;
+    }
+
+    if (preview.texture != 0U) {
+        glDeleteTextures(1, &preview.texture);
+    }
+    glGenTextures(1, &preview.texture);
+    glBindTexture(GL_TEXTURE_2D, preview.texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                 static_cast<GLsizei>(loaded.image->width),
+                 static_cast<GLsizei>(loaded.image->height), 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, loaded.image->rgba8.data());
+    glBindTexture(GL_TEXTURE_2D, 0);
+    preview.width = loaded.image->width;
+    preview.height = loaded.image->height;
+    preview.error.clear();
+    return true;
+}
 
 void copy_path_to_buffer(const std::filesystem::path& path,
                          std::array<char, 1024>& buffer) {
@@ -97,8 +137,10 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
 void draw_workspace(fabric::editor::ProjectSession& session,
                     std::array<char, 1024>& path_buffer,
                     ProjectCreationFields& creation,
+                    TexturePreview& preview,
                     bool& request_create,
                     bool& request_open,
+                    bool& request_png,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -119,6 +161,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::Button("Open project", {-1.0F, 0.0F})) {
             request_open = true;
         }
+    } else if (ImGui::Button("Preview PNG", {-1.0F, 0.0F})) {
+        preview.attempted = false;
+        request_png = true;
     }
     ImGui::End();
 
@@ -141,14 +186,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
                            IM_COL32(43, 48, 58, 120));
     }
-    const char* preview_message = session.has_project()
-                                      ? "Asset preview - import pipeline next"
-                                      : "Open a project to begin";
-    const ImVec2 text_size = ImGui::CalcTextSize(preview_message);
-    draw_list->AddText({origin.x + (available.x - text_size.x) * 0.5F,
-                        origin.y + (available.y - text_size.y) * 0.5F},
-                       IM_COL32(158, 170, 180, 255), preview_message);
-    ImGui::Dummy(available);
+    if (preview.texture != 0U) {
+        const float image_width = static_cast<float>(preview.width);
+        const float image_height = static_cast<float>(preview.height);
+        const float scale = std::min((available.x - 40.0F) / image_width,
+                                     (available.y - 40.0F) / image_height);
+        const ImVec2 image_size{image_width * scale, image_height * scale};
+        ImGui::SetCursorScreenPos({origin.x + (available.x - image_size.x) * 0.5F,
+                                   origin.y + (available.y - image_size.y) * 0.5F});
+        ImGui::Image(ImTextureRef(static_cast<ImTextureID>(preview.texture)),
+                     image_size, {0.0F, 1.0F}, {1.0F, 0.0F});
+    } else {
+        const char* preview_message = session.has_project()
+                                          ? "Preview a PNG to begin"
+                                          : "Open a project to begin";
+        const ImVec2 text_size = ImGui::CalcTextSize(preview_message);
+        draw_list->AddText({origin.x + (available.x - text_size.x) * 0.5F,
+                            origin.y + (available.y - text_size.y) * 0.5F},
+                           IM_COL32(158, 170, 180, 255), preview_message);
+        ImGui::Dummy(available);
+    }
     ImGui::End();
 
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
@@ -161,6 +218,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::Separator();
         ImGui::Text("Schema version: %u", session.manifest()->schema_version);
         ImGui::TextWrapped("%s", session.project_root().string().c_str());
+        if (preview.texture != 0U) {
+            ImGui::SeparatorText("Raster preview");
+            ImGui::Text("%u x %u RGBA8", preview.width, preview.height);
+            ImGui::TextWrapped("%s", preview.path.data());
+        }
     } else {
         ImGui::TextDisabled("No selection");
     }
@@ -185,6 +247,40 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     if (request_open) {
         ImGui::OpenPopup("Open project");
         request_open = false;
+    }
+    if (request_png) {
+        preview.attempted = false;
+        ImGui::OpenPopup("Preview PNG");
+        request_png = false;
+    }
+
+    if (ImGui::BeginPopupModal("Preview PNG", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("PNG source file");
+        ImGui::SetNextItemWidth(560.0F);
+        const bool submitted = ImGui::InputText(
+            "##png-path", preview.path.data(), preview.path.size(),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+        if (submitted || ImGui::Button("Preview", {110.0F, 0.0F})) {
+            if (load_texture_preview(preview)) {
+                status = "PNG preview loaded.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "PNG preview failed.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (preview.attempted && !preview.error.empty()) {
+            ImGui::Spacing();
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                                  ImVec4{0.95F, 0.42F, 0.38F, 1.0F});
+            ImGui::TextWrapped("%s", preview.error.c_str());
+            ImGui::PopStyleColor();
+        }
+        ImGui::EndPopup();
     }
 
     if (ImGui::BeginPopupModal("New project", nullptr,
@@ -325,8 +421,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     fabric::editor::ProjectSession session;
     std::array<char, 1024> path_buffer{};
     ProjectCreationFields creation;
+    TexturePreview preview;
     bool request_create = false;
     bool request_open = false;
+    bool request_png = false;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -365,6 +463,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     }
                     request_open = true;
                 }
+                if (ImGui::MenuItem("Preview PNG...", "Ctrl+I", false,
+                                    session.has_project())) {
+                    request_png = true;
+                }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
                     running = false;
@@ -381,12 +483,16 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) {
             request_create = true;
         }
+        if (io.KeyCtrl && session.has_project() &&
+            ImGui::IsKeyPressed(ImGuiKey_I, false)) {
+            request_png = true;
+        }
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
             running = false;
         }
 
-        draw_workspace(session, path_buffer, creation, request_create,
-                       request_open, status);
+        draw_workspace(session, path_buffer, creation, preview, request_create,
+                       request_open, request_png, status);
 
         ImGui::Render();
         int drawable_width = 0;
@@ -399,6 +505,9 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         SDL_GL_SwapWindow(window);
     }
 
+    if (preview.texture != 0U) {
+        glDeleteTextures(1, &preview.texture);
+    }
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();

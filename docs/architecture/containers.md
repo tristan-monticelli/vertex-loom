@@ -11,6 +11,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Types partagés, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, sérialisation et validation du format projet")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet et état réutilisable des outils d'authoring")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image", "Décodage raster et données de pixels indépendantes du GPU")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
@@ -22,6 +23,7 @@ C4Container
     Rel(runtime, core, "Utilise")
     Rel(asset, projectlib, "Lit et écrit")
     Rel(asset, editorlib, "Pilote une session")
+    Rel(asset, renderlib, "Charge les aperçus raster")
     Rel(map, projectlib, "Lit et écrit")
     Rel(runtime, projectlib, "Charge")
     Rel(projectcli, projectlib, "Utilise")
@@ -36,6 +38,6 @@ Les trois applications sont des exécutables desktop. Shared Core est une
 bibliothèque sans état distant. Le premier squelette CMake expose les cibles
 `fabric_core`, `asset_studio`, `map_studio`, `game_runtime` et
 `fabric_core_smoke`. Le composant `fabric_project` et son validateur headless
-constituent le premier contrat de données partagé. La première tranche
-d'Asset Studio ajoute `fabric_editor` et une coquille SDL2/OpenGL/Dear ImGui ;
-elle ne contient pas encore le renderer d'assets `fabric_render`.
+constituent le premier contrat de données partagé. Asset Studio utilise
+`fabric_editor` pour la session, une coquille SDL2/OpenGL/Dear ImGui et le
+premier composant `fabric_render` pour décoder les aperçus PNG en RGBA8.

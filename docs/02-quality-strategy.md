@@ -31,6 +31,8 @@ création complète, refus d'une destination occupée, diagnostics d'échec et
 conservation du dernier projet valide. La coquille
 graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
-n'est configuré. `npm run validate` regroupe les validations documentaires,
+n'est configuré. Le chargeur PNG couvre un fichier RGBA valide, une extension
+incorrecte et un contenu corrompu sans initialiser de fenêtre. `npm run
+validate` regroupe les validations documentaires,
 Node et C++ ;
 `npm run validate:cpp` exécute uniquement la configuration, le build et CTest.
