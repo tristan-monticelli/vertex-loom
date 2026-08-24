@@ -36,12 +36,55 @@ target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
 target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE nlohmann_json::nlohmann_json)
 
+add_library(fabric_editor STATIC
+    engine/fabric_editor/src/project_session.cpp
+)
+target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
+target_compile_features(fabric_editor PUBLIC cxx_std_20)
+target_link_libraries(fabric_editor PUBLIC fabric_project)
+
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)
 
 if(FABRIC_BUILD_EDITORS)
+    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+    set(SDL_STATIC ON CACHE BOOL "" FORCE)
+    set(SDL_TEST OFF CACHE BOOL "" FORCE)
+    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+    FetchContent_Declare(
+        SDL2
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG release-2.32.10
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_Declare(
+        imgui_source
+        GIT_REPOSITORY https://github.com/ocornut/imgui.git
+        GIT_TAG v1.92.9
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(SDL2 imgui_source)
+    find_package(OpenGL REQUIRED)
+
+    add_library(fabric_imgui STATIC
+        ${imgui_source_SOURCE_DIR}/imgui.cpp
+        ${imgui_source_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_source_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_source_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_source_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+        ${imgui_source_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
+    )
+    target_include_directories(fabric_imgui PUBLIC
+        ${imgui_source_SOURCE_DIR}
+        ${imgui_source_SOURCE_DIR}/backends
+    )
+    target_compile_features(fabric_imgui PUBLIC cxx_std_20)
+    target_link_libraries(fabric_imgui PUBLIC SDL2::SDL2-static OpenGL::GL)
+
     add_executable(asset_studio editors/asset_studio/main.cpp)
-    target_link_libraries(asset_studio PRIVATE fabric_project)
+    target_compile_definitions(asset_studio PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(asset_studio PRIVATE fabric_editor fabric_imgui)
     add_executable(map_studio editors/map_studio/main.cpp)
     target_link_libraries(map_studio PRIVATE fabric_project)
 endif()
@@ -60,6 +103,10 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_project_tests tests/cpp/project_manifest_tests.cpp)
     target_link_libraries(fabric_project_tests PRIVATE fabric_project)
     add_test(NAME fabric_project_tests COMMAND fabric_project_tests)
+
+    add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
+    target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
+    add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)
 
     add_test(
         NAME project_validator_accepts_valid_project

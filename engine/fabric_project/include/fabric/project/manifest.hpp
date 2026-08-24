@@ -81,6 +81,7 @@ struct MigrationResult {
 [[nodiscard]] ManifestResult parse_manifest(std::string_view json_text);
 [[nodiscard]] std::string serialize_manifest(const ProjectManifest& manifest);
 [[nodiscard]] ManifestResult load_manifest(const std::filesystem::path& project_root);
+[[nodiscard]] ManifestResult load_project(const std::filesystem::path& project_root);
 [[nodiscard]] ValidationReport save_manifest_atomic(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest);

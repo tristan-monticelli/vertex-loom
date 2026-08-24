@@ -26,5 +26,10 @@ Il couvre aussi la migration `v0` vers `v1` et la conservation du manifeste
 précédent lorsqu'une sauvegarde invalide est refusée.
 La journalisation vérifie la structure JSON Lines et l'échappement des données
 non fiables. Le validateur headless vérifie ses sorties humaine et structurée.
-`npm run validate` regroupe les validations documentaires, Node et C++ ;
+La session projet des éditeurs est testée sans fenêtre : ouverture valide,
+diagnostics d'échec et conservation du dernier projet valide. La coquille
+graphique est compilée sur les trois plateformes de CI ; son lancement visuel
+reste un smoke test de release tant qu'aucun environnement graphique virtuel
+n'est configuré. `npm run validate` regroupe les validations documentaires,
+Node et C++ ;
 `npm run validate:cpp` exécute uniquement la configuration, le build et CTest.

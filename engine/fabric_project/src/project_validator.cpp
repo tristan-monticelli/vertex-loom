@@ -49,28 +49,27 @@ ManifestResult load_manifest(const std::filesystem::path& project_root) {
     return parse_manifest(contents);
 }
 
-ValidationReport validate_project(const std::filesystem::path& project_root) {
-    ValidationReport report;
+ManifestResult load_project(const std::filesystem::path& project_root) {
+    ManifestResult result;
     std::error_code filesystem_error;
     if (!std::filesystem::is_directory(project_root, filesystem_error)) {
-        add_error(report.errors, ErrorCode::missing_directory, "project",
+        add_error(result.errors, ErrorCode::missing_directory, "project",
                   "project root is not an accessible directory");
-        return report;
+        return result;
     }
 
     ManifestResult loaded = load_manifest(project_root);
     if (!loaded.ok()) {
-        report.errors = std::move(loaded.errors);
-        return report;
+        return loaded;
     }
 
     filesystem_error.clear();
     const auto canonical_root = std::filesystem::weakly_canonical(
         project_root, filesystem_error);
     if (filesystem_error) {
-        add_error(report.errors, ErrorCode::io_error, "project",
+        add_error(result.errors, ErrorCode::io_error, "project",
                   "cannot resolve the project root");
-        return report;
+        return result;
     }
 
     const auto& directories = loaded.manifest->directories;
@@ -85,7 +84,7 @@ ValidationReport validate_project(const std::filesystem::path& project_root) {
         filesystem_error.clear();
         if (!std::filesystem::is_directory(project_root / *relative_path,
                                            filesystem_error)) {
-            add_error(report.errors, ErrorCode::missing_directory, field,
+            add_error(result.errors, ErrorCode::missing_directory, field,
                       "required project directory is missing or inaccessible");
             continue;
         }
@@ -94,11 +93,19 @@ ValidationReport validate_project(const std::filesystem::path& project_root) {
             project_root / *relative_path, filesystem_error);
         if (filesystem_error ||
             !is_within_project(canonical_root, canonical_directory)) {
-            add_error(report.errors, ErrorCode::invalid_path, field,
+            add_error(result.errors, ErrorCode::invalid_path, field,
                       "resolved directory must remain inside the project root");
         }
     }
-    return report;
+    if (result.errors.empty()) {
+        result.manifest = std::move(loaded.manifest);
+    }
+    return result;
+}
+
+ValidationReport validate_project(const std::filesystem::path& project_root) {
+    auto loaded = load_project(project_root);
+    return ValidationReport{.errors = std::move(loaded.errors)};
 }
 
 } // namespace fabric::project

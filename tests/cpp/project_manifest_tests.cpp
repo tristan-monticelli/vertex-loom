@@ -144,8 +144,10 @@ void complete_project_directory_is_accepted() {
         output << fabric::project::serialize_manifest(example_manifest());
     }
 
-    require(fabric::project::validate_project(project.root()).ok(),
-            "complete project directory rejected");
+    const auto loaded = fabric::project::load_project(project.root());
+    require(loaded.ok(), "complete project directory rejected");
+    require(*loaded.manifest == example_manifest(),
+            "validated project returned the wrong manifest");
 }
 
 void atomic_save_preserves_the_previous_valid_manifest() {

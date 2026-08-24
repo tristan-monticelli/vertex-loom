@@ -6,10 +6,11 @@ C4Container
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
         Container(runtime, "Game Runtime", "C++20 / CMake", "Point d'entrée du runtime ; SDL2, OpenGL et la boucle de jeu viendront dans les slices suivants")
-        Container(asset, "Asset Studio", "C++20 / CMake", "Point d'entrée de l'éditeur d'assets ; UI Dear ImGui à venir")
+        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre et inspecte un projet dans un atelier desktop natif")
         Container(map, "Map Studio", "C++20 / CMake", "Point d'entrée de l'éditeur de maps ; UI Dear ImGui à venir")
         Container(core, "fabric_core", "C++20 static library", "Types partagés, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, sérialisation et validation du format projet")
+        Container(editorlib, "fabric_editor", "C++20 static library", "Session projet et état réutilisable des outils d'authoring")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
@@ -20,10 +21,12 @@ C4Container
     Rel(map, core, "Utilise")
     Rel(runtime, core, "Utilise")
     Rel(asset, projectlib, "Lit et écrit")
+    Rel(asset, editorlib, "Pilote une session")
     Rel(map, projectlib, "Lit et écrit")
     Rel(runtime, projectlib, "Charge")
     Rel(projectcli, projectlib, "Utilise")
     Rel(projectlib, core, "Utilise les types communs")
+    Rel(editorlib, projectlib, "Valide et charge")
     Rel(projectlib, project, "Valide, lit et écrit")
 ```
 
@@ -33,5 +36,6 @@ Les trois applications sont des exécutables desktop. Shared Core est une
 bibliothèque sans état distant. Le premier squelette CMake expose les cibles
 `fabric_core`, `asset_studio`, `map_studio`, `game_runtime` et
 `fabric_core_smoke`. Le composant `fabric_project` et son validateur headless
-constituent le premier contrat de données partagé. Les dépendances graphiques
-seront ajoutées avec leurs contrats et ADR lors de leur premier usage réel.
+constituent le premier contrat de données partagé. La première tranche
+d'Asset Studio ajoute `fabric_editor` et une coquille SDL2/OpenGL/Dear ImGui ;
+elle ne contient pas encore le renderer d'assets `fabric_render`.

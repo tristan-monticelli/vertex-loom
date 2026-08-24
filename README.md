@@ -9,8 +9,8 @@ Vertex Loom is a cross-platform C++20 foundation for a 2D engine and native
 authoring tools focused on original textile, sprite, and vector worlds.
 
 The project prioritizes Asset Studio and Map Studio quality before a complete
-game runtime. The current milestone provides the shared project format and
-validation core; the editor and runtime executables are intentionally minimal.
+game runtime. The shared project format is complete and Phase 2 now has its
+first native Asset Studio workspace.
 
 ## Current capabilities
 
@@ -20,6 +20,7 @@ validation core; the editor and runtime executables are intentionally minimal.
 - Atomic manifest replacement on macOS, Linux, and Windows.
 - Human-readable and JSON Lines diagnostics.
 - Headless project validation.
+- Native SDL2/OpenGL/Dear ImGui Asset Studio shell with project inspection.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test
@@ -35,6 +36,13 @@ For the C++ suite only:
 
 ```sh
 npm run validate:cpp
+```
+
+Open Asset Studio, optionally with a project directory:
+
+```sh
+./build/asset_studio
+./build/asset_studio tests/fixtures/valid-project
 ```
 
 ## Validate a project

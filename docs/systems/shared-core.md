@@ -4,8 +4,8 @@
 
 `fabric_core` fournit les identifiants de ressources, la version du moteur et
 la journalisation JSON Lines locale. `fabric_project` fournit le manifeste,
-la sérialisation JSON, les migrations, la validation du dossier projet et la
-sauvegarde atomique.
+la sérialisation JSON, les migrations, le chargement validé du dossier projet
+et la sauvegarde atomique.
 
 ## Entrées et sorties
 
@@ -18,6 +18,8 @@ sauvegarde atomique.
 
 - Seul le schéma courant ou une version disposant d'une migration explicite est
   chargé.
+- Le manifeste renvoyé par `load_project` est l'instance exacte dont les
+  répertoires ont été validés ; il n'est pas relu après le contrôle.
 - Les identifiants sont stables, minuscules et indépendants des chemins.
 - Tous les chemins du manifeste sont portables, relatifs et restent dans le
   dossier projet après résolution.
