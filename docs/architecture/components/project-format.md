@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, VectorAsset, SpriteSheetDefinition et erreurs structurées")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, VectorAsset v1/v2 et contrats hérités")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -46,13 +46,18 @@ C4Component
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
   normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
   de publication : une source sans document n'est pas un asset chargeable.
-- Un vecteur est déclaré par `assets/vectors/<id>.vector.json` et sa source
-  normalisée est `assets/vectors/<id>.svg`. Le document JSON est publié en
-  dernier et constitue également le marqueur de validité de la ressource.
-- Une spritesheet est déclarée par `assets/textures/<id>.sprite.json`, conserve
+- `VectorAsset v1` déclare actuellement une source normalisée
+  `assets/vectors/<id>.svg`. Sa migration v2 conserve cette source et la marque
+  `sourceKind = linkedSvg` sans modifier ses octets.
+- `VectorAsset v2` devient le contrat cible. `sourceKind = native` porte des
+  nœuds stables, formes, fills, contours, clips et transforms ;
+  `sourceKind = linkedSvg` conserve les imports opaques compatibles.
+- Le contrat hérité `SpriteSheetDefinition v1` déclare
+  `assets/textures/<id>.sprite.json`, conserve
   sa source sous `<id>.aseprite` ou `<id>.source.png` et référence l’atlas
   `<id>.atlas.png`. Le document contient frames, durées, pivots, tags, slices
-  et provenance ; il est publié en dernier.
+  et provenance. Il reste chargeable mais n’est requis par aucun nouveau
+  document ni par le runtime cible.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
@@ -67,9 +72,9 @@ C4Component
   manifeste.
 - Le validateur headless inspecte chaque document `*.texture.json` et refuse
   une source manquante, extérieure au projet ou incohérente avec le contrat.
-- Le validateur headless applique les mêmes contrôles aux documents
-  `*.vector.json` et à leur source SVG.
-- Le validateur headless charge aussi chaque `*.sprite.json`, contrôle sa
+- Le validateur headless applique les contrôles propres à `linkedSvg` ou
+  `native` après migration de chaque `*.vector.json`.
+- Pour compatibilité, le validateur charge aussi chaque `*.sprite.json`, contrôle sa
   source, son atlas PNG, ses rectangles et toutes ses plages de frames.
 - Après chargement, le validateur headless refuse les identifiants dupliqués,
   références manquantes, types incompatibles et cycles du registre.

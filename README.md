@@ -6,7 +6,8 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Vertex Loom is a cross-platform C++20 foundation for a 2D engine and native
-authoring tools focused on original textile, sprite, and vector worlds.
+authoring tools focused on original textile and resolution-independent vector
+worlds.
 
 The project prioritizes Asset Studio and Map Studio quality before a complete
 game runtime. The shared project format is complete and Phase 2 now has its
@@ -67,10 +68,13 @@ and `schemas` directories. See the
 
 ## Roadmap
 
-1. Asset Studio static authoring and import pipeline.
-2. Hierarchical animation and textile deformation controls.
-3. Map Studio composition, collisions, triggers, and events.
+1. Native vector documents, typed creation prompts, and the integrated customizer.
+2. Generic property-bound keyframes, hierarchical animation, and textile deformation.
+3. Map Studio composition, collisions, triggers, and events without sprite dependencies.
 4. Preview runtime, followed by the game runtime.
+
+The deterministic sprite pipeline remains available only as legacy
+compatibility and is not a foundation of the target runtime.
 
 Vertex Loom does not include or reproduce Nintendo characters or assets.
 

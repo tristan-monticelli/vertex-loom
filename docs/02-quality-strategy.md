@@ -63,3 +63,9 @@ de fusion non rendus. Les mêmes frames produisent des atlas PNG et documents
 byte-identiques sur chaque exécution. Le découpage PNG couvre grille, frames
 libres, padding, extrusion et régénération atomique. Le validateur headless
 contrôle la source, l’atlas et chaque plage de métadonnées d’une spritesheet.
+Ces suites protègent désormais un format hérité ; aucun nouveau contrat ne doit
+dépendre d’une frame ou d’un atlas. `VectorAsset v2` devra couvrir migration
+byte-préservante depuis v1, formes/fills/contours/clips, images remplissantes,
+tessellation déterministe et draw packets headless. Les modèles de prompts
+seront testés sans Dear ImGui, notamment isolation de leur état, erreurs par
+champ, annulation sans effet et résumé avant publication.

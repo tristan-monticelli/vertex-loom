@@ -3,9 +3,13 @@
 ## Summary
 
 - Name: Vertex Loom
-- Problem solved: moteur 2D natif et outils pour un jeu de plateformes original inspiré d'une esthétique textile et diorama.
+- Problem solved: moteur 2D natif et ateliers de création pour un jeu de
+  plateformes original à rendu vectoriel, inspiré d'une esthétique textile et
+  diorama.
 - Users: développeur moteur, artiste technique et level designer.
-- In scope: runtime 2D, rendu avec profondeur, entités, animations, physique, ressources textiles, Asset Studio et Map Studio.
+- In scope: runtime 2D, rendu avec profondeur, artworks vectoriels natifs,
+  formes contenant des fills image ou matériaux, personnalisateur intégré,
+  keyframes génériques, entités, physique, Asset Studio et Map Studio.
 - Out of scope: assets ou personnages de Nintendo, backend en ligne, consoles et outil 3D généraliste.
 
 ## Constraints
@@ -29,6 +33,8 @@
 
 - Le runtime charge un projet et maintient 60 FPS sur une scène de référence.
 - Une entité peut être créée, transformée, animée, sauvegardée puis rechargée.
+- Un artwork peut combiner un contour vectoriel et une image remplissante,
+  puis animer leurs transforms indépendamment sans spritesheet.
 - Une map peut être composée, validée, sauvegardée et exécutée dans le runtime.
 - Les deux éditeurs et le runtime lisent le même format de projet versionné.
 - Collisions, sérialisation et validation des ressources sont testées automatiquement.

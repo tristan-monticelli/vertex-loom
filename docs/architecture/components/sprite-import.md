@@ -1,5 +1,9 @@
 # C4 Component — import Aseprite et sprites
 
+> Statut : compatibilité héritée. ADR-0022 exclut ce pipeline de l’architecture
+> cible ; [l’inventaire de retrait](../../checklists/sprite-legacy-inventory.md)
+> interdit sa suppression sans confirmation explicite.
+
 ```mermaid
 C4Component
     title Vertex Loom — import et atlas de sprites

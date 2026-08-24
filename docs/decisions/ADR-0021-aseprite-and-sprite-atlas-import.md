@@ -1,6 +1,6 @@
 # ADR-0021 — Import Aseprite et atlas de sprites déterministe
 
-- Status: accepted
+- Status: legacy — retained for compatibility, excluded from target architecture by ADR-0022
 - Date: 2026-08-24
 
 ## Context

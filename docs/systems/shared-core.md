@@ -7,7 +7,8 @@ ressources, la version du moteur et la journalisation JSON Lines locale.
 `fabric_project` fournit le manifeste,
 la sérialisation JSON, les migrations, la création sans écrasement, les
 contrats `DocumentHeader`, `ResourceReference`, `TextureAsset` et
-`VectorAsset`, le registre de ressources, le chargement validé du dossier
+`VectorAsset` — actuellement v1, puis v2 natif selon ADR-0022 —, le registre de
+ressources, le chargement validé du dossier
 projet et la publication atomique des documents.
 `fabric_editor` fournit l’historique réversible et la planification des
 autosaves ; `fabric_project` fournit leur stockage atomique validé et leur
@@ -35,8 +36,9 @@ chargement contrôlé.
   tous les répertoires déclarés ainsi que les quatre dossiers d'assets standard.
 - Une texture publiée possède un document `<id>.texture.json` et une source
   `<id>.png` sous le dossier `assets/textures` déclaré par le manifeste.
-- Un vecteur publié possède un document `<id>.vector.json` et une source
-  `<id>.svg` sous le dossier `assets/vectors` déclaré par le manifeste.
+- Un vecteur v1 publié possède un document `<id>.vector.json` et une source
+  `<id>.svg`. Sa migration v2 le classe `linkedSvg` ; un vecteur v2 `native`
+  porte directement ses nœuds et ne requiert aucune source SVG.
 - Le document d'une texture ou d'un vecteur est publié en dernier et aucun
   import ne remplace une ressource existante.
 - Le registre résout uniquement une ressource unique du type attendu et refuse
