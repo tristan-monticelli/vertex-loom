@@ -1,24 +1,30 @@
 # Quality strategy
 
-<!-- Guide: select only levels useful to the project and record tools that are actually installed. Mutation testing is recommended for critical or algorithmic logic, parsers, validators, and business rules. It is usually unnecessary for simple UI or glue code. Run targeted mutation tests before important commits and the complete mutation suite before major releases. -->
-
 ## Test matrix
 
 | Type | Required? | Tool | Command | Rationale |
 | --- | --- | --- | --- | --- |
-| Unit | to be decided | to be decided | to be decided | to be decided |
-| Integration | to be decided | to be decided | to be decided | to be decided |
-| End-to-end | to be decided | to be decided | to be decided | to be decided |
-| Contract | to be decided | to be decided | to be decided | to be decided |
-| Property | to be decided | to be decided | to be decided | to be decided |
-| Snapshot | to be decided | to be decided | to be decided | to be decided |
-| Performance | to be decided | to be decided | to be decided | to be decided |
-| Security | to be decided | to be decided | to be decided | to be decided |
-| Mutation | to be decided | to be decided | to be decided | to be decided |
+| Unit | Oui | CTest | `ctest --test-dir build` | Physique, collisions, maths et sérialisation. |
+| Integration | Oui | CTest | `ctest --test-dir build` | Chargement de projet et contrats du cœur. |
+| End-to-end | Plus tard | À sélectionner | null | Parcours éditeur vers runtime. |
+| Contract | Oui | validateurs C++ | `ctest --test-dir build` | Schémas et versions de ressources. |
+| Property | Plus tard | À sélectionner | null | Invariants de physique après stabilisation. |
+| Snapshot | Non | — | null | Variations GPU ; scènes de référence manuelles. |
+| Performance | Oui | benchmarks C++ | null | Boucle, renderer et chargement. |
+| Security | Oui | validation locale | `ctest --test-dir build` | Chemins et imports invalides. |
+| Mutation | Non | — | null | Trop coûteux avant stabilisation de la physique. |
 
 ## Decision rule
 
-Describe the covered risk, target scope, and execution timing for every selected test level.
-
-Record the mutation decision in `.project/project-config.json`. Hooks run the
-command only when `preCommit` or `prePush` is `true`.
+Les tests unitaires et de contrat s'exécutent à chaque modification du cœur.
+Les intégrations précèdent chaque étape fonctionnelle. Les benchmarks sont
+requis avant une release ou une modification du renderer. Les tests Node de
+gouvernance restent exécutés par `npm test`. Le contrat projet couvre le
+round-trip JSON, les versions non prises en charge, les chemins traversants et
+le comportement du validateur headless sur des fixtures valides et invalides.
+Il couvre aussi la migration `v0` vers `v1` et la conservation du manifeste
+précédent lorsqu'une sauvegarde invalide est refusée.
+La journalisation vérifie la structure JSON Lines et l'échappement des données
+non fiables. Le validateur headless vérifie ses sorties humaine et structurée.
+`npm run validate` regroupe les validations documentaires, Node et C++ ;
+`npm run validate:cpp` exécute uniquement la configuration, le build et CTest.

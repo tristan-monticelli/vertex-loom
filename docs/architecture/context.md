@@ -1,19 +1,16 @@
 # C4 Context
 
-<!-- Guide: replace this document after discovery.
-Describe the system, users, external systems, and major flows.
-Use Mermaid C4Context. The agent must ask about genuinely unknown actors or integrations before inventing a boundary. -->
-
 ```mermaid
 C4Context
-    title System context — to be defined
-    Person(user, "User", "Primary actor to be defined")
-    System(system, "System to be defined", "Primary responsibility to be defined")
-    Rel(user, system, "Uses")
+    title Fabric Engine — contexte système
+    Person(creator, "Créateur", "Développe le jeu et crée les assets")
+    System(fabric, "Fabric Engine", "Runtime 2D et outils de création textile")
+    System_Ext(files, "Système de fichiers local", "Projets, textures, sons et exports")
+    Rel(creator, fabric, "Crée, configure et teste")
+    Rel(fabric, files, "Lit et écrit les projets et ressources")
 ```
 
-## Discovery questions
+## Scope and assumptions
 
-- Who uses the system, and for what purpose?
-- Which external systems, providers, or regulatory constraints exist?
-- What is the exact project boundary?
+Le système couvre le runtime, Asset Studio et Map Studio. Aucun service distant
+ni compte utilisateur n'est requis ; les assets restent locaux.

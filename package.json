@@ -18,12 +18,15 @@
   "scripts": {
     "setup": "node .githooks/setup.mjs",
     "setup:check": "node .githooks/setup.mjs --check",
+    "build:cpp": "cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug && cmake --build build --parallel",
     "test": "node --test tests/*.test.mjs",
+    "test:cpp": "ctest --test-dir build --output-on-failure",
     "validate:architecture": "node .githooks/validate-architecture.mjs --all",
     "validate:config": "node .githooks/validate-project-config.mjs",
     "validate:ctxroute": "node .githooks/validate-ctxroute.mjs",
     "validate:docs": "node .githooks/validate-docs.mjs",
-    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:architecture && npm run validate:docs -- --all && npm test"
+    "validate:cpp": "npm run build:cpp && npm run test:cpp",
+    "validate": "npm run validate:config && npm run validate:ctxroute && npm run validate:architecture && npm run validate:docs -- --all && npm run validate:cpp && npm test"
   },
   "devDependencies": {
     "@mermaid-js/mermaid-cli": "^11.12.0",

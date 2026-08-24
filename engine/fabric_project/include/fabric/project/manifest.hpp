@@ -1,0 +1,89 @@
+#pragma once
+
+#include "fabric/core/resource_id.hpp"
+
+#include <cstdint>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace fabric::project {
+
+inline constexpr std::uint32_t current_schema_version = 1;
+
+enum class ErrorCode {
+    io_error,
+    invalid_json,
+    invalid_manifest,
+    unsupported_schema_version,
+    invalid_resource_id,
+    invalid_path,
+    missing_file,
+    missing_directory,
+};
+
+struct Error {
+    ErrorCode code;
+    std::string field;
+    std::string message;
+
+    friend bool operator==(const Error&, const Error&) = default;
+};
+
+struct ProjectDirectories {
+    std::filesystem::path assets{"assets"};
+    std::filesystem::path entities{"entities"};
+    std::filesystem::path maps{"maps"};
+    std::filesystem::path scenes{"scenes"};
+    std::filesystem::path schemas{"schemas"};
+
+    friend bool operator==(const ProjectDirectories&, const ProjectDirectories&) = default;
+};
+
+struct ProjectManifest {
+    std::uint32_t schema_version{current_schema_version};
+    core::ResourceId id;
+    std::string name;
+    ProjectDirectories directories;
+
+    friend bool operator==(const ProjectManifest&, const ProjectManifest&) = default;
+};
+
+struct ValidationReport {
+    std::vector<Error> errors;
+
+    [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
+};
+
+struct ManifestResult {
+    std::optional<ProjectManifest> manifest;
+    std::vector<Error> errors;
+
+    [[nodiscard]] bool ok() const noexcept {
+        return manifest.has_value() && errors.empty();
+    }
+};
+
+struct MigrationResult {
+    std::optional<std::string> json;
+    std::vector<Error> errors;
+
+    [[nodiscard]] bool ok() const noexcept {
+        return json.has_value() && errors.empty();
+    }
+};
+
+[[nodiscard]] std::string_view to_string(ErrorCode code) noexcept;
+[[nodiscard]] ValidationReport validate_manifest(const ProjectManifest& manifest);
+[[nodiscard]] MigrationResult migrate_manifest(std::string_view json_text);
+[[nodiscard]] ManifestResult parse_manifest(std::string_view json_text);
+[[nodiscard]] std::string serialize_manifest(const ProjectManifest& manifest);
+[[nodiscard]] ManifestResult load_manifest(const std::filesystem::path& project_root);
+[[nodiscard]] ValidationReport save_manifest_atomic(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest);
+[[nodiscard]] ValidationReport validate_project(const std::filesystem::path& project_root);
+
+} // namespace fabric::project

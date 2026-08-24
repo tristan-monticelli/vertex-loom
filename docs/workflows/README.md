@@ -1,7 +1,6 @@
 # Workflows
 
-<!-- Guide: describe real operational flows here after discovery. -->
+- [Validation et sauvegarde d'un projet](project-validation.md)
 
-Describe important operational sequences here.
-
-Use sequence diagrams for interactions and state diagrams for transitions.
+Le flux Asset Studio vers Map Studio puis runtime sera ajouté avec le premier
+asset importable.

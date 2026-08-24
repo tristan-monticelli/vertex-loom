@@ -1,14 +1,6 @@
 # Systems
 
-<!-- Guide: replace this text with real subsystems after discovery. -->
+- [Shared Core et format projet](shared-core.md)
 
-Describe subsystems and their contracts here.
-
-A system document includes:
-
-- responsibility;
-- inputs and outputs;
-- invariants;
-- dependencies;
-- tests;
-- a diagram when the flow is non-trivial.
+Le Resource Pipeline, le renderer, la physique et les services d'éditeur
+seront documentés lors de leur première implémentation.

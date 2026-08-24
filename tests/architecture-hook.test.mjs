@@ -18,7 +18,7 @@ function run(tool_input, options = {}) {
 }
 
 test('blocks a new product file without C4 evidence', () => {
-  const result = run({ command: '*** Add File: src/new-module.ts' });
+  const result = run({ command: '*** Add File: src/new-module.rb' }, { cwd: initializedWorkspace() });
   assert.match(result.stdout, /Write blocked/u);
 });
 
@@ -27,9 +27,9 @@ test('allows a new test file', () => {
   assert.equal(result.stdout, '');
 });
 
-test('blocks a new module during discovery even with a diagram', () => {
-  const result = run({ command: '*** Add File: src/new-module.ts\n*** Update File: docs/architecture/containers.md' });
-  assert.match(result.stdout, /template mode/u);
+test('allows a new module when C4 evidence is included', () => {
+  const result = run({ command: '*** Add File: engine/new-module.cpp\n*** Update File: docs/architecture/containers.md' });
+  assert.doesNotMatch(result.stdout, /decision":"block"/u);
 });
 
 test('does not block an existing hook', () => {
@@ -48,13 +48,13 @@ test('blocks a new dependency without architecture documentation', () => {
 });
 
 test('reads patches supplied through a patch property', () => {
-  const result = run({ patch: '*** Add File: application.rb' });
-  assert.match(result.stdout, /template mode/u);
+  const result = run({ patch: '*** Add File: src/application.rb' }, { cwd: initializedWorkspace() });
+  assert.match(result.stdout, /Write blocked/u);
 });
 
 test('blocks a shell write command during discovery', () => {
   const result = run({ cmd: 'touch application.rb' }, { toolName: 'exec_command' });
-  assert.match(result.stdout, /read and validation commands/u);
+  assert.match(result.stdout, /traceable editing tool/u);
 });
 
 test('allows a validation command during discovery', () => {

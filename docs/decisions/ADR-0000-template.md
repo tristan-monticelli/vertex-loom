@@ -1,22 +1,7 @@
-# ADR-NNNN — Decision title
+# ADR-0000 — Numéro réservé
 
-<!-- Guide: copy this file, rename it, and replace every section. -->
+- Status: accepted
+- Date: 2026-08-24
 
-- Status: proposed | accepted | superseded
-- Date: YYYY-MM-DD
-
-## Context
-
-Which problem or constraint requires a decision?
-
-## Decision
-
-Which option was selected, and why?
-
-## Alternatives
-
-Which options were evaluated and rejected?
-
-## Consequences
-
-What are the benefits, costs, risks, and follow-up work?
+ADR-0000 est conservé comme identifiant réservé par l'infrastructure du
+blueprint. Les décisions du projet commencent à ADR-0004.

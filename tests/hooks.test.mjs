@@ -80,6 +80,9 @@ test('configuration rejects incomplete initialization', () => {
   const configPath = join(cwd, '.project/project-config.json');
   const config = JSON.parse(readFileSync(configPath, 'utf8'));
   config.status = 'initialized';
+  config.decisions.language = null;
+  config.directories.source = [];
+  config.codeExtensions = [];
   writeFileSync(configPath, JSON.stringify(config));
   const result = spawnSync('node', [join(root, '.githooks/validate-project-config.mjs')], { cwd, encoding: 'utf8' });
   assert.equal(result.status, 1);
@@ -91,6 +94,7 @@ test('configuration rejects a missing declared starter file', () => {
   const cwd = starterWorkspace();
   const configPath = join(cwd, '.project/project-config.json');
   const config = JSON.parse(readFileSync(configPath, 'utf8'));
+  config.status = 'template';
   config.starter.rootFiles.push('MISSING-STARTER.md');
   writeFileSync(configPath, JSON.stringify(config));
   const result = spawnSync('node', [join(root, '.githooks/validate-project-config.mjs')], { cwd, encoding: 'utf8' });
@@ -189,6 +193,8 @@ function starterWorkspace() {
   }
   writeFileSync(join(cwd, '.codex/architecture-policy.json'), JSON.stringify({ policyVersion: 1, projectConfig: '.project/project-config.json', supportedStatuses: ['template', 'initialized'] }));
   writeFileSync(join(cwd, '.project/project-config.json'), readFileSync(join(root, '.project/project-config.json')));
+  writeFileSync(join(cwd, 'docs/architecture/context.md'), '# Context\n');
+  writeFileSync(join(cwd, 'docs/architecture/containers.md'), '# Containers\n');
   writeFileSync(join(cwd, 'package.json'), JSON.stringify({ scripts: { test: 'node --test', 'validate:docs': 'node validate-docs.mjs' } }));
   return cwd;
 }

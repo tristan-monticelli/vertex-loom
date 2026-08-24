@@ -1,20 +1,20 @@
 {
   "schemaVersion": 1,
-  "status": "template",
+  "status": "initialized",
   "tooling": {
     "runtime": "node",
     "packageManager": "npm"
   },
   "decisions": {
-    "language": null,
-    "runtime": null,
-    "frontend": null,
-    "backend": null,
-    "storage": null,
-    "deployment": null,
-    "observability": null,
-    "security": null,
-    "performance": null
+    "language": "C++20",
+    "runtime": "CMake + SDL2 + OpenGL",
+    "frontend": "Asset Studio + Map Studio",
+    "backend": "none",
+    "storage": "JSON project metadata and filesystem assets",
+    "deployment": "desktop archives",
+    "observability": "local structured logs and debug overlay",
+    "security": "validated local asset paths and schemas",
+    "performance": "60 FPS desktop target"
   },
   "commands": {
     "test": "npm test",
@@ -22,22 +22,22 @@
     "typecheck": null,
     "mutation": null,
     "integration": null,
-    "build": null,
+    "build": "npm run validate:cpp",
     "mermaid": "npm run validate:docs"
   },
   "quality": {
     "mutation": {
-      "decision": null,
+      "decision": "not-applicable",
       "preCommit": false,
       "prePush": false
     }
   },
   "directories": {
-    "source": [],
+    "source": ["engine/", "editors/", "game/", "tools/"],
     "tests": ["tests/"],
     "generated": ["coverage/", "dist/", "build/", ".ctxroute/state/"]
   },
-  "codeExtensions": [],
+  "codeExtensions": [".cpp", ".hpp", ".h", ".cmake"],
   "architecture": {
     "documents": [
       "docs/architecture/context.md",
