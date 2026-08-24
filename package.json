@@ -1,15 +1,15 @@
 {
-  "name": "ctxroute-blueprint",
+  "name": "vertex-loom",
   "version": "1.0.0",
-  "description": "Architecture-first, stack-neutral GitHub template with CTXRoute-powered agent context.",
+  "description": "Cross-platform C++20 2D engine and authoring tools for textile and vector worlds.",
   "private": true,
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zenonlab/ctxroute-blueprint.git"
+    "url": "git+https://github.com/tristan-monticelli/vertex-loom.git"
   },
-  "homepage": "https://github.com/zenonlab/ctxroute-blueprint#readme",
-  "bugs": "https://github.com/zenonlab/ctxroute-blueprint/issues",
+  "homepage": "https://github.com/tristan-monticelli/vertex-loom#readme",
+  "bugs": "https://github.com/tristan-monticelli/vertex-loom/issues",
   "type": "module",
   "engines": {
     "node": ">=22",

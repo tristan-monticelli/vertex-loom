@@ -2,9 +2,9 @@
 
 ```mermaid
 C4Context
-    title Fabric Engine — contexte système
+    title Vertex Loom — contexte système
     Person(creator, "Créateur", "Développe le jeu et crée les assets")
-    System(fabric, "Fabric Engine", "Runtime 2D et outils de création textile")
+    System(fabric, "Vertex Loom", "Runtime 2D et outils de création textile")
     System_Ext(files, "Système de fichiers local", "Projets, textures, sons et exports")
     Rel(creator, fabric, "Crée, configure et teste")
     Rel(fabric, files, "Lit et écrit les projets et ressources")

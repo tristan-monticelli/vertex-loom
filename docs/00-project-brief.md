@@ -2,7 +2,7 @@
 
 ## Summary
 
-- Name: Fabric Engine
+- Name: Vertex Loom
 - Problem solved: moteur 2D natif et outils pour un jeu de plateformes original inspiré d'une esthétique textile et diorama.
 - Users: développeur moteur, artiste technique et level designer.
 - In scope: runtime 2D, rendu avec profondeur, entités, animations, physique, ressources textiles, Asset Studio et Map Studio.

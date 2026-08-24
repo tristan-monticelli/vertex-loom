@@ -2,9 +2,9 @@
 
 ```mermaid
 C4Container
-    title Fabric Engine — conteneurs
+    title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
-    System_Boundary(fabric, "Fabric Engine") {
+    System_Boundary(fabric, "Vertex Loom") {
         Container(runtime, "Game Runtime", "C++20 / CMake", "Point d'entrée du runtime ; SDL2, OpenGL et la boucle de jeu viendront dans les slices suivants")
         Container(asset, "Asset Studio", "C++20 / CMake", "Point d'entrée de l'éditeur d'assets ; UI Dear ImGui à venir")
         Container(map, "Map Studio", "C++20 / CMake", "Point d'entrée de l'éditeur de maps ; UI Dear ImGui à venir")

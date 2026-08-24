@@ -2,7 +2,7 @@
 
 ```mermaid
 C4Component
-    title Fabric Engine — composants du format projet
+    title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
         Component(contracts, "Project contracts", "C++20", "ProjectManifest et erreurs structurées, avec ResourceId fourni par fabric_core")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")

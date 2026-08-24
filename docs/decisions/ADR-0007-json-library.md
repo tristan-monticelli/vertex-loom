@@ -24,5 +24,5 @@ petits documents de métadonnées du projet.
 ## Consequences
 
 La configuration CMake nécessite un accès à la dépendance lors du premier
-build. Les API publiques restent composées de types Fabric Engine et peuvent
+build. Les API publiques restent composées de types Vertex Loom et peuvent
 changer de bibliothèque JSON sans migration des consommateurs.

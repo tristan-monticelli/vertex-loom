@@ -2,7 +2,7 @@
 
 ```mermaid
 C4Component
-    title Fabric Engine — observabilité locale
+    title Vertex Loom — observabilité locale
     Container_Boundary(core, "fabric_core") {
         Component(logger, "JsonLineLogger", "C++20", "Sérialise des événements structurés vers un flux local de manière thread-safe")
     }

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(FabricEngine VERSION 0.1.0 LANGUAGES CXX)
+project(VertexLoom VERSION 0.1.0 LANGUAGES CXX)
 
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
