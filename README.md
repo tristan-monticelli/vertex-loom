@@ -26,8 +26,9 @@ The generated product remains stack-neutral. The template tooling requires
    npm run setup
    ```
 
-5. Ask your coding agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md),
-   then initialize the project from your requirements.
+5. Ask your [Codex](https://openai.com/codex/) or [Claude](https://www.anthropic.com/claude)
+   agent to read [`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md), then
+   initialize the project from your requirements.
 6. Review the [project brief](docs/00-project-brief.md), [technology decisions](docs/01-technology-decisions.md),
    [architecture decision records](docs/decisions/README.md), [C4 diagrams](docs/architecture/README.md),
    and [quality strategy](docs/02-quality-strategy.md).
@@ -43,9 +44,9 @@ Codex settings, delete tracked project files, or create commits.
 infrastructure. Product source directories and commands are created only after
 project discovery.
 
-[`AGENTS.md`](AGENTS.md) is the authoritative repository doctrine. [`CLAUDE.md`](CLAUDE.md)
-is the Claude-compatible entry point that points back to that doctrine; the two
-files are intentionally consistent and should be read together by agents.
+[`AGENTS.md`](AGENTS.md) and [`CLAUDE.md`](CLAUDE.md) provide the project rules
+for both Codex and Claude agents. They are intentionally kept aligned; the
+repository doctrine designates `AGENTS.md` as the canonical source.
 
 `.project/project-config.json` is the source of
 truth for source directories, code extensions, contracts, commands, and
@@ -63,7 +64,7 @@ both Codex and Claude-compatible tooling.
 
 CTXRoute never modifies global agent settings during installation. The tracked
 `.codex/` and `.claude/` configurations remain local to this project and work
-with both Codex and Claude-compatible tooling.
+with both Codex and Claude agents.
 
 For prerequisite diagnostics without installing anything, run
 `npm run setup:check`.
