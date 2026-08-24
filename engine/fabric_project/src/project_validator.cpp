@@ -1,4 +1,5 @@
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/resource_registry.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
@@ -39,6 +40,7 @@ void inspect_asset_documents(
     const std::string_view document_suffix,
     const std::string_view error_field,
     Loader&& loader,
+    ResourceRegistry& registry,
     std::vector<Error>& errors) {
     const auto asset_directory = project_root / manifest.directories.assets /
         directory_name;
@@ -72,6 +74,18 @@ void inspect_asset_documents(
         auto loaded_asset = loader(
             project_root, manifest,
             entry.path().lexically_relative(project_root));
+        if (loaded_asset.ok()) {
+            auto registration = registry.register_resource(ResourceEntry{
+                .document = loaded_asset.asset->document,
+                .document_path =
+                    entry.path().lexically_relative(project_root),
+                .references = {},
+            });
+            errors.insert(
+                errors.end(),
+                std::make_move_iterator(registration.errors.begin()),
+                std::make_move_iterator(registration.errors.end()));
+        }
         errors.insert(errors.end(),
                       std::make_move_iterator(loaded_asset.errors.begin()),
                       std::make_move_iterator(loaded_asset.errors.end()));
@@ -156,13 +170,20 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         return result;
     }
 
+    ResourceRegistry registry;
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, "textures",
         ".texture.json", "assets.textures", load_texture_asset,
-        result.errors);
+        registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, "vectors",
-        ".vector.json", "assets.vectors", load_vector_asset, result.errors);
+        ".vector.json", "assets.vectors", load_vector_asset, registry,
+        result.errors);
+    auto graph_validation = registry.validate();
+    result.errors.insert(
+        result.errors.end(),
+        std::make_move_iterator(graph_validation.errors.begin()),
+        std::make_move_iterator(graph_validation.errors.end()));
     if (result.errors.empty()) {
         result.manifest = std::move(loaded.manifest);
     }

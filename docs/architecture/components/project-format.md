@@ -64,3 +64,6 @@ C4Component
   `*.vector.json` et à leur source SVG.
 - Après chargement, le validateur headless refuse les identifiants dupliqués,
   références manquantes, types incompatibles et cycles du registre.
+- `ResourceRegistry` est instancié par chargement de projet, sans singleton ;
+  `register_resource`, `resolve` et `validate` restent utilisables dans les
+  tests et futurs chargeurs sans interface graphique.

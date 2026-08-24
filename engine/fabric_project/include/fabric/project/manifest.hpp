@@ -26,6 +26,10 @@ enum class ErrorCode {
     directory_not_empty,
     invalid_asset,
     asset_already_exists,
+    duplicate_resource,
+    missing_resource,
+    resource_type_mismatch,
+    resource_cycle,
 };
 
 struct Error {

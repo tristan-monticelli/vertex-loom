@@ -73,6 +73,10 @@ std::string_view to_string(const ErrorCode code) noexcept {
     case ErrorCode::directory_not_empty: return "directory_not_empty";
     case ErrorCode::invalid_asset: return "invalid_asset";
     case ErrorCode::asset_already_exists: return "asset_already_exists";
+    case ErrorCode::duplicate_resource: return "duplicate_resource";
+    case ErrorCode::missing_resource: return "missing_resource";
+    case ErrorCode::resource_type_mismatch: return "resource_type_mismatch";
+    case ErrorCode::resource_cycle: return "resource_cycle";
     }
     return "unknown_error";
 }

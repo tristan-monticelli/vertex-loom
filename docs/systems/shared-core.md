@@ -6,7 +6,8 @@
 ressources, la version du moteur et la journalisation JSON Lines locale.
 `fabric_project` fournit le manifeste,
 la sérialisation JSON, les migrations, la création sans écrasement, les
-contrats `AssetDocument`, `TextureAsset` et `VectorAsset`, le chargement validé du dossier
+contrats `DocumentHeader`, `ResourceReference`, `TextureAsset` et
+`VectorAsset`, le registre de ressources, le chargement validé du dossier
 projet et la publication atomique des documents.
 
 ## Entrées et sorties
@@ -35,6 +36,8 @@ projet et la publication atomique des documents.
   `<id>.svg` sous le dossier `assets/vectors` déclaré par le manifeste.
 - Le document d'une texture ou d'un vecteur est publié en dernier et aucun
   import ne remplace une ressource existante.
+- Le registre résout uniquement une ressource unique du type attendu et refuse
+  identifiants dupliqués, références absentes, types incompatibles et cycles.
 - Le remplacement de `project.json` se fait depuis un fichier temporaire
   adjacent et complet.
 - Aucun journal n'est envoyé hors de la machine.
@@ -51,7 +54,8 @@ bibliothèque JSON.
 npm run validate:cpp
 ```
 
-CTest couvre le round-trip JSON, les migrations `v0` vers `v1` puis `v2`, les versions
-futures, les chemins invalides, les documents de texture et de vecteur, la création sans
-écrasement, la sauvegarde atomique, les dossiers complets, le logger et les
-sorties du validateur headless.
+CTest couvre le round-trip JSON, les migrations `v0` vers `v1` puis `v2`, les
+versions futures, les chemins invalides, les documents de texture et de
+vecteur, le graphe de ressources, la création sans écrasement, la sauvegarde
+atomique, les dossiers complets, le logger et les sorties du validateur
+headless.
