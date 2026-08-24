@@ -78,3 +78,5 @@ C4Component
   `.vertex-loom/autosave/`. Il est récupérable seulement s’il est valide et
   strictement plus récent que le principal ; sa lecture ne modifie aucun
   fichier.
+- Le stockage refuse les documents de plus de 256 Mio et les autosaves résolus
+  hors du projet avant de charger leur contenu.

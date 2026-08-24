@@ -112,6 +112,7 @@ target_link_libraries(fabric_render PRIVATE
 )
 
 add_library(fabric_editor STATIC
+    engine/fabric_editor/src/autosave_scheduler.cpp
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/project_session.cpp
 )

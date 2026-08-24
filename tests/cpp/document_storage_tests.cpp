@@ -51,6 +51,16 @@ fabric::project::ValidationReport accept_expected(
     return report;
 }
 
+fabric::project::ValidationReport accept_recovery_document(
+    const std::string_view contents) {
+    fabric::project::ValidationReport report;
+    if (contents != "primary\n" && contents != "recovered\n") {
+        report.errors.push_back({fabric::project::ErrorCode::invalid_json,
+                                 "document", "invalid recovery document"});
+    }
+    return report;
+}
+
 } // namespace
 
 TEST_CASE("editable documents replace atomically") {
@@ -126,4 +136,66 @@ TEST_CASE("document storage does not follow a parent symlink outside project") {
 
     CHECK_FALSE(report.ok());
     CHECK_FALSE(std::filesystem::exists(outside.path() / "escape.json"));
+}
+
+TEST_CASE("autosaves mirror document paths and expose newer valid recovery") {
+    using namespace std::chrono_literals;
+    const TemporaryDirectory project;
+    REQUIRE(fabric::project::save_document_atomic(
+                project.path(), "entities/hero.json", "primary\n",
+                accept_recovery_document)
+                .ok());
+    const auto primary_path = project.path() / "entities/hero.json";
+    std::filesystem::last_write_time(
+        primary_path, std::filesystem::file_time_type::clock::now() - 2s);
+
+    REQUIRE(fabric::project::save_autosave_atomic(
+                project.path(), "entities/hero.json", "recovered\n",
+                accept_recovery_document)
+                .ok());
+    const auto expected_autosave = std::filesystem::path{".vertex-loom"} /
+        "autosave/entities/hero.json";
+    CHECK(fabric::project::autosave_document_path("entities/hero.json") ==
+          expected_autosave);
+
+    const auto recovery = fabric::project::inspect_recovery(
+        project.path(), "entities/hero.json", accept_recovery_document);
+    REQUIRE(recovery.ok());
+    REQUIRE(recovery.candidate.has_value());
+    CHECK(recovery.candidate->document_path == "entities/hero.json");
+    CHECK(recovery.candidate->autosave_path == expected_autosave);
+    CHECK(recovery.candidate->contents == "recovered\n");
+    CHECK(read_text(primary_path) == "primary\n");
+}
+
+TEST_CASE("old or invalid autosaves are never recovery candidates") {
+    using namespace std::chrono_literals;
+    const TemporaryDirectory project;
+    REQUIRE(fabric::project::save_document_atomic(
+                project.path(), "maps/room.json", "primary\n",
+                accept_recovery_document)
+                .ok());
+    REQUIRE(fabric::project::save_autosave_atomic(
+                project.path(), "maps/room.json", "recovered\n",
+                accept_recovery_document)
+                .ok());
+    const auto autosave = project.path() /
+        fabric::project::autosave_document_path("maps/room.json");
+    std::filesystem::last_write_time(
+        autosave, std::filesystem::file_time_type::clock::now() - 2s);
+
+    const auto old = fabric::project::inspect_recovery(
+        project.path(), "maps/room.json", accept_recovery_document);
+    REQUIRE(old.ok());
+    CHECK_FALSE(old.candidate.has_value());
+
+    {
+        std::ofstream output(autosave, std::ios::binary | std::ios::trunc);
+        output << "invalid\n";
+    }
+    const auto invalid = fabric::project::inspect_recovery(
+        project.path(), "maps/room.json", accept_recovery_document);
+    CHECK_FALSE(invalid.ok());
+    CHECK_FALSE(invalid.candidate.has_value());
+    CHECK(read_text(project.path() / "maps/room.json") == "primary\n");
 }

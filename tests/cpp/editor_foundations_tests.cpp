@@ -1,4 +1,5 @@
 #include "fabric/editor/command_stack.hpp"
+#include "fabric/editor/autosave_scheduler.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -135,4 +136,32 @@ TEST_CASE("mark dirty represents recovered state without fake history") {
     CHECK_FALSE(commands.can_undo());
     commands.mark_clean();
     CHECK_FALSE(commands.dirty());
+}
+
+TEST_CASE("autosave becomes due after two seconds of inactivity") {
+    using namespace std::chrono_literals;
+    fabric::editor::AutosaveScheduler scheduler;
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+
+    scheduler.mark_changed(start);
+    CHECK(scheduler.pending());
+    CHECK_FALSE(scheduler.due(start + 1999ms));
+    CHECK(scheduler.due(start + 2s));
+    scheduler.mark_saved();
+    CHECK_FALSE(scheduler.pending());
+    CHECK_FALSE(scheduler.due(start + 1h));
+}
+
+TEST_CASE("continuous changes cannot postpone autosave past thirty seconds") {
+    using namespace std::chrono_literals;
+    fabric::editor::AutosaveScheduler scheduler;
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+
+    scheduler.mark_changed(start);
+    for (int second = 1; second < 30; ++second) {
+        scheduler.mark_changed(start + std::chrono::seconds{second});
+        CHECK_FALSE(scheduler.due(
+            start + std::chrono::seconds{second}));
+    }
+    CHECK(scheduler.due(start + 30s));
 }
