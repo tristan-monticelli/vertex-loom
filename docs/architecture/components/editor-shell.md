@@ -49,3 +49,6 @@ C4Component
   état sans dépendance à Dear ImGui.
 - Une récupération plus récente est proposée à l’ouverture ; accepter charge
   son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
+- Le manifeste constitue le premier document éditable intégré : son nom et ses
+  unités passent par commandes, Save remplace `project.json`, et son autosave
+  sert de preuve headless du flux commun avant les futurs documents d’asset.

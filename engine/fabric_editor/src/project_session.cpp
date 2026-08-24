@@ -1,8 +1,52 @@
 #include "fabric/editor/project_session.hpp"
 
+#include "fabric/project/document_storage.hpp"
+
+#include <memory>
+#include <string_view>
 #include <utility>
 
 namespace fabric::editor {
+namespace {
+
+project::ValidationReport validate_serialized_manifest(
+    const std::string_view contents) {
+    auto parsed = project::parse_manifest(contents);
+    return {.errors = std::move(parsed.errors)};
+}
+
+template <typename Value>
+class SetValueCommand final : public Command {
+public:
+    SetValueCommand(Value& target, Value next)
+        : target_(target), before_(target), after_(std::move(next)) {}
+
+    bool execute() override {
+        target_ = after_;
+        return true;
+    }
+
+    bool undo() override {
+        target_ = before_;
+        return true;
+    }
+
+    bool merge_with(const Command& newer) override {
+        const auto* value = dynamic_cast<const SetValueCommand*>(&newer);
+        if (value == nullptr || &target_ != &value->target_) {
+            return false;
+        }
+        after_ = value->after_;
+        return true;
+    }
+
+private:
+    Value& target_;
+    Value before_;
+    Value after_;
+};
+
+} // namespace
 
 bool ProjectSession::create(const std::filesystem::path& project_root,
                             const project::ProjectManifest& manifest) {
@@ -16,6 +60,9 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     manifest_ = std::move(created.manifest);
     imported_texture_.reset();
     imported_vector_.reset();
+    recovery_manifest_.reset();
+    commands_.clear();
+    autosave_.reset();
     errors_.clear();
     return true;
 }
@@ -27,11 +74,26 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
         return false;
     }
 
+    auto recovery = project::inspect_recovery(
+        project_root, "project.json", validate_serialized_manifest);
+    std::optional<project::ProjectManifest> recovery_manifest;
+    if (recovery.candidate.has_value()) {
+        auto parsed = project::parse_manifest(recovery.candidate->contents);
+        if (parsed.ok()) {
+            recovery_manifest = std::move(parsed.manifest);
+        } else {
+            recovery.errors = std::move(parsed.errors);
+        }
+    }
+
     project_root_ = project_root;
     manifest_ = std::move(loaded.manifest);
     imported_texture_.reset();
     imported_vector_.reset();
-    errors_.clear();
+    recovery_manifest_ = std::move(recovery_manifest);
+    commands_.clear();
+    autosave_.reset();
+    errors_ = std::move(recovery.errors);
     return true;
 }
 
@@ -121,8 +183,172 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
     return true;
 }
 
+bool ProjectSession::set_project_name(
+    std::string name, const AutosaveScheduler::Clock::time_point now) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "project",
+                    "a project must be open before editing its name"}};
+        return false;
+    }
+    if (manifest_->name == name) {
+        return true;
+    }
+    auto candidate = *manifest_;
+    candidate.name = name;
+    auto validation = project::validate_manifest(candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<SetValueCommand<std::string>>(
+            manifest_->name, std::move(name)))) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "name",
+                    "cannot execute the name modification"}};
+        return false;
+    }
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_pixels_per_unit(
+    const double pixels_per_unit,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "project",
+                    "a project must be open before editing its units"}};
+        return false;
+    }
+    if (manifest_->pixels_per_unit == pixels_per_unit) {
+        return true;
+    }
+    auto candidate = *manifest_;
+    candidate.pixels_per_unit = pixels_per_unit;
+    auto validation = project::validate_manifest(candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<SetValueCommand<double>>(
+            manifest_->pixels_per_unit, pixels_per_unit))) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "pixelsPerUnit",
+                    "cannot execute the unit modification"}};
+        return false;
+    }
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
+    if (!commands_.undo()) {
+        return false;
+    }
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::redo(const AutosaveScheduler::Clock::time_point now) {
+    if (!commands_.redo()) {
+        return false;
+    }
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::save() {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "project",
+                    "a project must be open before saving"}};
+        return false;
+    }
+    auto report = project::save_manifest_atomic(project_root_, *manifest_);
+    if (!report.ok()) {
+        errors_ = std::move(report.errors);
+        return false;
+    }
+    commands_.mark_clean();
+    autosave_.reset();
+    errors_.clear();
+    return true;
+}
+
+AutosaveStatus ProjectSession::update_autosave(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!has_project()) {
+        autosave_.reset();
+        return AutosaveStatus::not_due;
+    }
+    if (!commands_.dirty()) {
+        if (!autosave_.pending()) {
+            return AutosaveStatus::not_due;
+        }
+        auto report = project::save_autosave_atomic(
+            project_root_, "project.json",
+            project::serialize_manifest(*manifest_),
+            validate_serialized_manifest);
+        if (!report.ok()) {
+            errors_ = std::move(report.errors);
+            return AutosaveStatus::failed;
+        }
+        autosave_.mark_saved();
+        errors_.clear();
+        return AutosaveStatus::saved;
+    }
+    if (!autosave_.due(now)) {
+        return AutosaveStatus::not_due;
+    }
+    auto report = project::save_autosave_atomic(
+        project_root_, "project.json", project::serialize_manifest(*manifest_),
+        validate_serialized_manifest);
+    if (!report.ok()) {
+        errors_ = std::move(report.errors);
+        return AutosaveStatus::failed;
+    }
+    autosave_.mark_saved();
+    errors_.clear();
+    return AutosaveStatus::saved;
+}
+
+bool ProjectSession::accept_recovery(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!recovery_manifest_.has_value()) {
+        return false;
+    }
+    manifest_ = std::move(recovery_manifest_);
+    recovery_manifest_.reset();
+    commands_.clear();
+    commands_.mark_dirty();
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+void ProjectSession::decline_recovery() noexcept {
+    recovery_manifest_.reset();
+    errors_.clear();
+}
+
 bool ProjectSession::has_project() const noexcept {
     return manifest_.has_value();
+}
+
+bool ProjectSession::dirty() const noexcept {
+    return has_project() && commands_.dirty();
+}
+
+bool ProjectSession::can_undo() const noexcept {
+    return commands_.can_undo();
+}
+
+bool ProjectSession::can_redo() const noexcept {
+    return commands_.can_redo();
+}
+
+bool ProjectSession::has_recovery() const noexcept {
+    return recovery_manifest_.has_value();
 }
 
 const std::filesystem::path& ProjectSession::project_root() const noexcept {

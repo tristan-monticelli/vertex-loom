@@ -48,3 +48,5 @@ flowchart TD
 - Les chemins absolus, traversants et les parents résolus hors projet sont
   refusés.
 - Refuser ou accepter une récupération ne modifie aucun fichier principal.
+- Un retour par undo au point propre écrit le contenu principal dans le miroir
+  afin de neutraliser un autosave obsolète sans supprimer de fichier.

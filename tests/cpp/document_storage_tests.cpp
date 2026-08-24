@@ -199,3 +199,20 @@ TEST_CASE("old or invalid autosaves are never recovery candidates") {
     CHECK_FALSE(invalid.candidate.has_value());
     CHECK(read_text(project.path() / "maps/room.json") == "primary\n");
 }
+
+TEST_CASE("newer autosave identical to primary needs no recovery") {
+    const TemporaryDirectory project;
+    REQUIRE(fabric::project::save_document_atomic(
+                project.path(), "scenes/start.json", "primary\n",
+                accept_recovery_document)
+                .ok());
+    REQUIRE(fabric::project::save_autosave_atomic(
+                project.path(), "scenes/start.json", "primary\n",
+                accept_recovery_document)
+                .ok());
+
+    const auto recovery = fabric::project::inspect_recovery(
+        project.path(), "scenes/start.json", accept_recovery_document);
+    REQUIRE(recovery.ok());
+    CHECK_FALSE(recovery.candidate.has_value());
+}

@@ -310,8 +310,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextDisabled("%s", session.manifest()->id.value.c_str());
         ImGui::Separator();
         ImGui::Text("Schema version: %u", session.manifest()->schema_version);
-        ImGui::Text("Pixels per unit: %.2f",
-                    session.manifest()->pixels_per_unit);
+        double pixels_per_unit = session.manifest()->pixels_per_unit;
+        ImGui::SetNextItemWidth(-1.0F);
+        if (ImGui::InputDouble("Pixels per unit", &pixels_per_unit, 1.0,
+                               10.0, "%.2f")) {
+            if (session.set_pixels_per_unit(pixels_per_unit)) {
+                status = "Project units changed";
+            } else {
+                status = "Invalid project units; inspect the diagnostics.";
+            }
+        }
         ImGui::TextWrapped("%s", session.project_root().string().c_str());
         if (preview.texture != 0U) {
             ImGui::SeparatorText(
@@ -354,6 +362,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::Begin("Status", nullptr, fixed_panel_flags | ImGuiWindowFlags_NoTitleBar |
                                       ImGuiWindowFlags_NoScrollbar);
     ImGui::TextUnformatted(status.c_str());
+    if (session.dirty()) {
+        ImGui::SameLine();
+        ImGui::TextColored({0.89F, 0.68F, 0.34F, 1.0F}, "Unsaved changes");
+    }
     ImGui::End();
 
     if (request_create) {
@@ -493,6 +505,29 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
+    if (session.has_recovery()) {
+        ImGui::OpenPopup("Recover autosave");
+    }
+    if (ImGui::BeginPopupModal("Recover autosave", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("A newer valid autosave is available.");
+        ImGui::TextWrapped(
+            "Recover it in memory? The saved project will not be overwritten until Save.");
+        if (ImGui::Button("Recover", {110.0F, 0.0F})) {
+            if (session.accept_recovery()) {
+                status = "Autosave recovered; save to keep it.";
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Keep saved", {110.0F, 0.0F})) {
+            session.decline_recovery();
+            status = "Saved project kept.";
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
 }
 
 int run_asset_studio(const std::filesystem::path& initial_project) {
@@ -618,6 +653,12 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     }
                     request_open = true;
                 }
+                if (ImGui::MenuItem("Save", "Ctrl+S", false,
+                                    session.has_project())) {
+                    status = session.save()
+                        ? "Project saved."
+                        : "Save failed; inspect the diagnostics.";
+                }
                 if (ImGui::MenuItem("Import PNG...", "Ctrl+I", false,
                                     session.has_project())) {
                     request_png = true;
@@ -632,7 +673,20 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 }
                 ImGui::EndMenu();
             }
-            ImGui::TextDisabled("Phase 2 - static authoring foundation");
+            if (ImGui::BeginMenu("Edit")) {
+                if (ImGui::MenuItem("Undo", "Ctrl+Z", false,
+                                    session.can_undo())) {
+                    static_cast<void>(session.undo());
+                    status = "Change undone.";
+                }
+                if (ImGui::MenuItem("Redo", "Ctrl+Shift+Z", false,
+                                    session.can_redo())) {
+                    static_cast<void>(session.redo());
+                    status = "Change redone.";
+                }
+                ImGui::EndMenu();
+            }
+            ImGui::TextDisabled("Phase 2 - resilient authoring foundation");
             ImGui::EndMainMenuBar();
         }
         const auto& io = ImGui::GetIO();
@@ -653,9 +707,33 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
             running = false;
         }
+        if (io.KeyCtrl && session.has_project() &&
+            ImGui::IsKeyPressed(ImGuiKey_S, false)) {
+            status = session.save()
+                ? "Project saved."
+                : "Save failed; inspect the diagnostics.";
+        }
+        if (io.KeyCtrl && !io.KeyShift &&
+            ImGui::IsKeyPressed(ImGuiKey_Z, false) && session.can_undo()) {
+            static_cast<void>(session.undo());
+            status = "Change undone.";
+        }
+        if (io.KeyCtrl &&
+            ((io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
+             ImGui::IsKeyPressed(ImGuiKey_Y, false)) && session.can_redo()) {
+            static_cast<void>(session.redo());
+            status = "Change redone.";
+        }
 
         draw_workspace(session, window, path_buffer, creation, preview, request_create,
                        request_open, request_png, request_svg, status);
+
+        const auto autosave_status = session.update_autosave();
+        if (autosave_status == fabric::editor::AutosaveStatus::saved) {
+            status = "Recovery autosave updated.";
+        } else if (autosave_status == fabric::editor::AutosaveStatus::failed) {
+            status = "Autosave failed; inspect the diagnostics.";
+        }
 
         ImGui::Render();
         int drawable_width = 0;

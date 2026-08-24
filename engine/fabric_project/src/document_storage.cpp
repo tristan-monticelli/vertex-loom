@@ -289,12 +289,6 @@ RecoveryResult inspect_recovery(
         return result;
     }
 
-    auto autosave = load_document_from_relative_path(
-        project_root, autosave_path, validator);
-    if (!autosave.ok()) {
-        result.errors = std::move(autosave.errors);
-        return result;
-    }
     const auto primary_time = std::filesystem::last_write_time(
         project_root / document_path, filesystem_error);
     if (filesystem_error) {
@@ -309,13 +303,24 @@ RecoveryResult inspect_recovery(
                   "cannot inspect the autosave modification time");
         return result;
     }
-    if (autosave_time > primary_time) {
-        result.candidate = RecoveryCandidate{
-            .document_path = document_path,
-            .autosave_path = autosave_path,
-            .contents = std::move(*autosave.contents),
-        };
+    if (autosave_time <= primary_time) {
+        return result;
     }
+
+    auto autosave = load_document_from_relative_path(
+        project_root, autosave_path, validator);
+    if (!autosave.ok()) {
+        result.errors = std::move(autosave.errors);
+        return result;
+    }
+    if (*autosave.contents == *primary.contents) {
+        return result;
+    }
+    result.candidate = RecoveryCandidate{
+        .document_path = document_path,
+        .autosave_path = autosave_path,
+        .contents = std::move(*autosave.contents),
+    };
     return result;
 }
 

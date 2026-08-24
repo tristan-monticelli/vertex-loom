@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fabric/editor/autosave_scheduler.hpp"
+#include "fabric/editor/command_stack.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -11,6 +13,12 @@
 #include <vector>
 
 namespace fabric::editor {
+
+enum class AutosaveStatus {
+    not_due,
+    saved,
+    failed,
+};
 
 struct ImportedTexture {
     project::TextureAsset asset;
@@ -24,6 +32,12 @@ struct ImportedVector {
 
 class ProjectSession {
 public:
+    ProjectSession() = default;
+    ProjectSession(const ProjectSession&) = delete;
+    ProjectSession& operator=(const ProjectSession&) = delete;
+    ProjectSession(ProjectSession&&) = delete;
+    ProjectSession& operator=(ProjectSession&&) = delete;
+
     [[nodiscard]] bool create(const std::filesystem::path& project_root,
                               const project::ProjectManifest& manifest);
     [[nodiscard]] bool open(const std::filesystem::path& project_root);
@@ -33,8 +47,34 @@ public:
     [[nodiscard]] bool import_svg(const std::filesystem::path& source,
                                   const core::ResourceId& id,
                                   const std::string& name);
+    [[nodiscard]] bool set_project_name(
+        std::string name,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_pixels_per_unit(
+        double pixels_per_unit,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool undo(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool redo(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool save();
+    [[nodiscard]] AutosaveStatus update_autosave(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool accept_recovery(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    void decline_recovery() noexcept;
 
     [[nodiscard]] bool has_project() const noexcept;
+    [[nodiscard]] bool dirty() const noexcept;
+    [[nodiscard]] bool can_undo() const noexcept;
+    [[nodiscard]] bool can_redo() const noexcept;
+    [[nodiscard]] bool has_recovery() const noexcept;
     [[nodiscard]] const std::filesystem::path& project_root() const noexcept;
     [[nodiscard]] const std::optional<project::ProjectManifest>& manifest() const noexcept;
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept;
@@ -46,6 +86,9 @@ private:
     std::optional<project::ProjectManifest> manifest_;
     std::optional<ImportedTexture> imported_texture_;
     std::optional<ImportedVector> imported_vector_;
+    std::optional<project::ProjectManifest> recovery_manifest_;
+    CommandStack commands_;
+    AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
 };
 
