@@ -28,9 +28,9 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install Linux OpenGL development files
+      - name: Install Linux desktop development files
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libsdl2-dev
 
       - name: Set up and validate starter
         run: npm run setup
