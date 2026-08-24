@@ -5,10 +5,10 @@ C4Component
     title Vertex Loom — première tranche Asset Studio
     Container_Boundary(asset, "Asset Studio") {
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
-        Component(project_ui, "Project workspace", "Dear ImGui", "Création, ouverture, état de chargement et diagnostics")
+        Component(project_ui, "Project workspace", "Dear ImGui", "Création, ouverture, import PNG, état de chargement et diagnostics")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve uniquement le manifeste lu et validé en une opération, ainsi que les erreurs de la dernière ouverture")
+        Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre l'import PNG et expose les erreurs de la dernière opération")
     }
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
@@ -27,4 +27,5 @@ C4Component
   dernière session valide.
 - SDL2 possède la fenêtre et les événements ; Dear ImGui possède uniquement
   l'interface d'outil ; OpenGL efface et présente la surface.
-- Aucun import ou rendu d'asset n'est introduit dans cette tranche.
+- Un import réussi conserve le `TextureAsset` et les pixels décodés pour
+  l'aperçu ; un échec conserve le dernier import réussi.

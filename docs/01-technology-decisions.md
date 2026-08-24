@@ -7,6 +7,7 @@
 | Frontend | Asset Studio + Map Studio, C++/Dear ImGui | Deux flux spécialisés partageant le cœur. | ADR-0005 |
 | Editor shell | SDL2 2.32.10 + OpenGL + Dear ImGui 1.92.9 | Fenêtre et UI d'outil portables avec sources épinglées. | ADR-0012 |
 | PNG decoding | SDL2_image 2.8.12 | Décodeur portable, borné derrière un contrat RGBA8 interne. | ADR-0014 |
+| Texture import | JSON versionné + publication locale sans remplacement | Projet portable, source validée et contrat commun aux outils et au runtime. | ADR-0015 |
 | Backend | none | Produit local hors ligne. | — |
 | Storage | JSON + assets sur disque | Métadonnées diffables et ressources lourdes séparées. | ADR-0006 |
 | Deployment | archives desktop | Distribution locale au début. | — |

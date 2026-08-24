@@ -23,6 +23,8 @@ enum class ErrorCode {
     missing_file,
     missing_directory,
     directory_not_empty,
+    invalid_asset,
+    asset_already_exists,
 };
 
 struct Error {

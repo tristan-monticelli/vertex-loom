@@ -32,7 +32,11 @@ conservation du dernier projet valide. La coquille
 graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
 n'est configuré. Le chargeur PNG couvre un fichier RGBA valide, une extension
-incorrecte et un contenu corrompu sans initialiser de fenêtre. `npm run
+incorrecte et un contenu corrompu sans initialiser de fenêtre. L'import de
+texture couvre le round-trip du document, les chemins traversants, la copie
+persistante d'un PNG valide, le refus d'un contenu corrompu et d'un identifiant
+existant, la conservation du dernier import réussi et le rejet d'une source
+projet manquante par le validateur headless. `npm run
 validate` regroupe les validations documentaires,
 Node et C++ ;
 `npm run validate:cpp` exécute uniquement la configuration, le build et CTest.

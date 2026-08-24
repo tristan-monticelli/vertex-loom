@@ -58,6 +58,8 @@ std::string_view to_string(const ErrorCode code) noexcept {
     case ErrorCode::missing_file: return "missing_file";
     case ErrorCode::missing_directory: return "missing_directory";
     case ErrorCode::directory_not_empty: return "directory_not_empty";
+    case ErrorCode::invalid_asset: return "invalid_asset";
+    case ErrorCode::asset_already_exists: return "asset_already_exists";
     }
     return "unknown_error";
 }

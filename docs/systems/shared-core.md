@@ -4,13 +4,15 @@
 
 `fabric_core` fournit les identifiants de ressources, la version du moteur et
 la journalisation JSON Lines locale. `fabric_project` fournit le manifeste,
-la sérialisation JSON, les migrations, la création sans écrasement, le
-chargement validé du dossier projet et la sauvegarde atomique.
+la sérialisation JSON, les migrations, la création sans écrasement, les
+contrats `AssetDocument` et `TextureAsset`, le chargement validé du dossier
+projet et la publication atomique des documents.
 
 ## Entrées et sorties
 
-- Entrées : texte JSON, chemin d'un dossier projet et `ProjectManifest` C++.
-- Sorties : manifeste typé, rapport d'erreurs structurées, JSON versionné ou
+- Entrées : texte JSON, chemin d'un dossier projet, `ProjectManifest` et
+  `TextureAsset` C++.
+- Sorties : contrats typés, rapport d'erreurs structurées, JSON versionné ou
   événements JSON Lines.
 - Outil : `fabric_project_validate [--json] <project-directory>`.
 
@@ -25,7 +27,11 @@ chargement validé du dossier projet et la sauvegarde atomique.
   dossier projet après résolution.
 - Un manifeste invalide n'est jamais écrit.
 - Une création accepte uniquement une destination absente ou vide et produit
-  tous les répertoires déclarés.
+  tous les répertoires déclarés ainsi que les quatre dossiers d'assets standard.
+- Une texture publiée possède un document `<id>.texture.json` et une source
+  `<id>.png` sous le dossier `assets/textures` déclaré par le manifeste.
+- Le document d'une texture est publié en dernier et aucun import ne remplace
+  une ressource existante.
 - Le remplacement de `project.json` se fait depuis un fichier temporaire
   adjacent et complet.
 - Aucun journal n'est envoyé hors de la machine.
@@ -43,6 +49,6 @@ npm run validate:cpp
 ```
 
 CTest couvre le round-trip JSON, la migration `v0` vers `v1`, les versions
-futures, les chemins invalides, la création sans écrasement, la sauvegarde
-atomique, les dossiers complets, le logger et les sorties du validateur
-headless.
+futures, les chemins invalides, les documents de texture, la création sans
+écrasement, la sauvegarde atomique, les dossiers complets, le logger et les
+sorties du validateur headless.

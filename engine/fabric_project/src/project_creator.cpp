@@ -86,6 +86,20 @@ ManifestResult create_project(const std::filesystem::path& project_root,
         }
     }
 
+    for (const auto* asset_directory :
+         {"textures", "vectors", "animations", "materials"}) {
+        filesystem_error.clear();
+        std::filesystem::create_directories(
+            project_root / directories.assets / asset_directory,
+            filesystem_error);
+        if (filesystem_error) {
+            add_error(result.errors, ErrorCode::io_error,
+                      "directories.assets",
+                      "cannot create the standard asset directories");
+            return result;
+        }
+    }
+
     auto save_report = save_manifest_atomic(project_root, manifest);
     if (!save_report.ok()) {
         return failure_from(std::move(save_report));

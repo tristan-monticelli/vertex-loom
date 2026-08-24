@@ -1,4 +1,5 @@
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/texture_asset.hpp"
 
 #include <array>
 #include <fstream>
@@ -96,6 +97,47 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
             add_error(result.errors, ErrorCode::invalid_path, field,
                       "resolved directory must remain inside the project root");
         }
+    }
+    if (!result.errors.empty()) {
+        return result;
+    }
+
+    const auto texture_directory = project_root /
+        loaded.manifest->directories.assets / "textures";
+    filesystem_error.clear();
+    if (std::filesystem::exists(texture_directory, filesystem_error)) {
+        const auto canonical_textures = std::filesystem::weakly_canonical(
+            texture_directory, filesystem_error);
+        if (filesystem_error ||
+            !is_within_project(canonical_root, canonical_textures)) {
+            add_error(result.errors, ErrorCode::invalid_path,
+                      "assets.textures",
+                      "texture directory must remain inside the project root");
+            return result;
+        }
+        for (std::filesystem::directory_iterator iterator(
+                 texture_directory, filesystem_error), end;
+             !filesystem_error && iterator != end; iterator.increment(filesystem_error)) {
+            const auto& entry = *iterator;
+            const std::string filename = entry.path().filename().string();
+            if (!entry.is_regular_file(filesystem_error) ||
+                !filename.ends_with(".texture.json")) {
+                continue;
+            }
+            auto loaded_texture = load_texture_asset(
+                project_root, *loaded.manifest,
+                entry.path().lexically_relative(project_root));
+            result.errors.insert(result.errors.end(),
+                                 std::make_move_iterator(loaded_texture.errors.begin()),
+                                 std::make_move_iterator(loaded_texture.errors.end()));
+        }
+        if (filesystem_error) {
+            add_error(result.errors, ErrorCode::io_error, "assets.textures",
+                      "cannot inspect texture assets");
+        }
+    } else if (filesystem_error) {
+        add_error(result.errors, ErrorCode::io_error, "assets.textures",
+                  "cannot inspect the texture directory");
     }
     if (result.errors.empty()) {
         result.manifest = std::move(loaded.manifest);

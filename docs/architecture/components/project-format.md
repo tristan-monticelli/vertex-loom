@@ -4,11 +4,11 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest et erreurs structurées, avec ResourceId fourni par fabric_core")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest, AssetDocument, TextureAsset et erreurs structurées, avec ResourceId fourni par fabric_core")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
-        Component(storage, "Atomic manifest storage", "C++20 / filesystem", "Écrit un fichier adjacent puis remplace project.json")
-        Component(validator, "Project validator", "C++20", "Valide versions, identifiants, chemins et structure du dossier")
+        Component(storage, "Atomic JSON storage", "C++20 / filesystem", "Écrit un fichier adjacent puis publie manifestes et documents d'asset")
+        Component(validator, "Project validator", "C++20", "Valide versions, identifiants, chemins, assets déclarés et structure du dossier")
         Component(creator, "Project creator", "C++20 / filesystem", "Crée l'arborescence standard uniquement dans un emplacement absent ou vide")
     }
     Container(cli, "fabric_project_validate", "C++20 CLI", "Valide un projet sans ouvrir de fenêtre")
@@ -33,6 +33,12 @@ C4Component
   deux extrémités.
 - `ProjectManifest` version 1 contient le nom du projet et ses répertoires
   relatifs d'assets, d'entités, de maps, de scènes et de schémas.
+- `AssetDocument` porte la version, le type, l'identifiant et le nom communs.
+  `TextureAsset` version 1 ajoute un chemin PNG relatif, ses dimensions et le
+  format de pixels `rgba8`.
+- Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
+  normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
+  de publication : une source sans document n'est pas un asset chargeable.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
@@ -44,3 +50,5 @@ C4Component
 - La création refuse un emplacement existant non vide et ne remplace aucun
   fichier. Elle crée les répertoires déclarés avant la sauvegarde atomique du
   manifeste.
+- Le validateur headless inspecte chaque document `*.texture.json` et refuse
+  une source manquante, extérieure au projet ou incohérente avec le contrat.

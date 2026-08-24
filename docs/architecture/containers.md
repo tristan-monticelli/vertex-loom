@@ -9,8 +9,8 @@ C4Container
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre et inspecte un projet dans un atelier desktop natif")
         Container(map, "Map Studio", "C++20 / CMake", "Point d'entrée de l'éditeur de maps ; UI Dear ImGui à venir")
         Container(core, "fabric_core", "C++20 static library", "Types partagés, identifiants de ressources et journaux structurés locaux")
-        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, sérialisation et validation du format projet")
-        Container(editorlib, "fabric_editor", "C++20 static library", "Session projet et état réutilisable des outils d'authoring")
+        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, documents d'assets, sérialisation et validation du format projet")
+        Container(editorlib, "fabric_editor", "C++20 static library", "Session projet et orchestration des imports des outils d'authoring")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image", "Décodage raster et données de pixels indépendantes du GPU")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
@@ -29,6 +29,7 @@ C4Container
     Rel(projectcli, projectlib, "Utilise")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
+    Rel(editorlib, renderlib, "Valide les sources raster")
     Rel(projectlib, project, "Valide, lit et écrit")
 ```
 

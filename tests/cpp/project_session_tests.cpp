@@ -1,6 +1,8 @@
 #include "fabric/editor/project_session.hpp"
 
+#include <array>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -55,6 +57,20 @@ void write_valid_project(const std::filesystem::path& root) {
     };
     std::ofstream output(root / "project.json", std::ios::binary);
     output << fabric::project::serialize_manifest(manifest);
+}
+
+void write_valid_png(const std::filesystem::path& path) {
+    constexpr std::array<std::uint8_t, 68> png{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+        0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x04, 0x00, 0x00, 0x00, 0xb5, 0x1c, 0x0c, 0x02, 0x00, 0x00, 0x00,
+        0x0b, 0x49, 0x44, 0x41, 0x54, 0x78, 0xda, 0x63, 0xfc, 0xff, 0x1f, 0x00,
+        0x02, 0xeb, 0x01, 0xf5, 0x69, 0x76, 0x9d, 0x7b, 0x00, 0x00, 0x00, 0x00,
+        0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
+    };
+    std::ofstream output(path, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(png.data()),
+                 static_cast<std::streamsize>(png.size()));
 }
 
 void session_opens_a_valid_project() {
@@ -128,6 +144,58 @@ void failed_creation_preserves_the_active_project() {
             "failed creation replaced the active manifest");
 }
 
+void session_imports_a_valid_png_persistently() {
+    const TemporaryDirectory valid{"png-import"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.png";
+    write_valid_png(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for import did not open");
+    require(session.import_png(source, {.value = "wool-fill"}, "Wool Fill"),
+            "valid PNG import failed");
+    require(session.imported_texture().has_value(),
+            "successful import retained no texture");
+    require(session.imported_texture()->image.width == 1,
+            "import retained the wrong decoded image");
+    require(std::filesystem::is_regular_file(
+                valid.path() / "assets/textures/wool-fill.png"),
+            "import did not persist the PNG");
+    require(std::filesystem::is_regular_file(
+                valid.path() / "assets/textures/wool-fill.texture.json"),
+            "import did not persist the texture document");
+    require(fabric::project::validate_project(valid.path()).ok(),
+            "project validator rejected an imported texture");
+}
+
+void failed_import_writes_no_asset_and_preserves_the_previous_import() {
+    const TemporaryDirectory valid{"failed-png-import"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.png";
+    write_valid_png(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for failed import did not open");
+    require(session.import_png(source, {.value = "first"}, "First"),
+            "initial valid import failed");
+    const auto corrupt = valid.path() / "corrupt.png";
+    {
+        std::ofstream output(corrupt, std::ios::binary);
+        output << "not a png";
+    }
+    require(!session.import_png(corrupt, {.value = "broken"}, "Broken"),
+            "corrupt PNG was imported");
+    require(!std::filesystem::exists(
+                valid.path() / "assets/textures/broken.texture.json"),
+            "failed import published a texture document");
+    require(session.imported_texture()->asset.document.id.value == "first",
+            "failed import replaced the previous successful import");
+    require(!session.import_png(source, {.value = "first"}, "Duplicate"),
+            "duplicate texture identifier was accepted");
+    require(session.imported_texture()->asset.document.name == "First",
+            "duplicate import replaced the existing texture state");
+}
+
 } // namespace
 
 int main() {
@@ -135,5 +203,7 @@ int main() {
     session_creates_and_opens_a_project();
     failed_open_preserves_the_active_project();
     failed_creation_preserves_the_active_project();
+    session_imports_a_valid_png_persistently();
+    failed_import_writes_no_asset_and_preserves_the_previous_import();
     return 0;
 }

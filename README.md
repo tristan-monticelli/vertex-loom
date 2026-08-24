@@ -22,7 +22,7 @@ first native Asset Studio workspace.
 - Headless project validation.
 - Native SDL2/OpenGL/Dear ImGui Asset Studio shell with project inspection.
 - Safe project creation in a new or empty destination.
-- Validated PNG decoding and temporary OpenGL preview.
+- Persistent PNG import with a versioned `TextureAsset` document and OpenGL preview.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test

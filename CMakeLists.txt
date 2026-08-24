@@ -32,82 +32,85 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/migrations.cpp
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
+    engine/fabric_project/src/texture_asset.cpp
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
 target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE nlohmann_json::nlohmann_json)
+
+add_executable(fabric_project_validate tools/project_validate/main.cpp)
+target_link_libraries(fabric_project_validate PRIVATE fabric_project)
+
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    SDL2
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+    GIT_TAG release-2.32.10
+    GIT_SHALLOW TRUE
+)
+set(SDL2IMAGE_INSTALL OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_DEPS_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_BACKEND_IMAGEIO OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_BACKEND_STB ON CACHE BOOL "" FORCE)
+set(SDL2IMAGE_AVIF OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_BMP OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_GIF OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_JPG OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_JXL OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_LBM OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_PCX OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_PNG ON CACHE BOOL "" FORCE)
+set(SDL2IMAGE_PNG_SAVE OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_PNM OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_QOI OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_SVG OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_TGA OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_TIF OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_WEBP OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_XCF OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_XPM OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_XV OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    SDL2_image
+    GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
+    GIT_TAG release-2.8.12
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(SDL2 SDL2_image)
+
+add_library(fabric_render STATIC
+    engine/fabric_render/src/raster_image.cpp
+)
+target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
+target_compile_features(fabric_render PUBLIC cxx_std_20)
+target_link_libraries(fabric_render PRIVATE
+    SDL2::SDL2-static
+    SDL2_image::SDL2_image-static
+)
 
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/project_session.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)
-target_link_libraries(fabric_editor PUBLIC fabric_project)
-
-add_executable(fabric_project_validate tools/project_validate/main.cpp)
-target_link_libraries(fabric_project_validate PRIVATE fabric_project)
+target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render)
 
 if(FABRIC_BUILD_EDITORS)
-    set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL_STATIC ON CACHE BOOL "" FORCE)
-    set(SDL_TEST OFF CACHE BOOL "" FORCE)
-    set(SDL_TESTS OFF CACHE BOOL "" FORCE)
-    set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        SDL2
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-2.32.10
-        GIT_SHALLOW TRUE
-    )
     FetchContent_Declare(
         imgui_source
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
         GIT_TAG v1.92.9
         GIT_SHALLOW TRUE
     )
-    set(SDL2IMAGE_INSTALL OFF CACHE BOOL "" FORCE)
-    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_DEPS_SHARED OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_SAMPLES OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_TESTS OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_BACKEND_IMAGEIO OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_BACKEND_STB ON CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_AVIF OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_BMP OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_GIF OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_JPG OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_JXL OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_LBM OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_PCX OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_PNG ON CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_PNG_SAVE OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_PNM OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_QOI OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_SVG OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_TGA OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_TIF OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_WEBP OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_XCF OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_XPM OFF CACHE BOOL "" FORCE)
-    set(SDL2IMAGE_XV OFF CACHE BOOL "" FORCE)
-    FetchContent_Declare(
-        SDL2_image
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-        GIT_TAG release-2.8.12
-        GIT_SHALLOW TRUE
-    )
-    FetchContent_MakeAvailable(SDL2 imgui_source SDL2_image)
+    FetchContent_MakeAvailable(imgui_source)
     find_package(OpenGL REQUIRED)
-
-    add_library(fabric_render STATIC
-        engine/fabric_render/src/raster_image.cpp
-    )
-    target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
-    target_compile_features(fabric_render PUBLIC cxx_std_20)
-    target_link_libraries(fabric_render PRIVATE
-        SDL2::SDL2-static
-        SDL2_image::SDL2_image-static
-    )
 
     add_library(fabric_imgui STATIC
         ${imgui_source_SOURCE_DIR}/imgui.cpp
@@ -150,11 +153,9 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
     add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)
 
-    if(FABRIC_BUILD_EDITORS)
-        add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
-        target_link_libraries(fabric_render_tests PRIVATE fabric_render)
-        add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
-    endif()
+    add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
+    target_link_libraries(fabric_render_tests PRIVATE fabric_render)
+    add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
 
     add_test(
         NAME project_validator_accepts_valid_project

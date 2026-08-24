@@ -1,27 +1,40 @@
 #pragma once
 
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/texture_asset.hpp"
+#include "fabric/render/raster_image.hpp"
 
 #include <filesystem>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace fabric::editor {
+
+struct ImportedTexture {
+    project::TextureAsset asset;
+    render::RasterImage image;
+};
 
 class ProjectSession {
 public:
     [[nodiscard]] bool create(const std::filesystem::path& project_root,
                               const project::ProjectManifest& manifest);
     [[nodiscard]] bool open(const std::filesystem::path& project_root);
+    [[nodiscard]] bool import_png(const std::filesystem::path& source,
+                                  const core::ResourceId& id,
+                                  const std::string& name);
 
     [[nodiscard]] bool has_project() const noexcept;
     [[nodiscard]] const std::filesystem::path& project_root() const noexcept;
     [[nodiscard]] const std::optional<project::ProjectManifest>& manifest() const noexcept;
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept;
+    [[nodiscard]] const std::optional<ImportedTexture>& imported_texture() const noexcept;
 
 private:
     std::filesystem::path project_root_;
     std::optional<project::ProjectManifest> manifest_;
+    std::optional<ImportedTexture> imported_texture_;
     std::vector<project::Error> errors_;
 };
 
