@@ -181,6 +181,10 @@ TEST_CASE("invalid autosave is diagnosed and never offered") {
         std::ofstream output(autosave, std::ios::binary);
         output << "{not-json";
     }
+    std::filesystem::last_write_time(
+        project.path() / "project.json",
+        std::filesystem::file_time_type::clock::now() -
+            std::chrono::seconds{5});
 
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));

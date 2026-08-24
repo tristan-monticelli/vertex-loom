@@ -975,6 +975,7 @@ SpriteSheetResult regenerate_sprite_sheet(
                   "cannot preserve the current atlas for rollback");
         return result;
     }
+    old_atlas_input.close();
     auto atlas_save = save_document_atomic(
         project_root, definition.atlas, atlas_contents,
         [&definition](const std::string_view contents) {
