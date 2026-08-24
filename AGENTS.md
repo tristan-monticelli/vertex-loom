@@ -65,5 +65,6 @@ Once the project is `initialized`, follow Development, Audit, Documentation, and
 - Branches: `feat/`, `fix/`, `refactor/`, `test/`, `docs/`, `chore/`, `perf/`.
 - Commits: `type(scope): short description`.
 - Allowed types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`.
-- Request confirmation before deletion or commit.
+- Request confirmation before deletion.
+- Commit each verified functional step without requesting confirmation.
 - Never delete automatically.
