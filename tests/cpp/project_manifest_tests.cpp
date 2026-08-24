@@ -6,6 +6,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <stdexcept>
 #include <string>
 
@@ -304,8 +305,8 @@ void vector_asset_round_trip_is_lossless() {
             .id = {.value = "thread-outline"},
             .name = "Thread Outline",
         },
+        .source_kind = fabric::project::VectorSourceKind::linked_svg,
         .source = "assets/vectors/thread-outline.svg",
-        .format = "svg",
     };
     const auto parsed = fabric::project::parse_vector_asset(
         manifest, fabric::project::serialize_vector_asset(expected));
@@ -313,9 +314,93 @@ void vector_asset_round_trip_is_lossless() {
     require(*parsed.asset == expected, "vector round-trip lost data");
 }
 
+void legacy_vector_asset_migrates_without_changing_its_source() {
+    constexpr std::string_view legacy = R"({
+  "schemaVersion": 1,
+  "type": "vector",
+  "id": "thread-outline",
+  "name": "Thread Outline",
+  "source": "assets/vectors/thread-outline.svg",
+  "format": "svg"
+})";
+    const auto migrated = fabric::project::parse_vector_asset(
+        example_manifest(), legacy);
+    require(migrated.ok(), "legacy vector asset did not migrate");
+    require(migrated.asset->document.schema_version ==
+                fabric::project::current_vector_schema_version,
+            "legacy vector retained the old schema version");
+    require(migrated.asset->source_kind ==
+                fabric::project::VectorSourceKind::linked_svg,
+            "legacy SVG did not become linkedSvg");
+    require(migrated.asset->source ==
+                "assets/vectors/thread-outline.svg",
+            "legacy SVG source path changed during migration");
+    const auto serialized =
+        fabric::project::serialize_vector_asset(*migrated.asset);
+    require(serialized.find("\"sourceKind\": \"linkedSvg\"") !=
+                std::string::npos,
+            "migrated vector did not serialize as linkedSvg");
+    require(serialized.find("\"format\"") == std::string::npos,
+            "migrated vector retained the obsolete format field");
+}
+
+void loading_a_legacy_vector_never_rewrites_the_svg() {
+    const TemporaryProject project;
+    std::filesystem::create_directories(project.root() / "assets/vectors");
+    const auto manifest = example_manifest();
+    constexpr std::string_view source_bytes =
+        "<svg xmlns=\"http://www.w3.org/2000/svg\"><path d=\"M0 0L1 1\"/></svg>";
+    {
+        std::ofstream source(
+            project.root() / "assets/vectors/thread-outline.svg",
+            std::ios::binary);
+        source << source_bytes;
+        std::ofstream document(
+            project.root() / "assets/vectors/thread-outline.vector.json",
+            std::ios::binary);
+        document << R"({
+  "schemaVersion": 1,
+  "type": "vector",
+  "id": "thread-outline",
+  "name": "Thread Outline",
+  "source": "assets/vectors/thread-outline.svg",
+  "format": "svg"
+})";
+    }
+
+    const auto loaded = fabric::project::load_vector_asset(
+        project.root(), manifest,
+        "assets/vectors/thread-outline.vector.json");
+    require(loaded.ok(), "legacy vector document did not load through migration");
+    std::ifstream source(
+        project.root() / "assets/vectors/thread-outline.svg",
+        std::ios::binary);
+    const std::string after{std::istreambuf_iterator<char>{source},
+                            std::istreambuf_iterator<char>{}};
+    require(after == source_bytes,
+            "loading the legacy vector rewrote its SVG source bytes");
+}
+
+void native_vector_is_rejected_until_geometry_is_available() {
+    constexpr std::string_view native_without_geometry = R"({
+  "schemaVersion": 2,
+  "type": "vector",
+  "id": "thread-outline",
+  "name": "Thread Outline",
+  "sourceKind": "native"
+})";
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(), native_without_geometry);
+    require(!parsed.ok(),
+            "native vector without geometry was accepted as a false success");
+    require(!parsed.errors.empty() && parsed.errors.front().field == "native",
+            "native vector rejection did not identify unavailable geometry");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
             .type = "vector",
             .id = {.value = "thread-outline"},
             .name = "Thread Outline",
@@ -341,6 +426,7 @@ void project_validation_rejects_a_missing_vector_source() {
     }
     const fabric::project::VectorAsset vector{
         .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
             .type = "vector",
             .id = {.value = "missing"},
             .name = "Missing",
@@ -375,6 +461,9 @@ int main() {
     invalid_texture_paths_are_rejected();
     project_validation_rejects_a_missing_texture_source();
     vector_asset_round_trip_is_lossless();
+    legacy_vector_asset_migrates_without_changing_its_source();
+    loading_a_legacy_vector_never_rewrites_the_svg();
+    native_vector_is_rejected_until_geometry_is_available();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

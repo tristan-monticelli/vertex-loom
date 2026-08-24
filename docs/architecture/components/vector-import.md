@@ -32,10 +32,12 @@ C4Component
 
 - L'import accepte uniquement l'extension `.svg`, sans tenir compte de la
   casse, puis laisse NanoSVG vérifier le contenu.
-- La source SVG originale est copiée sans conversion. Après migration elle
-  devient `sourceKind = linkedSvg` et reste prévisualisée par NanoSVG.
-- Un document `sourceKind = native` ne dépend pas d’un SVG : il porte sa
-  géométrie, ses fills, contours, clips et transforms versionnés.
+- La source SVG originale est copiée sans conversion. Le lecteur migre les
+  documents v1 en mémoire vers `sourceKind = linkedSvg`, sans réécrire le SVG,
+  qui reste prévisualisé par NanoSVG.
+- Le contrat réserve `sourceKind = native` à une géométrie sans dépendance SVG.
+  Ce mode est actuellement refusé ; sa livraison ajoutera les formes, fills,
+  contours, clips et transforms versionnés.
 - Une conversion de SVG lié vers natif est explicite et doit présenter les
   éléments non pris en charge avant publication.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un

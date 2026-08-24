@@ -12,16 +12,22 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_vector_schema_version =
-    current_asset_schema_version;
+inline constexpr std::uint32_t current_vector_schema_version = 2;
+
+enum class VectorSourceKind {
+    linked_svg,
+    native,
+};
+
+[[nodiscard]] std::string_view to_string(VectorSourceKind kind) noexcept;
 
 struct VectorAsset {
     AssetDocument document{
         .schema_version = current_vector_schema_version,
         .type = "vector",
     };
+    VectorSourceKind source_kind{VectorSourceKind::linked_svg};
     std::filesystem::path source;
-    std::string format{"svg"};
 
     friend bool operator==(const VectorAsset&, const VectorAsset&) = default;
 };

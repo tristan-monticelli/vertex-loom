@@ -264,10 +264,12 @@ TEST_CASE("headless project validation rejects duplicate resource identifiers") 
     };
     const fabric::project::VectorAsset vector{
         .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
             .type = "vector",
             .id = {.value = "shared-resource"},
             .name = "Shared Vector",
         },
+        .source_kind = fabric::project::VectorSourceKind::linked_svg,
         .source = "assets/vectors/shared-resource.svg",
     };
     {

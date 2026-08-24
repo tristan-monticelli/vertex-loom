@@ -336,8 +336,8 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
             .id = id,
             .name = name,
         },
+        .source_kind = project::VectorSourceKind::linked_svg,
         .source = project::vector_source_path(*manifest_, id),
-        .format = "svg",
     };
     auto published = project::publish_vector_asset(
         project_root_, *manifest_, asset, source);

@@ -46,12 +46,13 @@ C4Component
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
   normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
   de publication : une source sans document n'est pas un asset chargeable.
-- `VectorAsset v1` déclare actuellement une source normalisée
-  `assets/vectors/<id>.svg`. Sa migration v2 conserve cette source et la marque
-  `sourceKind = linkedSvg` sans modifier ses octets.
-- `VectorAsset v2` devient le contrat cible. `sourceKind = native` porte des
-  nœuds stables, formes, fills, contours, clips et transforms ;
-  `sourceKind = linkedSvg` conserve les imports opaques compatibles.
+- `VectorAsset v2` est la version écrite. Un document v1 est accepté en lecture,
+  conserve sa source `assets/vectors/<id>.svg` et devient
+  `sourceKind = linkedSvg` sans modifier le fichier source.
+- `sourceKind = linkedSvg` est actuellement chargeable et publiable.
+  `sourceKind = native` est reconnu mais refusé jusqu’à la livraison des nœuds,
+  formes, fills, contours, clips et transforms ; aucun document natif vide ne
+  peut donc être publié comme faux succès.
 - Le contrat hérité `SpriteSheetDefinition v1` déclare
   `assets/textures/<id>.sprite.json`, conserve
   sa source sous `<id>.aseprite` ou `<id>.source.png` et référence l’atlas

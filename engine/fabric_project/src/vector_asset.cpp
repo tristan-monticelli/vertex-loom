@@ -45,7 +45,34 @@ bool read_version(const Json& object, std::uint32_t& destination,
     return true;
 }
 
+bool read_source_kind(const Json& object, VectorSourceKind& destination,
+                      std::vector<Error>& errors) {
+    std::string value;
+    if (!read_string(object, "sourceKind", value, errors)) {
+        return false;
+    }
+    if (value == "linkedSvg") {
+        destination = VectorSourceKind::linked_svg;
+        return true;
+    }
+    if (value == "native") {
+        destination = VectorSourceKind::native;
+        return true;
+    }
+    add_error(errors, ErrorCode::invalid_asset, "sourceKind",
+              "must be linkedSvg or native");
+    return false;
+}
+
 } // namespace
+
+std::string_view to_string(const VectorSourceKind kind) noexcept {
+    switch (kind) {
+    case VectorSourceKind::linked_svg: return "linkedSvg";
+    case VectorSourceKind::native: return "native";
+    }
+    return "native";
+}
 
 std::filesystem::path vector_source_path(const ProjectManifest& manifest,
                                          const core::ResourceId& id) {
@@ -63,7 +90,7 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
     ValidationReport report;
     if (asset.document.schema_version != current_vector_schema_version) {
         add_error(report.errors, ErrorCode::unsupported_schema_version,
-                  "schemaVersion", "only vector schema version 1 is supported");
+                  "schemaVersion", "only vector schema version 2 is supported");
     }
     if (asset.document.type != "vector") {
         add_error(report.errors, ErrorCode::invalid_asset, "type",
@@ -77,27 +104,34 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
         add_error(report.errors, ErrorCode::invalid_asset, "name",
                   "must not be empty");
     }
-    if (!detail::is_portable_relative_path(asset.source) ||
-        asset.source != vector_source_path(manifest, asset.document.id)) {
-        add_error(report.errors, ErrorCode::invalid_path, "source",
-                  "must be the canonical project-relative vector path");
-    }
-    if (asset.format != "svg") {
-        add_error(report.errors, ErrorCode::invalid_asset, "format",
-                  "only svg is supported");
+    if (asset.source_kind == VectorSourceKind::linked_svg) {
+        if (!detail::is_portable_relative_path(asset.source) ||
+            asset.source != vector_source_path(manifest, asset.document.id)) {
+            add_error(report.errors, ErrorCode::invalid_path, "source",
+                      "linkedSvg source must use the canonical project-relative vector path");
+        }
+    } else {
+        if (!asset.source.empty()) {
+            add_error(report.errors, ErrorCode::invalid_asset, "source",
+                      "native vectors must not declare an SVG source");
+        }
+        add_error(report.errors, ErrorCode::invalid_asset, "native",
+                  "native vector geometry is not available in this migration slice");
     }
     return report;
 }
 
 std::string serialize_vector_asset(const VectorAsset& asset) {
-    const Json document = {
+    Json document = {
         {"schemaVersion", asset.document.schema_version},
         {"type", asset.document.type},
         {"id", asset.document.id.value},
         {"name", asset.document.name},
-        {"source", asset.source.generic_string()},
-        {"format", asset.format},
+        {"sourceKind", std::string(to_string(asset.source_kind))},
     };
+    if (asset.source_kind == VectorSourceKind::linked_svg) {
+        document["source"] = asset.source.generic_string();
+    }
     return document.dump(2) + '\n';
 }
 
@@ -119,15 +153,32 @@ VectorAssetResult parse_vector_asset(const ProjectManifest& manifest,
     }
 
     VectorAsset asset;
-    read_version(document, asset.document.schema_version, result.errors);
+    std::uint32_t source_version{};
+    read_version(document, source_version, result.errors);
     read_string(document, "type", asset.document.type, result.errors);
     read_string(document, "id", asset.document.id.value, result.errors);
     read_string(document, "name", asset.document.name, result.errors);
-    std::string source;
-    if (read_string(document, "source", source, result.errors)) {
-        asset.source = source;
+    if (source_version == 1) {
+        std::string format;
+        read_string(document, "format", format, result.errors);
+        if (format != "svg") {
+            add_error(result.errors, ErrorCode::invalid_asset, "format",
+                      "vector schema version 1 only supports svg");
+        }
+        asset.source_kind = VectorSourceKind::linked_svg;
+    } else if (source_version == current_vector_schema_version) {
+        read_source_kind(document, asset.source_kind, result.errors);
+    } else if (result.errors.empty()) {
+        add_error(result.errors, ErrorCode::unsupported_schema_version,
+                  "schemaVersion", "only vector schema versions 1 and 2 are readable");
     }
-    read_string(document, "format", asset.format, result.errors);
+    if (asset.source_kind == VectorSourceKind::linked_svg) {
+        std::string source;
+        if (read_string(document, "source", source, result.errors)) {
+            asset.source = source;
+        }
+    }
+    asset.document.schema_version = current_vector_schema_version;
     if (!result.errors.empty()) {
         return result;
     }
@@ -211,6 +262,11 @@ VectorAssetResult publish_vector_asset(
     auto validation = validate_vector_asset(manifest, asset);
     if (!validation.ok()) {
         result.errors = std::move(validation.errors);
+        return result;
+    }
+    if (asset.source_kind != VectorSourceKind::linked_svg) {
+        add_error(result.errors, ErrorCode::invalid_asset, "sourceKind",
+                  "publish_vector_asset only publishes linked SVG imports");
         return result;
     }
     const auto document_relative = vector_document_path(
