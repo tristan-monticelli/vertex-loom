@@ -25,8 +25,8 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | État | Constat et preuve | Correction attendue |
 | --- | --- | --- |
 | CONFORME | La création de projet valide le nom, l’identifiant et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage et enrichir le prompt. |
-| MANQUE | Le prompt « New project » de `asset_studio/main.cpp` ne demande que destination, nom et identifiant ; les unités restent un réglage ultérieur dans l’inspecteur. | Ajouter un assistant dédié avec résumé, unités, valeurs par défaut explicites et validation avant création. |
-| MANQUE | Les actions PNG, SVG, Aseprite et sprite PNG sont quatre formulaires d’import proches, centrés sur chemin/nom/identifiant. | Séparer la bibliothèque de sources, l’import, la conversion et la création de documents ; fournir des réglages et un aperçu avant publication. |
+| CONFORME | `CreateProjectPrompt` demande destination, nom, identifiant, unités monde, preset et `pixelsPerUnit`, puis affiche erreurs et résumé avant création. | Conserver les tests headless du modèle. |
+| MANQUE | Les états PNG, SVG, Aseprite et sprite PNG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
 | MANQUE | `VectorAsset v1` ne contient qu’un chemin vers un SVG opaque et un champ `format = svg`. | Introduire un document vectoriel natif versionné dont le SVG n’est qu’une provenance ou un mode lié. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
 | MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
@@ -35,7 +35,11 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | CONFORME | Le registre de ressources vérifie types, doublons, documents manquants et cycles. | Étendre ses types aux formes, fills, animations, entités et maps. |
 | CONFORME | La branche passe `npm run validate` et la matrice macOS/Windows/Linux. | Garder ce gate après chaque incrément. |
 
-## Principes de conception verrouillés
+## Décisions architecturales acceptées
+
+Les cases de cette section prouvent une décision documentée, pas son
+implémentation. Les preuves fonctionnelles restent exclusivement dans les
+étapes et gates ci-dessous.
 
 - [x] Une action `Create…` ouvre un prompt propre au type créé : projet,
   artwork vectoriel, matériau/fill, entité, animation, prefab, map ou scène.
@@ -80,29 +84,34 @@ runtime et chaque futur document possède un propriétaire clair.
 
 ## Étape B — Hub de création et prompts dédiés
 
-- [x] Remplacer la colonne d’actions d’import par un hub `Create`, `Import` et
-  `Add existing`.
+- [x] Remplacer la colonne d’actions d’import par des sections distinctes
+  `Create`, `Import` et `Add existing`.
+- [ ] Rendre `Add existing` fonctionnel avec un sélecteur de ressources
+  enregistrées ; le bouton actuel est uniquement visible et désactivé.
 - [x] Enrichir `Create project` : destination, nom, identifiant, unités,
   pixels par unité, preset de projet et résumé final.
-- [x] Ajouter `Create vector artwork` : nom, identifiant, taille de travail,
-  origine, unités, première forme et fill initial.
-- [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation à
-  mesure que leurs contrats deviennent disponibles. Aucun formulaire générique
-  n’est ouvert avant ces contrats ; les trois actions sont visibles mais
-  désactivées.
+- [x] Ajouter le prompt `Create vector artwork` : nom, identifiant, taille de
+  travail, origine, unités, première forme, fill initial et couleur.
+- [ ] Publier réellement l’artwork créé ; le prompt actuel prépare seulement
+  une intention en mémoire afin de ne pas écrire un faux document v1.
+- [ ] Ajouter les prompts dédiés pour matériau/fill, entité et animation après
+  livraison de leurs contrats ; les boutons actuels sont uniquement visibles
+  et désactivés.
 - [x] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
   doit pas modifier le projet ni polluer le prompt suivant.
 - [x] Afficher erreurs par champ, conflits d’identifiants et destination exacte
   avant confirmation.
-- [x] Tester les modèles de prompt et leurs validations sans Dear ImGui ; ne
-  laisser dans `main.cpp` que le rendu des widgets.
+- [x] Tester les modèles de prompt et leurs validations sans Dear ImGui.
+- [ ] Sortir de `main.cpp` l’orchestration des imports, des previews OpenGL et
+  du legacy afin de n’y laisser que le routage et le rendu des widgets.
 
 Gate : deux opérations différentes ne partagent ni libellé ambigu, ni état
 caché, ni publication implicite.
 
-État : gate validé. `Create vector artwork` prépare une intention native
-explicite sans écrire de document v1 ; sa publication commence avec
-`VectorAsset v2` à l’étape C.
+État : gate partiellement validé. La séparation des libellés, des modèles et
+des états est livrée. `Add existing`, la publication d’artwork et l’extraction
+de l’orchestration hors de `main.cpp` restent ouvertes. La publication native
+commence avec `VectorAsset v2` à l’étape C.
 
 ## Étape C — `VectorAsset v2` natif
 
