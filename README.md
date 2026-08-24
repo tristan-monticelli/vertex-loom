@@ -61,8 +61,9 @@ Rule documents live in CTXRoute's canonical
 [`.claude/hooks/docs/`](.claude/hooks/docs/) directory and remain available to
 both Codex and Claude-compatible tooling.
 
-CTXRoute never modifies global Codex settings during installation. The tracked
-`.codex/hooks.json` configuration is local to this project.
+CTXRoute never modifies global agent settings during installation. The tracked
+`.codex/` and `.claude/` configurations remain local to this project and work
+with both Codex and Claude-compatible tooling.
 
 For prerequisite diagnostics without installing anything, run
 `npm run setup:check`.
