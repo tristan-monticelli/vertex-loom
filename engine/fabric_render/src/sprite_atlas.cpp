@@ -398,6 +398,10 @@ SpriteAtlasResult build_sprite_atlas(
         return atlas_failure(SpriteAtlasErrorCode::no_frames,
                              "at least one sprite frame is required");
     }
+    if (frames.size() > maximum_aseprite_frames) {
+        return atlas_failure(SpriteAtlasErrorCode::atlas_too_large,
+                             "sprite atlas supports at most 65535 frames");
+    }
     std::vector<PackedInput> inputs;
     inputs.reserve(frames.size());
     std::uint64_t total_area = 0;
@@ -424,14 +428,16 @@ SpriteAtlasResult build_sprite_atlas(
     }
     std::ranges::sort(inputs, [](const PackedInput& left,
                                  const PackedInput& right) {
-        return std::tuple{std::max(left.width, left.height),
-                          static_cast<std::uint64_t>(left.width) * left.height,
-                          left.height, left.width,
-                          std::numeric_limits<std::size_t>::max() - left.index} >
-            std::tuple{std::max(right.width, right.height),
-                       static_cast<std::uint64_t>(right.width) * right.height,
-                       right.height, right.width,
-                       std::numeric_limits<std::size_t>::max() - right.index};
+        const auto left_key = std::tuple{
+            std::max(left.width, left.height),
+            static_cast<std::uint64_t>(left.width) * left.height, left.height,
+            left.width};
+        const auto right_key = std::tuple{
+            std::max(right.width, right.height),
+            static_cast<std::uint64_t>(right.width) * right.height,
+            right.height, right.width};
+        return left_key != right_key ? left_key > right_key
+                                     : left.index < right.index;
     });
 
     std::uint32_t atlas_width = next_power_of_two(maximum_width);

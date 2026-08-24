@@ -33,6 +33,15 @@ Bytes pixel(const RasterImage& value, const std::uint32_t x,
             value.rgba8[offset + 2], value.rgba8[offset + 3]};
 }
 
+std::uint64_t fnv1a64(const Bytes& bytes) {
+    std::uint64_t hash = 14'695'981'039'346'656'037ULL;
+    for (const std::uint8_t byte : bytes) {
+        hash ^= byte;
+        hash *= 1'099'511'628'211ULL;
+    }
+    return hash;
+}
+
 class TemporaryPng {
 public:
     explicit TemporaryPng(const Bytes& contents) {
@@ -139,6 +148,7 @@ TEST_CASE("MaxRects atlas and PNG output are deterministic and extruded") {
     REQUIRE(first.ok());
     REQUIRE(second.ok());
     CHECK(first.atlas->png == second.atlas->png);
+    CHECK(fnv1a64(first.atlas->png) == 17'850'407'558'359'247'692ULL);
     CHECK(first.atlas->frames == second.atlas->frames);
     const auto& metadata = first.atlas->frames[0];
     CHECK(metadata.source_bounds == fabric::render::SpriteRect{1, 0, 2, 2});

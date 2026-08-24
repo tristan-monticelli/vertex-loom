@@ -59,4 +59,5 @@ C4Component
 - `fabric/render/sprite_atlas.hpp` expose découpage et génération d’atlas ;
   `fabric_render/src/sprite_atlas.cpp` porte MaxRects, extrusion et PNG.
 - `fabric/project/sprite_sheet.hpp` expose `SpriteSheetDefinition v1` et
-  `fabric_project/src/sprite_sheet.cpp` porte son JSON et sa publication.
+  `fabric_project/src/sprite_sheet.cpp` porte son JSON, sa publication et la
+  validation complète signature/chunks/CRC/zlib de l’atlas PNG.

@@ -4,6 +4,7 @@
 #include "fabric/project/document_storage.hpp"
 
 #include <nlohmann/json.hpp>
+#include <zlib.h>
 
 #include <algorithm>
 #include <array>
@@ -216,53 +217,159 @@ std::uint32_t read_big_endian_u32(const std::uint8_t* bytes) {
         static_cast<std::uint32_t>(bytes[3]);
 }
 
-ValidationReport validate_atlas_header(const std::filesystem::path& path,
-                                       const SpriteSize& expected) {
-    std::ifstream input(path, std::ios::binary);
-    std::array<std::uint8_t, 24> header{};
-    input.read(reinterpret_cast<char*>(header.data()),
-               static_cast<std::streamsize>(header.size()));
-    constexpr std::array<std::uint8_t, 8> signature{
-        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
-    ValidationReport report;
-    if (input.gcount() != static_cast<std::streamsize>(header.size()) ||
-        !std::equal(signature.begin(), signature.end(), header.begin()) ||
-        std::memcmp(header.data() + 12, "IHDR", 4) != 0) {
-        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
-                  "atlas does not contain a complete PNG IHDR");
-        return report;
-    }
-    if (read_big_endian_u32(header.data() + 16) != expected.width ||
-        read_big_endian_u32(header.data() + 20) != expected.height) {
-        add_error(report.errors, ErrorCode::invalid_asset, "atlasSize",
-                  "atlas PNG dimensions differ from the document");
-    }
-    return report;
-}
-
 ValidationReport validate_atlas_bytes(const std::string_view contents,
                                       const SpriteSize& expected) {
     ValidationReport report;
     constexpr std::array<std::uint8_t, 8> signature{
         0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a};
-    if (contents.size() < 24) {
+    if (contents.size() < 33 || contents.size() > 256U * 1024U * 1024U) {
         add_error(report.errors, ErrorCode::invalid_asset, "atlas",
-                  "atlas does not contain a complete PNG IHDR");
+                  "atlas PNG size is outside the supported range");
         return report;
     }
-    const auto* header = reinterpret_cast<const std::uint8_t*>(contents.data());
-    if (!std::equal(signature.begin(), signature.end(), header) ||
-        std::memcmp(header + 12, "IHDR", 4) != 0) {
+    const auto* bytes = reinterpret_cast<const std::uint8_t*>(contents.data());
+    if (!std::equal(signature.begin(), signature.end(), bytes)) {
         add_error(report.errors, ErrorCode::invalid_asset, "atlas",
-                  "atlas does not contain a complete PNG IHDR");
+                  "atlas does not contain a valid PNG signature");
         return report;
     }
-    if (read_big_endian_u32(header + 16) != expected.width ||
-        read_big_endian_u32(header + 20) != expected.height) {
-        add_error(report.errors, ErrorCode::invalid_asset, "atlasSize",
-                  "atlas PNG dimensions differ from the document");
+    std::size_t position = signature.size();
+    bool saw_header = false;
+    bool saw_image_data = false;
+    bool saw_end = false;
+    std::vector<std::uint8_t> compressed;
+    while (position < contents.size()) {
+        if (contents.size() - position < 12U) {
+            add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                      "atlas PNG chunk header is truncated");
+            return report;
+        }
+        const std::uint32_t length = read_big_endian_u32(bytes + position);
+        position += 4U;
+        if (length > contents.size() - position - 8U) {
+            add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                      "atlas PNG chunk exceeds the file bounds");
+            return report;
+        }
+        const auto* type = bytes + position;
+        const auto* payload = type + 4U;
+        const std::uint32_t stored_crc =
+            read_big_endian_u32(payload + length);
+        const uLong computed_crc = crc32(
+            0, type, static_cast<uInt>(static_cast<std::uint64_t>(length) + 4U));
+        if (stored_crc != static_cast<std::uint32_t>(computed_crc)) {
+            add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                      "atlas PNG chunk CRC is invalid");
+            return report;
+        }
+        if (std::memcmp(type, "IHDR", 4) == 0) {
+            if (saw_header || position != 12U || length != 13U) {
+                add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                          "atlas PNG IHDR is duplicated or malformed");
+                return report;
+            }
+            saw_header = true;
+            if (read_big_endian_u32(payload) != expected.width ||
+                read_big_endian_u32(payload + 4) != expected.height) {
+                add_error(report.errors, ErrorCode::invalid_asset, "atlasSize",
+                          "atlas PNG dimensions differ from the document");
+                return report;
+            }
+            if (payload[8] != 8 || payload[9] != 6 || payload[10] != 0 ||
+                payload[11] != 0 || payload[12] != 0) {
+                add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                          "atlas PNG must be non-interlaced RGBA8");
+                return report;
+            }
+        } else if (std::memcmp(type, "IDAT", 4) == 0) {
+            if (!saw_header || saw_end ||
+                length > 256U * 1024U * 1024U - compressed.size()) {
+                add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                          "atlas PNG image data ordering or size is invalid");
+                return report;
+            }
+            saw_image_data = true;
+            compressed.insert(compressed.end(), payload, payload + length);
+        } else if (std::memcmp(type, "IEND", 4) == 0) {
+            if (length != 0 || !saw_image_data ||
+                position + 8U != contents.size()) {
+                add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                          "atlas PNG IEND is malformed or not final");
+                return report;
+            }
+            saw_end = true;
+        } else {
+            add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                      "atlas PNG contains a non-canonical chunk");
+            return report;
+        }
+        position += static_cast<std::size_t>(length) + 8U;
+    }
+    if (!saw_header || !saw_image_data || !saw_end || compressed.empty()) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas PNG is missing a required chunk");
+        return report;
+    }
+    const std::uint64_t row_size =
+        static_cast<std::uint64_t>(expected.width) * 4U + 1U;
+    const std::uint64_t decoded_size64 = row_size * expected.height;
+    if (decoded_size64 > 256U * 1024U * 1024U ||
+        compressed.size() > std::numeric_limits<uInt>::max() ||
+        decoded_size64 > std::numeric_limits<uInt>::max()) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas decoded data exceeds the validation limit");
+        return report;
+    }
+    std::vector<std::uint8_t> decoded(
+        static_cast<std::size_t>(decoded_size64));
+    z_stream stream{};
+    stream.next_in = compressed.data();
+    stream.avail_in = static_cast<uInt>(compressed.size());
+    stream.next_out = decoded.data();
+    stream.avail_out = static_cast<uInt>(decoded.size());
+    if (inflateInit(&stream) != Z_OK) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "cannot initialize atlas PNG decompression");
+        return report;
+    }
+    const int inflate_status = inflate(&stream, Z_FINISH);
+    const bool decoded_exactly = inflate_status == Z_STREAM_END &&
+        stream.avail_in == 0 && stream.total_out == decoded.size();
+    inflateEnd(&stream);
+    if (!decoded_exactly) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas PNG image data is corrupt or has the wrong size");
+        return report;
+    }
+    for (std::uint32_t row = 0; row < expected.height; ++row) {
+        if (decoded[static_cast<std::size_t>(row) * row_size] != 0) {
+            add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                      "atlas PNG must use deterministic unfiltered scanlines");
+            return report;
+        }
     }
     return report;
+}
+
+ValidationReport validate_atlas_file(const std::filesystem::path& path,
+                                     const SpriteSize& expected) {
+    std::error_code filesystem_error;
+    const auto size = std::filesystem::file_size(path, filesystem_error);
+    ValidationReport report;
+    if (filesystem_error || size > 256U * 1024U * 1024U) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "atlas PNG is inaccessible or too large");
+        return report;
+    }
+    std::ifstream input(path, std::ios::binary);
+    const std::string contents{std::istreambuf_iterator<char>{input},
+                               std::istreambuf_iterator<char>{}};
+    if (!input && !input.eof()) {
+        add_error(report.errors, ErrorCode::invalid_asset, "atlas",
+                  "cannot read the atlas PNG");
+        return report;
+    }
+    return validate_atlas_bytes(contents, expected);
 }
 
 ValidationReport validate_serialized_sprite_sheet(
@@ -782,7 +889,7 @@ SpriteSheetResult load_sprite_sheet(
             canonical_atlas = canonical;
         }
     }
-    auto atlas_validation = validate_atlas_header(
+    auto atlas_validation = validate_atlas_file(
         canonical_atlas, result.asset->atlas_size);
     if (!atlas_validation.ok()) {
         result.asset.reset();

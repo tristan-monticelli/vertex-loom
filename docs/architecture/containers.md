@@ -9,7 +9,7 @@ C4Container
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre et inspecte un projet dans un atelier desktop natif")
         Container(map, "Map Studio", "C++20 / CMake", "Point d'entrée de l'éditeur de maps ; UI Dear ImGui à venir")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
-        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, documents d'assets, sérialisation et validation du format projet")
+        Container(projectlib, "fabric_project", "C++20 / nlohmann-json / zlib", "Manifest, documents d'assets, sérialisation et validation du format projet et des atlas PNG")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, historique réversible, autosave et orchestration des imports")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / zlib", "Décodage PNG/SVG, lecture Aseprite et génération déterministe d’atlas indépendants du GPU")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")

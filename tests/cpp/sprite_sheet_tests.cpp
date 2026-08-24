@@ -178,7 +178,7 @@ TEST_CASE("sprite sheet publication preserves source and publishes JSON last") {
           fabric::project::ErrorCode::asset_already_exists);
 }
 
-TEST_CASE("headless validation rejects an atlas with inconsistent dimensions") {
+TEST_CASE("headless validation rejects a corrupt atlas PNG") {
     TemporaryProject project;
     auto value = fixture(project.manifest());
     const auto source = write_source(project, ".aseprite");
@@ -198,5 +198,5 @@ TEST_CASE("headless validation rejects an atlas with inconsistent dimensions") {
 
     const auto report = fabric::project::validate_project(project.root());
     REQUIRE_FALSE(report.ok());
-    CHECK(report.errors[0].field == "atlasSize");
+    CHECK(report.errors[0].field == "atlas");
 }

@@ -393,7 +393,13 @@ private:
         switch (type) {
         case 0x0004: parse_old_palette(chunk, frame.palette, false); break;
         case 0x0011: parse_old_palette(chunk, frame.palette, true); break;
-        case 0x2004: parse_layer(chunk); break;
+        case 0x2004:
+            if (frame_index != 0) {
+                fail(AsepriteErrorCode::invalid_metadata, chunk_offset,
+                     "layer chunks are only supported in the first frame");
+            }
+            parse_layer(chunk);
+            break;
         case 0x2005: parse_cel(chunk, frame_index, frame); break;
         case 0x2006: parse_cel_extra(chunk); break;
         case 0x2007: parse_color_profile(chunk); break;
@@ -436,12 +442,14 @@ private:
                      "old palette packet exceeds 256 entries");
             }
             for (std::uint32_t index = 0; index < count; ++index) {
-                auto convert = [six_bit](const std::uint8_t value) {
+                auto convert = [six_bit, &chunk](const std::uint8_t value) {
                     if (!six_bit) {
                         return value;
                     }
                     if (value > 63) {
-                        return static_cast<std::uint8_t>(255);
+                        fail(AsepriteErrorCode::invalid_palette,
+                             chunk.offset() - 1U,
+                             "six-bit palette value exceeds 63");
                     }
                     return static_cast<std::uint8_t>(
                         (static_cast<std::uint32_t>(value) * 255U + 31U) /
@@ -636,9 +644,9 @@ private:
         const std::uint32_t flags = chunk.u32();
         chunk.skip(16);
         chunk.skip(16);
-        if ((flags & ~1U) != 0) {
+        if (flags != 0) {
             fail(AsepriteErrorCode::invalid_chunk, chunk.offset(),
-                 "cel extra flags are invalid");
+                 "precise cel bounds are not supported");
         }
     }
 

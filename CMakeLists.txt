@@ -65,7 +65,10 @@ add_library(fabric_project STATIC
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
-target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE
+    nlohmann_json::nlohmann_json
+    ZLIB::ZLIBSTATIC
+)
 
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)

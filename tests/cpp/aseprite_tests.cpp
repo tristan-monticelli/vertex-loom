@@ -366,4 +366,65 @@ TEST_CASE("unsafe and unsupported Aseprite data is rejected precisely") {
         CHECK(result.error->code ==
               fabric::render::AsepriteErrorCode::invalid_chunk);
     }
+
+    SECTION("corrupt compressed cel") {
+        Bytes compressed = cel(0, 0, 0, 255, 2, 1, 1,
+                               Bytes{255, 0, 0, 255});
+        compressed.back() ^= 0xffU;
+        const TemporaryFile fixture(
+            file(1, 1, 32,
+                 {frame(50, {layer(1, 0, 0, 255, "paint"), compressed})}),
+            ".aseprite");
+        const auto result = fabric::render::load_aseprite(fixture.path());
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error->code ==
+              fabric::render::AsepriteErrorCode::inflate_failed);
+    }
+
+    SECTION("linked cel without target") {
+        const TemporaryFile fixture(
+            file(1, 1, 32,
+                 {frame(50, {layer(1, 0, 0, 255, "paint")}),
+                  frame(50, {linked_cel(0, 0)})}),
+            ".aseprite");
+        const auto result = fabric::render::load_aseprite(fixture.path());
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error->code ==
+              fabric::render::AsepriteErrorCode::invalid_reference);
+    }
+
+    SECTION("tilemap layer") {
+        const TemporaryFile fixture(
+            file(1, 1, 32, {frame(50, {layer(1, 2, 0, 255, "tiles")})}),
+            ".aseprite");
+        const auto result = fabric::render::load_aseprite(fixture.path());
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error->code ==
+              fabric::render::AsepriteErrorCode::unsupported_tilemap);
+    }
+
+    SECTION("precise cel bounds") {
+        Bytes payload;
+        u32(payload, 1);
+        zeros(payload, 32);
+        const TemporaryFile fixture(
+            file(1, 1, 32, {frame(50, {chunk(0x2006, payload)})}),
+            ".aseprite");
+        const auto result = fabric::render::load_aseprite(fixture.path());
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error->code ==
+              fabric::render::AsepriteErrorCode::invalid_chunk);
+    }
+
+    SECTION("layer declared after first frame") {
+        const TemporaryFile fixture(
+            file(1, 1, 32,
+                 {frame(50, {layer(1, 0, 0, 255, "paint")}),
+                  frame(50, {layer(1, 0, 0, 255, "late")})}),
+            ".aseprite");
+        const auto result = fabric::render::load_aseprite(fixture.path());
+        REQUIRE_FALSE(result.ok());
+        CHECK(result.error->code ==
+              fabric::render::AsepriteErrorCode::invalid_metadata);
+    }
 }
