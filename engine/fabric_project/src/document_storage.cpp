@@ -86,6 +86,51 @@ bool prepare_parent(const std::filesystem::path& canonical_root,
     return !error && is_root_or_within(canonical_root, canonical_parent);
 }
 
+std::optional<std::filesystem::path> resolve_document_path(
+    const std::filesystem::path& project_root,
+    const std::filesystem::path& relative_path, const bool required,
+    std::vector<Error>& errors, const std::string_view field) {
+    if (!detail::is_portable_relative_path(relative_path)) {
+        add_error(errors, ErrorCode::invalid_path, std::string(field),
+                  "document path must be portable and project-relative");
+        return std::nullopt;
+    }
+
+    std::error_code filesystem_error;
+    const auto canonical_root = std::filesystem::weakly_canonical(
+        project_root, filesystem_error);
+    if (filesystem_error ||
+        !std::filesystem::is_directory(canonical_root, filesystem_error)) {
+        add_error(errors, ErrorCode::missing_directory, "project",
+                  "project root is not an accessible directory");
+        return std::nullopt;
+    }
+    filesystem_error.clear();
+    const auto canonical_document = std::filesystem::weakly_canonical(
+        project_root / relative_path, filesystem_error);
+    if (filesystem_error ||
+        !detail::is_within(canonical_root, canonical_document)) {
+        add_error(errors, ErrorCode::invalid_path, std::string(field),
+                  "document must resolve inside the project");
+        return std::nullopt;
+    }
+    const bool is_file = std::filesystem::is_regular_file(
+        canonical_document, filesystem_error);
+    if (filesystem_error) {
+        add_error(errors, ErrorCode::io_error, std::string(field),
+                  "cannot inspect the document");
+        return std::nullopt;
+    }
+    if (!is_file) {
+        if (required) {
+            add_error(errors, ErrorCode::missing_file, std::string(field),
+                      "document is not a readable regular file");
+        }
+        return std::nullopt;
+    }
+    return canonical_document;
+}
+
 StoredDocumentResult load_document_from_relative_path(
     const std::filesystem::path& project_root,
     const std::filesystem::path& relative_path,
@@ -96,37 +141,13 @@ StoredDocumentResult load_document_from_relative_path(
                   "a document validator is required");
         return result;
     }
-    if (!detail::is_portable_relative_path(relative_path)) {
-        add_error(result.errors, ErrorCode::invalid_path, "document",
-                  "document path must be portable and project-relative");
+    const auto canonical_document = resolve_document_path(
+        project_root, relative_path, true, result.errors, "document");
+    if (!canonical_document.has_value()) {
         return result;
     }
-
     std::error_code filesystem_error;
-    const auto canonical_root = std::filesystem::weakly_canonical(
-        project_root, filesystem_error);
-    if (filesystem_error ||
-        !std::filesystem::is_directory(canonical_root, filesystem_error)) {
-        add_error(result.errors, ErrorCode::missing_directory, "project",
-                  "project root is not an accessible directory");
-        return result;
-    }
-    filesystem_error.clear();
-    const auto canonical_document = std::filesystem::weakly_canonical(
-        project_root / relative_path, filesystem_error);
-    if (filesystem_error ||
-        !detail::is_within(canonical_root, canonical_document)) {
-        add_error(result.errors, ErrorCode::invalid_path, "document",
-                  "document must resolve inside the project");
-        return result;
-    }
-    if (!std::filesystem::is_regular_file(canonical_document,
-                                          filesystem_error)) {
-        add_error(result.errors, ErrorCode::missing_file, "document",
-                  "document is not a readable regular file");
-        return result;
-    }
-    const auto size = std::filesystem::file_size(canonical_document,
+    const auto size = std::filesystem::file_size(*canonical_document,
                                                  filesystem_error);
     if (filesystem_error || size > maximum_document_bytes) {
         add_error(result.errors, ErrorCode::io_error, "document",
@@ -134,7 +155,7 @@ StoredDocumentResult load_document_from_relative_path(
         return result;
     }
 
-    std::ifstream input(canonical_document, std::ios::binary);
+    std::ifstream input(*canonical_document, std::ios::binary);
     if (!input) {
         add_error(result.errors, ErrorCode::io_error, "document",
                   "cannot open the document");
@@ -277,27 +298,24 @@ RecoveryResult inspect_recovery(
     }
 
     const auto autosave_path = autosave_document_path(document_path);
-    std::error_code filesystem_error;
-    const bool autosave_exists = std::filesystem::exists(
-        project_root / autosave_path, filesystem_error);
-    if (filesystem_error) {
-        add_error(result.errors, ErrorCode::io_error, "autosave",
-                  "cannot inspect the autosave");
-        return result;
-    }
-    if (!autosave_exists) {
+    const auto canonical_primary = resolve_document_path(
+        project_root, document_path, true, result.errors, "document");
+    const auto canonical_autosave = resolve_document_path(
+        project_root, autosave_path, false, result.errors, "autosave");
+    if (!result.errors.empty() || !canonical_autosave.has_value()) {
         return result;
     }
 
+    std::error_code filesystem_error;
     const auto primary_time = std::filesystem::last_write_time(
-        project_root / document_path, filesystem_error);
+        *canonical_primary, filesystem_error);
     if (filesystem_error) {
         add_error(result.errors, ErrorCode::io_error, "document",
                   "cannot inspect the document modification time");
         return result;
     }
     const auto autosave_time = std::filesystem::last_write_time(
-        project_root / autosave_path, filesystem_error);
+        *canonical_autosave, filesystem_error);
     if (filesystem_error) {
         add_error(result.errors, ErrorCode::io_error, "autosave",
                   "cannot inspect the autosave modification time");

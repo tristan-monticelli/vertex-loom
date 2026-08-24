@@ -216,3 +216,29 @@ TEST_CASE("newer autosave identical to primary needs no recovery") {
     REQUIRE(recovery.ok());
     CHECK_FALSE(recovery.candidate.has_value());
 }
+
+TEST_CASE("recovery rejects an autosave resolved outside the project") {
+    const TemporaryDirectory project;
+    const TemporaryDirectory outside;
+    REQUIRE(fabric::project::save_document_atomic(
+                project.path(), "entities/hero.json", "primary\n",
+                accept_recovery_document)
+                .ok());
+    std::filesystem::create_directories(outside.path() / "autosave/entities");
+    {
+        std::ofstream output(outside.path() / "autosave/entities/hero.json");
+        output << "recovered\n";
+    }
+    std::error_code error;
+    std::filesystem::create_directory_symlink(
+        outside.path(), project.path() / ".vertex-loom", error);
+    if (error) {
+        SKIP("directory symlinks are unavailable in this environment");
+    }
+
+    const auto recovery = fabric::project::inspect_recovery(
+        project.path(), "entities/hero.json", accept_recovery_document);
+
+    CHECK_FALSE(recovery.ok());
+    CHECK_FALSE(recovery.candidate.has_value());
+}
