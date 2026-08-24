@@ -170,7 +170,11 @@ test('CTXRoute wrapper directs missing installations to project setup', () => {
 
 test('setup prerequisite check is available before dependency installation', () => {
   const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const result = spawnSync(npm, ['run', 'setup:check'], { cwd: root, encoding: 'utf8' });
+  const result = spawnSync(npm, ['run', 'setup:check'], {
+    cwd: root,
+    encoding: 'utf8',
+    shell: process.platform === 'win32',
+  });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /Setup prerequisites are available/u);
 });

@@ -14,7 +14,12 @@ const files = indexMode ? indexFiles() : allMode ? repositoryDocs() : stagedFile
 const targets = files.filter(file => /\.(?:md|mmd)$/iu.test(file));
 const failures = [];
 const temporary = mkdtempSync(join(tmpdir(), 'diagram-validation-'));
+const puppeteerConfig = join(temporary, 'puppeteer.json');
 const { config, failures: configFailures } = indexMode ? loadIndexConfig() : loadProjectConfig();
+
+if (process.platform === 'linux') {
+  writeFileSync(puppeteerConfig, JSON.stringify({ args: ['--no-sandbox', '--disable-setuid-sandbox'] }));
+}
 
 failures.push(...configFailures);
 
@@ -89,7 +94,8 @@ function validateDiagram(file, index, source) {
   const output = join(temporary, `${stem}.svg`);
   writeFileSync(input, trimmed);
   try {
-    execFileSync(process.execPath, [mermaidCli, '-i', input, '-o', output, '-q'], { stdio: 'pipe' });
+    const puppeteerArgs = process.platform === 'linux' ? ['-p', puppeteerConfig] : [];
+    execFileSync(process.execPath, [mermaidCli, '-i', input, '-o', output, '-q', ...puppeteerArgs], { stdio: 'pipe' });
   } catch (error) {
     failures.push(`${label}: invalid Mermaid (${String(error.stderr ?? '').trim().split(/\r?\n/u).at(-1) ?? 'render failed'})`);
   }
