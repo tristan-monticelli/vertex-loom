@@ -72,6 +72,8 @@ C4Component
   tests et futurs chargeurs sans interface graphique.
 - Un document éditable est validé par son parseur avant remplacement atomique.
   Les imports continuent à utiliser une publication séparée sans remplacement.
+- `save_document_atomic` reçoit le chemin projet relatif, le document sérialisé
+  et son validateur ; il crée uniquement des parents résolus dans le projet.
 - Un autosave reproduit le chemin relatif du document sous
   `.vertex-loom/autosave/`. Il est récupérable seulement s’il est valide et
   strictement plus récent que le principal ; sa lecture ne modifie aucun
