@@ -5,10 +5,10 @@ C4Component
     title Vertex Loom — première tranche Asset Studio
     Container_Boundary(asset, "Asset Studio") {
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
-        Component(project_ui, "Project workspace", "Dear ImGui + NFD", "Création, ouverture, imports PNG/SVG par dialogues natifs, état et diagnostics")
+        Component(project_ui, "Project workspace", "Dear ImGui + NFD", "Création, ouverture, imports PNG/SVG/Aseprite et découpage sprite par dialogues natifs")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre les imports PNG/SVG et expose les erreurs de la dernière opération")
+        Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre les imports PNG/SVG/sprites et expose les erreurs de la dernière opération")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
     }
@@ -39,6 +39,8 @@ C4Component
   l'aperçu ; un échec conserve le dernier import réussi.
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
+- Un import sprite réussi conserve `SpriteSheetDefinition`, l’atlas RGBA8 et
+  ses métadonnées ; un échec conserve le dernier import sprite réussi.
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.

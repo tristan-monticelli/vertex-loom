@@ -56,3 +56,10 @@ refus avant écriture et conservation du principal en cas d’échec. L’autosa
 couvre les seuils de 2 secondes d’inactivité et 30 secondes maximum, les
 chemins miroir, les versions absentes, invalides ou anciennes et les décisions
 de récupération acceptée ou refusée sans interface graphique.
+Le lecteur Aseprite couvre RGBA, grayscale, indexed, palettes, groupes, cels
+raw, zlib et liés, tags, slices et pivots. Il refuse fichiers tronqués,
+dimensions excessives, références externes, tilemaps, chunks inconnus et modes
+de fusion non rendus. Les mêmes frames produisent des atlas PNG et documents
+byte-identiques sur chaque exécution. Le découpage PNG couvre grille, frames
+libres, padding, extrusion et régénération atomique. Le validateur headless
+contrôle la source, l’atlas et chaque plage de métadonnées d’une spritesheet.

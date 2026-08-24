@@ -11,7 +11,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, documents d'assets, sérialisation et validation du format projet")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, historique réversible, autosave et orchestration des imports")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image", "Décodage PNG, aperçu SVG borné et données de pixels indépendantes du GPU")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / zlib", "Décodage PNG/SVG, lecture Aseprite et génération déterministe d’atlas indépendants du GPU")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
@@ -23,7 +23,7 @@ C4Container
     Rel(runtime, core, "Utilise")
     Rel(asset, projectlib, "Lit et écrit")
     Rel(asset, editorlib, "Pilote une session")
-    Rel(asset, renderlib, "Charge les aperçus raster")
+    Rel(asset, renderlib, "Charge les aperçus et génère les atlas")
     Rel(map, projectlib, "Lit et écrit")
     Rel(runtime, projectlib, "Charge")
     Rel(projectcli, projectlib, "Utilise")
@@ -42,3 +42,5 @@ bibliothèque sans état distant. Le premier squelette CMake expose les cibles
 constituent le premier contrat de données partagé. Asset Studio utilise
 `fabric_editor` pour la session, une coquille SDL2/OpenGL/Dear ImGui et le
 premier composant `fabric_render` pour décoder les aperçus PNG et SVG en RGBA8.
+`fabric_render` lit aussi les sources Aseprite sans exécutable externe et
+produit les atlas PNG déterministes partagés avec le runtime.

@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, VectorAsset et erreurs structurées")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, VectorAsset, SpriteSheetDefinition et erreurs structurées")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -49,6 +49,10 @@ C4Component
 - Un vecteur est déclaré par `assets/vectors/<id>.vector.json` et sa source
   normalisée est `assets/vectors/<id>.svg`. Le document JSON est publié en
   dernier et constitue également le marqueur de validité de la ressource.
+- Une spritesheet est déclarée par `assets/textures/<id>.sprite.json`, conserve
+  sa source sous `<id>.aseprite` ou `<id>.source.png` et référence l’atlas
+  `<id>.atlas.png`. Le document contient frames, durées, pivots, tags, slices
+  et provenance ; il est publié en dernier.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
@@ -65,6 +69,8 @@ C4Component
   une source manquante, extérieure au projet ou incohérente avec le contrat.
 - Le validateur headless applique les mêmes contrôles aux documents
   `*.vector.json` et à leur source SVG.
+- Le validateur headless charge aussi chaque `*.sprite.json`, contrôle sa
+  source, son atlas PNG, ses rectangles et toutes ses plages de frames.
 - Après chargement, le validateur headless refuse les identifiants dupliqués,
   références manquantes, types incompatibles et cycles du registre.
 - `ResourceRegistry` est instancié par chargement de projet, sans singleton ;
