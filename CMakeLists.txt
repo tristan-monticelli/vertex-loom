@@ -116,6 +116,7 @@ FetchContent_MakeAvailable(SDL2 SDL2_image)
 add_library(fabric_render STATIC
     engine/fabric_render/src/aseprite.cpp
     engine/fabric_render/src/raster_image.cpp
+    engine/fabric_render/src/sprite_atlas.cpp
 )
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
 target_compile_features(fabric_render PUBLIC cxx_std_20)
@@ -249,6 +250,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         Catch2::Catch2WithMain
     )
     add_test(NAME fabric_aseprite_tests COMMAND fabric_aseprite_tests)
+
+    add_executable(fabric_sprite_atlas_tests
+        tests/cpp/sprite_atlas_tests.cpp
+    )
+    target_link_libraries(fabric_sprite_atlas_tests PRIVATE
+        fabric_render
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_sprite_atlas_tests COMMAND fabric_sprite_atlas_tests)
 
     add_test(
         NAME project_validator_accepts_valid_project

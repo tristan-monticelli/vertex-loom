@@ -52,3 +52,5 @@ C4Component
 - `fabric/render/aseprite.hpp` expose le document décodé sans type zlib.
 - `fabric_render/src/aseprite.cpp` contient le lecteur borné, la résolution des
   cels et la composition CPU déterministe.
+- `fabric/render/sprite_atlas.hpp` expose découpage et génération d’atlas ;
+  `fabric_render/src/sprite_atlas.cpp` porte MaxRects, extrusion et PNG.
