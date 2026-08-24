@@ -28,11 +28,17 @@ public:
                 ("fabric-editor-test-" + std::to_string(unique) + "-" +
                  std::string(suffix));
         std::filesystem::create_directories(path_);
+        std::cerr << "[ fixture  ] created " << path_.string() << '\n'
+                  << std::flush;
     }
 
     ~TemporaryDirectory() {
+        std::cerr << "[ fixture  ] cleaning " << path_.string() << '\n'
+                  << std::flush;
         std::error_code ignored;
         std::filesystem::remove_all(path_, ignored);
+        std::cerr << "[ fixture  ] cleaned " << path_.string() << '\n'
+                  << std::flush;
     }
 
     TemporaryDirectory(const TemporaryDirectory&) = delete;
@@ -81,14 +87,18 @@ void write_valid_svg(const std::filesystem::path& path) {
 
 void session_opens_a_valid_project() {
     const TemporaryDirectory valid{"valid"};
+    std::cerr << "[ fixture  ] writing project\n" << std::flush;
     write_valid_project(valid.path());
 
     fabric::editor::ProjectSession session;
+    std::cerr << "[ fixture  ] opening project\n" << std::flush;
     require(session.open(valid.path()), "valid project did not open");
+    std::cerr << "[ fixture  ] project opened\n" << std::flush;
     require(session.has_project(), "session did not retain the project");
     require(session.manifest()->name == "Studio Project",
             "session retained the wrong manifest");
     require(session.errors().empty(), "successful open retained errors");
+    std::cerr << "[ fixture  ] assertions complete\n" << std::flush;
 }
 
 void session_creates_and_opens_a_project() {
