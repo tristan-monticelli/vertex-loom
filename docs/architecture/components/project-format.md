@@ -4,11 +4,12 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest, AssetDocument, TextureAsset, VectorAsset et erreurs structurées, avec ResourceId fourni par fabric_core")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, VectorAsset et erreurs structurées")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
+        Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
         Component(storage, "Atomic JSON storage", "C++20 / filesystem", "Écrit un fichier adjacent puis publie manifestes et documents d'asset")
-        Component(validator, "Project validator", "C++20", "Valide versions, identifiants, chemins, assets déclarés et structure du dossier")
+        Component(validator, "Project validator", "C++20", "Valide versions, chemins, documents puis le graphe complet des ressources")
         Component(creator, "Project creator", "C++20 / filesystem", "Crée l'arborescence standard uniquement dans un emplacement absent ou vide")
     }
     Container(cli, "fabric_project_validate", "C++20 CLI", "Valide un projet sans ouvrir de fenêtre")
@@ -17,6 +18,8 @@ C4Component
     Rel(validator, migrations, "Demande la mise à niveau")
     Rel(migrations, serializer, "Fournit le JSON courant")
     Rel(serializer, contracts, "Construit")
+    Rel(validator, registry, "Enregistre et valide")
+    Rel(registry, contracts, "Résout les références typées")
     Rel(storage, serializer, "Sérialise")
     Rel(storage, validator, "Valide avant écriture")
     Rel(validator, files, "Inspecte")
@@ -31,9 +34,10 @@ C4Component
 - `ResourceId` contient 1 à 128 caractères parmi les lettres ASCII minuscules,
   chiffres, tirets, points ou underscores, avec un caractère alphanumérique aux
   deux extrémités.
-- `ProjectManifest` version 1 contient le nom du projet et ses répertoires
-  relatifs d'assets, d'entités, de maps, de scènes et de schémas.
-- `AssetDocument` porte la version, le type, l'identifiant et le nom communs.
+- `ProjectManifest` version 2 contient le nom du projet, `pixelsPerUnit` et ses
+  répertoires relatifs d'assets, d'entités, de maps, de scènes et de schémas.
+- `DocumentHeader` porte la version, le type, l'identifiant et le nom communs.
+  `AssetDocument` reste son alias de compatibilité.
   `TextureAsset` version 1 ajoute un chemin PNG relatif, ses dimensions et le
   format de pixels `rgba8`.
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
@@ -46,8 +50,9 @@ C4Component
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
 - Le chargeur refuse les versions de schéma non prises en charge.
-- Le format prototype `v0` (`projectId`, `displayName`, `assetsPath`) est migré
-  explicitement vers `v1`; ce format legacy est accepté en lecture uniquement.
+- Le format prototype `v0` (`projectId`, `displayName`, `assetsPath`) migre vers
+  `v1`, puis `v1` migre vers `v2` avec `pixelsPerUnit = 100`. Les anciens
+  formats sont acceptés en lecture uniquement.
 - La sauvegarde valide le manifeste avant de créer un fichier temporaire dans
   le dossier projet, puis remplace `project.json` par renommage atomique.
 - La création refuse un emplacement existant non vide et ne remplace aucun
@@ -57,3 +62,5 @@ C4Component
   une source manquante, extérieure au projet ou incohérente avec le contrat.
 - Le validateur headless applique les mêmes contrôles aux documents
   `*.vector.json` et à leur source SVG.
+- Après chargement, le validateur headless refuse les identifiants dupliqués,
+  références manquantes, types incompatibles et cycles du registre.
