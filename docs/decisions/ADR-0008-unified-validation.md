@@ -13,7 +13,10 @@ les trois systèmes de la matrice CI.
 
 Conserver `npm run validate` comme point d'entrée multiplateforme. Cette
 commande exécute la gouvernance, configure et construit CMake, lance CTest puis
-les tests Node. Les commandes C++ restent aussi disponibles séparément.
+les tests Node. CTest reçoit explicitement `-C Debug`, requis par les
+générateurs multi-configuration comme Visual Studio et accepté par les
+générateurs mono-configuration. Les commandes C++ restent aussi disponibles
+séparément.
 
 ## Alternatives
 

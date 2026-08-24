@@ -4,14 +4,14 @@
 
 | Type | Required? | Tool | Command | Rationale |
 | --- | --- | --- | --- | --- |
-| Unit | Oui | CTest | `ctest --test-dir build` | Physique, collisions, maths et sérialisation. |
-| Integration | Oui | CTest | `ctest --test-dir build` | Chargement de projet et contrats du cœur. |
+| Unit | Oui | CTest | `ctest --test-dir build -C Debug` | Physique, collisions, maths et sérialisation. |
+| Integration | Oui | CTest | `ctest --test-dir build -C Debug` | Chargement de projet et contrats du cœur. |
 | End-to-end | Plus tard | À sélectionner | null | Parcours éditeur vers runtime. |
-| Contract | Oui | validateurs C++ | `ctest --test-dir build` | Schémas et versions de ressources. |
+| Contract | Oui | validateurs C++ | `ctest --test-dir build -C Debug` | Schémas et versions de ressources. |
 | Property | Plus tard | À sélectionner | null | Invariants de physique après stabilisation. |
 | Snapshot | Non | — | null | Variations GPU ; scènes de référence manuelles. |
 | Performance | Oui | benchmarks C++ | null | Boucle, renderer et chargement. |
-| Security | Oui | validation locale | `ctest --test-dir build` | Chemins et imports invalides. |
+| Security | Oui | validation locale | `ctest --test-dir build -C Debug` | Chemins et imports invalides. |
 | Mutation | Non | — | null | Trop coûteux avant stabilisation de la physique. |
 
 ## Decision rule
