@@ -73,6 +73,11 @@ void write_valid_png(const std::filesystem::path& path) {
                  static_cast<std::streamsize>(png.size()));
 }
 
+void write_valid_svg(const std::filesystem::path& path) {
+    std::ofstream output(path, std::ios::binary);
+    output << R"(<svg xmlns="http://www.w3.org/2000/svg" width="4" height="2" viewBox="0 0 4 2"><path d="M0 0h4v2H0z" fill="#d9a441"/></svg>)";
+}
+
 void session_opens_a_valid_project() {
     const TemporaryDirectory valid{"valid"};
     write_valid_project(valid.path());
@@ -196,6 +201,59 @@ void failed_import_writes_no_asset_and_preserves_the_previous_import() {
             "duplicate import replaced the existing texture state");
 }
 
+void session_imports_a_valid_svg_persistently() {
+    const TemporaryDirectory valid{"svg-import"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.svg";
+    write_valid_svg(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for SVG import did not open");
+    require(session.import_svg(source, {.value = "thread-outline"},
+                               "Thread Outline"),
+            "valid SVG import failed");
+    require(session.imported_vector().has_value(),
+            "successful import retained no vector");
+    require(session.imported_vector()->preview.width == 2048,
+            "import retained the wrong SVG preview");
+    require(std::filesystem::is_regular_file(
+                valid.path() / "assets/vectors/thread-outline.svg"),
+            "import did not persist the SVG");
+    require(std::filesystem::is_regular_file(
+                valid.path() / "assets/vectors/thread-outline.vector.json"),
+            "import did not persist the vector document");
+    require(fabric::project::validate_project(valid.path()).ok(),
+            "project validator rejected an imported vector");
+}
+
+void failed_svg_import_preserves_the_previous_vector() {
+    const TemporaryDirectory valid{"failed-svg-import"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.svg";
+    write_valid_svg(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for failed SVG import did not open");
+    require(session.import_svg(source, {.value = "first-vector"}, "First"),
+            "initial valid SVG import failed");
+    const auto corrupt = valid.path() / "corrupt.svg";
+    {
+        std::ofstream output(corrupt, std::ios::binary);
+        output << "not an svg";
+    }
+    require(!session.import_svg(corrupt, {.value = "broken-vector"}, "Broken"),
+            "corrupt SVG was imported");
+    require(!std::filesystem::exists(
+                valid.path() / "assets/vectors/broken-vector.vector.json"),
+            "failed SVG import published a vector document");
+    require(session.imported_vector()->asset.document.id.value == "first-vector",
+            "failed SVG import replaced the previous successful import");
+    require(!session.import_svg(source, {.value = "first-vector"}, "Duplicate"),
+            "duplicate vector identifier was accepted");
+    require(session.imported_vector()->asset.document.name == "First",
+            "duplicate SVG import replaced the existing vector state");
+}
+
 } // namespace
 
 int main() {
@@ -205,5 +263,7 @@ int main() {
     failed_creation_preserves_the_active_project();
     session_imports_a_valid_png_persistently();
     failed_import_writes_no_asset_and_preserves_the_previous_import();
+    session_imports_a_valid_svg_persistently();
+    failed_svg_import_preserves_the_previous_vector();
     return 0;
 }

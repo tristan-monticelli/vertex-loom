@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest, AssetDocument, TextureAsset et erreurs structurées, avec ResourceId fourni par fabric_core")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest, AssetDocument, TextureAsset, VectorAsset et erreurs structurées, avec ResourceId fourni par fabric_core")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(storage, "Atomic JSON storage", "C++20 / filesystem", "Écrit un fichier adjacent puis publie manifestes et documents d'asset")
@@ -39,6 +39,9 @@ C4Component
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
   normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
   de publication : une source sans document n'est pas un asset chargeable.
+- Un vecteur est déclaré par `assets/vectors/<id>.vector.json` et sa source
+  normalisée est `assets/vectors/<id>.svg`. Le document JSON est publié en
+  dernier et constitue également le marqueur de validité de la ressource.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
@@ -52,3 +55,5 @@ C4Component
   manifeste.
 - Le validateur headless inspecte chaque document `*.texture.json` et refuse
   une source manquante, extérieure au projet ou incohérente avec le contrat.
+- Le validateur headless applique les mêmes contrôles aux documents
+  `*.vector.json` et à leur source SVG.

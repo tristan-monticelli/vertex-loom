@@ -5,10 +5,10 @@ C4Component
     title Vertex Loom — première tranche Asset Studio
     Container_Boundary(asset, "Asset Studio") {
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
-        Component(project_ui, "Project workspace", "Dear ImGui", "Création, ouverture, import PNG, état de chargement et diagnostics")
+        Component(project_ui, "Project workspace", "Dear ImGui", "Création, ouverture, imports PNG/SVG, état de chargement et diagnostics")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre l'import PNG et expose les erreurs de la dernière opération")
+        Component(session, "ProjectSession", "C++20", "Conserve le manifeste validé, orchestre les imports PNG/SVG et expose les erreurs de la dernière opération")
     }
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
@@ -29,3 +29,5 @@ C4Component
   l'interface d'outil ; OpenGL efface et présente la surface.
 - Un import réussi conserve le `TextureAsset` et les pixels décodés pour
   l'aperçu ; un échec conserve le dernier import réussi.
+- Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
+  un échec conserve le dernier import vectoriel réussi.

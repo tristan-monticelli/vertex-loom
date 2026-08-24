@@ -85,10 +85,64 @@ void invalid_inputs_are_rejected() {
             "oversized PNG reached the decoder");
 }
 
+void valid_svg_is_rasterized_to_a_bounded_preview() {
+    const auto path = temporary_path(".svg");
+    {
+        std::ofstream output(path, std::ios::binary);
+        output << R"(<svg xmlns="http://www.w3.org/2000/svg" width="4" height="2" viewBox="0 0 4 2"><rect width="4" height="2" fill="#d9a441"/></svg>)";
+    }
+    const auto loaded = fabric::render::load_svg_preview(path);
+    std::filesystem::remove(path);
+
+    require(loaded.ok(), "valid SVG did not rasterize");
+    require(loaded.image->width == 2048 && loaded.image->height == 1024,
+            "SVG preview did not preserve its aspect ratio");
+    require(loaded.image->rgba8.size() ==
+                static_cast<std::size_t>(loaded.image->width) *
+                    loaded.image->height * 4U,
+            "SVG preview is not RGBA8");
+}
+
+void invalid_svg_inputs_are_rejected_before_publication() {
+    const auto wrong_extension = fabric::render::load_svg_preview("vector.png");
+    require(!wrong_extension.ok() &&
+                wrong_extension.error->code ==
+                    fabric::render::RasterErrorCode::invalid_extension,
+            "wrong SVG extension was accepted");
+
+    const auto corrupt_path = temporary_path(".svg");
+    {
+        std::ofstream output(corrupt_path, std::ios::binary);
+        output << "not an svg";
+    }
+    const auto corrupt = fabric::render::load_svg_preview(corrupt_path);
+    std::filesystem::remove(corrupt_path);
+    require(!corrupt.ok() &&
+                corrupt.error->code ==
+                    fabric::render::RasterErrorCode::decode_failed,
+            "corrupt SVG was accepted");
+
+    const auto oversized_path = temporary_path(".svg");
+    {
+        std::ofstream output(oversized_path, std::ios::binary);
+        const std::string oversized(
+            fabric::render::maximum_svg_source_bytes + 1U, ' ');
+        output << oversized;
+    }
+    const auto oversized = fabric::render::load_svg_preview(oversized_path);
+    std::filesystem::remove(oversized_path);
+    require(!oversized.ok() &&
+                oversized.error->code ==
+                    fabric::render::RasterErrorCode::source_too_large,
+            "oversized SVG reached the decoder");
+}
+
 } // namespace
 
 int main() {
     valid_png_is_decoded_to_rgba8();
     invalid_inputs_are_rejected();
+    valid_svg_is_rasterized_to_a_bounded_preview();
+    invalid_svg_inputs_are_rejected_before_publication();
     return 0;
 }

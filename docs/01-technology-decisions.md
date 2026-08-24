@@ -8,6 +8,7 @@
 | Editor shell | SDL2 2.32.10 + OpenGL + Dear ImGui 1.92.9 | Fenêtre et UI d'outil portables avec sources épinglées. | ADR-0012 |
 | PNG decoding | SDL2_image 2.8.12 | Décodeur portable, borné derrière un contrat RGBA8 interne. | ADR-0014 |
 | Texture import | JSON versionné + publication locale sans remplacement | Projet portable, source validée et contrat commun aux outils et au runtime. | ADR-0015 |
+| SVG import | SDL2_image 2.8.12 / NanoSVG intégré | Source vectorielle conservée, validation bornée et aperçu RGBA8 portable. | ADR-0016 |
 | Backend | none | Produit local hors ligne. | — |
 | Storage | JSON + assets sur disque | Métadonnées diffables et ressources lourdes séparées. | ADR-0006 |
 | Deployment | archives desktop | Distribution locale au début. | — |

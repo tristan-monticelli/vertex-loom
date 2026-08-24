@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-08-24
+- Note: le choix de backend « PNG uniquement » est étendu par ADR-0016 pour SVG.
 
 ## Context
 

@@ -1,6 +1,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/vector_asset.hpp"
 
 #include <chrono>
 #include <filesystem>
@@ -245,7 +246,11 @@ void texture_asset_round_trip_is_lossless() {
 
 void invalid_texture_paths_are_rejected() {
     auto asset = fabric::project::TextureAsset{
-        .document = {.id = {.value = "wool-fill"}, .name = "Wool Fill"},
+        .document = {
+            .type = "texture",
+            .id = {.value = "wool-fill"},
+            .name = "Wool Fill",
+        },
         .source = "../outside.png",
         .width = 1,
         .height = 1,
@@ -267,7 +272,11 @@ void project_validation_rejects_a_missing_texture_source() {
         output << fabric::project::serialize_manifest(manifest);
     }
     const fabric::project::TextureAsset texture{
-        .document = {.id = {.value = "missing"}, .name = "Missing"},
+        .document = {
+            .type = "texture",
+            .id = {.value = "missing"},
+            .name = "Missing",
+        },
         .source = "assets/textures/missing.png",
         .width = 1,
         .height = 1,
@@ -282,6 +291,70 @@ void project_validation_rejects_a_missing_texture_source() {
     const auto report = fabric::project::validate_project(project.root());
     require(contains_error(report.errors, ErrorCode::missing_file, "source"),
             "project validator accepted a missing texture source");
+}
+
+void vector_asset_round_trip_is_lossless() {
+    const auto manifest = example_manifest();
+    const fabric::project::VectorAsset expected{
+        .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
+            .type = "vector",
+            .id = {.value = "thread-outline"},
+            .name = "Thread Outline",
+        },
+        .source = "assets/vectors/thread-outline.svg",
+        .format = "svg",
+    };
+    const auto parsed = fabric::project::parse_vector_asset(
+        manifest, fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "serialized vector asset did not parse");
+    require(*parsed.asset == expected, "vector round-trip lost data");
+}
+
+void invalid_vector_paths_are_rejected() {
+    auto asset = fabric::project::VectorAsset{
+        .document = {
+            .type = "vector",
+            .id = {.value = "thread-outline"},
+            .name = "Thread Outline",
+        },
+        .source = "../outside.svg",
+    };
+    const auto report = fabric::project::validate_vector_asset(
+        example_manifest(), asset);
+    require(contains_error(report.errors, ErrorCode::invalid_path, "source"),
+            "traversing vector source was accepted");
+}
+
+void project_validation_rejects_a_missing_vector_source() {
+    const TemporaryProject project;
+    for (const auto* directory :
+         {"assets/vectors", "entities", "maps", "scenes", "schemas"}) {
+        std::filesystem::create_directories(project.root() / directory);
+    }
+    const auto manifest = example_manifest();
+    {
+        std::ofstream output(project.root() / "project.json", std::ios::binary);
+        output << fabric::project::serialize_manifest(manifest);
+    }
+    const fabric::project::VectorAsset vector{
+        .document = {
+            .type = "vector",
+            .id = {.value = "missing"},
+            .name = "Missing",
+        },
+        .source = "assets/vectors/missing.svg",
+    };
+    {
+        std::ofstream output(
+            project.root() / "assets/vectors/missing.vector.json",
+            std::ios::binary);
+        output << fabric::project::serialize_vector_asset(vector);
+    }
+
+    const auto report = fabric::project::validate_project(project.root());
+    require(contains_error(report.errors, ErrorCode::missing_file, "source"),
+            "project validator accepted a missing vector source");
 }
 
 } // namespace
@@ -299,5 +372,8 @@ int main() {
     texture_asset_round_trip_is_lossless();
     invalid_texture_paths_are_rejected();
     project_validation_rejects_a_missing_texture_source();
+    vector_asset_round_trip_is_lossless();
+    invalid_vector_paths_are_rejected();
+    project_validation_rejects_a_missing_vector_source();
     return 0;
 }

@@ -11,7 +11,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Types partagés, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, documents d'assets, sérialisation et validation du format projet")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet et orchestration des imports des outils d'authoring")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image", "Décodage raster et données de pixels indépendantes du GPU")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image", "Décodage PNG, aperçu SVG borné et données de pixels indépendantes du GPU")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
@@ -29,7 +29,7 @@ C4Container
     Rel(projectcli, projectlib, "Utilise")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
-    Rel(editorlib, renderlib, "Valide les sources raster")
+    Rel(editorlib, renderlib, "Valide les sources raster et vectorielles")
     Rel(projectlib, project, "Valide, lit et écrit")
 ```
 
@@ -41,4 +41,4 @@ bibliothèque sans état distant. Le premier squelette CMake expose les cibles
 `fabric_core_smoke`. Le composant `fabric_project` et son validateur headless
 constituent le premier contrat de données partagé. Asset Studio utilise
 `fabric_editor` pour la session, une coquille SDL2/OpenGL/Dear ImGui et le
-premier composant `fabric_render` pour décoder les aperçus PNG en RGBA8.
+premier composant `fabric_render` pour décoder les aperçus PNG et SVG en RGBA8.

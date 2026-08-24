@@ -62,42 +62,20 @@ std::optional<RasterError> preflight_png(const std::filesystem::path& path) {
     return std::nullopt;
 }
 
-} // namespace
-
-std::string_view to_string(const RasterErrorCode code) noexcept {
-    switch (code) {
-    case RasterErrorCode::invalid_extension: return "invalid_extension";
-    case RasterErrorCode::decode_failed: return "decode_failed";
-    case RasterErrorCode::invalid_dimensions: return "invalid_dimensions";
-    }
-    return "unknown_error";
-}
-
-RasterImageResult load_png(const std::filesystem::path& path) {
-    if (lowercase_extension(path) != ".png") {
-        return failure(RasterErrorCode::invalid_extension,
-                       "source file must use the .png extension");
-    }
-    if (const auto error = preflight_png(path); error.has_value()) {
-        return RasterImageResult{.error = *error};
-    }
-
-    SDL_Surface* decoded = IMG_Load(path.string().c_str());
-    if (decoded == nullptr) {
-        return failure(RasterErrorCode::decode_failed, IMG_GetError());
-    }
-
+RasterImageResult convert_to_rgba8(SDL_Surface* decoded,
+                                   const std::uint32_t maximum_dimension,
+                                   const std::uint64_t maximum_pixels) {
     const bool dimensions_are_valid =
         decoded->w > 0 && decoded->h > 0 &&
-        decoded->w <= static_cast<int>(maximum_raster_dimension) &&
-        decoded->h <= static_cast<int>(maximum_raster_dimension) &&
+        decoded->w <= static_cast<int>(maximum_dimension) &&
+        decoded->h <= static_cast<int>(maximum_dimension) &&
         static_cast<std::uint64_t>(decoded->w) *
                 static_cast<std::uint64_t>(decoded->h) <=
-            maximum_raster_pixels;
+            maximum_pixels;
     if (!dimensions_are_valid) {
         SDL_FreeSurface(decoded);
         return failure(RasterErrorCode::invalid_dimensions,
-                       "image dimensions must be between 1 and 16384 pixels");
+                       "image dimensions exceed the preview safety limits");
     }
 
     SDL_Surface* converted = SDL_ConvertSurfaceFormat(
@@ -123,6 +101,67 @@ RasterImageResult load_png(const std::filesystem::path& path) {
     }
     SDL_FreeSurface(converted);
     return RasterImageResult{.image = std::move(image)};
+}
+
+} // namespace
+
+std::string_view to_string(const RasterErrorCode code) noexcept {
+    switch (code) {
+    case RasterErrorCode::invalid_extension: return "invalid_extension";
+    case RasterErrorCode::decode_failed: return "decode_failed";
+    case RasterErrorCode::invalid_dimensions: return "invalid_dimensions";
+    case RasterErrorCode::source_too_large: return "source_too_large";
+    }
+    return "unknown_error";
+}
+
+RasterImageResult load_png(const std::filesystem::path& path) {
+    if (lowercase_extension(path) != ".png") {
+        return failure(RasterErrorCode::invalid_extension,
+                       "source file must use the .png extension");
+    }
+    if (const auto error = preflight_png(path); error.has_value()) {
+        return RasterImageResult{.error = *error};
+    }
+
+    SDL_Surface* decoded = IMG_Load(path.string().c_str());
+    if (decoded == nullptr) {
+        return failure(RasterErrorCode::decode_failed, IMG_GetError());
+    }
+
+    return convert_to_rgba8(decoded, maximum_raster_dimension,
+                            maximum_raster_pixels);
+}
+
+RasterImageResult load_svg_preview(const std::filesystem::path& path) {
+    if (lowercase_extension(path) != ".svg") {
+        return failure(RasterErrorCode::invalid_extension,
+                       "source file must use the .svg extension");
+    }
+    std::error_code filesystem_error;
+    const auto source_size = std::filesystem::file_size(path, filesystem_error);
+    if (filesystem_error) {
+        return failure(RasterErrorCode::decode_failed,
+                       "cannot inspect the SVG source");
+    }
+    if (source_size > maximum_svg_source_bytes) {
+        return failure(RasterErrorCode::source_too_large,
+                       "SVG source exceeds the 8 MiB safety limit");
+    }
+
+    SDL_RWops* input = SDL_RWFromFile(path.string().c_str(), "rb");
+    if (input == nullptr) {
+        return failure(RasterErrorCode::decode_failed, SDL_GetError());
+    }
+    SDL_Surface* decoded = IMG_LoadSizedSVG_RW(
+        input, static_cast<int>(maximum_svg_preview_dimension),
+        static_cast<int>(maximum_svg_preview_dimension));
+    SDL_RWclose(input);
+    if (decoded == nullptr) {
+        return failure(RasterErrorCode::decode_failed, IMG_GetError());
+    }
+    return convert_to_rgba8(decoded, maximum_svg_preview_dimension,
+                            maximum_svg_preview_pixels);
 }
 
 } // namespace fabric::render

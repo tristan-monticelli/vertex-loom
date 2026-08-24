@@ -37,6 +37,10 @@ texture couvre le round-trip du document, les chemins traversants, la copie
 persistante d'un PNG valide, le refus d'un contenu corrompu et d'un identifiant
 existant, la conservation du dernier import réussi et le rejet d'une source
 projet manquante par le validateur headless. `npm run
-validate` regroupe les validations documentaires,
+validate` couvre aussi le round-trip du contrat `VectorAsset`, le refus des
+chemins SVG traversants, le décodage borné d'un aperçu SVG, la publication sans
+remplacement, la conservation du dernier import vectoriel réussi et le rejet
+d'une source SVG manquante par le validateur headless. `npm run validate`
+regroupe les validations documentaires,
 Node et C++ ;
 `npm run validate:cpp` exécute uniquement la configuration, le build et CTest.

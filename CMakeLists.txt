@@ -27,12 +27,14 @@ target_include_directories(fabric_core PUBLIC engine/fabric_core/include)
 target_compile_features(fabric_core PUBLIC cxx_std_20)
 
 add_library(fabric_project STATIC
+    engine/fabric_project/src/asset_storage.cpp
     engine/fabric_project/src/atomic_save.cpp
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/migrations.cpp
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/texture_asset.cpp
+    engine/fabric_project/src/vector_asset.cpp
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
@@ -70,7 +72,7 @@ set(SDL2IMAGE_PNG ON CACHE BOOL "" FORCE)
 set(SDL2IMAGE_PNG_SAVE OFF CACHE BOOL "" FORCE)
 set(SDL2IMAGE_PNM OFF CACHE BOOL "" FORCE)
 set(SDL2IMAGE_QOI OFF CACHE BOOL "" FORCE)
-set(SDL2IMAGE_SVG OFF CACHE BOOL "" FORCE)
+set(SDL2IMAGE_SVG ON CACHE BOOL "" FORCE)
 set(SDL2IMAGE_TGA OFF CACHE BOOL "" FORCE)
 set(SDL2IMAGE_TIF OFF CACHE BOOL "" FORCE)
 set(SDL2IMAGE_WEBP OFF CACHE BOOL "" FORCE)

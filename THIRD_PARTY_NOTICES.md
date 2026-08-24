@@ -52,3 +52,9 @@ SDL2_image's enabled PNG backend includes `stb_image`, copyright Sean Barrett
 and contributors, available under the MIT License or public-domain dedication.
 
 Source: https://github.com/nothings/stb
+
+SDL2_image's enabled SVG backend includes NanoSVG, copyright Mikko Mononen,
+distributed under the zlib License. Its rasterizer also incorporates work from
+Sean Barrett's `stb_truetype` rasterizer.
+
+Source: https://github.com/memononen/nanosvg

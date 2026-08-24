@@ -2,6 +2,7 @@
 
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/vector_asset.hpp"
 #include "fabric/render/raster_image.hpp"
 
 #include <filesystem>
@@ -16,6 +17,11 @@ struct ImportedTexture {
     render::RasterImage image;
 };
 
+struct ImportedVector {
+    project::VectorAsset asset;
+    render::RasterImage preview;
+};
+
 class ProjectSession {
 public:
     [[nodiscard]] bool create(const std::filesystem::path& project_root,
@@ -24,17 +30,22 @@ public:
     [[nodiscard]] bool import_png(const std::filesystem::path& source,
                                   const core::ResourceId& id,
                                   const std::string& name);
+    [[nodiscard]] bool import_svg(const std::filesystem::path& source,
+                                  const core::ResourceId& id,
+                                  const std::string& name);
 
     [[nodiscard]] bool has_project() const noexcept;
     [[nodiscard]] const std::filesystem::path& project_root() const noexcept;
     [[nodiscard]] const std::optional<project::ProjectManifest>& manifest() const noexcept;
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept;
     [[nodiscard]] const std::optional<ImportedTexture>& imported_texture() const noexcept;
+    [[nodiscard]] const std::optional<ImportedVector>& imported_vector() const noexcept;
 
 private:
     std::filesystem::path project_root_;
     std::optional<project::ProjectManifest> manifest_;
     std::optional<ImportedTexture> imported_texture_;
+    std::optional<ImportedVector> imported_vector_;
     std::vector<project::Error> errors_;
 };
 

@@ -1,4 +1,4 @@
-#include "fabric/project/texture_asset.hpp"
+#include "fabric/project/vector_asset.hpp"
 
 #include "asset_storage.hpp"
 
@@ -31,13 +31,13 @@ bool read_string(const Json& object, const char* key, std::string& destination,
     return true;
 }
 
-bool read_dimension(const Json& object, const char* key,
-                    std::uint32_t& destination, std::vector<Error>& errors) {
-    const auto iterator = object.find(key);
+bool read_version(const Json& object, std::uint32_t& destination,
+                  std::vector<Error>& errors) {
+    const auto iterator = object.find("schemaVersion");
     if (iterator == object.end() || !iterator->is_number_unsigned() ||
         iterator->get<std::uint64_t>() >
             std::numeric_limits<std::uint32_t>::max()) {
-        add_error(errors, ErrorCode::invalid_asset, key,
+        add_error(errors, ErrorCode::invalid_asset, "schemaVersion",
                   "expected an unsigned 32-bit integer");
         return false;
     }
@@ -47,27 +47,27 @@ bool read_dimension(const Json& object, const char* key,
 
 } // namespace
 
-std::filesystem::path texture_source_path(const ProjectManifest& manifest,
-                                          const core::ResourceId& id) {
-    return manifest.directories.assets / "textures" / (id.value + ".png");
+std::filesystem::path vector_source_path(const ProjectManifest& manifest,
+                                         const core::ResourceId& id) {
+    return manifest.directories.assets / "vectors" / (id.value + ".svg");
 }
 
-std::filesystem::path texture_document_path(const ProjectManifest& manifest,
-                                            const core::ResourceId& id) {
-    return manifest.directories.assets / "textures" /
-           (id.value + ".texture.json");
+std::filesystem::path vector_document_path(const ProjectManifest& manifest,
+                                           const core::ResourceId& id) {
+    return manifest.directories.assets / "vectors" /
+           (id.value + ".vector.json");
 }
 
-ValidationReport validate_texture_asset(const ProjectManifest& manifest,
-                                        const TextureAsset& asset) {
+ValidationReport validate_vector_asset(const ProjectManifest& manifest,
+                                       const VectorAsset& asset) {
     ValidationReport report;
-    if (asset.document.schema_version != current_texture_schema_version) {
+    if (asset.document.schema_version != current_vector_schema_version) {
         add_error(report.errors, ErrorCode::unsupported_schema_version,
-                  "schemaVersion", "only texture schema version 1 is supported");
+                  "schemaVersion", "only vector schema version 1 is supported");
     }
-    if (asset.document.type != "texture") {
+    if (asset.document.type != "vector") {
         add_error(report.errors, ErrorCode::invalid_asset, "type",
-                  "must be texture");
+                  "must be vector");
     }
     if (!core::ResourceId::is_valid(asset.document.id.value)) {
         add_error(report.errors, ErrorCode::invalid_resource_id, "id",
@@ -78,60 +78,48 @@ ValidationReport validate_texture_asset(const ProjectManifest& manifest,
                   "must not be empty");
     }
     if (!detail::is_portable_relative_path(asset.source) ||
-        asset.source != texture_source_path(manifest, asset.document.id)) {
+        asset.source != vector_source_path(manifest, asset.document.id)) {
         add_error(report.errors, ErrorCode::invalid_path, "source",
-                  "must be the canonical project-relative texture path");
+                  "must be the canonical project-relative vector path");
     }
-    constexpr std::uint32_t maximum_dimension = 16'384;
-    constexpr std::uint64_t maximum_pixels = 67'108'864;
-    const auto pixels = static_cast<std::uint64_t>(asset.width) * asset.height;
-    if (asset.width == 0 || asset.height == 0 ||
-        asset.width > maximum_dimension || asset.height > maximum_dimension ||
-        pixels > maximum_pixels) {
-        add_error(report.errors, ErrorCode::invalid_asset, "dimensions",
-                  "dimensions exceed the texture safety limits");
-    }
-    if (asset.pixel_format != "rgba8") {
-        add_error(report.errors, ErrorCode::invalid_asset, "pixelFormat",
-                  "only rgba8 is supported");
+    if (asset.format != "svg") {
+        add_error(report.errors, ErrorCode::invalid_asset, "format",
+                  "only svg is supported");
     }
     return report;
 }
 
-std::string serialize_texture_asset(const TextureAsset& asset) {
+std::string serialize_vector_asset(const VectorAsset& asset) {
     const Json document = {
         {"schemaVersion", asset.document.schema_version},
         {"type", asset.document.type},
         {"id", asset.document.id.value},
         {"name", asset.document.name},
         {"source", asset.source.generic_string()},
-        {"width", asset.width},
-        {"height", asset.height},
-        {"pixelFormat", asset.pixel_format},
+        {"format", asset.format},
     };
     return document.dump(2) + '\n';
 }
 
-TextureAssetResult parse_texture_asset(const ProjectManifest& manifest,
-                                       const std::string_view json_text) {
-    TextureAssetResult result;
+VectorAssetResult parse_vector_asset(const ProjectManifest& manifest,
+                                     const std::string_view json_text) {
+    VectorAssetResult result;
     Json document;
     try {
         document = Json::parse(json_text);
     } catch (const Json::parse_error&) {
-        add_error(result.errors, ErrorCode::invalid_json, "texture",
-                  "cannot parse texture asset JSON");
+        add_error(result.errors, ErrorCode::invalid_json, "vector",
+                  "cannot parse vector asset JSON");
         return result;
     }
     if (!document.is_object()) {
-        add_error(result.errors, ErrorCode::invalid_asset, "texture",
+        add_error(result.errors, ErrorCode::invalid_asset, "vector",
                   "top-level value must be an object");
         return result;
     }
 
-    TextureAsset asset;
-    read_dimension(document, "schemaVersion", asset.document.schema_version,
-                   result.errors);
+    VectorAsset asset;
+    read_version(document, asset.document.schema_version, result.errors);
     read_string(document, "type", asset.document.type, result.errors);
     read_string(document, "id", asset.document.id.value, result.errors);
     read_string(document, "name", asset.document.name, result.errors);
@@ -139,13 +127,11 @@ TextureAssetResult parse_texture_asset(const ProjectManifest& manifest,
     if (read_string(document, "source", source, result.errors)) {
         asset.source = source;
     }
-    read_dimension(document, "width", asset.width, result.errors);
-    read_dimension(document, "height", asset.height, result.errors);
-    read_string(document, "pixelFormat", asset.pixel_format, result.errors);
+    read_string(document, "format", asset.format, result.errors);
     if (!result.errors.empty()) {
         return result;
     }
-    auto validation = validate_texture_asset(manifest, asset);
+    auto validation = validate_vector_asset(manifest, asset);
     if (!validation.ok()) {
         result.errors = std::move(validation.errors);
         return result;
@@ -154,13 +140,13 @@ TextureAssetResult parse_texture_asset(const ProjectManifest& manifest,
     return result;
 }
 
-TextureAssetResult load_texture_asset(
+VectorAssetResult load_vector_asset(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
     const std::filesystem::path& document_path) {
-    TextureAssetResult result;
+    VectorAssetResult result;
     if (!detail::is_portable_relative_path(document_path)) {
-        add_error(result.errors, ErrorCode::invalid_path, "texture",
+        add_error(result.errors, ErrorCode::invalid_path, "vector",
                   "document path must be project-relative");
         return result;
     }
@@ -177,26 +163,26 @@ TextureAssetResult load_texture_asset(
         project_root / document_path, filesystem_error);
     if (filesystem_error ||
         !detail::is_within(canonical_root, canonical_document)) {
-        add_error(result.errors, ErrorCode::invalid_path, "texture",
-                  "texture document must resolve inside the project");
+        add_error(result.errors, ErrorCode::invalid_path, "vector",
+                  "vector document must resolve inside the project");
         return result;
     }
     std::ifstream input(canonical_document, std::ios::binary);
     if (!input) {
-        add_error(result.errors, ErrorCode::missing_file, "texture",
-                  "cannot open texture asset document");
+        add_error(result.errors, ErrorCode::missing_file, "vector",
+                  "cannot open vector asset document");
         return result;
     }
     const std::string contents{std::istreambuf_iterator<char>{input},
                                std::istreambuf_iterator<char>{}};
-    result = parse_texture_asset(manifest, contents);
+    result = parse_vector_asset(manifest, contents);
     if (!result.ok()) {
         return result;
     }
-    if (document_path != texture_document_path(manifest,
-                                               result.asset->document.id)) {
+    if (document_path != vector_document_path(manifest,
+                                              result.asset->document.id)) {
         result.asset.reset();
-        add_error(result.errors, ErrorCode::invalid_path, "texture",
+        add_error(result.errors, ErrorCode::invalid_path, "vector",
                   "document filename does not match its resource identifier");
         return result;
     }
@@ -211,33 +197,33 @@ TextureAssetResult load_texture_asset(
         !source_is_file) {
         result.asset.reset();
         add_error(result.errors, ErrorCode::missing_file, "source",
-                  "texture source is missing or outside the project");
+                  "vector source is missing or outside the project");
     }
     return result;
 }
 
-TextureAssetResult publish_texture_asset(
+VectorAssetResult publish_vector_asset(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
-    const TextureAsset& asset,
+    const VectorAsset& asset,
     const std::filesystem::path& validated_source) {
-    TextureAssetResult result;
-    auto validation = validate_texture_asset(manifest, asset);
+    VectorAssetResult result;
+    auto validation = validate_vector_asset(manifest, asset);
     if (!validation.ok()) {
         result.errors = std::move(validation.errors);
         return result;
     }
-    const auto document_relative = texture_document_path(
+    const auto document_relative = vector_document_path(
         manifest, asset.document.id);
     auto publication = detail::publish_asset_files(
-        project_root, manifest.directories.assets / "textures", asset.source,
-        document_relative, validated_source, serialize_texture_asset(asset),
-        "texture");
+        project_root, manifest.directories.assets / "vectors", asset.source,
+        document_relative, validated_source, serialize_vector_asset(asset),
+        "vector");
     if (!publication.ok()) {
         result.errors = std::move(publication.errors);
         return result;
     }
-    return load_texture_asset(project_root, manifest, document_relative);
+    return load_vector_asset(project_root, manifest, document_relative);
 }
 
 } // namespace fabric::project

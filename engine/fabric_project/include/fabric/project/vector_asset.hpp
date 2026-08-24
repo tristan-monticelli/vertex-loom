@@ -12,24 +12,22 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_texture_schema_version =
+inline constexpr std::uint32_t current_vector_schema_version =
     current_asset_schema_version;
 
-struct TextureAsset {
+struct VectorAsset {
     AssetDocument document{
-        .schema_version = current_texture_schema_version,
-        .type = "texture",
+        .schema_version = current_vector_schema_version,
+        .type = "vector",
     };
     std::filesystem::path source;
-    std::uint32_t width{};
-    std::uint32_t height{};
-    std::string pixel_format{"rgba8"};
+    std::string format{"svg"};
 
-    friend bool operator==(const TextureAsset&, const TextureAsset&) = default;
+    friend bool operator==(const VectorAsset&, const VectorAsset&) = default;
 };
 
-struct TextureAssetResult {
-    std::optional<TextureAsset> asset;
+struct VectorAssetResult {
+    std::optional<VectorAsset> asset;
     std::vector<Error> errors;
 
     [[nodiscard]] bool ok() const noexcept {
@@ -37,23 +35,23 @@ struct TextureAssetResult {
     }
 };
 
-[[nodiscard]] std::filesystem::path texture_source_path(
+[[nodiscard]] std::filesystem::path vector_source_path(
     const ProjectManifest& manifest, const core::ResourceId& id);
-[[nodiscard]] std::filesystem::path texture_document_path(
+[[nodiscard]] std::filesystem::path vector_document_path(
     const ProjectManifest& manifest, const core::ResourceId& id);
-[[nodiscard]] ValidationReport validate_texture_asset(
-    const ProjectManifest& manifest, const TextureAsset& asset);
-[[nodiscard]] std::string serialize_texture_asset(const TextureAsset& asset);
-[[nodiscard]] TextureAssetResult parse_texture_asset(
+[[nodiscard]] ValidationReport validate_vector_asset(
+    const ProjectManifest& manifest, const VectorAsset& asset);
+[[nodiscard]] std::string serialize_vector_asset(const VectorAsset& asset);
+[[nodiscard]] VectorAssetResult parse_vector_asset(
     const ProjectManifest& manifest, std::string_view json_text);
-[[nodiscard]] TextureAssetResult load_texture_asset(
+[[nodiscard]] VectorAssetResult load_vector_asset(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
     const std::filesystem::path& document_path);
-[[nodiscard]] TextureAssetResult publish_texture_asset(
+[[nodiscard]] VectorAssetResult publish_vector_asset(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
-    const TextureAsset& asset,
+    const VectorAsset& asset,
     const std::filesystem::path& validated_source);
 
 } // namespace fabric::project

@@ -1,9 +1,11 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/vector_asset.hpp"
 
 #include <array>
 #include <fstream>
 #include <iterator>
+#include <string_view>
 #include <utility>
 
 namespace fabric::project {
@@ -26,6 +28,58 @@ bool is_within_project(const std::filesystem::path& canonical_root,
         }
     }
     return true;
+}
+
+template <typename Loader>
+void inspect_asset_documents(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest,
+    const std::filesystem::path& canonical_root,
+    const std::string_view directory_name,
+    const std::string_view document_suffix,
+    const std::string_view error_field,
+    Loader&& loader,
+    std::vector<Error>& errors) {
+    const auto asset_directory = project_root / manifest.directories.assets /
+        directory_name;
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(asset_directory, filesystem_error)) {
+        if (filesystem_error) {
+            add_error(errors, ErrorCode::io_error, std::string(error_field),
+                      "cannot inspect the asset directory");
+        }
+        return;
+    }
+    const auto canonical_directory = std::filesystem::weakly_canonical(
+        asset_directory, filesystem_error);
+    if (filesystem_error ||
+        !is_within_project(canonical_root, canonical_directory)) {
+        add_error(errors, ErrorCode::invalid_path, std::string(error_field),
+                  "asset directory must remain inside the project root");
+        return;
+    }
+
+    for (std::filesystem::directory_iterator iterator(
+             asset_directory, filesystem_error), end;
+         !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto& entry = *iterator;
+        const std::string filename = entry.path().filename().string();
+        if (!entry.is_regular_file(filesystem_error) ||
+            !filename.ends_with(document_suffix)) {
+            continue;
+        }
+        auto loaded_asset = loader(
+            project_root, manifest,
+            entry.path().lexically_relative(project_root));
+        errors.insert(errors.end(),
+                      std::make_move_iterator(loaded_asset.errors.begin()),
+                      std::make_move_iterator(loaded_asset.errors.end()));
+    }
+    if (filesystem_error) {
+        add_error(errors, ErrorCode::io_error, std::string(error_field),
+                  "cannot inspect asset documents");
+    }
 }
 
 } // namespace
@@ -102,43 +156,13 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         return result;
     }
 
-    const auto texture_directory = project_root /
-        loaded.manifest->directories.assets / "textures";
-    filesystem_error.clear();
-    if (std::filesystem::exists(texture_directory, filesystem_error)) {
-        const auto canonical_textures = std::filesystem::weakly_canonical(
-            texture_directory, filesystem_error);
-        if (filesystem_error ||
-            !is_within_project(canonical_root, canonical_textures)) {
-            add_error(result.errors, ErrorCode::invalid_path,
-                      "assets.textures",
-                      "texture directory must remain inside the project root");
-            return result;
-        }
-        for (std::filesystem::directory_iterator iterator(
-                 texture_directory, filesystem_error), end;
-             !filesystem_error && iterator != end; iterator.increment(filesystem_error)) {
-            const auto& entry = *iterator;
-            const std::string filename = entry.path().filename().string();
-            if (!entry.is_regular_file(filesystem_error) ||
-                !filename.ends_with(".texture.json")) {
-                continue;
-            }
-            auto loaded_texture = load_texture_asset(
-                project_root, *loaded.manifest,
-                entry.path().lexically_relative(project_root));
-            result.errors.insert(result.errors.end(),
-                                 std::make_move_iterator(loaded_texture.errors.begin()),
-                                 std::make_move_iterator(loaded_texture.errors.end()));
-        }
-        if (filesystem_error) {
-            add_error(result.errors, ErrorCode::io_error, "assets.textures",
-                      "cannot inspect texture assets");
-        }
-    } else if (filesystem_error) {
-        add_error(result.errors, ErrorCode::io_error, "assets.textures",
-                  "cannot inspect the texture directory");
-    }
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, "textures",
+        ".texture.json", "assets.textures", load_texture_asset,
+        result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, "vectors",
+        ".vector.json", "assets.vectors", load_vector_asset, result.errors);
     if (result.errors.empty()) {
         result.manifest = std::move(loaded.manifest);
     }

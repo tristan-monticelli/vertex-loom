@@ -28,7 +28,13 @@ struct ProjectCreationFields {
     bool attempted{false};
 };
 
-struct TexturePreview {
+enum class PreviewKind {
+    none,
+    texture,
+    vector,
+};
+
+struct AssetPreview {
     GLuint texture{};
     std::uint32_t width{};
     std::uint32_t height{};
@@ -36,17 +42,11 @@ struct TexturePreview {
     std::array<char, 129> id{};
     std::array<char, 256> name{};
     bool attempted{false};
+    PreviewKind kind{PreviewKind::none};
 };
 
-bool import_texture(fabric::editor::ProjectSession& session,
-                    TexturePreview& preview) {
-    preview.attempted = true;
-    if (!session.import_png(preview.path.data(), {.value = preview.id.data()},
-                            preview.name.data())) {
-        return false;
-    }
-    const auto& imported = *session.imported_texture();
-
+void upload_preview(AssetPreview& preview,
+                    const fabric::render::RasterImage& image) {
     if (preview.texture != 0U) {
         glDeleteTextures(1, &preview.texture);
     }
@@ -58,16 +58,39 @@ bool import_texture(fabric::editor::ProjectSession& session,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                 static_cast<GLsizei>(imported.image.width),
-                 static_cast<GLsizei>(imported.image.height), 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, imported.image.rgba8.data());
+                 static_cast<GLsizei>(image.width),
+                 static_cast<GLsizei>(image.height), 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, image.rgba8.data());
     glBindTexture(GL_TEXTURE_2D, 0);
-    preview.width = imported.image.width;
-    preview.height = imported.image.height;
+    preview.width = image.width;
+    preview.height = image.height;
+}
+
+bool import_texture(fabric::editor::ProjectSession& session,
+                    AssetPreview& preview) {
+    preview.attempted = true;
+    if (!session.import_png(preview.path.data(), {.value = preview.id.data()},
+                            preview.name.data())) {
+        return false;
+    }
+    upload_preview(preview, session.imported_texture()->image);
+    preview.kind = PreviewKind::texture;
     return true;
 }
 
-void clear_texture_preview(TexturePreview& preview) {
+bool import_vector(fabric::editor::ProjectSession& session,
+                   AssetPreview& preview) {
+    preview.attempted = true;
+    if (!session.import_svg(preview.path.data(), {.value = preview.id.data()},
+                            preview.name.data())) {
+        return false;
+    }
+    upload_preview(preview, session.imported_vector()->preview);
+    preview.kind = PreviewKind::vector;
+    return true;
+}
+
+void clear_asset_preview(AssetPreview& preview) {
     if (preview.texture != 0U) {
         glDeleteTextures(1, &preview.texture);
         preview.texture = 0U;
@@ -75,6 +98,7 @@ void clear_texture_preview(TexturePreview& preview) {
     preview.width = 0;
     preview.height = 0;
     preview.attempted = false;
+    preview.kind = PreviewKind::none;
 }
 
 void copy_path_to_buffer(const std::filesystem::path& path,
@@ -147,10 +171,11 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
 void draw_workspace(fabric::editor::ProjectSession& session,
                     std::array<char, 1024>& path_buffer,
                     ProjectCreationFields& creation,
-                    TexturePreview& preview,
+                    AssetPreview& preview,
                     bool& request_create,
                     bool& request_open,
                     bool& request_png,
+                    bool& request_svg,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -171,9 +196,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::Button("Open project", {-1.0F, 0.0F})) {
             request_open = true;
         }
-    } else if (ImGui::Button("Import PNG", {-1.0F, 0.0F})) {
-        preview.attempted = false;
-        request_png = true;
+    } else {
+        if (ImGui::Button("Import PNG", {-1.0F, 0.0F})) {
+            preview.attempted = false;
+            request_png = true;
+        }
+        if (ImGui::Button("Import SVG", {-1.0F, 0.0F})) {
+            preview.attempted = false;
+            request_svg = true;
+        }
     }
     ImGui::End();
 
@@ -208,7 +239,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                      image_size, {0.0F, 1.0F}, {1.0F, 0.0F});
     } else {
         const char* preview_message = session.has_project()
-                                          ? "Import a PNG to begin"
+                                          ? "Import a PNG or SVG to begin"
                                           : "Open a project to begin";
         const ImVec2 text_size = ImGui::CalcTextSize(preview_message);
         draw_list->AddText({origin.x + (available.x - text_size.x) * 0.5F,
@@ -229,17 +260,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::Text("Schema version: %u", session.manifest()->schema_version);
         ImGui::TextWrapped("%s", session.project_root().string().c_str());
         if (preview.texture != 0U) {
-            ImGui::SeparatorText("Imported texture");
+            ImGui::SeparatorText(
+                preview.kind == PreviewKind::vector
+                    ? "Imported vector"
+                    : "Imported texture");
             ImGui::Text("%u x %u RGBA8", preview.width, preview.height);
-            if (session.imported_texture()) {
+            if (preview.kind == PreviewKind::texture &&
+                session.imported_texture()) {
                 ImGui::TextUnformatted(
                     session.imported_texture()->asset.document.name.c_str());
                 ImGui::TextDisabled("%s",
                     session.imported_texture()->asset.document.id.value.c_str());
             }
-            if (session.imported_texture()) {
+            if (preview.kind == PreviewKind::texture &&
+                session.imported_texture()) {
                 ImGui::TextWrapped("%s",
                     session.imported_texture()->asset.source.generic_string().c_str());
+            }
+            if (preview.kind == PreviewKind::vector && session.imported_vector()) {
+                ImGui::TextUnformatted(
+                    session.imported_vector()->asset.document.name.c_str());
+                ImGui::TextDisabled("%s",
+                    session.imported_vector()->asset.document.id.value.c_str());
+                ImGui::TextWrapped("%s",
+                    session.imported_vector()->asset.source.generic_string().c_str());
             }
         }
     } else {
@@ -271,6 +315,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         preview.attempted = false;
         ImGui::OpenPopup("Import PNG");
         request_png = false;
+    }
+    if (request_svg) {
+        preview.attempted = false;
+        ImGui::OpenPopup("Import SVG");
+        request_svg = false;
     }
 
     if (ImGui::BeginPopupModal("Import PNG", nullptr,
@@ -306,6 +355,40 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
+    if (ImGui::BeginPopupModal("Import SVG", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("SVG source file");
+        ImGui::SetNextItemWidth(560.0F);
+        const bool submitted = ImGui::InputText(
+            "##svg-path", preview.path.data(), preview.path.size(),
+            ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", preview.name.data(), preview.name.size());
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Resource ID", preview.id.data(), preview.id.size());
+        ImGui::TextDisabled(
+            "The SVG and its versioned document are copied into assets/vectors.");
+        if (submitted || ImGui::Button("Import", {110.0F, 0.0F})) {
+            if (import_vector(session, preview)) {
+                status = "SVG imported: " +
+                    session.imported_vector()->asset.document.id.value;
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "SVG import failed; inspect the diagnostics.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        if (preview.attempted && !session.errors().empty()) {
+            ImGui::Spacing();
+            ImGui::SeparatorText("Import failed");
+            draw_diagnostics(session);
+        }
+        ImGui::EndPopup();
+    }
+
     if (ImGui::BeginPopupModal("New project", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a versioned Vertex Loom project");
@@ -327,7 +410,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 .directories = {},
             };
             if (session.create(creation.path.data(), manifest)) {
-                clear_texture_preview(preview);
+                clear_asset_preview(preview);
                 status = "Project created: " + session.manifest()->name;
                 copy_path_to_buffer(session.project_root(), path_buffer);
                 ImGui::CloseCurrentPopup();
@@ -358,7 +441,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (path_buffer.front() == '\0') {
                 status = "A project directory is required.";
             } else if (session.open(path_buffer.data())) {
-                clear_texture_preview(preview);
+                clear_asset_preview(preview);
                 status = "Project opened: " + session.manifest()->name;
                 ImGui::CloseCurrentPopup();
             } else {
@@ -446,10 +529,11 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     fabric::editor::ProjectSession session;
     std::array<char, 1024> path_buffer{};
     ProjectCreationFields creation;
-    TexturePreview preview;
+    AssetPreview preview;
     bool request_create = false;
     bool request_open = false;
     bool request_png = false;
+    bool request_svg = false;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -492,6 +576,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                                     session.has_project())) {
                     request_png = true;
                 }
+                if (ImGui::MenuItem("Import SVG...", "Ctrl+Shift+I", false,
+                                    session.has_project())) {
+                    request_svg = true;
+                }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
                     running = false;
@@ -510,14 +598,18 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
         if (io.KeyCtrl && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_I, false)) {
-            request_png = true;
+            if (io.KeyShift) {
+                request_svg = true;
+            } else {
+                request_png = true;
+            }
         }
         if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
             running = false;
         }
 
         draw_workspace(session, path_buffer, creation, preview, request_create,
-                       request_open, request_png, status);
+                       request_open, request_png, request_svg, status);
 
         ImGui::Render();
         int drawable_width = 0;

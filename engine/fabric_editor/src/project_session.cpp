@@ -15,6 +15,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     project_root_ = project_root;
     manifest_ = std::move(created.manifest);
     imported_texture_.reset();
+    imported_vector_.reset();
     errors_.clear();
     return true;
 }
@@ -29,6 +30,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     project_root_ = project_root;
     manifest_ = std::move(loaded.manifest);
     imported_texture_.reset();
+    imported_vector_.reset();
     errors_.clear();
     return true;
 }
@@ -77,6 +79,48 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
     return true;
 }
 
+bool ProjectSession::import_svg(const std::filesystem::path& source,
+                                const core::ResourceId& id,
+                                const std::string& name) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before importing a vector"}};
+        return false;
+    }
+
+    auto decoded = render::load_svg_preview(source);
+    if (!decoded.ok()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "source",
+                    std::string(render::to_string(decoded.error->code)) +
+                        ": " + decoded.error->message}};
+        return false;
+    }
+
+    project::VectorAsset asset{
+        .document = {
+            .schema_version = project::current_vector_schema_version,
+            .type = "vector",
+            .id = id,
+            .name = name,
+        },
+        .source = project::vector_source_path(*manifest_, id),
+        .format = "svg",
+    };
+    auto published = project::publish_vector_asset(
+        project_root_, *manifest_, asset, source);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+
+    imported_vector_ = ImportedVector{
+        .asset = std::move(*published.asset),
+        .preview = std::move(*decoded.image),
+    };
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::has_project() const noexcept {
     return manifest_.has_value();
 }
@@ -95,6 +139,10 @@ const std::vector<project::Error>& ProjectSession::errors() const noexcept {
 
 const std::optional<ImportedTexture>& ProjectSession::imported_texture() const noexcept {
     return imported_texture_;
+}
+
+const std::optional<ImportedVector>& ProjectSession::imported_vector() const noexcept {
+    return imported_vector_;
 }
 
 } // namespace fabric::editor
