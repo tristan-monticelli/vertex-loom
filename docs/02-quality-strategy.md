@@ -67,5 +67,6 @@ Ces suites protègent désormais un format hérité ; aucun nouveau contrat ne d
 dépendre d’une frame ou d’un atlas. `VectorAsset v2` devra couvrir migration
 byte-préservante depuis v1, formes/fills/contours/clips, images remplissantes,
 tessellation déterministe et draw packets headless. Les modèles de prompts
-seront testés sans Dear ImGui, notamment isolation de leur état, erreurs par
-champ, annulation sans effet et résumé avant publication.
+sont testés sans Dear ImGui : defaults et presets, erreurs par champ,
+destination exacte, conflits de ressources, isolation de projet/artwork/import,
+annulation par reset sans effet et résumé avant publication.

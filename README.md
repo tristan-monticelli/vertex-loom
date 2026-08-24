@@ -23,7 +23,8 @@ first native Asset Studio workspace.
 - Human-readable and JSON Lines diagnostics.
 - Headless project validation.
 - Native SDL2/OpenGL/Dear ImGui Asset Studio shell with project inspection.
-- Safe project creation in a new or empty destination.
+- Typed Create, Import, and Add existing hub with isolated prompt state.
+- Safe project creation with scale presets, live validation, and final review.
 - Persistent PNG and SVG imports with versioned asset documents and OpenGL previews.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 

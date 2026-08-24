@@ -133,6 +133,7 @@ target_link_libraries(fabric_render PRIVATE
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/autosave_scheduler.cpp
     engine/fabric_editor/src/command_stack.cpp
+    engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/project_session.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
@@ -162,12 +163,14 @@ if(FABRIC_BUILD_EDITORS)
         ${imgui_source_SOURCE_DIR}/imgui_draw.cpp
         ${imgui_source_SOURCE_DIR}/imgui_tables.cpp
         ${imgui_source_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_source_SOURCE_DIR}/misc/cpp/imgui_stdlib.cpp
         ${imgui_source_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
         ${imgui_source_SOURCE_DIR}/backends/imgui_impl_sdl2.cpp
     )
     target_include_directories(fabric_imgui PUBLIC
         ${imgui_source_SOURCE_DIR}
         ${imgui_source_SOURCE_DIR}/backends
+        ${imgui_source_SOURCE_DIR}/misc/cpp
     )
     target_compile_features(fabric_imgui PUBLIC cxx_std_20)
     target_link_libraries(fabric_imgui PUBLIC SDL2::SDL2-static OpenGL::GL)
@@ -242,6 +245,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_editor_foundations_tests
              COMMAND fabric_editor_foundations_tests)
+
+    add_executable(fabric_creation_prompts_tests
+        tests/cpp/creation_prompts_tests.cpp
+    )
+    target_link_libraries(fabric_creation_prompts_tests PRIVATE
+        fabric_editor
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_creation_prompts_tests
+             COMMAND fabric_creation_prompts_tests)
 
     add_executable(fabric_project_session_editing_tests
         tests/cpp/project_session_editing_tests.cpp

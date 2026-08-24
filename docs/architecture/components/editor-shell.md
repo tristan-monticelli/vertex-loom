@@ -35,13 +35,19 @@ C4Component
 - Le chemin peut être fourni au démarrage ; les actions interactives utilisent
   le sélecteur natif de dossier ou de fichier.
 - La création demande un nom, un identifiant de ressource valide et un dossier
-  de destination absent ou vide. Le prochain modèle typé ajoute unités,
-  `pixelsPerUnit`, preset et résumé avant publication.
+  de destination absent ou vide. Son modèle typé porte unités monde,
+  `pixelsPerUnit`, preset d’échelle, erreurs par champ, destination exacte et
+  résumé avant publication.
 - `Create`, `Import` et `Add existing` sont trois intentions distinctes. Chaque
   type possède son état et sa validation ; annuler ne modifie aucun document.
-- Le personnalisateur et les modèles de prompts sont l’architecture cible des
-  prochains incréments ; la coquille actuelle expose encore les formulaires
-  d’import historiques.
+- Le hub affiche séparément `Create`, `Import` et `Add existing`. Projet,
+  artwork et chaque source d’import possèdent un état isolé ; les actions
+  matériau, entité, animation et ajout existant restent désactivées jusqu’à
+  l’arrivée de leur contrat.
+- L’assistant d’artwork valide taille de travail, origine, unités, première
+  forme, fill et conflit d’identifiant. Il conserve seulement une intention en
+  mémoire : la publication est volontairement différée à `VectorAsset v2` afin
+  de ne jamais produire un faux SVG opaque.
 - Une ouverture échouée expose les erreurs structurées et ne remplace pas la
   dernière session valide.
 - SDL2 possède la fenêtre et les événements ; Dear ImGui possède uniquement
@@ -51,7 +57,8 @@ C4Component
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
 - Le flux sprite existant conserve encore `SpriteSheetDefinition` et son atlas
-  pour compatibilité, mais il est exclu du hub cible par ADR-0022.
+  pour compatibilité, mais il est rangé sous une section `Legacy` et exclu des
+  créations natives par ADR-0022.
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.

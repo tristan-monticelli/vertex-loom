@@ -80,23 +80,29 @@ runtime et chaque futur document possède un propriétaire clair.
 
 ## Étape B — Hub de création et prompts dédiés
 
-- [ ] Remplacer la colonne d’actions d’import par un hub `Create`, `Import` et
+- [x] Remplacer la colonne d’actions d’import par un hub `Create`, `Import` et
   `Add existing`.
-- [ ] Enrichir `Create project` : destination, nom, identifiant, unités,
+- [x] Enrichir `Create project` : destination, nom, identifiant, unités,
   pixels par unité, preset de projet et résumé final.
-- [ ] Ajouter `Create vector artwork` : nom, identifiant, taille de travail,
+- [x] Ajouter `Create vector artwork` : nom, identifiant, taille de travail,
   origine, unités, première forme et fill initial.
-- [ ] Ajouter les prompts dédiés pour matériau/fill, entité et animation à
-  mesure que leurs contrats deviennent disponibles.
-- [ ] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
+- [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation à
+  mesure que leurs contrats deviennent disponibles. Aucun formulaire générique
+  n’est ouvert avant ces contrats ; les trois actions sont visibles mais
+  désactivées.
+- [x] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
   doit pas modifier le projet ni polluer le prompt suivant.
-- [ ] Afficher erreurs par champ, conflits d’identifiants et destination exacte
+- [x] Afficher erreurs par champ, conflits d’identifiants et destination exacte
   avant confirmation.
-- [ ] Tester les modèles de prompt et leurs validations sans Dear ImGui ; ne
+- [x] Tester les modèles de prompt et leurs validations sans Dear ImGui ; ne
   laisser dans `main.cpp` que le rendu des widgets.
 
 Gate : deux opérations différentes ne partagent ni libellé ambigu, ni état
 caché, ni publication implicite.
+
+État : gate validé. `Create vector artwork` prépare une intention native
+explicite sans écrire de document v1 ; sa publication commence avec
+`VectorAsset v2` à l’étape C.
 
 ## Étape C — `VectorAsset v2` natif
 
