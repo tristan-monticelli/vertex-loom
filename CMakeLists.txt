@@ -229,6 +229,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_animation_tests COMMAND fabric_animation_tests)
 
+    add_executable(fabric_property_descriptor_tests
+        tests/cpp/property_descriptor_tests.cpp
+    )
+    target_link_libraries(fabric_property_descriptor_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_property_descriptor_tests
+             COMMAND fabric_property_descriptor_tests)
+
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp
     )

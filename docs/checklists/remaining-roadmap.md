@@ -196,7 +196,7 @@ transform du fill restent ouverts.
 
 ## Étape E — Keyframes génériques et intelligentes
 
-- [ ] Définir `PropertyDescriptor` : identifiant stable, chemin affiché, type,
+- [x] Définir `PropertyDescriptor` : identifiant stable, chemin affiché, type,
   lecture, écriture, bornes, unité, animabilité et mode de composition.
 - [x] Définir `PropertyBinding` par `nodeId + componentId + propertyId`, jamais
   par pointeur, index temporaire ou chaîne interprétée au runtime.
