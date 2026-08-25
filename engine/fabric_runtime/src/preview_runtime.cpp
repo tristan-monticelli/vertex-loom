@@ -37,6 +37,7 @@ struct PreviewRuntime::Impl {
     PcmAudioMixer audio_mixer;
     PcmAudioDevice audio_device;
     std::optional<PcmWavClip> audio_clip;
+    SDL_GameController* controller{};
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
@@ -148,6 +149,7 @@ PreviewRuntime::PreviewRuntime() : impl_(std::make_unique<Impl>()) {}
 
 PreviewRuntime::~PreviewRuntime() {
     impl_->audio_device.close();
+    if (impl_->controller != nullptr) SDL_GameControllerClose(impl_->controller);
     if (impl_->context != nullptr) {
         for (const auto& [id, texture] : impl_->texture_handles) {
             const auto handle = static_cast<GLuint>(texture.handle);
@@ -235,7 +237,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             !input_.bind("move_left", {InputDevice::keyboard, SDLK_LEFT}) ||
             !input_.bind("move_right", {InputDevice::keyboard, SDLK_d}) ||
             !input_.bind("move_right", {InputDevice::keyboard, SDLK_RIGHT}) ||
-            !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE})) {
+            !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE}) ||
+            !input_.bind("move_left", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_LEFT}) ||
+            !input_.bind("move_right", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT}) ||
+            !input_.bind("jump", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_A})) {
             errors_.push_back("could not bind character input actions");
             return false;
         }
@@ -382,11 +387,20 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
 bool PreviewRuntime::run() {
     if (!loaded()) return false;
     SDL_SetMainReady();
-    if (SDL_Init(SDL_INIT_VIDEO) != 0) {
+    const auto sdl_flags = SDL_INIT_VIDEO |
+        (options_.enable_character ? SDL_INIT_GAMECONTROLLER : 0U);
+    if (SDL_Init(sdl_flags) != 0) {
         errors_.push_back(SDL_GetError());
         return false;
     }
     impl_->sdl_initialized = true;
+    if (options_.enable_character) {
+        for (int index = 0; index < SDL_NumJoysticks(); ++index) {
+            if (!SDL_IsGameController(index)) continue;
+            impl_->controller = SDL_GameControllerOpen(index);
+            if (impl_->controller != nullptr) break;
+        }
+    }
     if (!impl_->texture_sources.empty() && (IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) == 0) {
         errors_.push_back(IMG_GetError());
         return false;
@@ -483,6 +497,10 @@ bool PreviewRuntime::run() {
                              event.key.repeat != 0);
             else if (event.type == SDL_KEYUP)
                 input_.release(InputDevice::keyboard, event.key.keysym.sym);
+            else if (event.type == SDL_CONTROLLERBUTTONDOWN)
+                input_.press(InputDevice::gamepad, event.cbutton.button);
+            else if (event.type == SDL_CONTROLLERBUTTONUP)
+                input_.release(InputDevice::gamepad, event.cbutton.button);
         }
         const auto current_counter = SDL_GetPerformanceCounter();
         const auto elapsed = options_.mode == RuntimeMode::interactive

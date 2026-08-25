@@ -30,3 +30,14 @@ TEST_CASE("input action map ignores repeats and unknown actions") {
     CHECK_FALSE(input.pressed("move"));
     CHECK_FALSE(input.bind("missing", {fabric::runtime::InputDevice::keyboard, 1}));
 }
+
+TEST_CASE("input action map accepts logical gamepad buttons") {
+    fabric::runtime::InputActionMap input;
+    REQUIRE(input.define_action("jump"));
+    REQUIRE(input.bind("jump", {fabric::runtime::InputDevice::gamepad, 0}));
+    input.press(fabric::runtime::InputDevice::gamepad, 0);
+    CHECK(input.held("jump"));
+    CHECK(input.pressed("jump"));
+    input.release(fabric::runtime::InputDevice::gamepad, 0);
+    CHECK(input.released("jump"));
+}

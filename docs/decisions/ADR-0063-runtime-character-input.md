@@ -6,6 +6,8 @@ Le Preview Runtime expose `--character` pour activer un personnage Box2D et
 son `CharacterController`. Les touches `A`/flèche gauche, `D`/flèche droite
 et espace sont traduites en actions logiques `move_left`, `move_right` et
 `jump`. Un ReplayPlayer peut alimenter exactement le même `InputActionMap`.
+Les boutons D-pad gauche/droite et A d’un contrôleur SDL sont également
+reliés à ces actions.
 
 Les commandes sont appliquées avant chaque pas physique fixe de `1/60 s`.
 
