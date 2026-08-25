@@ -156,6 +156,10 @@ draw packets du renderer.
 - [ ] Ajouter canvas avec pan, zoom sous le curseur, cadrage, grille et unités.
 - [ ] Ajouter arbre de calques/nœuds, sélection multiple, verrouillage,
   visibilité, groupes et ordre Z.
+
+L’inspecteur permet désormais de choisir le parent et le clip d’un nœud natif
+avec historique et validation ; l’arbre de calques, la sélection multiple et
+les groupes restent ouverts.
 - [ ] Ajouter plume Bézier, primitives, édition des nœuds et poignées
   liées/libres, ouverture et fermeture de contour.
 - [ ] Ajouter gizmos translation, rotation, échelle, pivot et transform du fill

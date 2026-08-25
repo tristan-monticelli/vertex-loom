@@ -647,6 +647,52 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.visible = visible;
                 commit_node(node);
             }
+            const auto node_reference_label = [&](const std::optional<std::string>& reference,
+                                                  const char* empty_label) {
+                if (!reference.has_value()) return std::string{empty_label};
+                for (const auto& candidate : nodes) {
+                    if (candidate.id == *reference) return candidate.name;
+                }
+                return std::string{"Missing: "} + *reference;
+            };
+            if (ImGui::BeginCombo(
+                    "Parent",
+                    node_reference_label(node.parent_id, "None").c_str())) {
+                if (ImGui::Selectable("None", !node.parent_id.has_value())) {
+                    node.parent_id.reset();
+                    commit_node(node);
+                }
+                for (const auto& candidate : nodes) {
+                    if (candidate.id == node.id) continue;
+                    const bool selected_parent =
+                        node.parent_id.has_value() &&
+                        *node.parent_id == candidate.id;
+                    if (ImGui::Selectable(candidate.name.c_str(), selected_parent)) {
+                        node.parent_id = candidate.id;
+                        commit_node(node);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (ImGui::BeginCombo(
+                    "Clip",
+                    node_reference_label(node.clip_node_id, "None").c_str())) {
+                if (ImGui::Selectable("None", !node.clip_node_id.has_value())) {
+                    node.clip_node_id.reset();
+                    commit_node(node);
+                }
+                for (const auto& candidate : nodes) {
+                    if (candidate.id == node.id) continue;
+                    const bool selected_clip =
+                        node.clip_node_id.has_value() &&
+                        *node.clip_node_id == candidate.id;
+                    if (ImGui::Selectable(candidate.name.c_str(), selected_clip)) {
+                        node.clip_node_id = candidate.id;
+                        commit_node(node);
+                    }
+                }
+                ImGui::EndCombo();
+            }
             float position[]{node.transform.position.x,
                              node.transform.position.y};
             if (ImGui::InputFloat2("Position", position)) {

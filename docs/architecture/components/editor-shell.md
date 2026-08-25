@@ -89,7 +89,10 @@ C4Component
   historique de document.
 - La tranche native intégrée rend rectangles et ellipses, cadre le document,
   zoome sous le curseur et permet le pan. L'inspecteur sélectionne et édite un nœud :
-  nom, visibilité, verrouillage, transform, couleur et paramètres de fill image.
+  nom, visibilité, verrouillage, parent, clip, transform, couleur et paramètres
+  de fill image. Les sélecteurs parent et clip proposent uniquement les autres
+  nœuds du document ; la validation de session refuse ensuite les cycles ou
+  références invalides.
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.
