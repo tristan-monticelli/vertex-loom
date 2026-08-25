@@ -38,7 +38,7 @@ PNG après sauvegarde, autosave et récupération.
 
 - [x] Ajouter `VisualComposition v1` et ses calques raster, vectoriels,
   composants et chemins texturés.
-- [ ] Ajouter `VisualComponent v1`, instances, variantes, ancrages, paramètres
+- [x] Ajouter `VisualComponent v1`, instances, variantes, ancrages, paramètres
   typés, bounds et propriétés animables.
 - [ ] Livrer les presets œil, bouton, couture et fermeture éclair composée de
   deux rails texturés, dents répétées et curseur, sans logique spéciale dans le

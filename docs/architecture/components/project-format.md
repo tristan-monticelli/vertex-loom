@@ -64,6 +64,13 @@ C4Component
   calque raster peut surcharger localement la `RasterView` de sa texture.
   Les anciennes références directes à une texture resteront valides et seront
   interprétées comme une composition à un seul calque non recadré.
+- `VisualComponent v1` est stocké sous
+  `assets/components/<id>.component.json`. Il référence une composition
+  interne et déclare bounds locaux, ancrages, paramètres typés liés à ses
+  calques et variantes. Un calque composant conserve une instance avec
+  variante, ancrage et overrides ; les valeurs se résolvent dans l'ordre
+  défaut, variante, instance. Les paramètres compatibles avec
+  `AnimationValue` sont découvrables via `PropertyDescriptorRegistry`.
 - `TexturedPath v1` conservera un chemin, une largeur éventuellement variable,
   une référence texture, répétition ou étirement, offset, couleur, opacité et
   raccords. La collision restera une référence optionnelle et séparée.

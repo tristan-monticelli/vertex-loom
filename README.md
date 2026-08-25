@@ -30,6 +30,8 @@ first native Asset Studio workspace.
   Asset Studio preview controls, shared draw packets, and runtime pixel parity.
 - Strict VisualComposition v1 documents with ordered raster, vector,
   component, and textured-path layers.
+- Reusable VisualComponent v1 resources with typed parameters, variants,
+  anchors, instance overrides, bounds, and animatable property discovery.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test

@@ -154,6 +154,191 @@ bool read_reference(const Json& object, const char* key,
                   path);
 }
 
+Json serialize_parameter_value(const VisualParameterValue& value) {
+    Json result;
+    if (const auto* scalar = std::get_if<float>(&value)) {
+        result = {{"type", "float"}, {"value", *scalar}};
+    } else if (const auto* integer = std::get_if<std::int64_t>(&value)) {
+        result = {{"type", "integer"}, {"value", *integer}};
+    } else if (const auto* boolean = std::get_if<bool>(&value)) {
+        result = {{"type", "boolean"}, {"value", *boolean}};
+    } else if (const auto* text = std::get_if<std::string>(&value)) {
+        result = {{"type", "text"}, {"value", *text}};
+    } else if (const auto* vec2 = std::get_if<core::Vec2>(&value)) {
+        result = {{"type", "vec2"}, {"value", serialize_vec2(*vec2)}};
+    } else if (const auto* color = std::get_if<core::Color>(&value)) {
+        result = {{"type", "color"},
+                  {"value", {{"red", color->red}, {"green", color->green},
+                             {"blue", color->blue}, {"alpha", color->alpha}}}};
+    } else {
+        result = {{"type", "resource"},
+                  {"value", serialize_reference(
+                      std::get<ResourceReference>(value))}};
+    }
+    return result;
+}
+
+bool read_parameter_value(const Json& object, VisualParameterValue& output,
+                          std::vector<Error>& errors,
+                          const std::string& field) {
+    if (!object.is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a typed parameter value");
+        return false;
+    }
+    reject_unknown(object, {"type", "value"}, field, errors);
+    std::string type;
+    if (!read_text(object, "type", type, errors, field)) return false;
+    const auto value = object.find("value");
+    if (value == object.end()) {
+        add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                  "typed parameter value is missing");
+        return false;
+    }
+    if (type == "float") {
+        float parsed{};
+        if (!read_float(object, "value", parsed, errors, field)) return false;
+        output = parsed;
+        return true;
+    }
+    if (type == "integer") {
+        if (!value->is_number_integer()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                      "expected an integer");
+            return false;
+        }
+        output = value->get<std::int64_t>();
+        return true;
+    }
+    if (type == "boolean") {
+        if (!value->is_boolean()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                      "expected a boolean");
+            return false;
+        }
+        output = value->get<bool>();
+        return true;
+    }
+    if (type == "text") {
+        if (!value->is_string()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                      "expected text");
+            return false;
+        }
+        output = value->get<std::string>();
+        return true;
+    }
+    if (type == "vec2") {
+        if (!value->is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                      "expected a Vec2");
+            return false;
+        }
+        core::Vec2 parsed;
+        if (!read_vec2(object, "value", parsed, errors, field)) return false;
+        output = parsed;
+        return true;
+    }
+    if (type == "color") {
+        if (!value->is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".value",
+                      "expected a color");
+            return false;
+        }
+        reject_unknown(*value, {"red", "green", "blue", "alpha"},
+                       field + ".value", errors);
+        core::Color parsed;
+        if (!read_float(*value, "red", parsed.red, errors, field + ".value") ||
+            !read_float(*value, "green", parsed.green, errors,
+                        field + ".value") ||
+            !read_float(*value, "blue", parsed.blue, errors,
+                        field + ".value") ||
+            !read_float(*value, "alpha", parsed.alpha, errors,
+                        field + ".value")) return false;
+        output = parsed;
+        return true;
+    }
+    if (type == "resource") {
+        ResourceReference parsed;
+        if (!value->is_object() ||
+            !read_reference(object, "value", parsed, errors, field)) {
+            return false;
+        }
+        output = std::move(parsed);
+        return true;
+    }
+    add_error(errors, ErrorCode::invalid_asset, field + ".type",
+              "unsupported parameter value type");
+    return false;
+}
+
+Json serialize_component_instance(const VisualComponentInstance& instance) {
+    Json result{{"overrides", Json::array()}};
+    if (instance.variant_id) result["variantId"] = *instance.variant_id;
+    if (instance.anchor_id) result["anchorId"] = *instance.anchor_id;
+    for (const auto& override : instance.overrides) {
+        result["overrides"].push_back({
+            {"parameterId", override.parameter_id},
+            {"value", serialize_parameter_value(override.value)},
+        });
+    }
+    return result;
+}
+
+bool read_component_instance(const Json& object,
+                             VisualComponentInstance& output,
+                             std::vector<Error>& errors,
+                             const std::string& field) {
+    reject_unknown(object, {"variantId", "anchorId", "overrides"}, field,
+                   errors);
+    if (const auto variant = object.find("variantId");
+        variant != object.end()) {
+        if (!variant->is_string()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".variantId",
+                      "expected a string");
+        } else {
+            output.variant_id = variant->get<std::string>();
+        }
+    }
+    if (const auto anchor = object.find("anchorId"); anchor != object.end()) {
+        if (!anchor->is_string()) {
+            add_error(errors, ErrorCode::invalid_asset, field + ".anchorId",
+                      "expected a string");
+        } else {
+            output.anchor_id = anchor->get<std::string>();
+        }
+    }
+    const auto overrides = object.find("overrides");
+    if (overrides == object.end() || !overrides->is_array()) {
+        add_error(errors, ErrorCode::invalid_asset, field + ".overrides",
+                  "expected an array");
+        return false;
+    }
+    for (std::size_t index = 0; index < overrides->size(); ++index) {
+        const auto& serialized = (*overrides)[index];
+        const auto target = field + ".overrides[" + std::to_string(index) + "]";
+        if (!serialized.is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, target,
+                      "expected an object");
+            continue;
+        }
+        reject_unknown(serialized, {"parameterId", "value"}, target, errors);
+        VisualParameterOverride override;
+        read_text(serialized, "parameterId", override.parameter_id, errors,
+                  target);
+        const auto value = serialized.find("value");
+        if (value == serialized.end()) {
+            add_error(errors, ErrorCode::invalid_asset, target + ".value",
+                      "override value is required");
+        } else {
+            read_parameter_value(*value, override.value, errors,
+                                 target + ".value");
+        }
+        output.overrides.push_back(std::move(override));
+    }
+    return true;
+}
+
 Json serialize_raster_view(const RasterView& view) {
     return {{"schemaVersion", view.schema_version},
             {"crop", serialize_rect(view.crop)},
@@ -311,6 +496,89 @@ ValidationReport validate_visual_composition(
                           error.message);
             }
         }
+        if (layer.kind == VisualLayerKind::component &&
+            !layer.component_instance) {
+            add_error(report.errors, ErrorCode::invalid_asset,
+                      field + ".componentInstance",
+                      "component layers require an instance payload");
+        }
+        if (layer.kind != VisualLayerKind::component &&
+            layer.component_instance) {
+            add_error(report.errors, ErrorCode::invalid_asset,
+                      field + ".componentInstance",
+                      "is only valid for component layers");
+        }
+        if (layer.component_instance) {
+            if (layer.component_instance->variant_id &&
+                !core::ResourceId::is_valid(
+                    *layer.component_instance->variant_id)) {
+                add_error(report.errors, ErrorCode::invalid_resource_id,
+                          field + ".componentInstance.variantId",
+                          "must be a valid stable identifier");
+            }
+            if (layer.component_instance->anchor_id &&
+                !core::ResourceId::is_valid(
+                    *layer.component_instance->anchor_id)) {
+                add_error(report.errors, ErrorCode::invalid_resource_id,
+                          field + ".componentInstance.anchorId",
+                          "must be a valid stable identifier");
+            }
+            std::set<std::string> override_ids;
+            for (std::size_t override_index = 0;
+                 override_index < layer.component_instance->overrides.size();
+                 ++override_index) {
+                const auto& override =
+                    layer.component_instance->overrides[override_index];
+                const auto override_field = field +
+                    ".componentInstance.overrides[" +
+                    std::to_string(override_index) + "]";
+                if (!core::ResourceId::is_valid(override.parameter_id)) {
+                    add_error(report.errors, ErrorCode::invalid_resource_id,
+                              override_field + ".parameterId",
+                              "must be a valid parameter identifier");
+                } else if (!override_ids.insert(override.parameter_id).second) {
+                    add_error(report.errors, ErrorCode::duplicate_resource,
+                              override_field + ".parameterId",
+                              "parameter override must be unique");
+                }
+                if (const auto* scalar = std::get_if<float>(&override.value);
+                    scalar != nullptr && !std::isfinite(*scalar)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              override_field + ".value",
+                              "numeric value must be finite");
+                }
+                if (const auto* vec2 = std::get_if<core::Vec2>(&override.value);
+                    vec2 != nullptr && !finite(*vec2)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              override_field + ".value",
+                              "Vec2 value must be finite");
+                }
+                if (const auto* color = std::get_if<core::Color>(
+                        &override.value);
+                    color != nullptr &&
+                    (!std::isfinite(color->red) ||
+                     !std::isfinite(color->green) ||
+                     !std::isfinite(color->blue) ||
+                     !std::isfinite(color->alpha) || color->red < 0.0F ||
+                     color->red > 1.0F || color->green < 0.0F ||
+                     color->green > 1.0F || color->blue < 0.0F ||
+                     color->blue > 1.0F || color->alpha < 0.0F ||
+                     color->alpha > 1.0F)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              override_field + ".value",
+                              "color channels must be finite in [0,1]");
+                }
+                if (const auto* reference = std::get_if<ResourceReference>(
+                        &override.value);
+                    reference != nullptr &&
+                    (!core::ResourceId::is_valid(reference->id.value) ||
+                     reference->expected_type.empty())) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              override_field + ".value",
+                              "resource value must be valid and typed");
+                }
+            }
+        }
     }
     return report;
 }
@@ -321,6 +589,14 @@ std::vector<ResourceReference> visual_composition_resource_references(
     references.reserve(composition.layers.size());
     for (const auto& layer : composition.layers) {
         references.push_back(layer.resource);
+        if (layer.component_instance) {
+            for (const auto& override : layer.component_instance->overrides) {
+                if (const auto* reference = std::get_if<ResourceReference>(
+                        &override.value)) {
+                    references.push_back(*reference);
+                }
+            }
+        }
     }
     return references;
 }
@@ -344,6 +620,10 @@ std::string serialize_visual_composition(const VisualComposition& composition) {
                         {"zOrder", layer.z_order}};
         if (layer.raster_view) {
             serialized["rasterView"] = serialize_raster_view(*layer.raster_view);
+        }
+        if (layer.component_instance) {
+            serialized["componentInstance"] = serialize_component_instance(
+                *layer.component_instance);
         }
         document["layers"].push_back(std::move(serialized));
     }
@@ -397,7 +677,8 @@ VisualCompositionResult parse_visual_composition(
             reject_unknown(serialized,
                            {"id", "name", "kind", "resource", "anchor",
                             "transform", "visible", "opacity", "zOrder",
-                            "rasterView"}, field, result.errors);
+                            "rasterView", "componentInstance"}, field,
+                           result.errors);
             VisualCompositionLayer layer;
             std::string kind;
             read_text(serialized, "id", layer.id, result.errors, field);
@@ -438,6 +719,21 @@ VisualCompositionResult parse_visual_composition(
                     read_raster_view(*raster_view, view, result.errors,
                                      field + ".rasterView");
                     layer.raster_view = std::move(view);
+                }
+            }
+            const auto component_instance = serialized.find(
+                "componentInstance");
+            if (component_instance != serialized.end()) {
+                if (!component_instance->is_object()) {
+                    add_error(result.errors, ErrorCode::invalid_asset,
+                              field + ".componentInstance",
+                              "expected an object");
+                } else {
+                    VisualComponentInstance instance;
+                    read_component_instance(*component_instance, instance,
+                                            result.errors,
+                                            field + ".componentInstance");
+                    layer.component_instance = std::move(instance);
                 }
             }
             composition.layers.push_back(std::move(layer));

@@ -21,6 +21,28 @@ Une fermeture éclair compose deux rails `TexturedPath`, une répétition de den
 et un curseur ancré à une progression commune ; elle ne devient pas une forme
 vectorielle monolithique.
 
+Le document est stocké sous
+`assets/components/<id>.component.json` et référence une
+`VisualComposition v1` interne qui reste l'unique description de ses
+drawables. Ses bounds sont un `Rect` en unités locales. Chaque ancrage possède
+un identifiant stable et une position locale finie.
+
+Un paramètre déclare un type parmi scalaire, angle, entier, booléen, texte,
+`Vec2`, couleur et référence de ressource, une valeur par défaut, un binding
+cible dans la composition interne et son caractère animable. Entier et texte
+restent éditables mais non animables dans v1, car `AnimationValue v1` ne sait
+pas les interpoler. Les autres paramètres animables sont exposés au
+`PropertyDescriptorRegistry` ; aucune piste spéciale n'est ajoutée.
+Le registre étend donc ses genres de valeur avec `integer` et `text`, tout en
+les excluant de `animatable()` pour ce contrat v1.
+
+Une variante est un ensemble nommé d'overrides typés. Une instance de composant
+dans un calque `VisualComposition` choisit éventuellement une variante, un
+ancrage du composant et ses propres overrides. L'ordre de résolution est valeur
+par défaut, variante, puis instance. La validation headless vérifie la
+composition interne, les bindings de calques, les types d'override, les
+variantes, les ancrages et les cycles du graphe de ressources.
+
 `TexturedPath v1` décrit un chemin ouvert ou fermé, une largeur éventuellement
 variable, une texture, un mode `repeat` ou `stretch`, une échelle et un offset
 UV, une couleur, une opacité et des raccords. Le renderer dérive un ruban

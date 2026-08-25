@@ -9,7 +9,17 @@
 
 namespace fabric::project {
 
-enum class PropertyValueKind { scalar, vec2, color, boolean, angle, transform, resource };
+enum class PropertyValueKind {
+    scalar,
+    integer,
+    text,
+    vec2,
+    color,
+    boolean,
+    angle,
+    transform,
+    resource,
+};
 enum class PropertyComposition { replace, additive };
 
 struct PropertyDescriptor {

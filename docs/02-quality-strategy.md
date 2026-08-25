@@ -98,6 +98,11 @@ calques, les références typées, identifiants stables, ancrages, transforms,
 opacité, Z, publication atomique et refus des champs inconnus. Le validateur
 headless résout ses dépendances et vérifie chaque crop local contre les
 dimensions de la texture référencée.
+`VisualComponent v1` couvre le round-trip des huit types de paramètres,
+bounds, ancrages, bindings, variantes et instances. Les tests vérifient la
+priorité défaut → variante → instance, la découverte des propriétés animables,
+la publication atomique, les types incompatibles, les cibles absentes et les
+cycles composant/composition dans le validateur headless.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

@@ -3,6 +3,7 @@
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/visual_component.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -30,6 +31,7 @@ struct VisualCompositionLayer {
     float opacity{1.0F};
     float z_order{};
     std::optional<RasterView> raster_view;
+    std::optional<VisualComponentInstance> component_instance;
 
     friend bool operator==(const VisualCompositionLayer&,
                            const VisualCompositionLayer&) = default;

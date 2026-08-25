@@ -9,8 +9,10 @@
 #include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/project/visual_component.hpp"
 #include "fabric/project/visual_composition.hpp"
 
+#include <algorithm>
 #include <array>
 #include <fstream>
 #include <iterator>
@@ -226,6 +228,86 @@ void validate_composition_raster_views(
     }
 }
 
+void validate_visual_component_bindings(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest, std::vector<Error>& errors) {
+    const auto directory = project_root / manifest.directories.assets /
+        "components";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(directory, filesystem_error) ||
+        filesystem_error) return;
+    for (std::filesystem::directory_iterator iterator(directory, filesystem_error),
+         end; !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(filesystem_error) ||
+            !filename.ends_with(".component.json")) continue;
+        const auto component = load_visual_component(
+            project_root, manifest,
+            iterator->path().lexically_relative(project_root));
+        if (!component.ok()) continue;
+        const auto composition = load_visual_composition(
+            project_root, manifest,
+            visual_composition_document_path(
+                manifest, component.asset->composition.id));
+        if (!composition.ok()) continue;
+        for (std::size_t index = 0; index < component.asset->parameters.size();
+             ++index) {
+            const auto& parameter = component.asset->parameters[index];
+            if (!std::ranges::any_of(
+                    composition.asset->layers, [&](const auto& layer) {
+                        return layer.id == parameter.target.node_id;
+                    })) {
+                add_error(errors, ErrorCode::missing_resource,
+                          component.asset->document.id.value +
+                              ".parameters[" + std::to_string(index) +
+                              "].target.nodeId",
+                          "parameter target layer is missing from the internal composition");
+            }
+        }
+    }
+}
+
+void validate_visual_component_instances(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest, std::vector<Error>& errors) {
+    const auto directory = project_root / manifest.directories.assets /
+        "compositions";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(directory, filesystem_error) ||
+        filesystem_error) return;
+    for (std::filesystem::directory_iterator iterator(directory, filesystem_error),
+         end; !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(filesystem_error) ||
+            !filename.ends_with(".composition.json")) continue;
+        const auto composition = load_visual_composition(
+            project_root, manifest,
+            iterator->path().lexically_relative(project_root));
+        if (!composition.ok()) continue;
+        for (std::size_t index = 0; index < composition.asset->layers.size();
+             ++index) {
+            const auto& layer = composition.asset->layers[index];
+            if (layer.kind != VisualLayerKind::component ||
+                !layer.component_instance) continue;
+            const auto component = load_visual_component(
+                project_root, manifest,
+                visual_component_document_path(manifest, layer.resource.id));
+            if (!component.ok()) continue;
+            const auto resolved = resolve_visual_component_instance(
+                *component.asset, *layer.component_instance);
+            for (const auto& error : resolved.errors) {
+                add_error(errors, error.code,
+                          composition.asset->document.id.value +
+                              ".layers[" + std::to_string(index) +
+                              "].componentInstance." + error.field,
+                          error.message);
+            }
+        }
+    }
+}
+
 } // namespace
 
 ManifestResult load_manifest(const std::filesystem::path& project_root) {
@@ -319,10 +401,19 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         material_resource_references, registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root,
+        loaded.manifest->directories.assets, "components",
+        ".component.json", "assets.components", load_visual_component,
+        visual_component_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root,
         loaded.manifest->directories.assets, "compositions",
         ".composition.json", "assets.compositions", load_visual_composition,
         visual_composition_resource_references, registry, result.errors);
     validate_composition_raster_views(
+        project_root, *loaded.manifest, result.errors);
+    validate_visual_component_bindings(
+        project_root, *loaded.manifest, result.errors);
+    validate_visual_component_instances(
         project_root, *loaded.manifest, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "animations",
