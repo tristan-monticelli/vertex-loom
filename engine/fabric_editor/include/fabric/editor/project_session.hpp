@@ -3,11 +3,9 @@
 #include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/manifest.hpp"
-#include "fabric/project/sprite_sheet.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/render/raster_image.hpp"
-#include "fabric/render/sprite_atlas.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -34,11 +32,6 @@ struct ImportedVector {
     render::RasterImage preview;
 };
 
-struct ImportedSpriteSheet {
-    project::SpriteSheetDefinition asset;
-    render::RasterImage atlas;
-};
-
 class ProjectSession {
 public:
     ProjectSession() = default;
@@ -58,20 +51,6 @@ public:
                                   const std::string& name);
     [[nodiscard]] bool create_vector_artwork(
         const CreateVectorArtworkPrompt& prompt);
-    [[nodiscard]] bool import_aseprite(const std::filesystem::path& source,
-                                       const core::ResourceId& id,
-                                       const std::string& name);
-    [[nodiscard]] bool import_png_sprite_grid(
-        const std::filesystem::path& source,
-        const core::ResourceId& id,
-        const std::string& name,
-        const render::SpriteGrid& grid);
-    [[nodiscard]] bool import_png_sprite_regions(
-        const std::filesystem::path& source,
-        const core::ResourceId& id,
-        const std::string& name,
-        const std::vector<render::SpriteRegion>& regions);
-    [[nodiscard]] bool regenerate_sprite_sheet(const core::ResourceId& id);
     [[nodiscard]] bool set_project_name(
         std::string name,
         AutosaveScheduler::Clock::time_point now =
@@ -107,8 +86,6 @@ public:
     [[nodiscard]] const std::optional<ImportedVector>& imported_vector() const noexcept;
     [[nodiscard]] const std::optional<project::VectorAsset>&
     created_vector() const noexcept;
-    [[nodiscard]] const std::optional<ImportedSpriteSheet>&
-    imported_sprite_sheet() const noexcept;
 
 private:
     std::filesystem::path project_root_;
@@ -116,20 +93,11 @@ private:
     std::optional<ImportedTexture> imported_texture_;
     std::optional<ImportedVector> imported_vector_;
     std::optional<project::VectorAsset> created_vector_;
-    std::optional<ImportedSpriteSheet> imported_sprite_sheet_;
     std::optional<project::ProjectManifest> recovery_manifest_;
     CommandStack commands_;
     AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
 
-    [[nodiscard]] bool publish_sprite_frames(
-        const std::filesystem::path& source,
-        const core::ResourceId& id,
-        const std::string& name,
-        project::SpriteSourceKind source_kind,
-        std::vector<render::SpriteSourceFrame> frames,
-        std::vector<project::SpriteTagDefinition> tags,
-        std::vector<project::SpriteSliceDefinition> slices);
 };
 
 } // namespace fabric::editor

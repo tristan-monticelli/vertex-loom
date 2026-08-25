@@ -166,8 +166,6 @@ std::string_view label(const ImportSourceKind kind) noexcept {
     switch (kind) {
     case ImportSourceKind::png_image: return "PNG image source";
     case ImportSourceKind::linked_svg: return "Linked SVG source";
-    case ImportSourceKind::legacy_aseprite: return "Legacy Aseprite source";
-    case ImportSourceKind::legacy_sprite_png: return "Legacy sprite PNG source";
     }
     return "Import source";
 }
@@ -196,15 +194,6 @@ PromptValidation ImportSourcePrompt::validate(
         directory = manifest.directories.assets / "vectors";
         document_suffix = ".vector.json";
         break;
-    case ImportSourceKind::legacy_aseprite:
-        directory = manifest.directories.assets / "textures";
-        document_suffix = ".sprite.json";
-        break;
-    case ImportSourceKind::legacy_sprite_png:
-        expected_extension = ".png";
-        directory = manifest.directories.assets / "textures";
-        document_suffix = ".sprite.json";
-        break;
     }
     validation.destination = project_root / directory / (id + document_suffix);
 
@@ -220,10 +209,7 @@ PromptValidation ImportSourcePrompt::validate(
                 character = static_cast<char>(character - 'A' + 'a');
             }
         }
-        const bool extension_matches =
-            kind == ImportSourceKind::legacy_aseprite
-                ? extension == ".ase" || extension == ".aseprite"
-                : extension == expected_extension;
+        const bool extension_matches = extension == expected_extension;
         if (!extension_matches) {
             add_error(validation, "source",
                       "The selected file extension does not match this import.");

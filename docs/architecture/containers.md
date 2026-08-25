@@ -9,9 +9,9 @@ C4Container
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, fills, entités et animations")
         Container(map, "Map Studio", "C++20 / CMake", "Point d'entrée de l'éditeur de maps ; UI Dear ImGui à venir")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
-        Container(projectlib, "fabric_project", "C++20 / nlohmann-json / zlib", "Manifest, documents vectoriels et autres contrats ; charge aussi les sprites hérités")
+        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, prompts typés, historique réversible, autosave et orchestration d’authoring")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL / zlib", "Géométrie et compositing vectoriels ; conserve les décodeurs et atlas hérités")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie et compositing vectoriels")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
@@ -42,7 +42,6 @@ bibliothèque sans état distant. Le premier squelette CMake expose les cibles
 constituent le premier contrat de données partagé. Asset Studio utilise
 `fabric_editor` pour la session, une coquille SDL2/OpenGL/Dear ImGui et le
 premier composant `fabric_render` pour décoder les aperçus PNG et SVG en RGBA8.
-La tranche actuellement compilée décode encore les aperçus PNG/SVG et sait
-produire des atlas Aseprite déterministes. ADR-0022 classe ce dernier flux comme
-compatibilité héritée : le renderer cible consomme `VectorAsset v2`, le modèle
-forme/fill/contour/clip d’ADR-0023 et ne dépend d’aucune spritesheet.
+La tranche actuellement compilée décode les aperçus PNG/SVG. Le renderer cible
+consomme `VectorAsset v2` et le modèle forme/fill/contour/clip d’ADR-0023. Le
+pipeline sprite a été retiré par ADR-0025.

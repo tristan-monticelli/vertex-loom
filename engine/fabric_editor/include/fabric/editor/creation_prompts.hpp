@@ -56,8 +56,6 @@ struct CreateProjectPrompt {
 enum class ImportSourceKind {
     png_image,
     linked_svg,
-    legacy_aseprite,
-    legacy_sprite_png,
 };
 
 [[nodiscard]] std::string_view label(ImportSourceKind kind) noexcept;

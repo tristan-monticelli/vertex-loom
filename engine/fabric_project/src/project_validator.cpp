@@ -1,6 +1,5 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/resource_registry.hpp"
-#include "fabric/project/sprite_sheet.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
@@ -185,10 +184,6 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, "vectors",
         ".vector.json", "assets.vectors", load_vector_asset,
         vector_resource_references, registry, result.errors);
-    inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, "textures",
-        ".sprite.json", "assets.sprites", load_sprite_sheet, no_references,
-        registry, result.errors);
     auto graph_validation = registry.validate();
     result.errors.insert(
         result.errors.end(),

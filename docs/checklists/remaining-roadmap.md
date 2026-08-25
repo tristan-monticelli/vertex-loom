@@ -12,10 +12,9 @@ remplissage peut être une couleur, un matériau, un motif ou une image locale.
 Une image placée dans une forme reste découpée par cette forme ; son cadrage et
 sa transformation sont éditables indépendamment du contour.
 
-Le produit cible n’utilise pas de spritesheets. Le lecteur Aseprite, le packer
-d’atlas et `SpriteSheetDefinition v1` déjà présents sont conservés sans nouvelle
-extension jusqu’à une décision de migration. Leur retrait éventuel exigera un
-inventaire des références et une confirmation explicite avant suppression.
+Le produit n’utilise pas de spritesheets. Le lecteur Aseprite, le packer
+d’atlas et `SpriteSheetDefinition v1` ont été retirés après inventaire et
+confirmation explicite ; ADR-0025 enregistre cette décision.
 
 Chaque opération de création distincte possède son propre prompt ou assistant
 typé. Un import de source n’est pas présenté comme la création d’un document.
@@ -26,11 +25,11 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | --- | --- | --- |
 | CONFORME | La création de projet valide le nom, l’identifiant et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage et enrichir le prompt. |
 | CONFORME | `CreateProjectPrompt` demande destination, nom, identifiant, unités monde, preset et `pixelsPerUnit`, puis affiche erreurs et résumé avant création. | Conserver les tests headless du modèle. |
-| MANQUE | Les états PNG, SVG, Aseprite et sprite PNG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
+| MANQUE | Les états PNG et SVG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
 | PARTIEL | `VectorAsset v2 native` persiste primitives et fills couleur/image, mais ne produit pas encore de draw packets ni d’édition de sommets. | Livrer chemins, contours, clips, tessellation et personnalisateur. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
 | MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
-| MANQUE | Le flux récemment livré privilégie les spritesheets et les atlas, contrairement à la cible clarifiée. | Geler ce flux comme héritage, ne plus en faire une dépendance des étapes suivantes et planifier une migration sans suppression automatique. |
+| CONFORME | Le pipeline sprite a été retiré du build, des contrats, du validateur et de l’interface par ADR-0025. | Empêcher sa réintroduction dans les futurs contrats. |
 | CONFORME | `CommandStack`, sauvegarde atomique, autosave et récupération sont testés sans fenêtre. | Réutiliser ces services pour chaque futur document éditable. |
 | CONFORME | Le registre de ressources vérifie types, doublons, documents manquants et cycles. | Étendre ses types aux formes, fills, animations, entités et maps. |
 | CONFORME | La branche passe `npm run validate` et la matrice macOS/Windows/Linux. | Garder ce gate après chaque incrément. |
@@ -76,8 +75,8 @@ implémentation. Les preuves fonctionnelles restent exclusivement dans les
   projet et rendu avant le prochain changement structurel.
 - [x] Définir la migration `VectorAsset v1 -> v2` sans perte : les SVG actuels
   deviennent `sourceKind = linkedSvg`.
-- [x] Décider par inventaire si Aseprite reste un import optionnel de calques et
-  d’images ou devient entièrement obsolète.
+- [x] Décider par inventaire que le pipeline devient entièrement obsolète et le
+  retirer après confirmation explicite.
 
 Gate : la documentation ne présente plus les sprites comme une fondation du
 runtime et chaque futur document possède un propriétaire clair.
@@ -260,5 +259,5 @@ depuis les documents produits par Asset Studio et Map Studio.
 - [ ] Tester autosave, récupération et sauvegarde atomique sans fenêtre.
 - [ ] Exécuter `npm run validate` avant chaque commit.
 - [ ] Exiger macOS, Windows et Linux verts avant de cocher un gate.
-- [ ] Ne supprimer aucun code sprite, format ou fixture sans inventaire,
-  proposition de migration et confirmation explicite.
+- [x] Retirer le code sprite uniquement après inventaire et confirmation
+  explicite, sans toucher à des ressources utilisateur.

@@ -20,18 +20,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
-set(ZLIB_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(ZLIB_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-set(ZLIB_BUILD_STATIC ON CACHE BOOL "" FORCE)
-set(ZLIB_INSTALL OFF CACHE BOOL "" FORCE)
-FetchContent_Declare(
-    zlib
-    GIT_REPOSITORY https://github.com/madler/zlib.git
-    GIT_TAG v1.3.2
-    GIT_SHALLOW TRUE
-)
-FetchContent_MakeAvailable(zlib)
-
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     FetchContent_Declare(
         Catch2
@@ -59,7 +47,6 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/resource_registry.cpp
-    engine/fabric_project/src/sprite_sheet.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
 )
@@ -67,7 +54,6 @@ target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
 target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE
     nlohmann_json::nlohmann_json
-    ZLIB::ZLIBSTATIC
 )
 
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
@@ -117,17 +103,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL2 SDL2_image)
 
-add_library(fabric_render STATIC
-    engine/fabric_render/src/aseprite.cpp
-    engine/fabric_render/src/raster_image.cpp
-    engine/fabric_render/src/sprite_atlas.cpp
-)
+add_library(fabric_render STATIC engine/fabric_render/src/raster_image.cpp)
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
 target_compile_features(fabric_render PUBLIC cxx_std_20)
 target_link_libraries(fabric_render PRIVATE
     SDL2::SDL2-static
     SDL2_image::SDL2_image-static
-    ZLIB::ZLIBSTATIC
 )
 
 add_library(fabric_editor STATIC
@@ -221,16 +202,6 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(NAME fabric_document_storage_tests
              COMMAND fabric_document_storage_tests)
 
-    add_executable(fabric_sprite_sheet_tests
-        tests/cpp/sprite_sheet_tests.cpp
-    )
-    target_link_libraries(fabric_sprite_sheet_tests PRIVATE
-        fabric_project
-        fabric_render
-        Catch2::Catch2WithMain
-    )
-    add_test(NAME fabric_sprite_sheet_tests COMMAND fabric_sprite_sheet_tests)
-
     add_executable(fabric_editor_tests tests/cpp/project_session_tests.cpp)
     target_link_libraries(fabric_editor_tests PRIVATE fabric_editor)
     add_test(NAME fabric_editor_tests COMMAND fabric_editor_tests)
@@ -266,36 +237,9 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(NAME fabric_project_session_editing_tests
              COMMAND fabric_project_session_editing_tests)
 
-    add_executable(fabric_sprite_import_session_tests
-        tests/cpp/sprite_import_session_tests.cpp
-    )
-    target_link_libraries(fabric_sprite_import_session_tests PRIVATE
-        fabric_editor
-        Catch2::Catch2WithMain
-    )
-    add_test(NAME fabric_sprite_import_session_tests
-             COMMAND fabric_sprite_import_session_tests)
-
     add_executable(fabric_render_tests tests/cpp/raster_image_tests.cpp)
     target_link_libraries(fabric_render_tests PRIVATE fabric_render)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
-
-    add_executable(fabric_aseprite_tests tests/cpp/aseprite_tests.cpp)
-    target_link_libraries(fabric_aseprite_tests PRIVATE
-        fabric_render
-        ZLIB::ZLIBSTATIC
-        Catch2::Catch2WithMain
-    )
-    add_test(NAME fabric_aseprite_tests COMMAND fabric_aseprite_tests)
-
-    add_executable(fabric_sprite_atlas_tests
-        tests/cpp/sprite_atlas_tests.cpp
-    )
-    target_link_libraries(fabric_sprite_atlas_tests PRIVATE
-        fabric_render
-        Catch2::Catch2WithMain
-    )
-    add_test(NAME fabric_sprite_atlas_tests COMMAND fabric_sprite_atlas_tests)
 
     add_test(
         NAME project_validator_accepts_valid_project

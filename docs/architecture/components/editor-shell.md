@@ -56,9 +56,8 @@ C4Component
   l'aperçu ; un échec conserve le dernier import réussi.
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
-- Le flux sprite existant conserve encore `SpriteSheetDefinition` et son atlas
-  pour compatibilité, mais il est rangé sous une section `Legacy` et exclu des
-  créations natives par ADR-0022.
+- Asset Studio n’expose aucun import sprite ; PNG alimente les textures et SVG
+  les ressources vectorielles liées conformément à ADR-0025.
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.

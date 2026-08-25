@@ -11,7 +11,7 @@
 | SVG import lié | SDL2_image 2.8.12 / NanoSVG intégré | Source externe conservée et bornée ; le SVG n’est pas le format d’édition natif. | ADR-0016, ADR-0022 |
 | Vector authoring | `VectorAsset v2` natif | Géométrie, fills, contours, clips et propriétés animables indépendants du SVG. | ADR-0022, ADR-0023 |
 | Creation flows | Prompts typés `Create / Import / Add existing` | Chaque opération expose ses champs, validations et effets sans état partagé ambigu. | ADR-0024 |
-| Sprite compatibility | Pipeline Aseprite/atlas gelé | Lecture héritée conservée, sans dépendance des futurs éditeurs ou runtimes. | ADR-0021, ADR-0022 |
+| Graphic model | Aucun pipeline sprite | PNG comme texture de fill, SVG lié ou géométrie native ; ancien pipeline retiré. | ADR-0022, ADR-0025 |
 | New C++ tests | Catch2 3.15.3 | Nouvelles suites structurées sans réécriture immédiate des tests historiques. | ADR-0017 |
 | Native dialogs | Native File Dialog Extended 1.3.0 | Sélecteurs Cocoa, Win32 et GTK derrière une API C portable. | ADR-0017 |
 | Common contracts | Types C++ partagés + ProjectManifest v2 | Unités, transforms, en-têtes et références identiques dans tous les modules. | ADR-0018 |

@@ -2,7 +2,6 @@
 
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
-#include "fabric/render/aseprite.hpp"
 
 #include <memory>
 #include <limits>
@@ -49,173 +48,6 @@ private:
     Value after_;
 };
 
-std::string tag_direction(
-    const render::AsepriteLoopDirection direction) {
-    switch (direction) {
-    case render::AsepriteLoopDirection::forward: return "forward";
-    case render::AsepriteLoopDirection::reverse: return "reverse";
-    case render::AsepriteLoopDirection::ping_pong: return "pingPong";
-    case render::AsepriteLoopDirection::ping_pong_reverse:
-        return "pingPongReverse";
-    }
-    return "forward";
-}
-
-std::optional<render::AsepritePoint> frame_pivot(
-    const render::AsepriteDocument& document, const std::uint32_t frame) {
-    const render::AsepriteSliceKey* fallback = nullptr;
-    for (const auto& slice : document.slices) {
-        const render::AsepriteSliceKey* active = nullptr;
-        for (const auto& key : slice.keys) {
-            if (key.frame > frame) {
-                break;
-            }
-            active = &key;
-        }
-        if (active == nullptr || !active->pivot.has_value()) {
-            continue;
-        }
-        if (slice.name == "pivot") {
-            return active->pivot;
-        }
-        if (fallback == nullptr) {
-            fallback = active;
-        }
-    }
-    return fallback == nullptr ? std::nullopt : fallback->pivot;
-}
-
-std::vector<render::SpriteSourceFrame> aseprite_frames(
-    const render::AsepriteDocument& document) {
-    std::vector<render::SpriteSourceFrame> frames;
-    frames.reserve(document.frames.size());
-    for (std::size_t index = 0; index < document.frames.size(); ++index) {
-        frames.push_back(render::SpriteSourceFrame{
-            .name = "frame-" + std::to_string(index),
-            .image = document.frames[index].image,
-            .duration_ms = document.frames[index].duration_ms,
-            .pivot = frame_pivot(document, static_cast<std::uint32_t>(index)),
-        });
-    }
-    return frames;
-}
-
-std::vector<project::SpriteTagDefinition> aseprite_tags(
-    const render::AsepriteDocument& document) {
-    std::vector<project::SpriteTagDefinition> tags;
-    tags.reserve(document.tags.size());
-    for (const auto& tag : document.tags) {
-        tags.push_back({.name = tag.name,
-                        .from_frame = tag.from_frame,
-                        .to_frame = tag.to_frame,
-                        .direction = tag_direction(tag.direction),
-                        .repeat = tag.repeat});
-    }
-    return tags;
-}
-
-std::vector<project::SpriteSliceDefinition> aseprite_slices(
-    const render::AsepriteDocument& document) {
-    std::vector<project::SpriteSliceDefinition> slices;
-    slices.reserve(document.slices.size());
-    for (const auto& slice : document.slices) {
-        project::SpriteSliceDefinition converted{.name = slice.name};
-        converted.keys.reserve(slice.keys.size());
-        for (const auto& key : slice.keys) {
-            project::SpriteSliceKeyDefinition converted_key{
-                .frame = key.frame,
-                .bounds = {key.bounds.x, key.bounds.y, key.bounds.width,
-                           key.bounds.height},
-            };
-            if (key.center.has_value()) {
-                converted_key.center = project::SpriteSliceRect{
-                    key.center->x, key.center->y, key.center->width,
-                    key.center->height};
-            }
-            if (key.pivot.has_value()) {
-                converted_key.pivot =
-                    project::SpritePoint{key.pivot->x, key.pivot->y};
-            }
-            converted.keys.push_back(std::move(converted_key));
-        }
-        slices.push_back(std::move(converted));
-    }
-    return slices;
-}
-
-project::SpriteSheetDefinition sprite_definition(
-    const project::ProjectManifest& manifest,
-    const core::ResourceId& id,
-    const std::string& name,
-    const project::SpriteSourceKind source_kind,
-    const render::SpriteAtlas& atlas,
-    std::vector<project::SpriteTagDefinition> tags,
-    std::vector<project::SpriteSliceDefinition> slices) {
-    project::SpriteSheetDefinition definition{
-        .document = {
-            .schema_version = project::current_sprite_sheet_schema_version,
-            .type = "spriteSheet",
-            .id = id,
-            .name = name,
-        },
-        .source_kind = source_kind,
-        .source = project::sprite_sheet_source_path(manifest, id, source_kind),
-        .atlas = project::sprite_sheet_atlas_path(manifest, id),
-        .atlas_size = {atlas.image.width, atlas.image.height},
-        .tags = std::move(tags),
-        .slices = std::move(slices),
-    };
-    definition.frames.reserve(atlas.frames.size());
-    for (const auto& frame : atlas.frames) {
-        project::SpriteFrameDefinition converted{
-            .name = frame.name,
-            .atlas_bounds = {frame.atlas_bounds.x, frame.atlas_bounds.y,
-                             frame.atlas_bounds.width,
-                             frame.atlas_bounds.height},
-            .source_bounds = {frame.source_bounds.x, frame.source_bounds.y,
-                              frame.source_bounds.width,
-                              frame.source_bounds.height},
-            .source_size = {frame.source_width, frame.source_height},
-            .duration_ms = frame.duration_ms,
-        };
-        if (frame.pivot.has_value()) {
-            converted.pivot =
-                project::SpritePoint{frame.pivot->x, frame.pivot->y};
-        }
-        if (frame.input_bounds.has_value()) {
-            converted.input_bounds = project::SpriteRect{
-                frame.input_bounds->x, frame.input_bounds->y,
-                frame.input_bounds->width, frame.input_bounds->height};
-        }
-        definition.frames.push_back(std::move(converted));
-    }
-    return definition;
-}
-
-std::vector<render::SpriteRegion> png_regions(
-    const project::SpriteSheetDefinition& definition) {
-    std::vector<render::SpriteRegion> regions;
-    regions.reserve(definition.frames.size());
-    for (const auto& frame : definition.frames) {
-        if (!frame.input_bounds.has_value()) {
-            return {};
-        }
-        render::SpriteRegion region{
-            .name = frame.name,
-            .bounds = {frame.input_bounds->x, frame.input_bounds->y,
-                       frame.input_bounds->width,
-                       frame.input_bounds->height},
-            .duration_ms = frame.duration_ms,
-        };
-        if (frame.pivot.has_value()) {
-            region.pivot =
-                render::AsepritePoint{frame.pivot->x, frame.pivot->y};
-        }
-        regions.push_back(std::move(region));
-    }
-    return regions;
-}
-
 } // namespace
 
 bool ProjectSession::create(const std::filesystem::path& project_root,
@@ -231,7 +63,6 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
-    imported_sprite_sheet_.reset();
     recovery_manifest_.reset();
     commands_.clear();
     autosave_.reset();
@@ -263,7 +94,6 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
-    imported_sprite_sheet_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
     commands_.clear();
     autosave_.reset();
@@ -432,196 +262,6 @@ bool ProjectSession::create_vector_artwork(
     }
     created_vector_ = std::move(*published.asset);
     imported_vector_.reset();
-    errors_.clear();
-    return true;
-}
-
-bool ProjectSession::publish_sprite_frames(
-    const std::filesystem::path& source,
-    const core::ResourceId& id,
-    const std::string& name,
-    const project::SpriteSourceKind source_kind,
-    std::vector<render::SpriteSourceFrame> frames,
-    std::vector<project::SpriteTagDefinition> tags,
-    std::vector<project::SpriteSliceDefinition> slices) {
-    auto packed = render::build_sprite_atlas(frames);
-    if (!packed.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "atlas",
-                    std::string(render::to_string(packed.error->code)) +
-                        ": " + packed.error->message}};
-        return false;
-    }
-    auto definition = sprite_definition(
-        *manifest_, id, name, source_kind, *packed.atlas, std::move(tags),
-        std::move(slices));
-    auto published = project::publish_sprite_sheet(
-        project_root_, *manifest_, definition, source, packed.atlas->png);
-    if (!published.ok()) {
-        errors_ = std::move(published.errors);
-        return false;
-    }
-    imported_sprite_sheet_ = ImportedSpriteSheet{
-        .asset = std::move(*published.asset),
-        .atlas = std::move(packed.atlas->image),
-    };
-    errors_.clear();
-    return true;
-}
-
-bool ProjectSession::import_aseprite(const std::filesystem::path& source,
-                                     const core::ResourceId& id,
-                                     const std::string& name) {
-    if (!has_project()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "a project must be open before importing a sprite"}};
-        return false;
-    }
-    auto decoded = render::load_aseprite(source);
-    if (!decoded.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "source",
-                    std::string(render::to_string(decoded.error->code)) +
-                        " at byte " + std::to_string(decoded.error->offset) +
-                        ": " + decoded.error->message}};
-        return false;
-    }
-    auto frames = aseprite_frames(*decoded.document);
-    auto tags = aseprite_tags(*decoded.document);
-    auto slices = aseprite_slices(*decoded.document);
-    return publish_sprite_frames(source, id, name,
-                                 project::SpriteSourceKind::aseprite,
-                                 std::move(frames), std::move(tags),
-                                 std::move(slices));
-}
-
-bool ProjectSession::import_png_sprite_grid(
-    const std::filesystem::path& source,
-    const core::ResourceId& id,
-    const std::string& name,
-    const render::SpriteGrid& grid) {
-    if (!has_project()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "a project must be open before importing a sprite"}};
-        return false;
-    }
-    auto decoded = render::load_png(source);
-    if (!decoded.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "source",
-                    std::string(render::to_string(decoded.error->code)) +
-                        ": " + decoded.error->message}};
-        return false;
-    }
-    auto sliced = render::slice_sprite_grid(*decoded.image, grid);
-    if (!sliced.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "frames",
-                    std::string(render::to_string(sliced.error->code)) +
-                        ": " + sliced.error->message}};
-        return false;
-    }
-    return publish_sprite_frames(source, id, name,
-                                 project::SpriteSourceKind::png,
-                                 std::move(*sliced.frames), {}, {});
-}
-
-bool ProjectSession::import_png_sprite_regions(
-    const std::filesystem::path& source,
-    const core::ResourceId& id,
-    const std::string& name,
-    const std::vector<render::SpriteRegion>& regions) {
-    if (!has_project()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "a project must be open before importing a sprite"}};
-        return false;
-    }
-    auto decoded = render::load_png(source);
-    if (!decoded.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "source",
-                    std::string(render::to_string(decoded.error->code)) +
-                        ": " + decoded.error->message}};
-        return false;
-    }
-    auto sliced = render::slice_sprite_regions(*decoded.image, regions);
-    if (!sliced.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "frames",
-                    std::string(render::to_string(sliced.error->code)) +
-                        ": " + sliced.error->message}};
-        return false;
-    }
-    return publish_sprite_frames(source, id, name,
-                                 project::SpriteSourceKind::png,
-                                 std::move(*sliced.frames), {}, {});
-}
-
-bool ProjectSession::regenerate_sprite_sheet(const core::ResourceId& id) {
-    if (!has_project()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "a project must be open before regenerating a sprite"}};
-        return false;
-    }
-    auto current = project::load_sprite_sheet(
-        project_root_, *manifest_,
-        project::sprite_sheet_document_path(*manifest_, id));
-    if (!current.ok()) {
-        errors_ = std::move(current.errors);
-        return false;
-    }
-    std::vector<render::SpriteSourceFrame> frames;
-    std::vector<project::SpriteTagDefinition> tags;
-    std::vector<project::SpriteSliceDefinition> slices;
-    const auto source = project_root_ / current.asset->source;
-    if (current.asset->source_kind == project::SpriteSourceKind::aseprite) {
-        auto decoded = render::load_aseprite(source);
-        if (!decoded.ok()) {
-            errors_ = {{project::ErrorCode::invalid_asset, "source",
-                        std::string(render::to_string(decoded.error->code)) +
-                            " at byte " +
-                            std::to_string(decoded.error->offset) + ": " +
-                            decoded.error->message}};
-            return false;
-        }
-        frames = aseprite_frames(*decoded.document);
-        tags = aseprite_tags(*decoded.document);
-        slices = aseprite_slices(*decoded.document);
-    } else {
-        auto decoded = render::load_png(source);
-        if (!decoded.ok()) {
-            errors_ = {{project::ErrorCode::invalid_asset, "source",
-                        std::string(render::to_string(decoded.error->code)) +
-                            ": " + decoded.error->message}};
-            return false;
-        }
-        const auto regions = png_regions(*current.asset);
-        auto sliced = render::slice_sprite_regions(*decoded.image, regions);
-        if (!sliced.ok()) {
-            errors_ = {{project::ErrorCode::invalid_asset, "frames",
-                        std::string(render::to_string(sliced.error->code)) +
-                            ": " + sliced.error->message}};
-            return false;
-        }
-        frames = std::move(*sliced.frames);
-        tags = current.asset->tags;
-        slices = current.asset->slices;
-    }
-    auto packed = render::build_sprite_atlas(frames);
-    if (!packed.ok()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "atlas",
-                    std::string(render::to_string(packed.error->code)) +
-                        ": " + packed.error->message}};
-        return false;
-    }
-    auto updated = sprite_definition(
-        *manifest_, id, current.asset->document.name,
-        current.asset->source_kind, *packed.atlas, std::move(tags),
-        std::move(slices));
-    auto regenerated = project::regenerate_sprite_sheet(
-        project_root_, *manifest_, updated, packed.atlas->png);
-    if (!regenerated.ok()) {
-        errors_ = std::move(regenerated.errors);
-        return false;
-    }
-    imported_sprite_sheet_ = ImportedSpriteSheet{
-        .asset = std::move(*regenerated.asset),
-        .atlas = std::move(packed.atlas->image),
-    };
     errors_.clear();
     return true;
 }
@@ -817,11 +457,6 @@ const std::optional<ImportedVector>& ProjectSession::imported_vector() const noe
 const std::optional<project::VectorAsset>&
 ProjectSession::created_vector() const noexcept {
     return created_vector_;
-}
-
-const std::optional<ImportedSpriteSheet>&
-ProjectSession::imported_sprite_sheet() const noexcept {
-    return imported_sprite_sheet_;
 }
 
 } // namespace fabric::editor

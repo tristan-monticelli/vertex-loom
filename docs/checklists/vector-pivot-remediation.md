@@ -7,8 +7,8 @@ compilé n’a pas encore atteint toute cette cible : `VectorAsset v2` sait migr
 un SVG opaque v1 vers `linkedSvg` et publier une première géométrie `native`.
 Les chemins, contours, clips et le renderer restent à livrer. Le fill image est
 persistant et ajustable, mais sa déformation visuelle attend encore les sommets
-et draw packets. Le pipeline sprite demeure compilé et accessible sous
-`Legacy`.
+et draw packets. Le pipeline sprite a été entièrement retiré après
+confirmation explicite, conformément à ADR-0025.
 
 Cette checklist distingue la construction de la voie vectorielle cible du
 retrait du legacy. Aucune case de suppression ne peut avancer sans confirmation
@@ -51,34 +51,32 @@ forme avec fill couleur ou image, sans utiliser le pipeline sprite.
 Gate : `main.cpp` ne contient aucune règle métier d’import et chaque opération
 affiche son résultat exact avant toute écriture.
 
-## P2 — Prouver l’absence de nouvelle dépendance sprite
+## P2 — Prouver l’absence de dépendance sprite
 
-- [ ] Interdire dans les nouveaux contrats d’entité, animation, map et runtime
+- [x] Interdire dans les nouveaux contrats d’entité, animation, map et runtime
   toute référence à `SpriteSheetDefinition`, frame ou atlas.
+- [x] Retirer du build, des contrats et du validateur tous les en-têtes et
+  documents sprite ; `rg` sur le code produit doit rester vide.
 - [ ] Ajouter une vérification mécanique qui échoue si ces contrats incluent
   les en-têtes sprite hérités.
-- [ ] Construire le renderer vectoriel et ses draw packets sans inclure
-  `sprite_atlas.hpp`.
+- [ ] Construire le renderer vectoriel et ses draw packets sans pipeline atlas.
 - [ ] Vérifier qu’un projet composé uniquement de ressources natives se charge
   lorsque les imports legacy ne sont jamais invoqués.
 
 Gate : Asset Studio, Map Studio et Preview Runtime exécutent la scène de
 référence vectorielle sans ressource `.sprite.json`.
 
-## P3 — Legacy, sans suppression automatique
+## P3 — Retrait du legacy confirmé
 
-- [x] Classer Aseprite, atlas et `SpriteSheetDefinition v1` comme legacy gelé.
-- [x] Les isoler visuellement sous `Legacy` dans Asset Studio.
-- [ ] Inventorier les projets réels et leurs fichiers sprite selon
-  `sprite-legacy-inventory.md`.
-- [ ] Proposer une migration vers textures locales ou artworks natifs.
-- [ ] Présenter la liste exacte des fichiers, symboles, tests et dépendances à
+- [x] Inventorier contrats, code, interface, tests, documentation et zlib.
+- [x] Constater qu’aucun projet utilisateur n’est placé dans le périmètre de
+  migration.
+- [x] Présenter la liste exacte des fichiers, symboles, tests et dépendances à
   retirer.
-- [ ] Obtenir la confirmation explicite de suppression.
-- [ ] Retirer le legacy dans un incrément vérifié distinct.
+- [x] Obtenir la confirmation explicite de suppression.
+- [x] Retirer le legacy dans un incrément vérifié distinct.
 
-Gate : aucune suppression avant confirmation ; après confirmation, aucune
-référence sprite ne subsiste dans le build cible ni dans les projets migrés.
+Gate : aucune référence sprite ne subsiste dans le build cible.
 
 ## Validation continue
 

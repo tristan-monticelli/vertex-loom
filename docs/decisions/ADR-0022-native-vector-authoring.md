@@ -3,19 +3,19 @@
 - Status: accepted
 - Date: 2026-08-24
 - Supersedes: la phrase d’ADR-0016 faisant du SVG le contrat vectoriel futur
-- Reclassifies: ADR-0021 comme compatibilité héritée uniquement
+- Updated by: ADR-0025, qui retire la compatibilité sprite
 
 ## Context
 
-Le premier Asset Studio sait importer un SVG opaque et produire des
-spritesheets déterministes. Ce flux valide le stockage et l’import, mais ne
+Le premier Asset Studio sait importer un SVG opaque. L’ancien flux sprite a
+validé le stockage et l’import, mais ne
 correspond pas au produit cible : Vertex Loom doit créer, personnaliser et
 animer des artworks vectoriels dont les formes portent aussi des images en
 remplissage. Le SVG est un format d’échange, pas le modèle d’édition ni la
 définition du rendu du jeu.
 
-Le code Aseprite et atlas est déjà testé et publié. Aucun document d’entité,
-de map, de scène ou de runtime ne dépend encore de `SpriteSheetDefinition`.
+Avant ADR-0025, aucun document d’entité, de map, de scène ou de runtime ne
+dépendait du contrat sprite, ce qui a permis son retrait sans migration.
 
 ## Decision
 
@@ -39,11 +39,7 @@ Le renderer cible consomme la géométrie native et ses draw packets. NanoSVG
 reste le lecteur borné des SVG liés. Aucun atlas, frame ou spritesheet n’est
 requis par Asset Studio, Map Studio, les entités, les animations ou le runtime.
 
-`SpriteSheetDefinition v1`, le lecteur Aseprite et le packer restent compilés,
-validés et chargeables comme compatibilité héritée. Ils ne reçoivent plus de
-fonctionnalités et ne sont pas exposés comme voie de création cible. Leur
-suppression nécessitera une confirmation distincte après inventaire des projets
-réels et proposition de migration.
+ADR-0025 retire le contrat et son pipeline après confirmation explicite.
 
 ## Alternatives
 
@@ -56,6 +52,5 @@ tous les SVG serait destructif pour les éléments non compris.
 ## Consequences
 
 Les prochaines étapes commencent par la migration du contrat vectoriel et le
-renderer natif. Le flux sprite livré reste une dette explicite mais isolée. Les
-tests de migration doivent prouver l’identité de la source SVG et le validateur
+renderer natif. Les tests de migration doivent prouver l’identité de la source SVG et le validateur
 headless doit accepter `linkedSvg` et `native` sans fenêtre.

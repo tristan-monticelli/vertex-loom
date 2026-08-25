@@ -56,15 +56,9 @@ refus avant écriture et conservation du principal en cas d’échec. L’autosa
 couvre les seuils de 2 secondes d’inactivité et 30 secondes maximum, les
 chemins miroir, les versions absentes, invalides ou anciennes et les décisions
 de récupération acceptée ou refusée sans interface graphique.
-Le lecteur Aseprite couvre RGBA, grayscale, indexed, palettes, groupes, cels
-raw, zlib et liés, tags, slices et pivots. Il refuse fichiers tronqués,
-dimensions excessives, références externes, tilemaps, chunks inconnus et modes
-de fusion non rendus. Les mêmes frames produisent des atlas PNG et documents
-byte-identiques sur chaque exécution. Le découpage PNG couvre grille, frames
-libres, padding, extrusion et régénération atomique. Le validateur headless
-contrôle la source, l’atlas et chaque plage de métadonnées d’une spritesheet.
-Ces suites protègent désormais un format hérité ; aucun nouveau contrat ne doit
-dépendre d’une frame ou d’un atlas. `VectorAsset v2` couvre la lecture de v1
+Le pipeline sprite retiré par ADR-0025 ne fait plus partie de la matrice. Les
+audits structurels vérifient son absence des contrats et du build.
+`VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,
 identifiants dupliqués, rectangle/ellipse, fill couleur/transparent,
