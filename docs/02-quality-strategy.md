@@ -71,3 +71,9 @@ modèles de prompts
 sont testés sans Dear ImGui : defaults et presets, erreurs par champ,
 destination exacte, conflits de ressources, isolation de projet/artwork/import,
 annulation par reset sans effet et résumé avant publication.
+L'espace de travail Asset Studio couvre aussi sans fenêtre l'indexation des
+textures et vecteurs, la sélection et le rechargement, l'aperçu temporaire sans
+publication, le choix d'une texture par ressource et les mutations natives via
+undo, redo, dirty et autosave. Un test de contrôleur vérifie les décisions
+Save/Discard/Cancel avant remplacement de session ; les raccourcis et la mise
+en page restent dans le smoke test visuel multiplateforme.

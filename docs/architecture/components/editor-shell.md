@@ -6,6 +6,7 @@ C4Component
     Container_Boundary(asset, "Asset Studio") {
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
+        Component(browser, "Resource browser", "Dear ImGui", "Indexe, filtre et sélectionne les documents du projet")
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite forme, fill, contour, clip, hiérarchie et propriétés animables")
     }
     Container_Boundary(editor, "fabric_editor") {
@@ -18,7 +19,9 @@ C4Component
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
     Rel(shell, project_ui, "Affiche")
+    Rel(shell, browser, "Affiche")
     Rel(shell, customizer, "Affiche")
+    Rel(browser, session, "Charge et sélectionne une ressource")
     Rel(project_ui, session, "Demande la création ou l'ouverture")
     Rel(project_ui, prompts, "Construit le prompt du type choisi")
     Rel(prompts, session, "Publie une intention validée")
@@ -45,6 +48,12 @@ C4Component
   artwork et chaque source d’import possèdent un état isolé ; les actions
   matériau, entité, animation et ajout existant restent désactivées jusqu’à
   l’arrivée de leur contrat.
+- Le panneau gauche liste les ressources réellement présentes, conserve une
+  sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
+- Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
+  réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
+- Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,
+  `Discard` ou `Cancel` avant de remplacer la session.
 - L’assistant d’artwork valide taille de travail, origine, unités, première
   forme et fill ; il résout seul les conflits d’identifiant. Un fill image référence une texture
   locale et expose cadrage, offset, rotation, échelle, opacité et suivi de la
@@ -55,6 +64,8 @@ C4Component
   l'interface d'outil ; OpenGL efface et présente la surface.
 - Un import réussi conserve le `TextureAsset` et les pixels décodés pour
   l'aperçu ; un échec conserve le dernier import réussi.
+- Un import PNG ou SVG décode et présente d'abord un aperçu temporaire. La
+  publication ne se produit qu'après confirmation de l'utilisateur.
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
 - Asset Studio n’expose aucun import sprite ; PNG alimente les textures et SVG
@@ -69,6 +80,8 @@ C4Component
   état sans dépendance à Dear ImGui.
 - Une récupération plus récente est proposée à l’ouverture ; accepter charge
   son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
+- Les raccourcis affichent et utilisent `Cmd` sur macOS et `Ctrl` sur Windows
+  et Linux. Ils restent inactifs lorsqu'une modale requiert une décision.
 - Le manifeste constitue le premier document éditable intégré : son nom et ses
   unités passent par commandes, Save remplace `project.json`, et son autosave
   sert de preuve headless du flux commun avant les futurs documents d’asset.
