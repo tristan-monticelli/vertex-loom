@@ -66,6 +66,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/migrations.cpp
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
+    engine/fabric_project/src/progress_save.cpp
     engine/fabric_project/src/resource_registry.cpp
     engine/fabric_project/src/replay.cpp
     engine/fabric_project/src/scene.cpp
@@ -353,6 +354,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_scene_session_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_scene_session_tests COMMAND fabric_scene_session_tests)
+
+    add_executable(fabric_progress_save_tests tests/cpp/progress_save_tests.cpp)
+    target_link_libraries(fabric_progress_save_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_progress_save_tests COMMAND fabric_progress_save_tests)
 
     add_executable(fabric_character_controller_tests
         tests/cpp/character_controller_tests.cpp)
