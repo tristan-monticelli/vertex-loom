@@ -39,5 +39,65 @@ std::string serialize_animation(const AnimationClip& a){Json j={{"schemaVersion"
 AnimationResult parse_animation(const ProjectManifest& m,std::string_view s){AnimationResult r;Json j;try{j=Json::parse(s);}catch(...){error(r.errors,ErrorCode::invalid_json,"animation","cannot parse animation JSON");return r;}if(!j.is_object()){error(r.errors,ErrorCode::invalid_asset,"animation","top-level value must be an object");return r;}AnimationClip a;auto schema=j.find("schemaVersion");if(schema==j.end()||!schema->is_number_unsigned())error(r.errors,ErrorCode::invalid_asset,"schemaVersion","expected unsigned integer");else a.document.schema_version=schema->get<std::uint32_t>();text(j,"type",a.document.type,r.errors);text(j,"id",a.document.id.value,r.errors);text(j,"name",a.document.name,r.errors);number(j,"duration",a.duration,r.errors);auto loop=j.find("loop");if(loop==j.end()||!loop->is_boolean())error(r.errors,ErrorCode::invalid_asset,"loop","expected boolean");else a.loop=loop->get<bool>();auto ms=j.find("markers");if(ms!=j.end()&&ms->is_array())for(const auto& x:*ms){AnimationMarker m;text(x,"id",m.id,r.errors);number(x,"time",m.time,r.errors);a.markers.push_back(std::move(m));}else error(r.errors,ErrorCode::invalid_asset,"markers","expected array");auto ts=j.find("tracks");if(ts!=j.end()&&ts->is_array())for(const auto& x:*ts){AnimationTrack t;auto b=x.find("binding");if(b==x.end()||!b->is_object()){error(r.errors,ErrorCode::invalid_asset,"binding","expected object");}else{text(*b,"node",t.binding.node_id,r.errors);text(*b,"component",t.binding.component_id,r.errors);text(*b,"property",t.binding.property_id,r.errors);}std::string interpolation;text(x,"interpolation",interpolation,r.errors);if(interpolation=="step")t.interpolation=AnimationInterpolation::step;else if(interpolation=="linear")t.interpolation=AnimationInterpolation::linear;else if(interpolation=="cubic")t.interpolation=AnimationInterpolation::cubic;else error(r.errors,ErrorCode::invalid_asset,"interpolation","unsupported interpolation");auto composition=x.find("composition");if(composition!=x.end()){if(!composition->is_string())error(r.errors,ErrorCode::invalid_asset,"composition","expected a string");else if(composition->get<std::string>()=="additive")t.composition=AnimationComposition::additive;else if(composition->get<std::string>()!="replace")error(r.errors,ErrorCode::invalid_asset,"composition","unsupported composition");}auto ks=x.find("keys");if(ks!=x.end()&&ks->is_array())for(const auto& k:*ks){AnimationKey key;number(k,"time",key.time,r.errors);auto v=k.find("value");if(v==k.end()||!v->is_object())error(r.errors,ErrorCode::invalid_asset,"value","expected object");else value_read(*v,key.value,r.errors);t.keys.push_back(std::move(key));}else error(r.errors,ErrorCode::invalid_asset,"keys","expected array");a.tracks.push_back(std::move(t));}else error(r.errors,ErrorCode::invalid_asset,"tracks","expected array");if(!r.errors.empty())return r;auto v=validate_animation(m,a);if(!v.ok()){r.errors=std::move(v.errors);return r;}r.asset=std::move(a);return r;}
 AnimationResult load_animation(const std::filesystem::path& root,const ProjectManifest& m,const std::filesystem::path& path){auto s=load_document(root,path,[&](std::string_view v){return parse_validation(m,v);});AnimationResult r;r.errors=std::move(s.errors);if(s.contents)r=parse_animation(m,*s.contents);if(r.ok()&&path!=animation_document_path(m,r.asset->document.id)){r.asset.reset();error(r.errors,ErrorCode::invalid_path,"document","document filename does not match its id");}return r;}
 AnimationResult publish_animation(const std::filesystem::path& root,const ProjectManifest& m,const AnimationClip& a){AnimationResult r;auto v=validate_animation(m,a);if(!v.ok()){r.errors=std::move(v.errors);return r;}auto p=animation_document_path(m,a.document.id);auto s=save_document_atomic(root,p,serialize_animation(a),[&](std::string_view x){return parse_validation(m,x);});if(!s.ok()){r.errors=std::move(s.errors);return r;}return load_animation(root,m,p);}
-EvaluationResult evaluate_animation(const AnimationClip& clip,float time){EvaluationResult r;auto v=validate_animation(ProjectManifest{},clip);if(!v.ok()){r.errors=std::move(v.errors);return r;}float t=time;if(clip.loop&&clip.duration>0)t=std::fmod(std::max(0.0F,time),clip.duration);else t=std::clamp(time,0.0F,clip.duration);for(const auto& track:clip.tracks){auto it=std::upper_bound(track.keys.begin(),track.keys.end(),t,[](float x,const AnimationKey& k){return x<k.time;});if(it==track.keys.begin()){r.properties.push_back({track.binding,track.keys.front().value,track.composition});continue;}if(it==track.keys.end()){r.properties.push_back({track.binding,track.keys.back().value,track.composition});continue;}const auto& right=*it;const auto& left=*(it-1);if(track.interpolation==AnimationInterpolation::step||!interpolatable(left.value,right.value)){r.properties.push_back({track.binding,left.value,track.composition});continue;}const float span=right.time-left.time;float amount=span<=0?1.0F:(t-left.time)/span;if(track.interpolation==AnimationInterpolation::cubic)amount=amount*amount*(3.0F-2.0F*amount);r.properties.push_back({track.binding,interpolate(left.value,right.value,amount),track.composition});}return r;}
+float interpolate_rotation_degrees(const float left, const float right, const float amount) {
+    constexpr float full_turn = 360.0F;
+    constexpr float half_turn = 180.0F;
+    auto delta = std::fmod(right - left + half_turn, full_turn);
+    if (delta < 0.0F) delta += full_turn;
+    delta -= half_turn;
+    return left + delta * amount;
+}
+
+EvaluationResult evaluate_animation(const AnimationClip& clip, const float time) {
+    EvaluationResult result;
+    const auto validation = validate_animation(ProjectManifest{}, clip);
+    if (!validation.ok()) {
+        result.errors = std::move(validation.errors);
+        return result;
+    }
+    float evaluated_time = time;
+    if (clip.loop && clip.duration > 0.0F)
+        evaluated_time = std::fmod(std::max(0.0F, time), clip.duration);
+    else
+        evaluated_time = std::clamp(time, 0.0F, clip.duration);
+
+    for (const auto& track : clip.tracks) {
+        const auto iterator = std::upper_bound(
+            track.keys.begin(), track.keys.end(), evaluated_time,
+            [](const float value, const AnimationKey& key) { return value < key.time; });
+        if (iterator == track.keys.begin()) {
+            result.properties.push_back(
+                {track.binding, track.keys.front().value, track.composition});
+            continue;
+        }
+        if (iterator == track.keys.end()) {
+            result.properties.push_back(
+                {track.binding, track.keys.back().value, track.composition});
+            continue;
+        }
+
+        const auto& right = *iterator;
+        const auto& left = *(iterator - 1);
+        if (track.interpolation == AnimationInterpolation::step ||
+            !interpolatable(left.value, right.value)) {
+            result.properties.push_back({track.binding, left.value, track.composition});
+            continue;
+        }
+        const float span = right.time - left.time;
+        float amount = span <= 0.0F ? 1.0F : (evaluated_time - left.time) / span;
+        if (track.interpolation == AnimationInterpolation::cubic)
+            amount = amount * amount * (3.0F - 2.0F * amount);
+
+        AnimationValue value = interpolate(left.value, right.value, amount);
+        if (track.binding.component_id == "transform" &&
+            track.binding.property_id == "rotationDegrees") {
+            const auto* left_angle = std::get_if<float>(&left.value);
+            const auto* right_angle = std::get_if<float>(&right.value);
+            if (left_angle && right_angle)
+                value = interpolate_rotation_degrees(*left_angle, *right_angle, amount);
+        }
+        result.properties.push_back({track.binding, std::move(value), track.composition});
+    }
+    return result;
+}
 }

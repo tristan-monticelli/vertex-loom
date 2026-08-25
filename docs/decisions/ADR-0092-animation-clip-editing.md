@@ -25,7 +25,9 @@ dans le JSON. Les documents v1 qui n’ont pas ce champ restent `replace` par
 défaut. Le runtime applique les tracks additives comme des offsets sur les
 transformations de base (position, rotation et échelle), dans l’ordre stable
 des tracks. Les propriétés matériau `color` et `opacity` suivent la même règle
-de composition lors du rendu des draw packets.
+de composition lors du rendu des draw packets. Les tracks
+`transform/rotationDegrees` suivent toujours le chemin angulaire le plus
+court, y compris lorsqu’elles franchissent 0°/360°.
 
 Asset Studio propose un mode `Auto-key at scrub time`. Lorsqu’il est actif,
 toute modification de la valeur de clé dans l’inspecteur appelle `Set key` au

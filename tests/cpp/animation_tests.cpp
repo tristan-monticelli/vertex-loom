@@ -100,4 +100,22 @@ TEST_CASE("animation composition round-trips and is exposed during evaluation") 
     CHECK(std::get<float>(evaluated.properties.front().value) == 0.5F);
 }
 
+TEST_CASE("rotation interpolation follows the shortest angular path") {
+    auto source = clip();
+    source.tracks.push_back({
+        {.node_id = "root", .component_id = "transform", .property_id = "rotationDegrees"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, 350.0F}, {1.0F, 10.0F}}});
+    const auto evaluated = fabric::project::evaluate_animation(source, 0.5F);
+    REQUIRE(evaluated.ok());
+    const auto& angle = evaluated.properties.back().value;
+    REQUIRE(std::holds_alternative<float>(angle));
+    CHECK(std::get<float>(angle) == 360.0F);
+
+    source.tracks.back().keys = {{0.0F, 10.0F}, {1.0F, 350.0F}};
+    const auto reverse = fabric::project::evaluate_animation(source, 0.5F);
+    REQUIRE(reverse.ok());
+    CHECK(std::get<float>(reverse.properties.back().value) == 0.0F);
+}
+
 } // namespace
