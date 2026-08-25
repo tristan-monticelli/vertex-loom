@@ -234,7 +234,7 @@ plateforme tournante pilotée par la présence du personnage.
   map, sans écrasement. Une session dirty est sauvegardée avant les deux
   opérations de paquet. Le service headless copie manifeste, documents et
   payloads et son round-trip est vérifié par `fabric_map_package_tests`.
-- [ ] Charger le paquet directement depuis Preview Runtime et le chemin futur
+- [x] Charger le paquet directement depuis Preview Runtime et le chemin futur
   du catalogue du jeu.
 - [ ] Vérifier qu'un paquet produit sur une plateforme se charge sur les deux
   autres sans conversion.

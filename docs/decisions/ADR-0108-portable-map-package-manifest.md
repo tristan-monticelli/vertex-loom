@@ -54,6 +54,11 @@ interplateformes sans bénéfice pour cette première version.
   la fermeture. Une ressource invalide mais non référencée ne bloque pas la map.
 - Preview Runtime et le futur catalogue partageront le même contrôle de
   compatibilité avant chargement.
+- Preview Runtime accepte `--package <dossier>` sans `project.json` ni
+  sélection séparée de map : il contrôle le manifeste, la compatibilité, les
+  chemins canoniques et l'existence de tous les documents/payloads, puis
+  charge `rootMap` avec les chargeurs de projet communs. Le catalogue futur
+  réutilisera cette entrée de chargement.
 - `publish_map_package` refuse une destination déjà existante, crée le paquet
   uniquement après planification valide et supprime le dossier nouvellement
   créé en cas d'échec de copie.

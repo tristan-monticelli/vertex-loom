@@ -16,7 +16,8 @@
 namespace {
 
 void usage() {
-    std::cerr << "usage: game_runtime --project <path> (--map <id> | --scene <id>) "
+    std::cerr << "usage: game_runtime (--project <path> (--map <id> | --scene <id>) | "
+                 "--package <path>) "
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
                  "[--character] "
@@ -68,6 +69,8 @@ int main(int argc, char** argv) {
         const std::string_view argument(argv[index]);
         if (argument == "--project" && index + 1 < argc) {
             options.project_root = argv[++index];
+        } else if (argument == "--package" && index + 1 < argc) {
+            options.package_root = std::filesystem::path(argv[++index]);
         } else if (argument == "--map" && index + 1 < argc) {
             options.map_id.value = argv[++index];
         } else if (argument == "--scene" && index + 1 < argc) {

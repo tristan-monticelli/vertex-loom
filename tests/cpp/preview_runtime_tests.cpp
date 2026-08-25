@@ -3,6 +3,7 @@
 
 #include "fabric/project/entity.hpp"
 #include "fabric/project/material.hpp"
+#include "fabric/project/map_package.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/project/visual_composition.hpp"
@@ -477,6 +478,30 @@ TEST_CASE("preview runtime validates and loads a map before graphics") {
     REQUIRE(runtime.stats().frames == 1);
     REQUIRE(runtime.stats().physics_steps == 1);
     REQUIRE(runtime.stats().p95_frame_ms >= 0.0);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime loads the published map package directly") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-package-source-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root / "published.map-package";
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
+    REQUIRE(fabric::project::publish_map_package(root, {.value = "preview"}, package).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    const auto loaded = runtime.load({.package_root = package,
+                                      .mode = fabric::runtime::RuntimeMode::smoke_test});
+    if (!loaded) for (const auto& error : runtime.errors()) std::cerr << error << '\n';
+    REQUIRE(loaded);
+    REQUIRE(runtime.loaded());
+    REQUIRE(runtime.map()->document.id.value == "preview");
+    REQUIRE(runtime.errors().empty());
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.stats().frames == 1);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

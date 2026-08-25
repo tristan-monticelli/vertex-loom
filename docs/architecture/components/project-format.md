@@ -192,6 +192,11 @@ C4Component
   conservera le `MapDocument`, les ressources transitivement référencées et
   une version minimale de runtime ; les chemins absolus et dépendances non
   résolues empêcheront la publication.
+- Le Preview Runtime accepte directement le dossier publié via `--package`.
+  Il lit `map-package.json`, vérifie la compatibilité de version et la présence
+  de chaque document/payload dans le dossier, puis réutilise les mêmes chemins
+  standard et chargeurs que le projet d'authoring. Le futur catalogue appellera
+  ce même contrat de validation et de chargement.
 - Une propriété custom d’instance nommée `animation` est réservée à la
   lecture d’un `ResourceReference` de type `animation`. Elle est unique par
   instance, validée par le parseur MapDocument et résolue par le Preview

@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
+#include "fabric/project/map_package.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
@@ -32,6 +33,7 @@ using GameplayEventHandler = std::function<bool(const GameplayEvent&)>;
 
 struct PreviewRuntimeOptions {
     std::filesystem::path project_root;
+    std::optional<std::filesystem::path> package_root;
     core::ResourceId map_id;
     std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;
