@@ -276,6 +276,9 @@ références de triggers vérifiables dans l’éditeur.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,
   échelle et pivot d’une instance sélectionnée, chaque modification étant
   enregistrée par `MapSession`.
+  Les poignées du canvas permettent aussi de translater, faire pivoter et
+  mettre à l’échelle directement une instance ; le geste est enregistré en
+  une seule commande à son relâchement.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

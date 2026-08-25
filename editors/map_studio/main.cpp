@@ -119,6 +119,17 @@ struct TransformEditorState {
     fabric::core::Transform value{};
 };
 
+enum class CanvasGizmoMode { translate, rotate, scale };
+
+struct CanvasGizmoState {
+    bool active{};
+    CanvasGizmoMode mode{CanvasGizmoMode::translate};
+    std::string instance_id;
+    ImVec2 start_mouse{};
+    fabric::core::Transform start_transform{};
+    fabric::core::Transform preview_transform{};
+};
+
 void draw_transform_editor(fabric::editor::MapSession& session,
                            const std::vector<std::string>& selected_instances,
                            TransformEditorState& state,
@@ -163,11 +174,14 @@ void draw_transform_editor(fabric::editor::MapSession& session,
     }
 }
 
-void draw_map_canvas(const fabric::project::MapDocument& map,
+void draw_map_canvas(fabric::editor::MapSession& session,
                      std::vector<std::string>& selected_instances,
                      ImVec2& pan,
                      float& zoom,
+                     CanvasGizmoState& gizmo,
                      std::string& status) {
+    if (!session.map()) return;
+    const auto& map = *session.map();
     ImGui::SeparatorText("Canvas");
     const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
     const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
@@ -182,6 +196,10 @@ void draw_map_canvas(const fabric::project::MapDocument& map,
     auto screen_to_world = [&](const ImVec2 point) {
         return fabric::core::Vec2{(point.x - canvas_center.x - pan.x) / zoom,
                                   -(point.y - canvas_center.y - pan.y) / zoom};
+    };
+    auto transform_for = [&](const fabric::project::MapInstance& instance) {
+        return gizmo.active && gizmo.instance_id == instance.id
+            ? gizmo.preview_transform : instance.transform;
     };
 
     auto* draw = ImGui::GetWindowDrawList();
@@ -237,7 +255,8 @@ void draw_map_canvas(const fabric::project::MapDocument& map,
     }
     for (const auto& instance : map.instances) {
         if (!layer_visible(map, instance.layer_id)) continue;
-        const auto point = world_to_screen(instance.transform.position);
+        const auto transform = transform_for(instance);
+        const auto point = world_to_screen(transform.position);
         const bool selected = std::find(selected_instances.begin(), selected_instances.end(),
                                         instance.id) != selected_instances.end();
         draw->AddCircleFilled(point, selected ? 8.0F : 6.0F,
@@ -245,6 +264,23 @@ void draw_map_canvas(const fabric::project::MapDocument& map,
                                        : IM_COL32(150, 205, 165, 255));
         draw->AddText({point.x + 9.0F, point.y - 7.0F}, IM_COL32(220, 225, 235, 230),
                       instance.id.c_str());
+    }
+    if (selected_instances.size() == 1U) {
+        const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
+                                           [&](const auto& instance) {
+                                               return instance.id == selected_instances.front();
+                                           });
+        if (selected != map.instances.end() && layer_visible(map, selected->layer_id)) {
+            const auto transform = transform_for(*selected);
+            const auto center = world_to_screen(transform.position);
+            const auto scale_handle = ImVec2{center.x + 36.0F, center.y};
+            const auto rotate_handle = ImVec2{center.x, center.y - 36.0F};
+            draw->AddLine({center.x - 18.0F, center.y}, {center.x + 48.0F, center.y},
+                          IM_COL32(90, 190, 255, 180), 1.0F);
+            draw->AddCircleFilled(scale_handle, 6.0F, IM_COL32(100, 220, 140, 240));
+            draw->AddCircle(rotate_handle, 6.0F, IM_COL32(240, 180, 80, 240), 16, 2.0F);
+            draw->AddCircle(center, 11.0F, IM_COL32(90, 190, 255, 240), 24, 2.0F);
+        }
     }
     draw->AddRect(canvas_pos,
                   {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
@@ -263,7 +299,75 @@ void draw_map_canvas(const fabric::project::MapDocument& map,
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
-        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if (!gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+            selected_instances.size() == 1U) {
+            const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
+                                               [&](const auto& instance) {
+                                                   return instance.id == selected_instances.front();
+                                               });
+            if (selected != map.instances.end()) {
+                const auto transform = transform_for(*selected);
+                const auto center = world_to_screen(transform.position);
+                const auto scale_handle = ImVec2{center.x + 36.0F, center.y};
+                const auto rotate_handle = ImVec2{center.x, center.y - 36.0F};
+                const auto distance = [](const ImVec2 a, const ImVec2 b) {
+                    const auto dx = a.x - b.x;
+                    const auto dy = a.y - b.y;
+                    return std::sqrt(dx * dx + dy * dy);
+                };
+                const auto handle_distance = distance(io.MousePos, scale_handle);
+                const auto rotate_distance = distance(io.MousePos, rotate_handle);
+                const auto center_distance = distance(io.MousePos, center);
+                if (handle_distance <= 10.0F || rotate_distance <= 10.0F ||
+                    center_distance <= 12.0F) {
+                    gizmo.active = true;
+                    gizmo.instance_id = selected->id;
+                    gizmo.start_mouse = io.MousePos;
+                    gizmo.start_transform = selected->transform;
+                    gizmo.preview_transform = selected->transform;
+                    gizmo.mode = handle_distance <= 10.0F
+                        ? CanvasGizmoMode::scale
+                        : (rotate_distance <= 10.0F ? CanvasGizmoMode::rotate
+                                                   : CanvasGizmoMode::translate);
+                }
+            }
+        }
+        if (gizmo.active) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                if (gizmo.mode == CanvasGizmoMode::translate) {
+                    const auto start = screen_to_world(gizmo.start_mouse);
+                    const auto current = screen_to_world(io.MousePos);
+                    gizmo.preview_transform.position = {
+                        gizmo.start_transform.position.x + current.x - start.x,
+                        gizmo.start_transform.position.y + current.y - start.y};
+                } else if (gizmo.mode == CanvasGizmoMode::rotate) {
+                    const auto center = world_to_screen(gizmo.start_transform.position);
+                    const auto start_angle = std::atan2(gizmo.start_mouse.y - center.y,
+                                                        gizmo.start_mouse.x - center.x);
+                    const auto current_angle = std::atan2(io.MousePos.y - center.y,
+                                                          io.MousePos.x - center.x);
+                    constexpr float radians_to_degrees = 57.29577951308232F;
+                    gizmo.preview_transform.rotation_degrees =
+                        gizmo.start_transform.rotation_degrees +
+                        (current_angle - start_angle) * radians_to_degrees;
+                } else {
+                    const auto delta = (io.MousePos.x - gizmo.start_mouse.x) / 48.0F;
+                    const auto factor = std::max(0.05F, 1.0F + delta);
+                    gizmo.preview_transform.scale = {
+                        gizmo.start_transform.scale.x * factor,
+                        gizmo.start_transform.scale.y * factor};
+                }
+            } else {
+                const auto committed = session.set_instance_transform(
+                    {.value = gizmo.instance_id}, gizmo.preview_transform,
+                    {.enabled = false});
+                status = committed ? "Canvas transform committed"
+                                   : "Canvas transform rejected (layer locked or invalid)";
+                gizmo.active = false;
+                gizmo.instance_id.clear();
+            }
+        }
+        if (!gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             const auto world = screen_to_world(io.MousePos);
             auto hit = map.instances.end();
             float best_distance = 12.0F / zoom;
@@ -359,6 +463,7 @@ int run(const std::filesystem::path& project_root,
     int instance_property_kind = 2;
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
+    CanvasGizmoState canvas_gizmo;
     TransformEditorState transform_editor;
     bool running = true;
     while (running) {
@@ -463,7 +568,8 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
-            draw_map_canvas(map, selected_instances, canvas_pan, canvas_zoom, status);
+            draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
+                            status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
