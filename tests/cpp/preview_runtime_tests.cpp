@@ -30,6 +30,18 @@ fabric::project::MapDocument map() {
                         fabric::project::MapLayerKind::instances, true, false, 0.0F}}};
 }
 
+fabric::project::ReplayDocument replay() {
+    return {.document = {.schema_version = 1,
+                         .type = "replay",
+                         .id = {.value = "smoke-replay"},
+                         .name = "Smoke Replay"},
+            .build = "test-build",
+            .seed = 42,
+            .inputs = {{0, "jump", true, false}, {1, "jump", false, true}},
+            .events = {{1, "opened", ""}},
+            .checkpoints = {{1, {{"player", 0, 0, 0}}}}};
+}
+
 fabric::project::VectorAsset vector_asset() {
     return {.document = {.schema_version = 2,
                          .type = "vector",
@@ -125,6 +137,28 @@ TEST_CASE("preview runtime rejects invalid projects before loading") {
                                  .map_id = {.value = "preview"}}));
     REQUIRE_FALSE(runtime.loaded());
     REQUIRE_FALSE(runtime.errors().empty());
+}
+
+TEST_CASE("preview runtime consumes a replay on fixed physics frames") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-replay-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
+    REQUIRE(fabric::project::publish_replay(root, manifest(), replay()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .replay_id = fabric::core::ResourceId{.value = "smoke-replay"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test,
+                          .frame_limit = 2}));
+    REQUIRE(runtime.replay().has_value());
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().replay_events == 1);
+    CHECK(runtime.stats().replay_checkpoints == 1);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
 }
 
 TEST_CASE("preview runtime resolves native vector entity drawables") {

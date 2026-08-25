@@ -9,6 +9,7 @@ namespace {
 
 void usage() {
     std::cerr << "usage: game_runtime --project <path> (--map <id> | --scene <id>) "
+                 "[--replay <id>] "
                  "[--smoke-test [frames]] [--benchmark [frames]]\n";
 }
 
@@ -25,6 +26,8 @@ int main(int argc, char** argv) {
             options.map_id.value = argv[++index];
         } else if (argument == "--scene" && index + 1 < argc) {
             scene_id = fabric::core::ResourceId{argv[++index]};
+        } else if (argument == "--replay" && index + 1 < argc) {
+            options.replay_id = fabric::core::ResourceId{argv[++index]};
         } else if (argument == "--smoke-test") {
             options.mode = fabric::runtime::RuntimeMode::smoke_test;
             if (index + 1 < argc && argv[index + 1][0] != '-')
@@ -73,7 +76,9 @@ int main(int argc, char** argv) {
                   << " draw_calls=" << runtime.stats().draw_calls
                   << " triangles=" << runtime.stats().triangles
                   << " elapsed_ms=" << runtime.stats().elapsed_ms
-                  << " p95_frame_ms=" << runtime.stats().p95_frame_ms << '\n';
+                  << " p95_frame_ms=" << runtime.stats().p95_frame_ms
+                  << " replay_events=" << runtime.stats().replay_events
+                  << " replay_checkpoints=" << runtime.stats().replay_checkpoints << '\n';
     }
     return 0;
 }

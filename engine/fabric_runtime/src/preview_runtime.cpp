@@ -8,6 +8,7 @@
 #include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/runtime/replay_player.hpp"
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -162,6 +163,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     options_ = options;
     manifest_.reset();
     map_.reset();
+    replay_.reset();
+    replay_player_.reset();
+    replay_input_ = {};
     errors_.clear();
     stats_ = {};
     impl_->packets.clear();
@@ -187,8 +191,20 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         return false;
     }
 
+    if (options_.replay_id) {
+        auto loaded_replay = project::load_replay(
+            options_.project_root, *loaded_project.manifest,
+            project::replay_document_path(*loaded_project.manifest, *options_.replay_id));
+        if (!loaded_replay.ok()) {
+            append_errors(errors_, loaded_replay.errors);
+            return false;
+        }
+        replay_ = std::move(loaded_replay.asset);
+    }
+
     manifest_ = std::move(loaded_project.manifest);
     map_ = std::move(loaded_map.asset);
+    if (replay_) replay_player_ = std::make_unique<ReplayPlayer>(*replay_);
     if (!physics_.create() || !physics_.load_map_collisions(*map_)) {
         errors_.push_back("could not create the map physics world");
         map_.reset();
@@ -423,6 +439,14 @@ bool PreviewRuntime::run() {
         previous_counter = current_counter;
         accumulator += elapsed;
         const auto step_physics = [&]() {
+            if (replay_player_) {
+                if (!replay_player_->advance(stats_.physics_steps, replay_input_)) {
+                    errors_.push_back("replay frame order is invalid");
+                    return false;
+                }
+                stats_.replay_events += replay_player_->events().size();
+                if (replay_player_->checkpoint()) ++stats_.replay_checkpoints;
+            }
             if (!physics_.step(static_cast<float>(fixed_time_step))) {
                 errors_.push_back("physics step failed");
                 return false;

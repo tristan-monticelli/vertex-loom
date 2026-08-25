@@ -43,6 +43,8 @@ bool InputActionMap::matches(const std::string_view action, const InputDevice de
 void InputActionMap::begin_frame() noexcept {
     pressed_bindings_.clear();
     released_bindings_.clear();
+    pressed_actions_.clear();
+    released_actions_.clear();
 }
 
 void InputActionMap::press(const InputDevice device, const int code, const bool repeat) noexcept {
@@ -56,7 +58,21 @@ void InputActionMap::release(const InputDevice device, const int code) noexcept 
     if (held_bindings_.erase(binding) != 0U) released_bindings_.insert(binding);
 }
 
+void InputActionMap::press_action(const std::string_view action) noexcept {
+    if (action.empty()) return;
+    const std::string value(action);
+    held_actions_.insert(value);
+    pressed_actions_.insert(value);
+}
+
+void InputActionMap::release_action(const std::string_view action) noexcept {
+    if (action.empty()) return;
+    const std::string value(action);
+    if (held_actions_.erase(value) != 0U) released_actions_.insert(value);
+}
+
 bool InputActionMap::held(const std::string_view action) const noexcept {
+    if (held_actions_.contains(std::string(action))) return true;
     for (const auto& binding : held_bindings_) {
         const auto separator = binding.find(':');
         if (separator == std::string::npos) continue;
@@ -68,6 +84,7 @@ bool InputActionMap::held(const std::string_view action) const noexcept {
 }
 
 bool InputActionMap::pressed(const std::string_view action) const noexcept {
+    if (pressed_actions_.contains(std::string(action))) return true;
     for (const auto& binding : pressed_bindings_) {
         const auto separator = binding.find(':');
         if (separator == std::string::npos) continue;
@@ -79,6 +96,7 @@ bool InputActionMap::pressed(const std::string_view action) const noexcept {
 }
 
 bool InputActionMap::released(const std::string_view action) const noexcept {
+    if (released_actions_.contains(std::string(action))) return true;
     for (const auto& binding : released_bindings_) {
         const auto separator = binding.find(':');
         if (separator == std::string::npos) continue;

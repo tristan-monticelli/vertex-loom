@@ -29,6 +29,8 @@ public:
     void begin_frame() noexcept;
     void press(InputDevice device, int code, bool repeat = false) noexcept;
     void release(InputDevice device, int code) noexcept;
+    void press_action(std::string_view action) noexcept;
+    void release_action(std::string_view action) noexcept;
 
     [[nodiscard]] bool held(std::string_view action) const noexcept;
     [[nodiscard]] bool pressed(std::string_view action) const noexcept;
@@ -46,6 +48,9 @@ private:
     std::unordered_set<std::string> held_bindings_;
     std::unordered_set<std::string> pressed_bindings_;
     std::unordered_set<std::string> released_bindings_;
+    std::unordered_set<std::string> held_actions_;
+    std::unordered_set<std::string> pressed_actions_;
+    std::unordered_set<std::string> released_actions_;
 };
 
 } // namespace fabric::runtime

@@ -153,6 +153,7 @@ add_library(fabric_runtime STATIC
     engine/fabric_runtime/src/character_controller.cpp
     engine/fabric_runtime/src/input.cpp
     engine/fabric_runtime/src/preview_runtime.cpp
+    engine/fabric_runtime/src/replay_player.cpp
 )
 target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include
     PRIVATE ${SDL2_image_SOURCE_DIR}/include)
@@ -341,6 +342,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_input_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_input_tests COMMAND fabric_input_tests)
+
+    add_executable(fabric_replay_player_tests tests/cpp/replay_player_tests.cpp)
+    target_link_libraries(fabric_replay_player_tests PRIVATE
+        fabric_runtime Catch2::Catch2WithMain)
+    add_test(NAME fabric_replay_player_tests COMMAND fabric_replay_player_tests)
 
     add_executable(fabric_character_controller_tests
         tests/cpp/character_controller_tests.cpp)
