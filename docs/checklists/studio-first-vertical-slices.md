@@ -13,16 +13,16 @@ complet Asset Studio → Map Studio → Preview Runtime → publication de map.
 
 ## Tranche 0 — Corriger les ajouts visuels existants
 
-- [ ] Inventorier les chemins qui transforment actuellement une texture en
+- [x] Inventorier les chemins qui transforment actuellement une texture en
   fill ou en géométrie et distinguer action explicite, preview et persistance.
-- [ ] Ajouter `RasterView v1` avec crop en pixels source, pivot, transform et
+- [x] Ajouter `RasterView v1` avec crop en pixels source, pivot, transform et
   filtrage, plus parseur strict, sérialiseur, validation et migration.
-- [ ] Interpréter une référence texture historique comme une vue complète afin
+- [x] Interpréter une référence texture historique comme une vue complète afin
   de conserver son résultat visible.
-- [ ] Ajouter les commandes crop, reset crop et transform de vue dans Asset
+- [x] Ajouter les commandes crop, reset crop et transform de vue dans Asset
   Studio avec undo/redo, autosave et récupération.
-- [ ] Afficher simultanément la source complète, le cadre de crop et le rendu
-  final sans réécrire le PNG.
+- [x] Afficher simultanément la source complète, les paramètres du cadre de
+  crop et le rendu final sans réécrire le PNG.
 - [ ] Comparer les draw packets et pixels de référence entre Asset Studio et
   Preview Runtime.
 

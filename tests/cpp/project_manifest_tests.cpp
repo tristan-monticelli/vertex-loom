@@ -247,6 +247,42 @@ void texture_asset_round_trip_is_lossless() {
     require(*parsed.asset == expected, "texture round-trip lost data");
 }
 
+void raster_view_round_trips_and_rejects_out_of_bounds_crop() {
+    const auto manifest = example_manifest();
+    auto expected = fabric::project::TextureAsset{
+        .document = {
+            .schema_version = fabric::project::current_texture_schema_version,
+            .type = "texture",
+            .id = {.value = "wool-fill"},
+            .name = "Wool Fill",
+        },
+        .source = "assets/textures/wool-fill.png",
+        .width = 32,
+        .height = 24,
+        .pixel_format = "rgba8",
+        .view = fabric::project::RasterView{
+            .crop = {{4.0F, 2.0F}, {16.0F, 12.0F}},
+            .pivot = {0.25F, 0.75F},
+            .transform = {.position = {3.0F, -2.0F},
+                          .rotation_degrees = 12.0F,
+                          .scale = {1.25F, 0.8F}},
+            .filter = fabric::project::RasterFilter::nearest,
+        },
+    };
+    const auto parsed = fabric::project::parse_texture_asset(
+        manifest, fabric::project::serialize_texture_asset(expected));
+    require(parsed.ok(), "raster view did not parse");
+    require(*parsed.asset == expected, "raster view round-trip lost data");
+
+    auto invalid = *expected.view;
+    invalid.crop.origin.x = 20.0F;
+    invalid.crop.size.x = 20.0F;
+    const auto report = fabric::project::validate_raster_view(
+        invalid, expected.width, expected.height);
+    require(contains_error(report.errors, ErrorCode::invalid_asset, "view.crop"),
+            "out-of-bounds raster crop was accepted");
+}
+
 void invalid_texture_paths_are_rejected() {
     auto asset = fabric::project::TextureAsset{
         .document = {
@@ -692,6 +728,7 @@ int main() {
     invalid_project_creation_writes_nothing();
     atomic_save_preserves_the_previous_valid_manifest();
     texture_asset_round_trip_is_lossless();
+    raster_view_round_trips_and_rejects_out_of_bounds_crop();
     invalid_texture_paths_are_rejected();
     project_validation_rejects_a_missing_texture_source();
     vector_asset_round_trip_is_lossless();

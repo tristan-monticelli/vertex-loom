@@ -86,6 +86,10 @@ L'export de map couvrira fermeture transitive des dépendances, ordre
 déterministe, chemins portables, absence de ressources externes et chargement
 du paquet par Preview Runtime. Une comparaison de scène vérifiera le même
 résultat visible avant sauvegarde, après reload et depuis le paquet publié.
+Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
+les transformations, le filtrage, undo/redo, autosave, récupération et la
+conservation byte-for-byte de la source PNG. Le test de comparaison pixel et
+draw-packet entre les deux applications reste le prochain verrou de la tranche.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

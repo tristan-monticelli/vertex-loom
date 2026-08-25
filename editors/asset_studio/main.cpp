@@ -365,27 +365,52 @@ EntityPreviewResult build_entity_preview(
                 continue;
             }
             const float ppu = static_cast<float>(session.manifest()->pixels_per_unit);
-            const float half_width = std::max(0.5F,
-                static_cast<float>(loaded.asset->width) / ppu * 0.5F);
-            const float half_height = std::max(0.5F,
-                static_cast<float>(loaded.asset->height) / ppu * 0.5F);
+            const auto crop = loaded.asset->view
+                ? loaded.asset->view->crop
+                : fabric::core::Rect{{0.0F, 0.0F},
+                    {static_cast<float>(loaded.asset->width),
+                     static_cast<float>(loaded.asset->height)}};
+            const auto pivot = loaded.asset->view
+                ? loaded.asset->view->pivot : fabric::core::Vec2{0.5F, 0.5F};
+            const float width = crop.size.x / ppu;
+            const float height = crop.size.y / ppu;
+            const float left = -width * pivot.x;
+            const float right = width * (1.0F - pivot.x);
+            const float top = -height * pivot.y;
+            const float bottom = height * (1.0F - pivot.y);
+            const fabric::core::Vec2 uv_min{
+                crop.origin.x / static_cast<float>(loaded.asset->width),
+                crop.origin.y / static_cast<float>(loaded.asset->height)};
+            const fabric::core::Vec2 uv_max{
+                (crop.origin.x + crop.size.x) /
+                    static_cast<float>(loaded.asset->width),
+                (crop.origin.y + crop.size.y) /
+                    static_cast<float>(loaded.asset->height)};
             fabric::render::VectorDrawPacket packet{
                 .node_id = entity.document.id.value + ":" + node.id,
                 .fill_color = material && !material->texture
                     ? std::optional{fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F}}
                     : std::nullopt,
                 .image_fill = fabric::project::VectorImageFill{
-                    .texture = *node.drawable.resource},
-                .outline = {{-half_width, -half_height}, {half_width, -half_height},
-                            {half_width, half_height}, {-half_width, half_height}},
-                .fill_vertices = {{-half_width, -half_height},
-                                  {half_width, -half_height},
-                                  {half_width, half_height},
-                                  {-half_width, half_height}},
-                .fill_uv = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F},
-                            {0.0F, 1.0F}},
+                    .texture = *node.drawable.resource,
+                    .transform = loaded.asset->view
+                        ? loaded.asset->view->transform : fabric::core::Transform{}},
+                .outline = {{left, top}, {right, top}, {right, bottom},
+                            {left, bottom}},
+                .fill_vertices = {{left, top}, {right, top}, {right, bottom},
+                                  {left, bottom}},
+                .fill_uv = {uv_min, {uv_max.x, uv_min.y}, uv_max,
+                            {uv_min.x, uv_max.y}},
                 .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
                 .closed_outline = true};
+            if (loaded.asset->view) {
+                for (auto& point : packet.outline)
+                    point = transform_entity_point(
+                        point, loaded.asset->view->transform);
+                for (auto& point : packet.fill_vertices)
+                    point = transform_entity_point(
+                        point, loaded.asset->view->transform);
+            }
             if (material) apply_entity_material(packet, *material);
             transform_entity_packet(packet, entity, node_index);
             result.packets.push_back(std::move(packet));
@@ -1232,6 +1257,89 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 session.imported_texture()) {
                 ImGui::TextWrapped("%s",
                     session.imported_texture()->asset.source.generic_string().c_str());
+                ImGui::SeparatorText("Raster view (non-destructive)");
+                static std::string raster_view_edit_id;
+                static fabric::project::RasterView raster_view_edit;
+                const auto& texture = *session.imported_texture();
+                if (raster_view_edit_id != texture.asset.document.id.value) {
+                    raster_view_edit_id = texture.asset.document.id.value;
+                    raster_view_edit.crop = texture.asset.view
+                        ? texture.asset.view->crop
+                        : fabric::core::Rect{
+                            {0.0F, 0.0F},
+                            {static_cast<float>(texture.asset.width),
+                             static_cast<float>(texture.asset.height)}};
+                    raster_view_edit.pivot = texture.asset.view
+                        ? texture.asset.view->pivot
+                        : fabric::core::Vec2{0.5F, 0.5F};
+                    raster_view_edit.transform = texture.asset.view
+                        ? texture.asset.view->transform
+                        : fabric::core::Transform{};
+                    raster_view_edit.filter = texture.asset.view
+                        ? texture.asset.view->filter
+                        : fabric::project::RasterFilter::linear;
+                }
+                float crop_origin[2]{raster_view_edit.crop.origin.x,
+                                     raster_view_edit.crop.origin.y};
+                float crop_size[2]{raster_view_edit.crop.size.x,
+                                   raster_view_edit.crop.size.y};
+                float crop_pivot[2]{raster_view_edit.pivot.x,
+                                    raster_view_edit.pivot.y};
+                float view_position[2]{raster_view_edit.transform.position.x,
+                                       raster_view_edit.transform.position.y};
+                float view_scale[2]{raster_view_edit.transform.scale.x,
+                                    raster_view_edit.transform.scale.y};
+                float view_rotation = raster_view_edit.transform.rotation_degrees;
+                ImGui::InputFloat2("Crop origin (px)", crop_origin);
+                ImGui::InputFloat2("Crop size (px)", crop_size);
+                ImGui::InputFloat2("Pivot (normalized)", crop_pivot);
+                ImGui::InputFloat2("View position", view_position);
+                ImGui::InputFloat("View rotation", &view_rotation);
+                ImGui::InputFloat2("View scale", view_scale);
+                if (ImGui::Button("Apply crop/view")) {
+                    raster_view_edit.crop.origin = {crop_origin[0], crop_origin[1]};
+                    raster_view_edit.crop.size = {crop_size[0], crop_size[1]};
+                    raster_view_edit.pivot = {crop_pivot[0], crop_pivot[1]};
+                    raster_view_edit.transform.position =
+                        {view_position[0], view_position[1]};
+                    raster_view_edit.transform.rotation_degrees = view_rotation;
+                    raster_view_edit.transform.scale =
+                        {view_scale[0], view_scale[1]};
+                    if (session.set_selected_texture_view(raster_view_edit)) {
+                        status = "Raster view saved in the document.";
+                    } else {
+                        status = "Raster view rejected; inspect diagnostics.";
+                    }
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Reset full source")) {
+                    if (session.reset_selected_texture_view()) {
+                        raster_view_edit_id.clear();
+                        status = "Raster view reset to the full source.";
+                    } else {
+                        status = "Raster view reset failed; inspect diagnostics.";
+                    }
+                }
+                const auto view = texture.asset.view
+                    ? texture.asset.view->crop
+                    : fabric::core::Rect{
+                        {0.0F, 0.0F},
+                        {static_cast<float>(texture.asset.width),
+                         static_cast<float>(texture.asset.height)}};
+                const ImVec2 cropped_size{220.0F,
+                    220.0F * view.size.y / std::max(view.size.x, 1.0F)};
+                const ImVec2 uv_min{
+                    view.origin.x / static_cast<float>(texture.asset.width),
+                    1.0F - (view.origin.y + view.size.y) /
+                        static_cast<float>(texture.asset.height)};
+                const ImVec2 uv_max{
+                    (view.origin.x + view.size.x) /
+                        static_cast<float>(texture.asset.width),
+                    1.0F - view.origin.y /
+                        static_cast<float>(texture.asset.height)};
+                ImGui::TextUnformatted("Cropped preview");
+                ImGui::Image(ImTextureRef(static_cast<ImTextureID>(preview.texture)),
+                             cropped_size, uv_min, uv_max);
             }
             if (preview.kind == PreviewKind::vector && session.imported_vector()) {
                 ImGui::TextUnformatted(

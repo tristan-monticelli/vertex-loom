@@ -88,6 +88,13 @@ public:
         double pixels_per_unit,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_texture_view(
+        std::optional<project::RasterView> view,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool reset_selected_texture_view(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_vector_node(
         std::size_t node_index, project::VectorNode node,
         AutosaveScheduler::Clock::time_point now =
@@ -217,6 +224,7 @@ private:
     enum class DirtyDocument {
         none,
         manifest,
+        texture,
         vector,
         entity,
         animation,
@@ -235,10 +243,12 @@ private:
     std::vector<StudioResource> resources_;
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;
+    std::optional<project::TextureAsset> recovery_texture_;
     std::optional<project::VectorAsset> recovery_vector_;
     std::optional<project::EntityDefinition> recovery_entity_;
     std::optional<project::AnimationClip> recovery_animation_;
     std::filesystem::path selected_vector_document_path_;
+    std::filesystem::path selected_texture_document_path_;
     std::filesystem::path selected_entity_document_path_;
     std::filesystem::path selected_animation_document_path_;
     std::filesystem::path selected_input_document_path_;
@@ -248,6 +258,8 @@ private:
     std::vector<project::Error> errors_;
 
     [[nodiscard]] bool prepare_animation_edit(
+        AutosaveScheduler::Clock::time_point now);
+    [[nodiscard]] bool prepare_texture_edit(
         AutosaveScheduler::Clock::time_point now);
     [[nodiscard]] bool prepare_input_edit(
         AutosaveScheduler::Clock::time_point now);

@@ -1,10 +1,13 @@
 #include "fabric/project/texture_asset.hpp"
 
 #include "asset_storage.hpp"
+#include "fabric/project/document_storage.hpp"
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <fstream>
+#include <cmath>
 #include <iterator>
 #include <limits>
 #include <utility>
@@ -45,7 +48,93 @@ bool read_dimension(const Json& object, const char* key,
     return true;
 }
 
+bool read_float(const Json& object, const char* key, float& destination,
+                std::vector<Error>& errors) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_number()) {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "expected a finite number");
+        return false;
+    }
+    destination = iterator->get<float>();
+    if (!std::isfinite(destination)) {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "expected a finite number");
+        return false;
+    }
+    return true;
+}
+
+bool read_vec2(const Json& object, const char* key, core::Vec2& destination,
+               std::vector<Error>& errors) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "expected an object with x and y");
+        return false;
+    }
+    return read_float(*iterator, "x", destination.x, errors) &&
+        read_float(*iterator, "y", destination.y, errors);
+}
+
+bool read_rect(const Json& object, const char* key, core::Rect& destination,
+               std::vector<Error>& errors) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "expected an object with origin and size");
+        return false;
+    }
+    return read_vec2(*iterator, "origin", destination.origin, errors) &&
+        read_vec2(*iterator, "size", destination.size, errors);
+}
+
+bool read_transform(const Json& object, const char* key,
+                    core::Transform& destination,
+                    std::vector<Error>& errors) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "expected a transform object");
+        return false;
+    }
+    return read_vec2(*iterator, "position", destination.position, errors) &&
+        read_float(*iterator, "rotationDegrees", destination.rotation_degrees,
+                   errors) &&
+        read_vec2(*iterator, "scale", destination.scale, errors) &&
+        read_vec2(*iterator, "pivot", destination.pivot, errors);
+}
+
+Json serialize_vec2(const core::Vec2 value) {
+    return Json{{"x", value.x}, {"y", value.y}};
+}
+
+Json serialize_transform(const core::Transform& transform) {
+    return Json{{"position", serialize_vec2(transform.position)},
+                {"rotationDegrees", transform.rotation_degrees},
+                {"scale", serialize_vec2(transform.scale)},
+                {"pivot", serialize_vec2(transform.pivot)}};
+}
+
+bool read_filter(const Json& object, const char* key, RasterFilter& destination,
+                 std::vector<Error>& errors) {
+    std::string value;
+    if (!read_string(object, key, value, errors)) return false;
+    if (value == "nearest") destination = RasterFilter::nearest;
+    else if (value == "linear") destination = RasterFilter::linear;
+    else {
+        add_error(errors, ErrorCode::invalid_asset, key,
+                  "must be nearest or linear");
+        return false;
+    }
+    return true;
+}
+
 } // namespace
+
+std::string_view to_string(const RasterFilter filter) noexcept {
+    return filter == RasterFilter::nearest ? "nearest" : "linear";
+}
 
 std::filesystem::path texture_source_path(const ProjectManifest& manifest,
                                           const core::ResourceId& id) {
@@ -95,11 +184,52 @@ ValidationReport validate_texture_asset(const ProjectManifest& manifest,
         add_error(report.errors, ErrorCode::invalid_asset, "pixelFormat",
                   "only rgba8 is supported");
     }
+    if (asset.view) {
+        auto view_report = validate_raster_view(*asset.view, asset.width,
+                                                asset.height);
+        report.errors.insert(report.errors.end(), view_report.errors.begin(),
+                             view_report.errors.end());
+    }
+    return report;
+}
+
+ValidationReport validate_raster_view(const RasterView& view,
+                                     const std::uint32_t source_width,
+                                     const std::uint32_t source_height) {
+    ValidationReport report;
+    if (view.schema_version != current_raster_view_schema_version) {
+        add_error(report.errors, ErrorCode::unsupported_schema_version,
+                  "view.schemaVersion", "only raster view schema version 1 is supported");
+    }
+    const auto finite = [](const float value) { return std::isfinite(value); };
+    const auto& crop = view.crop;
+    if (!finite(crop.origin.x) || !finite(crop.origin.y) ||
+        !finite(crop.size.x) || !finite(crop.size.y) ||
+        crop.origin.x < 0.0F || crop.origin.y < 0.0F ||
+        crop.size.x <= 0.0F || crop.size.y <= 0.0F ||
+        crop.origin.x + crop.size.x > static_cast<float>(source_width) ||
+        crop.origin.y + crop.size.y > static_cast<float>(source_height)) {
+        add_error(report.errors, ErrorCode::invalid_asset, "view.crop",
+                  "must be a positive rectangle inside the source image");
+    }
+    if (!finite(view.pivot.x) || !finite(view.pivot.y) || view.pivot.x < 0.0F ||
+        view.pivot.x > 1.0F || view.pivot.y < 0.0F || view.pivot.y > 1.0F) {
+        add_error(report.errors, ErrorCode::invalid_asset, "view.pivot",
+                  "must be finite and normalized between 0 and 1");
+    }
+    const auto values = {view.transform.position.x, view.transform.position.y,
+                         view.transform.rotation_degrees, view.transform.scale.x,
+                         view.transform.scale.y, view.transform.pivot.x,
+                         view.transform.pivot.y};
+    if (!std::ranges::all_of(values, finite)) {
+        add_error(report.errors, ErrorCode::invalid_asset, "view.transform",
+                  "must contain only finite values");
+    }
     return report;
 }
 
 std::string serialize_texture_asset(const TextureAsset& asset) {
-    const Json document = {
+    Json document = {
         {"schemaVersion", asset.document.schema_version},
         {"type", asset.document.type},
         {"id", asset.document.id.value},
@@ -109,6 +239,16 @@ std::string serialize_texture_asset(const TextureAsset& asset) {
         {"height", asset.height},
         {"pixelFormat", asset.pixel_format},
     };
+    if (asset.view) {
+        document["view"] = {
+            {"schemaVersion", asset.view->schema_version},
+            {"crop", { {"origin", serialize_vec2(asset.view->crop.origin)},
+                        {"size", serialize_vec2(asset.view->crop.size)} }},
+            {"pivot", serialize_vec2(asset.view->pivot)},
+            {"transform", serialize_transform(asset.view->transform)},
+            {"filter", std::string(to_string(asset.view->filter))},
+        };
+    }
     return document.dump(2) + '\n';
 }
 
@@ -142,6 +282,23 @@ TextureAssetResult parse_texture_asset(const ProjectManifest& manifest,
     read_dimension(document, "width", asset.width, result.errors);
     read_dimension(document, "height", asset.height, result.errors);
     read_string(document, "pixelFormat", asset.pixel_format, result.errors);
+    if (const auto view_iterator = document.find("view");
+        view_iterator != document.end()) {
+        if (!view_iterator->is_object()) {
+            add_error(result.errors, ErrorCode::invalid_asset, "view",
+                      "expected an object");
+        } else {
+            RasterView view;
+            read_dimension(*view_iterator, "schemaVersion", view.schema_version,
+                           result.errors);
+            read_rect(*view_iterator, "crop", view.crop, result.errors);
+            read_vec2(*view_iterator, "pivot", view.pivot, result.errors);
+            read_transform(*view_iterator, "transform", view.transform,
+                           result.errors);
+            read_filter(*view_iterator, "filter", view.filter, result.errors);
+            asset.view = view;
+        }
+    }
     if (!result.errors.empty()) {
         return result;
     }
@@ -238,6 +395,20 @@ TextureAssetResult publish_texture_asset(
         return result;
     }
     return load_texture_asset(project_root, manifest, document_relative);
+}
+
+ValidationReport save_texture_asset_document(
+    const std::filesystem::path& project_root, const ProjectManifest& manifest,
+    const TextureAsset& asset) {
+    auto report = validate_texture_asset(manifest, asset);
+    if (!report.ok()) return report;
+    return save_document_atomic(
+        project_root, texture_document_path(manifest, asset.document.id),
+        serialize_texture_asset(asset),
+        [&manifest](const std::string_view contents) {
+            const auto parsed = parse_texture_asset(manifest, contents);
+            return ValidationReport{.errors = parsed.errors};
+        });
 }
 
 } // namespace fabric::project

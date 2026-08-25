@@ -26,6 +26,8 @@ first native Asset Studio workspace.
 - Typed Create, Import, and Add existing hub with isolated prompt state.
 - Safe project creation with scale presets, live validation, and final review.
 - Persistent PNG and SVG imports with versioned asset documents and OpenGL previews.
+- Non-destructive raster views with source-pixel crop, pivot, transform and
+  Asset Studio preview controls.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test

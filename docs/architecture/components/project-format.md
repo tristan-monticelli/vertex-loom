@@ -50,9 +50,10 @@ C4Component
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
   normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
   de publication : une source sans document n'est pas un asset chargeable.
-- `RasterView v1` sera une vue non destructive d'un `TextureAsset`. Elle
-  conservera un rectangle de crop en pixels source, un pivot, un transform et
-  le filtrage, sans posséder ni réécrire les pixels.
+- `RasterView v1` est une vue non destructive d'un `TextureAsset`. Elle
+  conserve un rectangle de crop en pixels source, un pivot, un transform et
+  le filtrage, sans posséder ni réécrire les pixels. Un champ `view` absent
+  conserve la vue complète des textures historiques.
 - `VisualComposition v1` ordonnera une vue raster, des drawables vectoriels,
   des instances de `VisualComponent v1` et des `TexturedPath v1`. Chaque calque
   conservera son ancrage, son transform, sa visibilité, son opacité et son Z.

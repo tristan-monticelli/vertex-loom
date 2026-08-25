@@ -39,6 +39,7 @@ struct PreviewRuntime::Impl {
         std::filesystem::path path;
         std::uint32_t width{};
         std::uint32_t height{};
+        std::optional<project::RasterView> view;
     };
 
     struct PacketBaseTransform {
@@ -718,7 +719,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         impl_->texture_sources.emplace(reference.id.value,
             Impl::TextureSource{.path = options_.project_root / texture.asset->source,
                                 .width = texture.asset->width,
-                                .height = texture.asset->height});
+                                .height = texture.asset->height,
+                                .view = texture.asset->view});
         return true;
     };
 
@@ -854,30 +856,51 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
                 // Texture upload is handled by the next resolver slice. Keep a
                 // deterministic placeholder so the entity remains visible.
-                constexpr std::array<core::Vec2, 4> uv_quad{
-                    core::Vec2{0.0F, 0.0F}, core::Vec2{1.0F, 0.0F},
-                    core::Vec2{1.0F, 1.0F}, core::Vec2{0.0F, 1.0F}};
                 if (!node.drawable.resource || !ensure_texture(*node.drawable.resource))
                     return false;
                 const auto& source = impl_->texture_sources.at(node.drawable.resource->id.value);
                 const auto pixels_per_unit = static_cast<float>(manifest_->pixels_per_unit);
-                const auto half_width = std::max(0.5F,
-                    static_cast<float>(source.width) / pixels_per_unit * 0.5F);
-                const auto half_height = std::max(0.5F,
-                    static_cast<float>(source.height) / pixels_per_unit * 0.5F);
-                const std::array<core::Vec2, 4> texture_quad{
-                    core::Vec2{-half_width, -half_height},
-                    core::Vec2{half_width, -half_height},
-                    core::Vec2{half_width, half_height},
-                    core::Vec2{-half_width, half_height}};
+                const auto crop = source.view
+                    ? source.view->crop
+                    : core::Rect{{0.0F, 0.0F},
+                                 {static_cast<float>(source.width),
+                                  static_cast<float>(source.height)}};
+                const auto pivot = source.view
+                    ? source.view->pivot : core::Vec2{0.5F, 0.5F};
+                const auto width = crop.size.x / pixels_per_unit;
+                const auto height = crop.size.y / pixels_per_unit;
+                const auto left = -width * pivot.x;
+                const auto right = width * (1.0F - pivot.x);
+                const auto top = -height * pivot.y;
+                const auto bottom = height * (1.0F - pivot.y);
+                std::array<core::Vec2, 4> texture_quad{
+                    core::Vec2{left, top}, core::Vec2{right, top},
+                    core::Vec2{right, bottom}, core::Vec2{left, bottom}};
+                if (source.view) {
+                    for (auto& point : texture_quad)
+                        point = apply_transform(point, source.view->transform);
+                }
+                const auto uv_min = core::Vec2{
+                    crop.origin.x / static_cast<float>(source.width),
+                    crop.origin.y / static_cast<float>(source.height)};
+                const auto uv_max = core::Vec2{
+                    (crop.origin.x + crop.size.x) /
+                        static_cast<float>(source.width),
+                    (crop.origin.y + crop.size.y) /
+                        static_cast<float>(source.height)};
                 auto packet = render::VectorDrawPacket{
                     .node_id = node.id,
-                    .fill_color = core::Color{0.7F, 0.7F, 0.7F, 1.0F},
+                    .fill_color = std::nullopt,
                     .image_fill = project::VectorImageFill{
-                        .texture = *node.drawable.resource},
+                        .texture = *node.drawable.resource,
+                        .transform = source.view
+                            ? source.view->transform : core::Transform{}},
                     .outline = std::vector<core::Vec2>(texture_quad.begin(), texture_quad.end()),
                     .fill_vertices = std::vector<core::Vec2>(texture_quad.begin(), texture_quad.end()),
-                    .fill_uv = std::vector<core::Vec2>(uv_quad.begin(), uv_quad.end()),
+                    .fill_uv = {core::Vec2{uv_min.x, uv_min.y},
+                               core::Vec2{uv_max.x, uv_min.y},
+                               core::Vec2{uv_max.x, uv_max.y},
+                               core::Vec2{uv_min.x, uv_max.y}},
                     .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
                     .closed_outline = true};
                 packet.fill_color.reset();
@@ -1021,8 +1044,11 @@ bool PreviewRuntime::run() {
             return false;
         }
         glBindTexture(GL_TEXTURE_2D, handle);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        const auto filter = source.view &&
+                source.view->filter == project::RasterFilter::nearest
+            ? GL_NEAREST : GL_LINEAR;
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);

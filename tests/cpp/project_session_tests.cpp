@@ -202,6 +202,69 @@ void session_imports_a_valid_png_persistently() {
             "selected texture was not decoded after reopen");
 }
 
+void session_edits_a_non_destructive_raster_view() {
+    const TemporaryDirectory valid{"raster-view"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.png";
+    write_valid_png(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "raster view project did not open");
+    require(session.import_png(source, {.value = "wool-fill"}, "Wool Fill"),
+            "raster view texture import failed");
+    const auto published_source = valid.path() /
+        "assets/textures/wool-fill.png";
+    std::ifstream before(published_source, std::ios::binary);
+    const std::string source_bytes_before{
+        std::istreambuf_iterator<char>{before}, std::istreambuf_iterator<char>{}};
+
+    fabric::editor::ProjectSession edited;
+    require(edited.open(valid.path()), "raster view reload failed");
+    require(edited.select_resource(fabric::editor::StudioResourceKind::texture,
+                                   {.value = "wool-fill"}),
+            "raster view texture selection failed");
+    const fabric::project::RasterView view{
+        .crop = {{0.0F, 0.0F}, {1.0F, 1.0F}},
+        .pivot = {0.5F, 0.5F},
+        .filter = fabric::project::RasterFilter::nearest,
+    };
+    require(edited.set_selected_texture_view(view),
+            "raster view edit failed");
+    require(edited.undo(), "raster view undo failed");
+    require(!edited.imported_texture()->asset.view.has_value(),
+            "raster view undo did not restore the full source view");
+    require(edited.redo(), "raster view redo failed");
+    require(edited.imported_texture()->asset.view == view,
+            "raster view redo did not restore the crop");
+    require(edited.update_autosave(
+                fabric::editor::AutosaveScheduler::Clock::now()) ==
+                fabric::editor::AutosaveStatus::not_due,
+            "raster view autosave was due too early");
+    require(edited.update_autosave(
+                fabric::editor::AutosaveScheduler::Clock::now() +
+                std::chrono::seconds{2}) == fabric::editor::AutosaveStatus::saved,
+            "raster view autosave failed");
+
+    fabric::editor::ProjectSession recovered;
+    require(recovered.open(valid.path()), "recovery project could not open");
+    require(recovered.select_resource(
+                fabric::editor::StudioResourceKind::texture,
+                {.value = "wool-fill"}),
+            "recovery texture selection failed");
+    require(recovered.has_recovery(),
+            "newer raster view autosave was not offered for recovery");
+    require(recovered.accept_recovery(), "raster view recovery failed");
+    require(recovered.imported_texture()->asset.view == view,
+            "raster view recovery lost the crop");
+    require(recovered.save(), "recovered raster view was not saved");
+
+    std::ifstream after(published_source, std::ios::binary);
+    const std::string source_bytes_after{
+        std::istreambuf_iterator<char>{after}, std::istreambuf_iterator<char>{}};
+    require(source_bytes_after == source_bytes_before,
+            "raster view editing changed the source PNG");
+}
+
 void failed_import_writes_no_asset_and_preserves_the_previous_import() {
     const TemporaryDirectory valid{"failed-png-import"};
     write_valid_project(valid.path());
@@ -405,6 +468,7 @@ int main() {
     std::cerr << "[       OK ] failed_creation_preserves_the_active_project\n" << std::flush;
     std::cerr << "[ RUN      ] session_imports_a_valid_png_persistently\n" << std::flush;
     session_imports_a_valid_png_persistently();
+    session_edits_a_non_destructive_raster_view();
     std::cerr << "[       OK ] session_imports_a_valid_png_persistently\n" << std::flush;
     std::cerr << "[ RUN      ] failed_import_writes_no_asset_and_preserves_the_previous_import\n" << std::flush;
     failed_import_writes_no_asset_and_preserves_the_previous_import();

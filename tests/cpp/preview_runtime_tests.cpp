@@ -1080,7 +1080,11 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
                       .name = "Runtime Texture"},
          .source = "assets/textures/runtime-texture.png",
          .width = 1,
-         .height = 1}, input).ok());
+         .height = 1,
+         .view = fabric::project::RasterView{
+             .crop = {{0.0F, 0.0F}, {0.5F, 1.0F}},
+             .pivot = {0.5F, 0.5F},
+         }}, input).ok());
     REQUIRE(fabric::project::publish_entity(root, manifest(), texture_entity()).ok());
     REQUIRE(fabric::project::publish_map(root, manifest(), map_with_texture_entity()).ok());
 
@@ -1089,6 +1093,15 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
+    const auto& packets = runtime.last_frame_packets();
+    REQUIRE(packets.size() == 1U);
+    REQUIRE(packets.front().image_fill.has_value());
+    REQUIRE(packets.front().fill_uv.size() == 4U);
+    CHECK(packets.front().fill_uv[1].x == 0.5F);
+    const auto packet_width = packets.front().fill_vertices[1].x -
+        packets.front().fill_vertices[0].x;
+    CHECK(packet_width > 0.0049F);
+    CHECK(packet_width < 0.0051F);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
