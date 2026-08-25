@@ -17,6 +17,7 @@ struct VectorDrawPacket {
     std::optional<core::Color> fill_color;
     std::optional<project::VectorImageFill> image_fill;
     std::optional<project::RasterFilter> raster_filter;
+    bool repeat_texture_x{};
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
     std::vector<core::Vec2> fill_vertices;

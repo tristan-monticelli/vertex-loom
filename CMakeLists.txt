@@ -144,6 +144,7 @@ add_library(fabric_render STATIC
     engine/fabric_render/src/raster_image.cpp
     engine/fabric_render/src/opengl_vector_renderer.cpp
     engine/fabric_render/src/svg_vector.cpp
+    engine/fabric_render/src/textured_path_geometry.cpp
     engine/fabric_render/src/vector_geometry.cpp
 )
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include
@@ -312,6 +313,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_textured_path_tests
              COMMAND fabric_textured_path_tests)
+
+    add_executable(fabric_textured_path_geometry_tests
+        tests/cpp/textured_path_geometry_tests.cpp
+    )
+    target_link_libraries(fabric_textured_path_geometry_tests PRIVATE
+        fabric_render
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_textured_path_geometry_tests
+             COMMAND fabric_textured_path_geometry_tests)
 
     add_executable(fabric_animation_tests
         tests/cpp/animation_tests.cpp

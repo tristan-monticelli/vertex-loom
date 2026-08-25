@@ -108,6 +108,11 @@ chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule
 dépendance texture, la résolution headless des références et l'absence de
 collision ou de maillage persisté dans le document d'auteur.
+La géométrie dérivée couvre le ruban exact d'une ligne, l'aplatissement Bézier
+borné et reproductible, les fermetures avec couture UV, l'interpolation de
+largeur, les modes repeat/stretch, les raccords miter/bevel/round et les caps
+butt/square/round. Le smoke OpenGL vérifie aussi la teinte des textures et la
+répétition longitudinale réellement échantillonnée.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

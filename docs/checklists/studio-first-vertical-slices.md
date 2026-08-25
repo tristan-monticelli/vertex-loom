@@ -56,7 +56,7 @@ sauvegarde, reload et chargement runtime.
 
 - [x] Ajouter `TexturedPath v1`, validation des courbes, largeurs, références,
   modes UV, raccords et valeurs finies.
-- [ ] Générer un ruban triangulé déterministe avec UV continus pour chemins
+- [x] Générer un ruban triangulé déterministe avec UV continus pour chemins
   ouverts, fermés et Bézier.
 - [ ] Ajouter dans Asset Studio plume, attaches, largeur, répétition, offset,
   couleur, opacité et animation de texture.

@@ -167,12 +167,61 @@ int main() {
     const bool raster_crop = raster_packets.ok() && raster_stats.ok() &&
         raster_stats.packets_drawn == 1U && raster_pixel[0] < 40U &&
         raster_pixel[1] > 200U && raster_pixel[2] < 40U;
+
+    auto tinted_packets = raster_packets.packets;
+    tinted_packets.front().fill_color =
+        fabric::core::Color{1.0F, 0.5F, 1.0F, 1.0F};
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto tinted_stats = renderer.draw(
+        tinted_packets,
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {-0.5F, -0.5F},
+                          .size = {1.0F, 1.0F}}},
+        [texture](const fabric::core::ResourceId& id)
+            -> std::optional<fabric::render::OpenGLTextureHandle> {
+            if (id.value != "reference-texture") return std::nullopt;
+            return fabric::render::OpenGLTextureHandle{
+                .handle = texture, .width = 2U, .height = 1U};
+        });
+    glFinish();
+    std::array<std::uint8_t, 4> tinted_pixel{};
+    glReadPixels(32, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 tinted_pixel.data());
+    const bool texture_tint = tinted_stats.ok() &&
+        tinted_pixel[0] < 40U && tinted_pixel[1] > 90U &&
+        tinted_pixel[1] < 170U && tinted_pixel[2] < 40U;
+
+    auto repeated_packets = raster_packets.packets;
+    repeated_packets.front().repeat_texture_x = true;
+    for (auto& uv : repeated_packets.front().fill_uv) uv.x = 1.1F;
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto repeated_stats = renderer.draw(
+        repeated_packets,
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {-0.5F, -0.5F},
+                          .size = {1.0F, 1.0F}}},
+        [texture](const fabric::core::ResourceId& id)
+            -> std::optional<fabric::render::OpenGLTextureHandle> {
+            if (id.value != "reference-texture") return std::nullopt;
+            return fabric::render::OpenGLTextureHandle{
+                .handle = texture, .width = 2U, .height = 1U};
+        });
+    glFinish();
+    std::array<std::uint8_t, 4> repeated_pixel{};
+    glReadPixels(32, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 repeated_pixel.data());
+    const bool texture_repeat = repeated_stats.ok() &&
+        repeated_pixel[0] > 200U && repeated_pixel[1] < 40U &&
+        repeated_pixel[2] < 40U;
     glDeleteTextures(1, &texture);
     renderer.shutdown();
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    if (!rendered || !clipping || !raster_crop) {
+    if (!rendered || !clipping || !raster_crop || !texture_tint ||
+        !texture_repeat) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "
                   << stats.packets_drawn << "/" << stats.triangles_drawn
                   << " pixel=" << static_cast<int>(pixel[0]) << ","
@@ -188,7 +237,13 @@ int main() {
                   << raster_stats.packets_drawn << "/"
                   << static_cast<int>(raster_pixel[0]) << ","
                   << static_cast<int>(raster_pixel[1]) << ","
-                  << static_cast<int>(raster_pixel[2]) << "\n";
+                  << static_cast<int>(raster_pixel[2]) << " tint="
+                  << static_cast<int>(tinted_pixel[0]) << ","
+                  << static_cast<int>(tinted_pixel[1]) << ","
+                  << static_cast<int>(tinted_pixel[2]) << " repeat="
+                  << static_cast<int>(repeated_pixel[0]) << ","
+                  << static_cast<int>(repeated_pixel[1]) << ","
+                  << static_cast<int>(repeated_pixel[2]) << "\n";
         return 1;
     }
     return 0;

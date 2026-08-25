@@ -64,9 +64,14 @@ triangulé n'est persisté dans `TexturedPath v1`.
 
 La tessellation aplatit les cubiques avec une tolérance explicite, calcule la
 distance cumulée sur la ligne centrale, interpole le profil de largeur et émet
-deux sommets par échantillon. Les UV en répétition utilisent cette distance ;
-les UV en étirement utilisent sa normalisation globale. Pour un chemin fermé,
-la couture UV reste continue jusqu'à une paire de sommets dupliquée à la fin.
+deux sommets par section, complétés par des éventails pour les caps ronds. Les
+UV en répétition utilisent cette distance ;
+les UV en étirement utilisent sa normalisation globale. `uvScale.x` multiplie
+la coordonnée longitudinale et `uvScale.y` la coordonnée transversale ; le draw
+packet demande `GL_REPEAT` uniquement sur l'axe longitudinal en mode repeat.
+Pour un chemin fermé, la couture UV reste continue jusqu'à une paire de sommets
+dupliquée à la fin. La couleur est une teinte du fragment texturé et l'opacité
+reste un multiplicateur séparé.
 
 Le premier exemple est un Beam à deux attaches, courbe optionnelle, largeur,
 texture animée, couleur et opacité. Une collision peut le référencer mais n'est
