@@ -152,7 +152,9 @@ parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
 initialise et dessine les triangles de fills couleur dans le canvas Asset
 Studio ainsi que les contours ouverts/fermés. Asset Studio résout maintenant
 les `TextureAsset` locaux à la demande et met leurs handles GPU en cache ; la
-validation visuelle complète du gate reste ouverte.
+validation visuelle complète du gate reste ouverte. Les `clipNodeId` simples
+sont maintenant appliqués par stencil dans le backend ; clips imbriqués,
+gizmos de clip et validation visuelle complète restent ouverts.
 
 ## Étape D — Personnalisateur intégré
 

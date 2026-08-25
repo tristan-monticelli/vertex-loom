@@ -33,7 +33,8 @@ graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
 n'est configuré. `npm run test:gl` ajoute un smoke test OpenGL opt-in : il crée
 un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
-que la couleur lue ; il retourne `77` lorsqu'aucun contexte n'est disponible.
+que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
+disponible et retourne `77` lorsqu'aucun contexte n'est disponible.
 Le chargeur PNG couvre un fichier RGBA valide, une extension
 incorrecte et un contenu corrompu sans initialiser de fenêtre. L'import de
 texture couvre le round-trip du document, les chemins traversants, la copie

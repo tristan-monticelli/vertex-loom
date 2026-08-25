@@ -20,6 +20,11 @@ normalisées et la résolution texture est injectée par callback. Le viewport
 convertit les unités monde en coordonnées clip ; les statistiques retournent
 packets soumis, packets dessinés, triangles et diagnostics.
 
+Les packets portant `clipNodeId` utilisent le stencil du framebuffer pour
+appliquer un masque de premier niveau à leur fill et leur contour. Les clips
+imbriqués sont refusés avec un diagnostic ; un contexte sans stencil refuse
+également le packet concerné.
+
 Les fills image sont refusés explicitement tant qu’un résolveur de textures
 local n’est pas passé au backend. Asset Studio fournit désormais ce resolver :
 il charge le `TextureAsset` et le PNG local à la demande, puis conserve le
@@ -27,8 +32,9 @@ handle GPU pendant la session. Aucun atlas implicite n’est créé.
 Les tests headless couvrent l’état non initialisé. Asset Studio appelle le
 backend après le rendu ImGui dans le viewport natif courant. `npm run test:gl`
 exécute un smoke-test dédié avec contexte SDL caché, rendu d’un quad et
-vérification d’un pixel ; il est tolérant à l’absence de contexte en retournant
-le code de saut `77`.
+vérification d’un pixel ; lorsque le contexte possède un stencil, il vérifie
+également un masque triangulaire. Il est tolérant à l’absence de contexte en
+retournant le code de saut `77`.
 
 ## Consequences
 

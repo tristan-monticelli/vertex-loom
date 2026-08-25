@@ -82,4 +82,6 @@ C4Component
   Le backend OpenGL 3 compile ses shaders et possède ses buffers via les
   fonctions chargées par SDL ; il refuse explicitement les fills image tant
   qu’aucun résolveur de textures n’est fourni, mais dessine les contours
-  ouverts et fermés avec le même packet.
+  ouverts et fermés avec le même packet. Un `clipNodeId` applique un masque
+  stencil de premier niveau au fill et au contour ; les clips imbriqués ou les
+  contextes sans stencil sont diagnostiqués.
