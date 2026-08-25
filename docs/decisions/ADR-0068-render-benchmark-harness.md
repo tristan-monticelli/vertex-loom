@@ -22,6 +22,8 @@ référence et ne peut pas être déduite de la compilation ou des tests headles
 fabrique un projet temporaire valide avec une map dense, passe par le chargement
 réel des ressources et mesure le culling, les draw calls et le p95. Le projet
 temporaire est supprimé après la mesure et ne modifie pas le workspace.
+L’option `--min-fps` transforme le seuil de performance en assertion explicite ;
+le workflow multiplateforme l’utilise avec `60` FPS.
 
 Sur macOS, la scène générée de 10 000 instances visibles en 1440 × 900 donne
 `7,070 ms` p95, soit `141,4 FPS p95` sur 600 frames. Cette mesure couvre le

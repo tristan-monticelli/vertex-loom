@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <string_view>
 
 namespace {
@@ -17,6 +18,7 @@ namespace {
 struct Options {
     std::size_t instances{10000U};
     std::size_t frames{600U};
+    double minimum_fps{};
 };
 
 bool positive(const char* value, std::size_t& output) {
@@ -30,6 +32,17 @@ bool positive(const char* value, std::size_t& output) {
     }
 }
 
+bool non_negative(const char* value, double& output) {
+    try {
+        const auto parsed = std::stod(value);
+        if (!std::isfinite(parsed) || parsed < 0.0) return false;
+        output = parsed;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 bool parse_options(const int argc, char** argv, Options& options) {
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
@@ -37,8 +50,10 @@ bool parse_options(const int argc, char** argv, Options& options) {
             if (!positive(argv[++index], options.instances)) return false;
         } else if (argument == "--frames" && index + 1 < argc) {
             if (!positive(argv[++index], options.frames)) return false;
+        } else if (argument == "--min-fps" && index + 1 < argc) {
+            if (!non_negative(argv[++index], options.minimum_fps)) return false;
         } else if (argument == "--help") {
-            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N]\n";
+            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N] [--min-fps N]\n";
             return false;
         } else {
             return false;
@@ -160,5 +175,6 @@ int main(const int argc, char** argv) {
                   ? 1000.0 / stats.p95_frame_ms : 0.0) << '\n';
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
-    return stats.visible_instances == options.instances ? 0 : 1;
+    const auto fps = stats.p95_frame_ms > 0.0 ? 1000.0 / stats.p95_frame_ms : 0.0;
+    return stats.visible_instances == options.instances && fps >= options.minimum_fps ? 0 : 1;
 }
