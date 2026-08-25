@@ -7,10 +7,13 @@
 
 namespace fabric::runtime {
 
+enum class GameplayEventKind { entered, exited };
+
 struct GameplayEvent {
     core::ResourceId id;
     std::string trigger_id;
     std::vector<project::MapProperty> payload;
+    GameplayEventKind kind{GameplayEventKind::entered};
 };
 
 class TriggerRuntime {

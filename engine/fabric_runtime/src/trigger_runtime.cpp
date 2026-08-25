@@ -73,12 +73,13 @@ std::vector<GameplayEvent> TriggerRuntime::update(const core::Vec2 position) {
         const auto& trigger = map_->triggers[index];
         const auto inside = trigger.collision_index < map_->collisions.size() &&
             contains(map_->collisions[trigger.collision_index], position);
-        if (inside && !active_[index]) {
+        if (inside != active_[index]) {
             const auto event = std::find_if(map_->events.begin(), map_->events.end(),
                 [&](const auto& candidate) { return candidate.id == trigger.event_id; });
             events.push_back({trigger.event_id, trigger.id,
                               event == map_->events.end() ? std::vector<project::MapProperty>{}
-                                                           : event->payload});
+                                                           : event->payload,
+                              inside ? GameplayEventKind::entered : GameplayEventKind::exited});
         }
         active_[index] = inside;
     }

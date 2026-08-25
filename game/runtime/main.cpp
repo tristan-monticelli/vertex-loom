@@ -95,6 +95,7 @@ int main(int argc, char** argv) {
             : std::nullopt;
         options.gameplay_event_handler = scene_id
             ? fabric::runtime::GameplayEventHandler([&](const auto& event) {
+                if (event.kind != fabric::runtime::GameplayEventKind::entered) return true;
                 if (!scene_session.transition_for_event(event.id)) return true;
                 scene_changed = true;
                 return false;

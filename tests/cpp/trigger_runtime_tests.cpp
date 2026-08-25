@@ -17,11 +17,15 @@ TEST_CASE("trigger runtime emits an enter event once and resolves payload") {
     REQUIRE(entered.size() == 1);
     CHECK(entered.front().id.value == "door-open");
     CHECK(entered.front().trigger_id == "door");
+    CHECK(entered.front().kind == runtime::GameplayEventKind::entered);
     REQUIRE(entered.front().payload.size() == 1);
     CHECK(std::get<std::string>(entered.front().payload.front().value) == "blue");
     CHECK(triggers.update({2.0F, 0.0F}).empty());
     CHECK(triggers.active_count() == 1);
-    CHECK(triggers.update({0.0F, 0.0F}).empty());
+    const auto exited = triggers.update({0.0F, 0.0F});
+    REQUIRE(exited.size() == 1);
+    CHECK(exited.front().kind == runtime::GameplayEventKind::exited);
+    CHECK(exited.front().payload == entered.front().payload);
     CHECK(triggers.active_count() == 0);
     REQUIRE(triggers.update({2.0F, 0.0F}).size() == 1);
 }
@@ -38,6 +42,11 @@ TEST_CASE("trigger runtime supports polygon and capsule zones") {
     runtime::TriggerRuntime triggers(map);
 
     REQUIRE(triggers.update({2.0F, 2.0F}).size() == 1);
-    CHECK(triggers.update({10.0F, 0.5F}).size() == 1);
-    CHECK(triggers.update({20.0F, 20.0F}).empty());
+    const auto moved = triggers.update({10.0F, 0.5F});
+    REQUIRE(moved.size() == 2);
+    CHECK(moved[0].kind == runtime::GameplayEventKind::exited);
+    CHECK(moved[1].kind == runtime::GameplayEventKind::entered);
+    const auto exited = triggers.update({20.0F, 20.0F});
+    REQUIRE(exited.size() == 1);
+    CHECK(exited.front().kind == runtime::GameplayEventKind::exited);
 }
