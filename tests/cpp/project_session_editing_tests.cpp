@@ -332,6 +332,15 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     REQUIRE(recovered.selected_animation()->tracks.size() == 1U);
     REQUIRE(recovered.save());
     REQUIRE(session.save());
+    fabric::editor::CreateEntityPrompt entity_prompt;
+    entity_prompt.name = "Preview target";
+    entity_prompt.node_name = "Root";
+    REQUIRE(session.create_entity(entity_prompt));
+    REQUIRE(session.selected_entity().has_value());
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::animation, {.value = "walk-cycle"}));
+    REQUIRE(session.selected_animation().has_value());
+    CHECK(session.selected_entity().has_value());
     const auto loaded = fabric::project::load_animation(
         project.path(), *session.manifest(),
         fabric::project::animation_document_path(

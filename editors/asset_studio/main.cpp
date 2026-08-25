@@ -221,10 +221,55 @@ void apply_entity_material(fabric::render::VectorDrawPacket& packet,
 }
 
 EntityPreviewResult build_entity_preview(
-    const fabric::editor::ProjectSession& session) {
+    const fabric::editor::ProjectSession& session,
+    const fabric::project::AnimationClip* animation = nullptr,
+    const float animation_time = 0.0F) {
     EntityPreviewResult result;
     if (!session.selected_entity() || !session.manifest()) return result;
-    const auto& entity = *session.selected_entity();
+    auto entity = *session.selected_entity();
+    if (animation != nullptr) {
+        const auto evaluated = fabric::project::evaluate_animation(
+            *animation, animation_time);
+        if (!evaluated.ok()) {
+            result.errors.push_back("animation: evaluation failed");
+        }
+        for (const auto& property : evaluated.properties) {
+            if (property.binding.component_id != "transform") continue;
+            const auto node = std::find_if(
+                entity.nodes.begin(), entity.nodes.end(),
+                [&](const auto& candidate) {
+                    return candidate.id == property.binding.node_id;
+                });
+            if (node == entity.nodes.end()) continue;
+            const bool additive = property.composition ==
+                fabric::project::AnimationComposition::additive;
+            if (property.binding.property_id == "position") {
+                if (const auto* value = std::get_if<fabric::core::Vec2>(
+                        &property.value)) {
+                    node->transform.position = additive
+                        ? fabric::core::Vec2{
+                              node->transform.position.x + value->x,
+                              node->transform.position.y + value->y}
+                        : *value;
+                }
+            } else if (property.binding.property_id == "rotationDegrees") {
+                if (const auto* value = std::get_if<float>(&property.value)) {
+                    node->transform.rotation_degrees = additive
+                        ? node->transform.rotation_degrees + *value
+                        : *value;
+                }
+            } else if (property.binding.property_id == "scale") {
+                if (const auto* value = std::get_if<fabric::core::Vec2>(
+                        &property.value)) {
+                    node->transform.scale = additive
+                        ? fabric::core::Vec2{
+                              node->transform.scale.x + value->x,
+                              node->transform.scale.y + value->y}
+                        : *value;
+                }
+            }
+        }
+    }
     for (std::size_t node_index = 0; node_index < entity.nodes.size();
          ++node_index) {
         const auto& node = entity.nodes[node_index];
@@ -1089,10 +1134,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session, canvas,
             {std::max(1.0F, available.x - 16.0F),
              std::max(1.0F, available.y - 42.0F)});
-    } else if (entity_selected) {
+    } else if (entity_selected ||
+               (session.selected_resource() != nullptr &&
+                session.selected_resource()->kind ==
+                    fabric::editor::StudioResourceKind::animation &&
+                session.selected_entity() && !entity_preview.packets.empty())) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         if (entity_preview.errors.empty()) {
-            ImGui::TextUnformatted("Entity preview");
+            ImGui::TextUnformatted(entity_selected
+                                        ? "Entity preview"
+                                        : "Animated entity preview");
         } else {
             ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                                "Entity preview (%zu unresolved)",
@@ -2771,11 +2822,20 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
         EntityPreviewResult entity_preview;
         const bool entity_selection = session.selected_resource() != nullptr &&
-            session.selected_resource()->kind ==
-                fabric::editor::StudioResourceKind::entity &&
+            (session.selected_resource()->kind ==
+                 fabric::editor::StudioResourceKind::entity ||
+             session.selected_resource()->kind ==
+                 fabric::editor::StudioResourceKind::animation) &&
             session.selected_entity();
         if (entity_selection) {
-            entity_preview = build_entity_preview(session);
+            const auto* animation =
+                session.selected_resource()->kind ==
+                        fabric::editor::StudioResourceKind::animation &&
+                    session.selected_animation()
+                ? &*session.selected_animation()
+                : nullptr;
+            entity_preview = build_entity_preview(
+                session, animation, animation_ui.scrub_time);
             canvas.entity_world_bounds = entity_preview.bounds;
         }
 

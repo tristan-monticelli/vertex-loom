@@ -950,7 +950,6 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         created_vector_.reset();
         selected_material_.reset();
         selected_entity_ = std::move(*loaded.entity);
-        selected_animation_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
         selected_entity_document_path_ = match->document_path;
@@ -968,8 +967,6 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             if (parsed.ok()) recovery_entity_ = std::move(parsed.entity);
             else recovery.errors = std::move(parsed.errors);
         }
-        selected_animation_document_path_.clear();
-        recovery_animation_.reset();
         if (!recovery.errors.empty()) {
             selection_warnings = std::move(recovery.errors);
         }
@@ -1005,12 +1002,9 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_vector_.reset();
         created_vector_.reset();
         selected_material_.reset();
-        selected_entity_.reset();
         selected_animation_ = std::move(*loaded.asset);
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
-        selected_entity_document_path_.clear();
-        recovery_entity_.reset();
         selected_animation_document_path_ = match->document_path;
         recovery_animation_.reset();
         auto recovery = project::inspect_recovery(

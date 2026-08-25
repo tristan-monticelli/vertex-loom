@@ -175,3 +175,6 @@ C4Component
   markers peuvent être ajoutés ou supprimés. Le mode `Auto-key at scrub time`
   transforme toute modification de valeur dans l’inspecteur en `Set key` au
   temps de scrubbing courant.
+  Lorsqu’un clip est sélectionné après une entité, cette entité reste disponible
+  comme cible de preview ; ses draw packets sont reconstruits avec les
+  transformations évaluées au temps de scrubbing.
