@@ -112,6 +112,7 @@ struct AnimationUiState {
     std::string node_id{"root"};
     std::string component_id{"transform"};
     std::string property_id{"position"};
+    float scrub_time{};
     float key_time{};
     float key_value[2]{};
     fabric::project::AnimationInterpolation interpolation{
@@ -1488,6 +1489,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     status = "Animation loop rejected; inspect diagnostics.";
                 }
             }
+            animation_ui.scrub_time = std::clamp(animation_ui.scrub_time, 0.0F,
+                                                  std::max(0.0F, clip.duration));
+            ImGui::SliderFloat("Scrub", &animation_ui.scrub_time, 0.0F,
+                               std::max(0.01F, clip.duration), "%.2f s");
+            const auto evaluated = fabric::project::evaluate_animation(
+                clip, animation_ui.scrub_time);
+            ImGui::TextDisabled("Evaluated properties: %zu",
+                                evaluated.properties.size());
             ImGui::SeparatorText("Insert key");
             ImGui::InputText("Node id", &animation_ui.node_id);
             ImGui::InputText("Component", &animation_ui.component_id);
@@ -1545,9 +1554,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    track.binding.property_id.c_str(),
                                    track.keys.size());
                 for (std::size_t key_index = 0;
-                     key_index < track.keys.size(); ++key_index) {
+                    key_index < track.keys.size(); ++key_index) {
                     const auto& key = track.keys[key_index];
-                    ImGui::BulletText("key %zu · %.2f s", key_index, key.time);
+                    const auto key_scope = "animation-key-" +
+                        std::to_string(track_index) + "-" +
+                        std::to_string(key_index);
+                    ImGui::PushID(key_scope.c_str());
+                    ImGui::BulletText("key %zu", key_index);
+                    ImGui::SameLine();
+                    float key_time = key.time;
+                    ImGui::SetNextItemWidth(120.0F);
+                    if (ImGui::SliderFloat("##key-time", &key_time, 0.0F,
+                                           std::max(0.01F, clip.duration),
+                                           "%.2f s")) {
+                        if (!session.move_selected_animation_key(
+                                track.binding, key_index, key_time)) {
+                            status = "Key move rejected; inspect diagnostics.";
+                        }
+                    }
                     ImGui::SameLine();
                     const auto button_id = "Remove##animation-key-" +
                         std::to_string(track_index) + "-" +
@@ -1558,8 +1582,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         status = key_removed
                             ? "Animation key removed."
                             : "Animation key could not be removed; inspect diagnostics.";
+                        ImGui::PopID();
                         break;
                     }
+                    ImGui::PopID();
                 }
             }
         }

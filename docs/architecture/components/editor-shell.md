@@ -156,4 +156,5 @@ C4Component
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,
   récupération et sauvegarde atomique que les autres documents éditables ; les
-  clés existantes peuvent être supprimées sauf la dernière clé d’une track.
+  clés existantes peuvent être déplacées ou supprimées sauf la dernière clé
+  d’une track, et un scrubber évalue les propriétés à l’instant courant.

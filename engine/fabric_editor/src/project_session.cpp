@@ -1331,6 +1331,22 @@ bool ProjectSession::remove_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::move_selected_animation_key(
+    project::PropertyBinding binding, const std::size_t key_index,
+    const float time, const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.move_key(binding, key_index, time)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys.time",
+                    "the key time is invalid"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.undo()) {
         return false;

@@ -288,9 +288,18 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
          .property_id = "position"},
         2.0F, fabric::core::Vec2{3.0F, 4.0F},
         fabric::project::AnimationInterpolation::linear, start));
+    const fabric::project::PropertyBinding position_binding{
+        "root", "transform", "position"};
+    REQUIRE(session.move_selected_animation_key(position_binding, 1, 1.5F,
+                                                start));
+    REQUIRE(session.move_selected_animation_key(position_binding, 1, 1.25F,
+                                                start));
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_animation()->tracks.front().keys.back().time ==
+          2.0F);
+    REQUIRE(session.redo(start));
     REQUIRE(session.remove_selected_animation_key(
-        {.node_id = "root", .component_id = "transform",
-         .property_id = "position"},
+        position_binding,
         1U, start));
     CHECK(session.selected_animation()->tracks.front().keys.size() == 1U);
     REQUIRE(session.update_autosave(start + std::chrono::seconds{2}) ==

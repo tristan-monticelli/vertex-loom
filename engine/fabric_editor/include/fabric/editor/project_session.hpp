@@ -120,6 +120,10 @@ public:
         project::PropertyBinding binding, std::size_t key_index,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool move_selected_animation_key(
+        project::PropertyBinding binding, std::size_t key_index, float time,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());

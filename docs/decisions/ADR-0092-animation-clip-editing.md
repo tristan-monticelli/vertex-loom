@@ -10,7 +10,9 @@ Asset Studio édite les `AnimationClip v1` par binding générique
 l’insertion de clés `Vec2` avec interpolation step, linear ou cubic. Les
 tracks sont créées à la première clé et doivent conserver le type de valeur du
 track. Une clé existante peut être supprimée depuis la liste de tracks, sauf si
-elle est la dernière clé de la track.
+elle est la dernière clé de la track, ou déplacée dans la durée du clip. Les
+déplacements continus fusionnent leurs commandes ; le scrubber évalue le clip
+sans modifier le document.
 
 `ProjectSession` orchestre `AnimationTimeline` avec le même `CommandStack`,
 dirty state, autosave miroir, récupération validée et publication atomique que
