@@ -78,6 +78,7 @@ public:
         return errors_;
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
+    [[nodiscard]] std::vector<std::string> packet_order() const;
     [[nodiscard]] std::size_t animation_count() const noexcept;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(
         const core::ResourceId& animation_id, float time) const;

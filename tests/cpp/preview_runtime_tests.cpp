@@ -113,6 +113,26 @@ fabric::project::MapDocument map_with_entity() {
     return result;
 }
 
+fabric::project::EntityDefinition ordered_entity() {
+    auto result = entity();
+    result.nodes.front().z_order = 10.0F;
+    result.nodes.push_back({.id = "front",
+                            .name = "Front",
+                            .z_order = -1.0F,
+                            .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
+                                         .resource = fabric::project::ResourceReference{
+                                             {.value = "runtime-vector"}, "vector"}}});
+    return result;
+}
+
+fabric::project::MapDocument map_with_ordered_entity() {
+    auto result = map();
+    result.instances.push_back({"ordered", fabric::project::ResourceReference{
+                                    {.value = "ordered-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_animated_entity() {
     auto result = map_with_entity();
     result.instances.front().properties.push_back({
@@ -661,6 +681,29 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     REQUIRE(runtime.stats().vector_geometry_cache_entries == 1U);
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime sorts packets by layer depth and node z order") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-packet-order-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(root, manifest(), vector_asset()).ok());
+    auto source = ordered_entity();
+    source.document.id = {.value = "ordered-entity"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), source).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_ordered_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto order = runtime.packet_order();
+    REQUIRE(order.size() == 2U);
+    CHECK(order.front().starts_with("ordered:front:"));
+    CHECK(order.back().starts_with("ordered:root:"));
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

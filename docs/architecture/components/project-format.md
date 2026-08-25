@@ -101,7 +101,8 @@ C4Component
   paramètres d'instance utilisent les propriétés `animationParameter.<id>`.
 - `PreviewRuntime` met en cache les `VectorAsset` convertis et les résultats de
   géométrie par ressource ; chaque instance reçoit ensuite une copie mutable
-  avant matériau et transformation.
+  avant matériau et transformation. Les packets sont triés de façon stable par
+  profondeur de couche, ordre Z du nœud, puis identifiant.
 - Le système XPBD unifié expose distance, flexion, aire, pin et collision,
   conserve les lambdas, applique la compliance et quantifie l’état après
   chaque sous-pas.

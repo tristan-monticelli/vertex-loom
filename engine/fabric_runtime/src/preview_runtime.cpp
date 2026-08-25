@@ -43,6 +43,11 @@ struct PreviewRuntime::Impl {
         core::Vec2 world_origin;
     };
 
+    struct PacketSortKey {
+        float layer_depth{};
+        float z_order{};
+    };
+
     struct EntitySimulation {
         std::optional<project::DeformationMesh> mesh;
         std::optional<project::XpbdSystem> xpbd;
@@ -77,6 +82,7 @@ struct PreviewRuntime::Impl {
     mutable std::unordered_map<std::string,
         std::optional<std::vector<project::EntityNode>>> node_evaluation_cache;
     std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
+    std::unordered_map<std::string, PacketSortKey> packet_sort_keys;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
@@ -396,6 +402,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->animation_evaluation_cache.clear();
     impl_->node_evaluation_cache.clear();
     impl_->packet_base_transforms.clear();
+    impl_->packet_sort_keys.clear();
     impl_->entity_simulations.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
@@ -602,6 +609,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             return false;
         }
         auto resolved_entity = std::move(*entity.entity);
+        const auto layer = std::find_if(map_->layers.begin(), map_->layers.end(),
+            [&](const auto& candidate) { return candidate.id == instance.layer_id; });
+        const float layer_depth = layer == map_->layers.end() ? 0.0F : layer->depth;
         if (!resolve_constraints(resolved_entity.nodes, resolved_entity.constraints)) {
             errors_.push_back("entity constraints could not be resolved");
             return false;
@@ -698,6 +708,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                             .world_origin = apply_node_transform(
                                 {0.0F, 0.0F}, resolved_entity, node_index,
                                 instance.transform)});
+                    impl_->packet_sort_keys.emplace(
+                        packet.node_id, Impl::PacketSortKey{layer_depth, node.z_order});
                     impl_->packets.push_back(std::move(packet));
                 }
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
@@ -740,6 +752,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         .world_origin = apply_node_transform(
                             {0.0F, 0.0F}, resolved_entity, node_index,
                             instance.transform)});
+                impl_->packet_sort_keys.emplace(
+                    packet.node_id, Impl::PacketSortKey{layer_depth, node.z_order});
                 impl_->packets.push_back(std::move(packet));
             }
         }
@@ -750,7 +764,13 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         }));
     stats_.vector_geometry_cache_entries = impl_->vector_geometry_cache.size();
     std::stable_sort(impl_->packets.begin(), impl_->packets.end(),
-                     [](const auto& left, const auto& right) {
+                     [&](const auto& left, const auto& right) {
+                         const auto left_key = impl_->packet_sort_keys.at(left.node_id);
+                         const auto right_key = impl_->packet_sort_keys.at(right.node_id);
+                         if (left_key.layer_depth != right_key.layer_depth)
+                             return left_key.layer_depth < right_key.layer_depth;
+                         if (left_key.z_order != right_key.z_order)
+                             return left_key.z_order < right_key.z_order;
                          return left.node_id < right.node_id;
                      });
     for (std::size_t index = 0; index < impl_->packets.size(); ++index) {
@@ -1122,6 +1142,14 @@ bool PreviewRuntime::run() {
 
 std::size_t PreviewRuntime::animation_count() const noexcept {
     return impl_ ? impl_->animation_clips.size() : 0U;
+}
+
+std::vector<std::string> PreviewRuntime::packet_order() const {
+    if (!impl_) return {};
+    std::vector<std::string> result;
+    result.reserve(impl_->packets.size());
+    for (const auto& packet : impl_->packets) result.push_back(packet.node_id);
+    return result;
 }
 
 std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(

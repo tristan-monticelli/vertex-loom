@@ -392,6 +392,8 @@ inspectable avec collisions et événements.
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
   stable et caméra interpolée.
+- [x] Appliquer le tri stable couche → profondeur → Z → identifiant aux packets
+  du Preview Runtime.
 - [ ] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre avec interpolation.
 - [x] Ajouter smoke test, benchmark et replay par checkpoints.
 - [x] Réduire les draw calls des packets contigus compatibles par batching stable
