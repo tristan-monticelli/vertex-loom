@@ -7,6 +7,7 @@ C4Component
         Component(loader, "SVG preview loader", "C++20 / SDL2_image / NanoSVG", "Valide la taille du fichier et rasterise un aperçu RGBA8 borné")
         Component(image, "RasterImage", "C++20", "Aperçu possédé par le moteur sans type SDL ou OpenGL public")
         Component(geometry, "Native vector renderer", "C++20 / OpenGL", "Valide les contours, applique les transforms, aplatit, triangule, met en cache et produit des draw packets déterministes")
+        Component(gl_renderer, "OpenGL vector backend", "OpenGL 3 / SDL loader", "Compile le programme couleur, gère VAO/VBO/IBO et dessine les triangles des packets")
     }
     Container_Boundary(asset, "Asset Studio") {
         Component(import_ui, "SVG import dialog", "Dear ImGui", "Saisit la source, l'identifiant et le nom puis présente les diagnostics")
@@ -26,6 +27,7 @@ C4Component
     Rel(import_ui, gpu_preview, "Téléverse")
     Rel(image, gpu_preview, "Fournit les pixels")
     Rel(customizer, geometry, "Prévisualise VectorAsset v2 natif")
+    Rel(geometry, gl_renderer, "Fournit les packets")
 ```
 
 ## Contract
@@ -61,3 +63,6 @@ C4Component
   même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
   Les sommets sont exprimés dans l’espace monde après application du transform
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.
+  Le backend OpenGL 3 compile ses shaders et possède ses buffers via les
+  fonctions chargées par SDL ; il refuse explicitement les fills image tant
+  qu’aucun résolveur de textures n’est fourni.

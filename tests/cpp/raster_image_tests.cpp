@@ -1,5 +1,6 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/vector_geometry.hpp"
+#include "fabric/render/opengl_vector_renderer.hpp"
 
 #include <array>
 #include <chrono>
@@ -245,6 +246,18 @@ void native_geometry_applies_node_and_parent_transforms() {
             "parent and child transforms were not composed in draw packet");
 }
 
+void opengl_vector_renderer_reports_uninitialized_use() {
+    fabric::render::OpenGLVectorRenderer renderer;
+    const auto stats = renderer.draw(
+        std::span<const fabric::render::VectorDrawPacket>{}, {
+        .width = 64,
+        .height = 64,
+        .world_bounds = {.origin = {0.0F, 0.0F}, .size = {10.0F, 10.0F}},
+    });
+    require(!stats.ok() && !renderer.ready(),
+            "uninitialized OpenGL renderer did not report its state");
+}
+
 } // namespace
 
 int main() {
@@ -256,5 +269,6 @@ int main() {
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
     native_geometry_applies_node_and_parent_transforms();
+    opengl_vector_renderer_reports_uninitialized_use();
     return 0;
 }

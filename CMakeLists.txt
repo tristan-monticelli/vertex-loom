@@ -103,13 +103,16 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(SDL2 SDL2_image)
 
+find_package(OpenGL REQUIRED)
+
 add_library(fabric_render STATIC
     engine/fabric_render/src/raster_image.cpp
+    engine/fabric_render/src/opengl_vector_renderer.cpp
     engine/fabric_render/src/vector_geometry.cpp
 )
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
 target_compile_features(fabric_render PUBLIC cxx_std_20)
-target_link_libraries(fabric_render PUBLIC fabric_project PRIVATE
+target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
     SDL2::SDL2-static
     SDL2_image::SDL2_image-static
 )
@@ -141,8 +144,6 @@ if(FABRIC_BUILD_EDITORS)
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(native_file_dialog imgui_source)
-    find_package(OpenGL REQUIRED)
-
     add_library(fabric_imgui STATIC
         ${imgui_source_SOURCE_DIR}/imgui.cpp
         ${imgui_source_SOURCE_DIR}/imgui_draw.cpp

@@ -1,0 +1,50 @@
+#pragma once
+
+#include "fabric/core/types.hpp"
+#include "fabric/render/vector_geometry.hpp"
+
+#include <cstdint>
+#include <span>
+#include <string>
+#include <vector>
+
+namespace fabric::render {
+
+struct OpenGLVectorViewport {
+    std::int32_t width{};
+    std::int32_t height{};
+    core::Rect world_bounds;
+};
+
+struct OpenGLVectorRenderStats {
+    std::uint32_t packets_submitted{};
+    std::uint32_t packets_drawn{};
+    std::uint32_t triangles_drawn{};
+    std::vector<std::string> errors;
+
+    [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
+};
+
+class OpenGLVectorRenderer {
+public:
+    OpenGLVectorRenderer() = default;
+    OpenGLVectorRenderer(const OpenGLVectorRenderer&) = delete;
+    OpenGLVectorRenderer& operator=(const OpenGLVectorRenderer&) = delete;
+    ~OpenGLVectorRenderer();
+
+    [[nodiscard]] bool initialize();
+    void shutdown() noexcept;
+    [[nodiscard]] bool ready() const noexcept { return program_ != 0U; }
+    [[nodiscard]] OpenGLVectorRenderStats draw(
+        std::span<const VectorDrawPacket> packets,
+        const OpenGLVectorViewport& viewport);
+
+private:
+    std::uint32_t program_{};
+    std::uint32_t vertex_array_{};
+    std::uint32_t vertex_buffer_{};
+    std::uint32_t index_buffer_{};
+    std::int32_t world_to_clip_uniform_{-1};
+};
+
+} // namespace fabric::render
