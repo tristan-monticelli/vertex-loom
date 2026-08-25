@@ -147,6 +147,9 @@ C4Component
   `VisualComponent` dans le `CommandStack`. Asset Studio édite les calques,
   transforms, ordre Z, visibilité, ancrages et paramètres avec le même flux
   undo/redo, autosave, récupération et sauvegarde atomique que les entités.
+  La création générique publie une composition vide puis, séparément, un
+  composant réutilisable qui la référence ; l'ajout de calque choisit toujours
+  une ressource déjà indexée et typée.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

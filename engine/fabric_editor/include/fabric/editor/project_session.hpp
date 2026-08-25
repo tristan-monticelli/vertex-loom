@@ -86,6 +86,11 @@ public:
     [[nodiscard]] bool create_input(const CreateInputPrompt& prompt);
     [[nodiscard]] bool create_visual_preset(
         const VisualPresetRequest& request);
+    [[nodiscard]] bool create_visual_composition(
+        const core::ResourceId& id, std::string name, core::Vec2 size);
+    [[nodiscard]] bool create_visual_component(
+        const core::ResourceId& id, std::string name,
+        const core::ResourceId& composition_id, core::Rect bounds);
     [[nodiscard]] bool convert_selected_linked_svg_to_native(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());

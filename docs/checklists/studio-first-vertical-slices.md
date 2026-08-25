@@ -53,8 +53,13 @@ PNG après sauvegarde, autosave et récupération.
   Preuve : l'inspecteur Asset Studio pilote les documents par commandes
   validées ; le test session couvre undo/redo, autosave, récupération,
   sauvegarde atomique et reload des calques, ancrages et paramètres.
-- [ ] Construire une tête textile avec crop raster, deux yeux paramétriques,
+- [x] Construire une tête textile avec crop raster, deux yeux paramétriques,
   boutons et couture uniquement depuis l'outil.
+
+  Preuve : `tests/fixtures/studio-textile-head` est régénérée par
+  `ProjectSession` avec composition générique, crop 1 × 2 sur source 2 × 2,
+  deux instances d'œil, deux boutons et une couture ; le resolver vérifie ses
+  20 draw packets et les UV recadrés.
 - [ ] Prévisualiser et charger la composition dans une entité et une map.
 
 Gate : la composition conserve le même résultat visible après undo/redo,

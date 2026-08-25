@@ -1,0 +1,13 @@
+{
+  "directories": {
+    "assets": "assets",
+    "entities": "entities",
+    "maps": "maps",
+    "scenes": "scenes",
+    "schemas": "schemas"
+  },
+  "id": "studio-textile-head",
+  "name": "Studio Textile Head",
+  "pixelsPerUnit": 100.0,
+  "schemaVersion": 2
+}

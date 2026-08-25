@@ -1,0 +1,246 @@
+{
+  "id": "textile-head-composition",
+  "layers": [
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "face",
+      "kind": "raster",
+      "name": "Cropped face",
+      "opacity": 1.0,
+      "rasterView": {
+        "crop": {
+          "origin": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "size": {
+            "x": 1.0,
+            "y": 2.0
+          }
+        },
+        "filter": "linear",
+        "pivot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "schemaVersion": 1,
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        }
+      },
+      "resource": {
+        "expectedType": "texture",
+        "id": "head-face"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 400.0,
+          "y": 200.0
+        }
+      },
+      "visible": true,
+      "zOrder": 0.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "left-eye",
+      "kind": "component",
+      "name": "Left eye",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "head-eye"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": -1.399999976158142,
+          "y": 0.6000000238418579
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 0.6000000238418579,
+          "y": 0.6000000238418579
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "right-eye",
+      "kind": "component",
+      "name": "Right eye",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "head-eye"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 1.399999976158142,
+          "y": 0.6000000238418579
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 0.6000000238418579,
+          "y": 0.6000000238418579
+        }
+      },
+      "visible": true,
+      "zOrder": 2.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "left-button",
+      "kind": "component",
+      "name": "Left button",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "head-button"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": -1.0,
+          "y": -1.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 0.3499999940395355,
+          "y": 0.3499999940395355
+        }
+      },
+      "visible": true,
+      "zOrder": 3.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "right-button",
+      "kind": "component",
+      "name": "Right button",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "head-button"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 1.0,
+          "y": -1.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 0.3499999940395355,
+          "y": 0.3499999940395355
+        }
+      },
+      "visible": true,
+      "zOrder": 4.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "mouth-seam",
+      "kind": "component",
+      "name": "Mouth seam",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "head-seam"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -2.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 5.0
+    }
+  ],
+  "name": "Textile Head Composition",
+  "schemaVersion": 1,
+  "size": {
+    "x": 8.0,
+    "y": 6.0
+  },
+  "type": "visualComposition"
+}

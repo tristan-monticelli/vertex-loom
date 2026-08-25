@@ -812,6 +812,83 @@ bool ProjectSession::create_visual_preset(
     return select_resource(StudioResourceKind::visual_component, request.id);
 }
 
+bool ProjectSession::create_visual_composition(
+    const core::ResourceId& id, std::string name, const core::Vec2 size) {
+    if (!has_project() || commands_.dirty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "open a project and save current changes before creating a composition"}};
+        return false;
+    }
+    const auto path = project::visual_composition_document_path(*manifest_, id);
+    std::error_code filesystem_error;
+    if (std::filesystem::exists(project_root_ / path, filesystem_error) ||
+        filesystem_error) {
+        errors_ = {{project::ErrorCode::asset_already_exists, "id",
+                    "the visual composition destination already exists"}};
+        return false;
+    }
+    project::VisualComposition composition{
+        .document = {.schema_version =
+                         project::current_visual_composition_schema_version,
+                     .type = "visualComposition",
+                     .id = id,
+                     .name = std::move(name)},
+        .size = size};
+    auto published = project::publish_visual_composition(
+        project_root_, *manifest_, composition);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::visual_composition, id);
+}
+
+bool ProjectSession::create_visual_component(
+    const core::ResourceId& id, std::string name,
+    const core::ResourceId& composition_id, const core::Rect bounds) {
+    if (!has_project() || commands_.dirty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "open a project and save current changes before creating a component"}};
+        return false;
+    }
+    if (std::ranges::none_of(resources_, [&](const auto& resource) {
+            return resource.kind == StudioResourceKind::visual_composition &&
+                resource.id == composition_id;
+        })) {
+        errors_ = {{project::ErrorCode::missing_resource, "composition",
+                    "select an existing visual composition"}};
+        return false;
+    }
+    const auto path = project::visual_component_document_path(*manifest_, id);
+    std::error_code filesystem_error;
+    if (std::filesystem::exists(project_root_ / path, filesystem_error) ||
+        filesystem_error) {
+        errors_ = {{project::ErrorCode::asset_already_exists, "id",
+                    "the visual component destination already exists"}};
+        return false;
+    }
+    project::VisualComponent component{
+        .document = {.schema_version =
+                         project::current_visual_component_schema_version,
+                     .type = "visualComponent",
+                     .id = id,
+                     .name = std::move(name)},
+        .composition = {composition_id, "visualComposition"},
+        .bounds = bounds,
+        .anchors = {{"center", "Center", {
+            bounds.origin.x + bounds.size.x * 0.5F,
+            bounds.origin.y + bounds.size.y * 0.5F}}}};
+    auto published = project::publish_visual_component(
+        project_root_, *manifest_, component);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::visual_component, id);
+}
+
 bool ProjectSession::convert_selected_linked_svg_to_native(
     const AutosaveScheduler::Clock::time_point now) {
     auto* selected = selected_resource();

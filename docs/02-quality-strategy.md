@@ -108,6 +108,9 @@ avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La
 régénération volontaire s'effectue sur une destination absente avec
 `FABRIC_UPDATE_STUDIO_PRESET_FIXTURE=1 ./build/fabric_visual_presets_tests`.
+La fixture `tests/fixtures/studio-textile-head` suit le même protocole avec
+`FABRIC_UPDATE_STUDIO_HEAD_FIXTURE=1` et vérifie en plus la fermeture du graphe
+composé, les 20 draw packets et les UV du crop raster à mi-largeur.
 Les commandes d'édition de composition et composant couvrent modification et
 duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
 test session vérifie undo/redo, autosave, récupération, sauvegarde et reload

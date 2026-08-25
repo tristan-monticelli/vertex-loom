@@ -49,6 +49,17 @@ constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
 struct CreationUiState {
+    struct VisualCompositionFields {
+        std::string name{"Visual composition"};
+        std::string id{"visual-composition"};
+        float size[2]{10.0F, 10.0F};
+    } composition;
+    struct VisualComponentFields {
+        std::string name{"Visual component"};
+        std::string id{"visual-component"};
+        std::string composition_id;
+        float size[2]{10.0F, 10.0F};
+    } component;
     fabric::editor::CreateProjectPrompt project;
     fabric::editor::CreateVectorArtworkPrompt artwork;
     fabric::editor::CreateMaterialPrompt material;
@@ -64,6 +75,8 @@ struct CreationUiState {
     bool request_animation{};
     bool request_input{};
     bool request_visual_preset{};
+    bool request_visual_composition{};
+    bool request_visual_component{};
     bool project_publish_attempted{};
 };
 
@@ -1163,6 +1176,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::MenuItem("New visual preset...")) {
                 creation.request_visual_preset = true;
             }
+            if (ImGui::MenuItem("New visual composition...")) {
+                creation.request_visual_composition = true;
+            }
+            if (ImGui::MenuItem("New visual component...")) {
+                creation.request_visual_component = true;
+            }
             if (ImGui::MenuItem("New material / fill...")) {
                 creation.request_material = true;
             }
@@ -1358,6 +1377,106 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ImGui::IsItemClicked()) selected_layer = index;
                     ImGui::PopID();
                 }
+                static std::string add_layer_composition_id;
+                static fabric::project::VisualLayerKind add_layer_kind{
+                    fabric::project::VisualLayerKind::raster};
+                static std::string add_layer_resource_id;
+                if (add_layer_composition_id != composition.document.id.value) {
+                    add_layer_composition_id = composition.document.id.value;
+                    add_layer_kind = fabric::project::VisualLayerKind::raster;
+                    add_layer_resource_id.clear();
+                }
+                ImGui::SeparatorText("Add layer");
+                const auto add_kind_label = std::string(
+                    fabric::project::to_string(add_layer_kind));
+                if (ImGui::BeginCombo("Layer type", add_kind_label.c_str())) {
+                    for (const auto kind : {
+                             fabric::project::VisualLayerKind::raster,
+                             fabric::project::VisualLayerKind::vector,
+                             fabric::project::VisualLayerKind::component,
+                             fabric::project::VisualLayerKind::textured_path}) {
+                        const bool selected = add_layer_kind == kind;
+                        const auto label = std::string(
+                            fabric::project::to_string(kind));
+                        if (ImGui::Selectable(label.c_str(), selected)) {
+                            add_layer_kind = kind;
+                            add_layer_resource_id.clear();
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                const auto accepts_kind = [&](const auto& resource) {
+                    using Kind = fabric::editor::StudioResourceKind;
+                    return (add_layer_kind ==
+                                fabric::project::VisualLayerKind::raster &&
+                            resource.kind == Kind::texture) ||
+                        (add_layer_kind ==
+                                fabric::project::VisualLayerKind::vector &&
+                            resource.kind == Kind::vector) ||
+                        (add_layer_kind ==
+                                fabric::project::VisualLayerKind::component &&
+                            resource.kind == Kind::visual_component) ||
+                        (add_layer_kind ==
+                                fabric::project::VisualLayerKind::textured_path &&
+                            resource.kind == Kind::textured_path);
+                };
+                const auto add_resource = std::ranges::find_if(
+                    session.resources(), [&](const auto& resource) {
+                        return accepts_kind(resource) &&
+                            resource.id.value == add_layer_resource_id;
+                    });
+                const char* add_resource_label =
+                    add_resource == session.resources().end()
+                    ? "Choose a resource..." : add_resource->name.c_str();
+                if (ImGui::BeginCombo("Resource", add_resource_label)) {
+                    for (const auto& resource : session.resources()) {
+                        if (!accepts_kind(resource)) continue;
+                        const bool selected =
+                            resource.id.value == add_layer_resource_id;
+                        if (ImGui::Selectable(resource.name.c_str(), selected))
+                            add_layer_resource_id = resource.id.value;
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::BeginDisabled(add_resource == session.resources().end());
+                if (ImGui::Button("Add selected resource")) {
+                    auto candidate = composition;
+                    auto id = add_resource->id.value;
+                    const auto base = id;
+                    std::size_t suffix = 2U;
+                    while (std::ranges::any_of(
+                        candidate.layers, [&](const auto& layer) {
+                            return layer.id == id;
+                        })) id = base + "-" + std::to_string(suffix++);
+                    std::string expected_type;
+                    if (add_layer_kind ==
+                        fabric::project::VisualLayerKind::raster)
+                        expected_type = "texture";
+                    else if (add_layer_kind ==
+                             fabric::project::VisualLayerKind::vector)
+                        expected_type = "vector";
+                    else if (add_layer_kind ==
+                             fabric::project::VisualLayerKind::component)
+                        expected_type = "visualComponent";
+                    else expected_type = "texturedPath";
+                    fabric::project::VisualCompositionLayer layer{
+                        .id = id,
+                        .name = add_resource->name,
+                        .kind = add_layer_kind,
+                        .resource = {add_resource->id, expected_type},
+                        .z_order = static_cast<float>(candidate.layers.size())};
+                    if (add_layer_kind ==
+                        fabric::project::VisualLayerKind::component)
+                        layer.component_instance =
+                            fabric::project::VisualComponentInstance{};
+                    candidate.layers.push_back(std::move(layer));
+                    if (session.set_selected_visual_composition(
+                            std::move(candidate))) {
+                        selected_layer = session.selected_visual_composition()
+                            ->layers.size() - 1U;
+                    }
+                }
+                ImGui::EndDisabled();
                 if (!composition.layers.empty() &&
                     selected_layer < composition.layers.size()) {
                     if (ImGui::Button("Duplicate layer")) {
@@ -1405,6 +1524,70 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     changed |= ImGui::DragFloat2("Pivot",
                                                  &layer.transform.pivot.x,
                                                  0.01F);
+                    if (layer.kind ==
+                        fabric::project::VisualLayerKind::raster) {
+                        const auto texture = fabric::project::load_texture_asset(
+                            session.project_root(), *session.manifest(),
+                            fabric::project::texture_document_path(
+                                *session.manifest(), layer.resource.id));
+                        if (texture.ok()) {
+                            ImGui::SeparatorText("Raster crop");
+                            if (!layer.raster_view) {
+                                if (ImGui::Button("Enable crop view")) {
+                                    layer.raster_view =
+                                        fabric::project::RasterView{
+                                            .crop = {{0.0F, 0.0F},
+                                                {static_cast<float>(
+                                                     texture.asset->width),
+                                                 static_cast<float>(
+                                                     texture.asset->height)}}};
+                                    changed = true;
+                                }
+                            } else {
+                                auto& view = *layer.raster_view;
+                                if (ImGui::DragFloat2(
+                                        "Crop origin", &view.crop.origin.x,
+                                        1.0F, 0.0F,
+                                        static_cast<float>(std::max(
+                                            texture.asset->width,
+                                            texture.asset->height)))) {
+                                    view.crop.origin.x = std::clamp(
+                                        view.crop.origin.x, 0.0F,
+                                        static_cast<float>(texture.asset->width) -
+                                            1.0F);
+                                    view.crop.origin.y = std::clamp(
+                                        view.crop.origin.y, 0.0F,
+                                        static_cast<float>(texture.asset->height) -
+                                            1.0F);
+                                    changed = true;
+                                }
+                                if (ImGui::DragFloat2(
+                                        "Crop size", &view.crop.size.x, 1.0F,
+                                        1.0F,
+                                        static_cast<float>(std::max(
+                                            texture.asset->width,
+                                            texture.asset->height)))) {
+                                    view.crop.size.x = std::clamp(
+                                        view.crop.size.x, 1.0F,
+                                        static_cast<float>(texture.asset->width) -
+                                            view.crop.origin.x);
+                                    view.crop.size.y = std::clamp(
+                                        view.crop.size.y, 1.0F,
+                                        static_cast<float>(texture.asset->height) -
+                                            view.crop.origin.y);
+                                    changed = true;
+                                }
+                                changed |= ImGui::SliderFloat2(
+                                    "Crop pivot", &view.pivot.x, 0.0F, 1.0F);
+                                if (ImGui::Button("Reset full crop")) {
+                                    view.crop = {{0.0F, 0.0F},
+                                        {static_cast<float>(texture.asset->width),
+                                         static_cast<float>(texture.asset->height)}};
+                                    changed = true;
+                                }
+                            }
+                        }
+                    }
                     if (changed) {
                         auto candidate =
                             *session.selected_visual_composition();
@@ -2399,6 +2582,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::OpenPopup("Create visual preset");
         creation.request_visual_preset = false;
     }
+    if (creation.request_visual_composition && session.has_project()) {
+        creation.composition = {};
+        ImGui::OpenPopup("Create visual composition");
+        creation.request_visual_composition = false;
+    }
+    if (creation.request_visual_component && session.has_project()) {
+        creation.component = {};
+        ImGui::OpenPopup("Create visual component");
+        creation.request_visual_component = false;
+    }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
             if (session.open(path_buffer.data())) {
@@ -2767,6 +2960,95 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();
         }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create visual composition", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        auto& fields = creation.composition;
+        ImGui::TextUnformatted("Create an empty layered visual composition");
+        ImGui::InputText("Name", &fields.name);
+        ImGui::InputText("Resource id", &fields.id);
+        ImGui::InputFloat2("Size", fields.size);
+        const bool valid = !fields.name.empty() &&
+            fabric::core::ResourceId::is_valid(fields.id) &&
+            std::isfinite(fields.size[0]) && std::isfinite(fields.size[1]) &&
+            fields.size[0] > 0.0F && fields.size[1] > 0.0F;
+        if (!valid) {
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                               "Name, id and positive finite size are required.");
+        }
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Create composition", {160.0F, 0.0F})) {
+            if (session.create_visual_composition(
+                    {.value = fields.id}, fields.name,
+                    {fields.size[0], fields.size[1]})) {
+                clear_asset_preview(preview);
+                status = "Visual composition created and selected.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Visual composition creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F}))
+            ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create visual component", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        auto& fields = creation.component;
+        ImGui::TextUnformatted("Wrap a composition as a reusable component");
+        ImGui::InputText("Name", &fields.name);
+        ImGui::InputText("Resource id", &fields.id);
+        const auto selected_composition = std::ranges::find_if(
+            session.resources(), [&](const auto& resource) {
+                return resource.kind ==
+                           fabric::editor::StudioResourceKind::visual_composition &&
+                    resource.id.value == fields.composition_id;
+            });
+        const char* composition_label =
+            selected_composition == session.resources().end()
+            ? "Choose a composition..."
+            : selected_composition->name.c_str();
+        if (ImGui::BeginCombo("Composition", composition_label)) {
+            for (const auto& resource : session.resources()) {
+                if (resource.kind !=
+                    fabric::editor::StudioResourceKind::visual_composition)
+                    continue;
+                const bool selected = resource.id.value == fields.composition_id;
+                if (ImGui::Selectable(resource.name.c_str(), selected))
+                    fields.composition_id = resource.id.value;
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::InputFloat2("Bounds size", fields.size);
+        const bool valid = !fields.name.empty() &&
+            fabric::core::ResourceId::is_valid(fields.id) &&
+            fabric::core::ResourceId::is_valid(fields.composition_id) &&
+            std::isfinite(fields.size[0]) && std::isfinite(fields.size[1]) &&
+            fields.size[0] > 0.0F && fields.size[1] > 0.0F;
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Create component", {160.0F, 0.0F})) {
+            if (session.create_visual_component(
+                    {.value = fields.id}, fields.name,
+                    {.value = fields.composition_id},
+                    {{-fields.size[0] * 0.5F, -fields.size[1] * 0.5F},
+                     {fields.size[0], fields.size[1]}})) {
+                clear_asset_preview(preview);
+                status = "Visual component created and selected.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Visual component creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F}))
+            ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
 
