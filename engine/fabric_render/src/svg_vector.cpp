@@ -1,6 +1,11 @@
 #include "fabric/render/svg_vector.hpp"
 #include "fabric/render/raster_image.hpp"
 
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wsign-conversion"
@@ -14,7 +19,6 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <limits>
