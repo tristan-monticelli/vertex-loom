@@ -44,9 +44,11 @@ int main(int argc, char** argv) {
     }
     if (options.mode != fabric::runtime::RuntimeMode::interactive) {
         std::cout << "frames=" << runtime.stats().frames
+                  << " physics_steps=" << runtime.stats().physics_steps
                   << " visible=" << runtime.stats().visible_instances
                   << " draw_calls=" << runtime.stats().draw_calls
-                  << " triangles=" << runtime.stats().triangles << '\n';
+                  << " triangles=" << runtime.stats().triangles
+                  << " elapsed_ms=" << runtime.stats().elapsed_ms << '\n';
     }
     return 0;
 }

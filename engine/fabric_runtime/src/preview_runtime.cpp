@@ -401,14 +401,38 @@ bool PreviewRuntime::run() {
         ? options_.frame_limit
         : (options_.mode == RuntimeMode::smoke_test ? 1U
            : options_.mode == RuntimeMode::benchmark ? 600U : 0U);
+    constexpr double fixed_time_step = 1.0 / 60.0;
+    const auto performance_frequency = static_cast<double>(SDL_GetPerformanceFrequency());
+    auto previous_counter = SDL_GetPerformanceCounter();
+    double accumulator = 0.0;
+    const auto start_counter = previous_counter;
     bool running = true;
     while (running && (limit == 0U || stats_.frames < limit)) {
         SDL_Event event{};
         while (SDL_PollEvent(&event) != 0) {
             if (event.type == SDL_QUIT) running = false;
         }
-        if (!physics_.step(1.0F / 60.0F)) {
-            errors_.push_back("physics step failed");
+        const auto current_counter = SDL_GetPerformanceCounter();
+        const auto elapsed = options_.mode == RuntimeMode::interactive
+            ? std::min(0.25, static_cast<double>(current_counter - previous_counter) /
+                       performance_frequency)
+            : fixed_time_step;
+        previous_counter = current_counter;
+        accumulator += elapsed;
+        const auto step_physics = [&]() {
+            if (!physics_.step(static_cast<float>(fixed_time_step))) {
+                errors_.push_back("physics step failed");
+                return false;
+            }
+            ++stats_.physics_steps;
+            return true;
+        };
+        if (options_.mode == RuntimeMode::interactive) {
+            while (accumulator >= fixed_time_step) {
+                if (!step_physics()) return false;
+                accumulator -= fixed_time_step;
+            }
+        } else if (!step_physics()) {
             return false;
         }
 
@@ -441,6 +465,8 @@ bool PreviewRuntime::run() {
         ++stats_.frames;
         SDL_GL_SwapWindow(impl_->window);
     }
+    stats_.elapsed_ms = static_cast<double>(SDL_GetPerformanceCounter() - start_counter) /
+        performance_frequency * 1000.0;
     return true;
 }
 

@@ -112,6 +112,7 @@ TEST_CASE("preview runtime validates and loads a map before graphics") {
     if (!ran) for (const auto& error : runtime.errors()) std::cerr << error << '\n';
     REQUIRE(ran);
     REQUIRE(runtime.stats().frames == 1);
+    REQUIRE(runtime.stats().physics_steps == 1);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

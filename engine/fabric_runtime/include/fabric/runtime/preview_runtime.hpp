@@ -27,9 +27,11 @@ struct PreviewRuntimeOptions {
 
 struct PreviewRuntimeStats {
     std::size_t frames{};
+    std::size_t physics_steps{};
     std::size_t visible_instances{};
     std::size_t draw_calls{};
     std::size_t triangles{};
+    double elapsed_ms{};
 };
 
 class PreviewRuntime {
