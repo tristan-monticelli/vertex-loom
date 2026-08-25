@@ -2,6 +2,7 @@
 
 #include "fabric/physics/mechanic_plan.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <ranges>
 #include <string_view>
