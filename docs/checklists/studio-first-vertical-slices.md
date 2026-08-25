@@ -96,7 +96,14 @@ Preview Runtime.
   et renseigne le binding générique de timeline. Le test `beam` découvre
   `beam/offset`, crée deux clés scalaires et vérifie leur interpolation sans
   branche de code ni type d'animation propre au Beam.
-- [ ] Afficher le même Beam dans Asset Studio, Map Studio et Preview Runtime.
+- [x] Afficher le même Beam dans Asset Studio, Map Studio et Preview Runtime.
+
+  Preuve : la fixture versionnée `studio-beam` est créée uniquement avec les
+  sessions Asset Studio et Map Studio. À `1/60 s`, le résolveur animé partagé,
+  la preview headless de Map Studio et Preview Runtime produisent exactement
+  les mêmes sommets, UV, indices, couleurs et référence de texture. Le canvas
+  Map Studio dessine ces packets avec le backend OpenGL partagé, derrière ses
+  overlays ImGui.
 - [ ] Vérifier explicitement qu'aucune collision n'est générée sans référence
   de collision déclarée.
 

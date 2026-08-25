@@ -12,7 +12,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées par les studios, prompts typés, historique réversible, autosave, preview et publication")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, géométrie, chemins texturés et batching stable")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
         Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
@@ -63,6 +63,11 @@ tolérance explicite puis dérive un ruban, ses raccords, terminaisons, largeurs
 et UV. Seuls le document d'auteur et sa texture appartiennent à
 `fabric_project`; les sommets et indices restent un résultat de rendu
 reproductible et non persisté.
+
+La preview d'authoring d'une map résout ses instances, entités, composants et
+animations en draw packets headless dans `fabric_render`. Map Studio dessine
+ce résultat avec le backend OpenGL partagé ; Preview Runtime peut comparer le
+même instant sans introduire un format de preview distinct.
 
 Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de

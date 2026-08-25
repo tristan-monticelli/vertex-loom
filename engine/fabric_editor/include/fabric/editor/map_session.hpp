@@ -77,6 +77,12 @@ public:
     [[nodiscard]] bool can_redo() const noexcept { return commands_.can_redo(); }
     [[nodiscard]] bool has_recovery() const noexcept { return recovery_map_.has_value(); }
     [[nodiscard]] const std::optional<project::MapDocument>& map() const noexcept { return map_; }
+    [[nodiscard]] const std::filesystem::path& project_root() const noexcept {
+        return project_root_;
+    }
+    [[nodiscard]] const std::optional<project::ProjectManifest>& manifest() const noexcept {
+        return manifest_;
+    }
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept { return errors_; }
 
 private:

@@ -1,0 +1,56 @@
+{
+  "cap": "round",
+  "closed": false,
+  "color": {
+    "alpha": 1.0,
+    "blue": 1.0,
+    "green": 1.0,
+    "red": 1.0
+  },
+  "commands": [
+    {
+      "kind": "move",
+      "point": {
+        "x": -2.0,
+        "y": 0.0
+      }
+    },
+    {
+      "control1": {
+        "x": -0.800000011920929,
+        "y": 0.30000001192092896
+      },
+      "control2": {
+        "x": 0.800000011920929,
+        "y": -0.30000001192092896
+      },
+      "kind": "cubic",
+      "point": {
+        "x": 2.0,
+        "y": 0.0
+      }
+    }
+  ],
+  "id": "beam-rail",
+  "join": "round",
+  "miterLimit": 4.0,
+  "name": "Beam Rail",
+  "opacity": 1.0,
+  "schemaVersion": 1,
+  "texture": {
+    "expectedType": "texture",
+    "id": "beam-thread"
+  },
+  "type": "texturedPath",
+  "uvMode": "repeat",
+  "uvOffset": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "uvScale": {
+    "x": 5.0,
+    "y": 1.0
+  },
+  "width": 0.11999999731779099,
+  "widthProfile": []
+}

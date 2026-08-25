@@ -1,4 +1,7 @@
 #include "fabric/editor/map_session.hpp"
+#include "fabric/render/map_preview.hpp"
+#include "fabric/render/opengl_vector_renderer.hpp"
+#include "fabric/render/raster_image.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -19,6 +22,7 @@
 #include <string>
 #include <string_view>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace {
@@ -147,6 +151,63 @@ struct SelectionBoxState {
     ImVec2 current_mouse{};
 };
 
+struct MapTexture {
+    GLuint handle{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+};
+
+struct MapPreviewRenderState {
+    fabric::render::OpenGLVectorRenderer* renderer{};
+    const fabric::render::MapPreviewResult* preview{};
+    const std::filesystem::path* project_root{};
+    const fabric::project::ProjectManifest* manifest{};
+    std::unordered_map<std::string, MapTexture>* textures{};
+    fabric::render::OpenGLVectorViewport viewport{};
+};
+
+void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
+    auto* state = static_cast<MapPreviewRenderState*>(command->UserCallbackData);
+    if (state == nullptr || state->renderer == nullptr || state->preview == nullptr ||
+        state->project_root == nullptr || state->manifest == nullptr ||
+        state->textures == nullptr || state->preview->packets.empty()) return;
+    const fabric::render::OpenGLTextureResolver resolver =
+        [state](const fabric::core::ResourceId& id)
+        -> std::optional<fabric::render::OpenGLTextureHandle> {
+        const auto cached = state->textures->find(id.value);
+        if (cached != state->textures->end()) {
+            return fabric::render::OpenGLTextureHandle{
+                cached->second.handle, cached->second.width, cached->second.height};
+        }
+        const auto loaded = fabric::project::load_texture_asset(
+            *state->project_root, *state->manifest,
+            fabric::project::texture_document_path(*state->manifest, id));
+        if (!loaded.ok()) return std::nullopt;
+        const auto decoded = fabric::render::load_png(
+            *state->project_root / loaded.asset->source);
+        if (!decoded.ok()) return std::nullopt;
+        MapTexture texture{.width = decoded.image->width,
+                           .height = decoded.image->height};
+        glGenTextures(1, &texture.handle);
+        glBindTexture(GL_TEXTURE_2D, texture.handle);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     static_cast<GLsizei>(texture.width),
+                     static_cast<GLsizei>(texture.height), 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, decoded.image->rgba8.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+        const auto [inserted, _] = state->textures->emplace(id.value, texture);
+        return fabric::render::OpenGLTextureHandle{
+            inserted->second.handle, inserted->second.width, inserted->second.height};
+    };
+    static_cast<void>(state->renderer->draw(
+        state->preview->packets, state->viewport, resolver));
+}
+
 void draw_transform_editor(fabric::editor::MapSession& session,
                            const std::vector<std::string>& selected_instances,
                            TransformEditorState& state,
@@ -206,6 +267,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      std::string& placement_resource_id,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
+                     MapPreviewRenderState& preview_render_state,
                      std::string& status) {
     if (!session.map()) return;
     const auto& map = *session.map();
@@ -313,6 +375,22 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                       {canvas_pos.x + canvas_size.x, line.y},
                       y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
     }
+    const auto framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
+    preview_render_state.viewport = {
+        .width = std::max(1, static_cast<std::int32_t>(
+            canvas_size.x * framebuffer_scale.x)),
+        .height = std::max(1, static_cast<std::int32_t>(
+            canvas_size.y * framebuffer_scale.y)),
+        .world_bounds = {{top_left.x, bottom_right.y},
+                         {bottom_right.x - top_left.x, top_left.y - bottom_right.y}},
+        .x = std::max(0, static_cast<std::int32_t>(
+            canvas_pos.x * framebuffer_scale.x)),
+        .y = std::max(0, static_cast<std::int32_t>(
+            (ImGui::GetIO().DisplaySize.y - canvas_pos.y - canvas_size.y) *
+            framebuffer_scale.y)),
+    };
+    draw->AddCallback(render_map_preview_callback, &preview_render_state);
+    draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
     for (std::size_t collision_index = 0; collision_index < map.collisions.size();
          ++collision_index) {
         const auto& collision = map.collisions[collision_index];
@@ -822,6 +900,12 @@ int run(const std::filesystem::path& project_root,
 #endif
 
     fabric::editor::MapSession session;
+    fabric::render::OpenGLVectorRenderer map_renderer;
+    std::unordered_map<std::string, MapTexture> map_textures;
+    if (!map_renderer.initialize()) {
+        std::cerr << "map OpenGL vector renderer initialization failed: "
+                  << map_renderer.initialization_error() << '\n';
+    }
     std::string status;
     if (!project_root.empty()) {
         if (!session.open(project_root, map_id)) status = "Map could not be opened";
@@ -864,6 +948,13 @@ int run(const std::filesystem::path& project_root,
     SelectionBoxState selection_box;
     fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
+    float preview_time = 0.0F;
+    bool preview_playing = true;
+    fabric::render::MapPreviewResult map_preview;
+    MapPreviewRenderState preview_render_state{
+        .renderer = &map_renderer,
+        .textures = &map_textures,
+    };
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -1010,12 +1101,24 @@ int run(const std::filesystem::path& project_root,
             if (ImGui::Button(placement_mode ? "Cancel placement" : "Place in canvas"))
                 placement_mode = !placement_mode;
             ImGui::EndDisabled();
+            ImGui::Checkbox("Play visual animation", &preview_playing);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::SliderFloat("Preview time", &preview_time, 0.0F, 10.0F, "%.2f s");
+            if (preview_playing) preview_time += ImGui::GetIO().DeltaTime;
+            map_preview = fabric::render::resolve_map_preview(
+                session.project_root(), *session.manifest(), map, preview_time);
+            preview_render_state.preview = &map_preview;
+            preview_render_state.project_root = &session.project_root();
+            preview_render_state.manifest = &*session.manifest();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
                             selected_trigger_index, active_layer_id, selection_box,
                             placement_mode,
                             placement_id, placement_resource_id, placement_kind,
-                            canvas_snapping, status);
+                            canvas_snapping, preview_render_state, status);
+            for (const auto& error : map_preview.errors)
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
@@ -1322,6 +1425,10 @@ int run(const std::filesystem::path& project_root,
         SDL_GL_SwapWindow(window);
     }
 
+    for (const auto& [_, texture] : map_textures) {
+        if (texture.handle != 0U) glDeleteTextures(1, &texture.handle);
+    }
+    map_renderer.shutdown();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();

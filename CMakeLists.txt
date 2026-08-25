@@ -141,6 +141,7 @@ FetchContent_MakeAvailable(SDL2 SDL2_image)
 find_package(OpenGL REQUIRED)
 
 add_library(fabric_render STATIC
+    engine/fabric_render/src/map_preview.cpp
     engine/fabric_render/src/raster_image.cpp
     engine/fabric_render/src/opengl_vector_renderer.cpp
     engine/fabric_render/src/svg_vector.cpp
