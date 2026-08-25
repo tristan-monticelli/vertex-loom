@@ -257,7 +257,8 @@ même résultat visible après sauvegarde, rechargement et replay.
 - [x] Indexer les instances par chunks de 64 × 64 unités ; le benchmark
   100 000 éléments et la cible 10 000 visibles restent à mesurer.
 - [x] Ajouter placement, snapping configurable et overrides typés réversibles
-  des instances ; profondeur, sélection, visibilité et verrouillage restent ouverts.
+  des instances et prefabs ; profondeur, sélection, visibilité et verrouillage
+  des calques sont maintenant commandables.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

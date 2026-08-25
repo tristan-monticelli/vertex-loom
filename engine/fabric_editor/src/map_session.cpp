@@ -37,6 +37,20 @@ std::optional<std::size_t> find_instance(const project::MapDocument& map,
     return std::nullopt;
 }
 
+std::optional<std::size_t> find_layer(const project::MapDocument& map,
+                                      const core::ResourceId& id) {
+    for (std::size_t index = 0; index < map.layers.size(); ++index)
+        if (map.layers[index].id == id.value) return index;
+    return std::nullopt;
+}
+
+std::optional<std::size_t> find_prefab(const project::MapDocument& map,
+                                       const core::ResourceId& id) {
+    for (std::size_t index = 0; index < map.prefabs.size(); ++index)
+        if (map.prefabs[index].id == id.value) return index;
+    return std::nullopt;
+}
+
 std::optional<std::size_t> find_event(const project::MapDocument& map,
                                       const core::ResourceId& id) {
     for (std::size_t index = 0; index < map.events.size(); ++index)
@@ -155,6 +169,54 @@ bool MapSession::set_instance_property(const core::ResourceId& instance_id,
         [&](const auto& candidate) { return candidate.id == property.id; });
     if (existing != properties.end()) existing->value = std::move(property.value);
     else properties.push_back(std::move(property));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_layer_visibility(const core::ResourceId& layer_id,
+                                      const bool visible) {
+    if (!map_) return false;
+    const auto found = find_layer(*map_, layer_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.layers[*found].visible = visible;
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_layer_locked(const core::ResourceId& layer_id,
+                                  const bool locked) {
+    if (!map_) return false;
+    const auto found = find_layer(*map_, layer_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.layers[*found].locked = locked;
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_layer_depth(const core::ResourceId& layer_id,
+                                 const float depth) {
+    if (!map_ || !std::isfinite(depth)) return false;
+    const auto found = find_layer(*map_, layer_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.layers[*found].depth = depth;
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_prefab_override(const core::ResourceId& prefab_id,
+                                     project::MapProperty property) {
+    if (!map_ || property.id.empty()) return false;
+    const auto found = find_prefab(*map_, prefab_id);
+    if (!found) return false;
+    auto next = *map_;
+    auto& overrides = next.prefabs[*found].overrides;
+    const auto existing = std::find_if(overrides.begin(), overrides.end(),
+        [&](const auto& candidate) { return candidate.id == property.id; });
+    if (existing != overrides.end()) existing->value = std::move(property.value);
+    else overrides.push_back(std::move(property));
     auto before = *map_;
     return commit(commands_, *map_, std::move(before), std::move(next));
 }

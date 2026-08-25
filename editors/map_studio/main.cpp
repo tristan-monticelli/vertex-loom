@@ -111,8 +111,38 @@ int run(const std::filesystem::path& project_root,
             ImGui::Separator();
             ImGui::Columns(2, "map-studio-columns", true);
             ImGui::Text("Layers (%zu)", map.layers.size());
-            for (const auto& layer : map.layers)
-                ImGui::BulletText("%s%s", layer.name.c_str(), layer.locked ? " [locked]" : "");
+            bool layer_changed = false;
+            for (std::size_t layer_index = 0; layer_index < map.layers.size(); ++layer_index) {
+                const auto layer = map.layers[layer_index];
+                ImGui::PushID(layer.id.c_str());
+                bool visible = layer.visible;
+                if (ImGui::Checkbox("##visible", &visible) &&
+                    session.set_layer_visibility({.value = layer.id}, visible)) {
+                    status = "Layer visibility changed";
+                    layer_changed = true;
+                }
+                ImGui::SameLine();
+                bool locked = layer.locked;
+                if (ImGui::Checkbox("##locked", &locked) &&
+                    session.set_layer_locked({.value = layer.id}, locked)) {
+                    status = "Layer lock changed";
+                    layer_changed = true;
+                }
+                ImGui::SameLine();
+                ImGui::TextUnformatted(layer.name.c_str());
+                ImGui::SameLine();
+                float depth = layer.depth;
+                ImGui::SetNextItemWidth(90.0F);
+                if (ImGui::DragFloat("##depth", &depth, 0.1F) &&
+                    ImGui::IsItemDeactivatedAfterEdit() &&
+                    session.set_layer_depth({.value = layer.id}, depth)) {
+                    status = "Layer depth changed";
+                    layer_changed = true;
+                }
+                ImGui::PopID();
+                if (layer_changed) break;
+            }
+            if (layer_changed) ImGui::TextDisabled("Layer edit recorded in undo history");
             ImGui::SeparatorText("Content");
             ImGui::Text("Instances: %zu", map.instances.size());
             ImGui::Text("Collisions: %zu", map.collisions.size());

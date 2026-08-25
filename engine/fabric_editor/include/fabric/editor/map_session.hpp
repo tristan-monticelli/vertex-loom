@@ -30,6 +30,11 @@ public:
                                                MapSnapSettings snapping = {});
     [[nodiscard]] bool set_instance_property(const core::ResourceId& instance_id,
                                               project::MapProperty property);
+    [[nodiscard]] bool set_layer_visibility(const core::ResourceId& layer_id, bool visible);
+    [[nodiscard]] bool set_layer_locked(const core::ResourceId& layer_id, bool locked);
+    [[nodiscard]] bool set_layer_depth(const core::ResourceId& layer_id, float depth);
+    [[nodiscard]] bool set_prefab_override(const core::ResourceId& prefab_id,
+                                            project::MapProperty property);
     [[nodiscard]] static core::Vec2 snap_position(core::Vec2 position,
                                                   MapSnapSettings snapping = {}) noexcept;
     [[nodiscard]] bool declare_event(project::MapEventDefinition event);
