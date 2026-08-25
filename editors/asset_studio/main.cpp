@@ -1334,12 +1334,61 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
-            session.selected_entity() &&
-            !session.selected_entity()->nodes.empty()) {
+            session.selected_entity()) {
             const auto& entity = *session.selected_entity();
             ImGui::SeparatorText("Entity hierarchy");
-            canvas.selected_node = std::min(canvas.selected_node,
-                                            entity.nodes.size() - 1);
+            if (!entity.nodes.empty()) {
+                canvas.selected_node = std::min(canvas.selected_node,
+                                                entity.nodes.size() - 1);
+            }
+            if (entity.nodes.empty()) {
+                if (ImGui::Button("Add root node")) {
+                    fabric::project::EntityNode new_node{
+                        .id = "node-1", .name = "Node 1"};
+                    if (session.add_selected_entity_node(std::move(new_node))) {
+                        canvas.selected_node = 0U;
+                        status = "Entity root node added.";
+                    } else {
+                        status = "Entity node rejected; inspect diagnostics.";
+                    }
+                }
+                ImGui::TextDisabled("This entity has no nodes.");
+            } else {
+            if (ImGui::Button("Add child")) {
+                const auto& parent = entity.nodes[canvas.selected_node];
+                fabric::project::EntityNode new_node{
+                    .id = "node-" + std::to_string(entity.nodes.size() + 1U),
+                    .name = "Node " + std::to_string(entity.nodes.size() + 1U),
+                    .parent = parent.id};
+                while (std::ranges::any_of(
+                    entity.nodes, [&](const auto& candidate) {
+                        return candidate.id == new_node.id;
+                    })) {
+                    new_node.id += "-copy";
+                }
+                if (session.add_selected_entity_node(std::move(new_node))) {
+                    canvas.selected_node = entity.nodes.size();
+                    status = "Entity child added.";
+                } else {
+                    status = "Entity node rejected; inspect diagnostics.";
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Duplicate")) {
+                if (session.duplicate_selected_entity_node(canvas.selected_node)) {
+                    canvas.selected_node = entity.nodes.size();
+                    status = "Entity node duplicated.";
+                } else {
+                    status = "Entity node rejected; inspect diagnostics.";
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Delete") &&
+                session.remove_selected_entity_node(canvas.selected_node)) {
+                canvas.selected_node = canvas.selected_node == 0U
+                    ? 0U : canvas.selected_node - 1U;
+                status = "Entity node deleted.";
+            }
             for (std::size_t node_index = 0; node_index < entity.nodes.size();
                  ++node_index) {
                 const auto label = entity.nodes[node_index].name + "##entity-node-" +
@@ -1408,6 +1457,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::InputFloat("Z order", &z_order, 0.1F, 1.0F, "%.2f")) {
                 node.z_order = z_order;
                 commit_entity_node(node);
+            }
             }
         }
     } else {

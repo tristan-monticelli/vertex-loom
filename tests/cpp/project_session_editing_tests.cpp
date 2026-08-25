@@ -218,6 +218,19 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     REQUIRE(session.redo(start));
     CHECK(session.selected_entity()->nodes.front().transform.position ==
           fabric::core::Vec2{2.0F, -1.0F});
+    fabric::project::EntityNode child{
+        .id = "child", .name = "Child", .parent = "root"};
+    REQUIRE(session.add_selected_entity_node(child, start));
+    REQUIRE(session.selected_entity()->nodes.size() == 2U);
+    CHECK_FALSE(session.remove_selected_entity_node(0, start));
+    REQUIRE(session.duplicate_selected_entity_node(0, start));
+    REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_entity()->nodes.size() == 2U);
+    REQUIRE(session.redo(start));
+    REQUIRE(session.remove_selected_entity_node(2, start));
+    REQUIRE(session.remove_selected_entity_node(1, start));
+    CHECK(session.selected_entity()->nodes.size() == 1U);
     CHECK(session.update_autosave(start) ==
           fabric::editor::AutosaveStatus::not_due);
     CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==

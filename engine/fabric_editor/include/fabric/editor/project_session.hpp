@@ -91,6 +91,18 @@ public:
         std::size_t node_index, project::EntityNode node,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool add_selected_entity_node(
+        project::EntityNode node,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool duplicate_selected_entity_node(
+        std::size_t node_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool remove_selected_entity_node(
+        std::size_t node_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());

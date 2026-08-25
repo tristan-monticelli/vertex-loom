@@ -249,6 +249,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   drawables vectoriels et références d’artworks.
 - [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
+- [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
+  suppressions qui laisseraient des enfants orphelins.
 - [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
   viewport OpenGL, avec composition des transforms et matériaux.
 - [ ] Refuser cycles, références invalides et valeurs non finies.

@@ -168,6 +168,28 @@ private:
     Value after_;
 };
 
+template <typename Value>
+class ReplaceValueCommand final : public Command {
+public:
+    ReplaceValueCommand(Value& target, Value next)
+        : target_(target), before_(target), after_(std::move(next)) {}
+
+    bool execute() override {
+        target_ = after_;
+        return true;
+    }
+
+    bool undo() override {
+        target_ = before_;
+        return true;
+    }
+
+private:
+    Value& target_;
+    Value before_;
+    Value after_;
+};
+
 class ConvertLinkedSvgCommand final : public Command {
 public:
     ConvertLinkedSvgCommand(std::optional<project::VectorAsset>& target,
@@ -1068,6 +1090,118 @@ bool ProjectSession::set_selected_entity_node(
             selected_entity_->nodes[node_index], std::move(node)))) {
         errors_ = {{project::ErrorCode::invalid_asset, "node",
                     "cannot execute the entity node modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::add_selected_entity_node(
+    project::EntityNode node, const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an entity before adding a node"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing an entity"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto candidate = *selected_entity_;
+    candidate.nodes.push_back(std::move(node));
+    auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::EntityNode>>>(
+            selected_entity_->nodes, std::move(candidate.nodes)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "could not add the entity node"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::duplicate_selected_entity_node(
+    const std::size_t node_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || node_index >= selected_entity_->nodes.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an entity node before duplicating it"}};
+        return false;
+    }
+    auto node = selected_entity_->nodes[node_index];
+    const auto base_id = node.id + "-copy";
+    node.id = base_id;
+    std::size_t suffix = 2;
+    while (std::ranges::any_of(selected_entity_->nodes,
+                               [&](const auto& candidate) {
+                                   return candidate.id == node.id;
+                               })) {
+        node.id = base_id + "-" + std::to_string(suffix++);
+    }
+    node.name += " copy";
+    return add_selected_entity_node(std::move(node), now);
+}
+
+bool ProjectSession::remove_selected_entity_node(
+    const std::size_t node_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || node_index >= selected_entity_->nodes.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an entity node before removing it"}};
+        return false;
+    }
+    const auto& node = selected_entity_->nodes[node_index];
+    if (std::ranges::any_of(selected_entity_->nodes,
+                            [&](const auto& candidate) {
+                                return candidate.parent &&
+                                    *candidate.parent == node.id;
+                            })) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes.parent",
+                    "remove or reparent child nodes before removing this node"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing an entity"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto candidate = *selected_entity_;
+    candidate.nodes.erase(candidate.nodes.begin() +
+                          static_cast<std::ptrdiff_t>(node_index));
+    auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::EntityNode>>>(
+            selected_entity_->nodes, std::move(candidate.nodes)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "could not remove the entity node"}};
         return false;
     }
     dirty_document_ = DirtyDocument::entity;

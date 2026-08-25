@@ -74,6 +74,9 @@ C4Component
   modifier nom, parent et transform. Chaque mutation passe par
   `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de
   transform non fini.
+- Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
+  de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
+  suppression d’un parent ayant encore des enfants est refusée.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,
