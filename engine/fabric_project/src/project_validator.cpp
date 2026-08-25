@@ -4,6 +4,7 @@
 #include "fabric/project/material.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/resource_registry.hpp"
+#include "fabric/project/replay.hpp"
 #include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -197,6 +198,10 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "animations",
         ".animation.json", "assets.animations", load_animation,
         animation_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "replays",
+        ".replay.json", "assets.replays", load_replay, replay_resource_references,
+        registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, "",
         ".map.json", "maps", load_map, map_resource_references,

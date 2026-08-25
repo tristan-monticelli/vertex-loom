@@ -67,6 +67,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/resource_registry.cpp
+    engine/fabric_project/src/replay.cpp
     engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
@@ -330,6 +331,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_scene_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_scene_tests COMMAND fabric_scene_tests)
+
+    add_executable(fabric_replay_tests tests/cpp/replay_tests.cpp)
+    target_link_libraries(fabric_replay_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_replay_tests COMMAND fabric_replay_tests)
 
     add_executable(fabric_input_tests tests/cpp/input_tests.cpp)
     target_link_libraries(fabric_input_tests PRIVATE
