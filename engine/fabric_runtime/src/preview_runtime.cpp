@@ -93,6 +93,7 @@ struct PreviewRuntime::Impl {
     std::vector<RuntimePacketBounds> packet_bounds;
     std::vector<bool> packet_bounds_dynamic;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
+    std::vector<GameplayEvent> gameplay_events;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -438,6 +439,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_bounds.clear();
     impl_->packet_bounds_dynamic.clear();
     impl_->entity_simulations.clear();
+    impl_->gameplay_events.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -1002,12 +1004,15 @@ bool PreviewRuntime::run() {
                 return false;
             }
             ++stats_.physics_steps;
+            impl_->gameplay_events.clear();
             if (character_) {
                 const auto position = character_->position();
                 stats_.character_x = position.x;
                 stats_.character_y = position.y;
-                if (triggers_)
-                    stats_.gameplay_events += triggers_->update(position).size();
+                if (triggers_) {
+                    impl_->gameplay_events = triggers_->update(position);
+                    stats_.gameplay_events += impl_->gameplay_events.size();
+                }
             }
             return true;
         };
@@ -1256,6 +1261,11 @@ bool PreviewRuntime::run() {
 
 std::size_t PreviewRuntime::animation_count() const noexcept {
     return impl_ ? impl_->animation_clips.size() : 0U;
+}
+
+const std::vector<GameplayEvent>& PreviewRuntime::gameplay_events() const noexcept {
+    static const std::vector<GameplayEvent> empty;
+    return impl_ ? impl_->gameplay_events : empty;
 }
 
 std::vector<std::string> PreviewRuntime::packet_order() const {

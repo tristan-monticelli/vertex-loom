@@ -16,3 +16,9 @@ déterministe, sans script ni état distant.
 Les maps peuvent être inspectées et prévisualisées avec leurs événements sans
 introduire de langage de script. Les événements de sortie, conditions et
 actions gameplay restent des incréments ultérieurs.
+
+Preview Runtime conserve les événements entrés pendant le dernier pas fixe et
+les expose avec leur identifiant de trigger et leur payload. Le compteur
+global reste disponible dans `PreviewRuntimeStats`, tandis que le flux courant
+permet aux transitions du runtime jouable de consommer les données sans
+réinterroger la géométrie des triggers.

@@ -81,6 +81,7 @@ public:
         return errors_;
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
+    [[nodiscard]] const std::vector<GameplayEvent>& gameplay_events() const noexcept;
     [[nodiscard]] std::vector<std::string> packet_order() const;
     [[nodiscard]] std::size_t animation_count() const noexcept;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(

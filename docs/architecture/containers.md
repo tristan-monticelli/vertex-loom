@@ -54,3 +54,7 @@ premier composant `fabric_render` pour décoder les aperçus PNG et SVG en RGBA8
 La tranche actuellement compilée décode les aperçus PNG/SVG. Le renderer cible
 consomme `VectorAsset v2` et le modèle forme/fill/contour/clip d’ADR-0023. Le
 pipeline sprite a été retiré par ADR-0025.
+
+Le Preview Runtime expose au code de jeu les événements de trigger et payloads
+produits au dernier pas fixe, en complément de ses métriques de culling et de
+performance.
