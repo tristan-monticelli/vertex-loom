@@ -273,8 +273,9 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   temps dans la durée.
 - [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
   viewport OpenGL, avec composition des transforms et matériaux.
-- [ ] Refuser cycles, références invalides et valeurs non finies.
-- [ ] Ajouter contraintes copy-transform, limites, look-at et ordre explicite.
+- [x] Refuser cycles, références invalides et valeurs non finies.
+- [x] Ajouter contraintes copy-transform, limites, look-at et ordre explicite
+  dans Preview Runtime.
 - [ ] Ajouter maillage triangulé, poids, FABRIK 2D et solveur XPBD unifié.
 - [ ] Quantifier l’état simulé après chaque sous-pas pour le replay portable.
 - [x] Ajouter `fabric_asset_preview` headless basé sur les draw packets réels.

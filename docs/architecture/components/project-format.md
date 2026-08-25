@@ -84,7 +84,9 @@ C4Component
   clips sont validés avant sélection déterministe.
 - `AnimationConstraint` porte une dépendance source/cible et un ordre explicite
   pour `copy_transform`, `limits` ou `look_at`. Les cycles et rangs dupliqués
-  sont refusés avant résolution.
+  sont refusés avant résolution ; les bornes optionnelles de `limits` doivent
+  être finies et ordonnées. Preview Runtime résout ces contraintes avant les
+  draw packets et les poses de déformation.
 - Le solveur FABRIK 2D conserve la racine, borne ses itérations, vérifie les
   longueurs de segments et traite explicitement les cibles hors de portée.
 - Le système XPBD unifié expose distance, flexion, aire, pin et collision,

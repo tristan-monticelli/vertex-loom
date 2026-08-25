@@ -199,6 +199,35 @@ fabric::project::MapDocument map_with_render_deformed_entity() {
     return result;
 }
 
+fabric::project::EntityDefinition constrained_entity() {
+    auto result = entity();
+    result.document.id = {.value = "constrained-entity"};
+    result.nodes.push_back({.id = "target", .name = "Target"});
+    result.nodes.front().transform.position = {3.0F, 4.0F};
+    result.constraints.push_back({
+        .id = "copy-root-to-target",
+        .kind = fabric::project::AnimationConstraintKind::copy_transform,
+        .target_node = "target",
+        .source_node = "root",
+        .order = 1,
+        .constrain_position = true,
+        .constrain_rotation = false,
+        .constrain_scale = false});
+    result.deformation_mesh = fabric::project::DeformationMesh{
+        .vertices = {{.rest_position = {0.0F, 0.0F},
+                      .influences = {{.node_id = "target", .weight = 1.0F}}}},
+        .triangles = {}};
+    return result;
+}
+
+fabric::project::MapDocument map_with_constrained_entity() {
+    auto result = map();
+    result.instances.push_back({"constrained", fabric::project::ResourceReference{
+                                    {.value = "constrained-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_texture_entity() {
     auto result = map();
     result.instances.push_back({"textured",
@@ -363,6 +392,31 @@ TEST_CASE("preview runtime applies deformation positions to matching draw packet
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.run());
     CHECK(runtime.stats().deformed_packets > 0U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves ordered entity constraints before deformation") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-constraints-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_constrained_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), constrained_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto deformation = runtime.evaluate_instance_deformation("constrained");
+    REQUIRE(deformation.has_value());
+    REQUIRE(deformation->ok());
+    REQUIRE(deformation->positions.size() == 1U);
+    CHECK(deformation->positions.front() == fabric::core::Vec2{3.0F, 4.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

@@ -119,7 +119,13 @@ TEST_CASE("entity constraints round-trip and require existing nodes") {
         .order = 1,
         .constrain_position = true,
         .constrain_rotation = false,
-        .constrain_scale = true});
+        .constrain_scale = true,
+        .min_position = fabric::core::Vec2{-2.0F, -3.0F},
+        .max_position = fabric::core::Vec2{2.0F, 3.0F},
+        .min_rotation_degrees = -45.0F,
+        .max_rotation_degrees = 45.0F,
+        .min_scale = fabric::core::Vec2{0.5F, 0.5F},
+        .max_scale = fabric::core::Vec2{2.0F, 2.0F}});
     const auto parsed = fabric::project::parse_entity(
         manifest(), fabric::project::serialize_entity(source));
     REQUIRE(parsed.ok());

@@ -2,6 +2,7 @@
 
 #include "fabric/project/animation.hpp"
 
+#include <optional>
 #include <vector>
 
 namespace fabric::project {
@@ -17,6 +18,12 @@ struct AnimationConstraint {
     bool constrain_position{true};
     bool constrain_rotation{true};
     bool constrain_scale{true};
+    std::optional<core::Vec2> min_position;
+    std::optional<core::Vec2> max_position;
+    std::optional<float> min_rotation_degrees;
+    std::optional<float> max_rotation_degrees;
+    std::optional<core::Vec2> min_scale;
+    std::optional<core::Vec2> max_scale;
     friend bool operator==(const AnimationConstraint&, const AnimationConstraint&) = default;
 };
 

@@ -1,6 +1,7 @@
 #include "fabric/project/animation_constraints.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <set>
 #include <utility>
@@ -11,6 +12,16 @@ namespace {
 void error(std::vector<Error>& errors, ErrorCode code, std::string field,
            std::string message) {
     errors.push_back({code, std::move(field), std::move(message)});
+}
+
+bool finite(const core::Vec2 value) {
+    return std::isfinite(value.x) && std::isfinite(value.y);
+}
+
+bool ordered(const std::optional<core::Vec2>& minimum,
+             const std::optional<core::Vec2>& maximum) {
+    return !minimum || !maximum ||
+        (minimum->x <= maximum->x && minimum->y <= maximum->y);
 }
 
 } // namespace
@@ -33,6 +44,28 @@ ValidationReport validate_animation_constraints(
         if (!orders.insert(constraint.order).second)
             error(report.errors, ErrorCode::duplicate_resource, "constraints.order",
                   "constraint order values must be unique");
+        const auto valid_vec = [&](const std::optional<core::Vec2>& value,
+                                   const char* field) {
+            if (value && !finite(*value))
+                error(report.errors, ErrorCode::invalid_asset, field,
+                      "constraint bounds must be finite");
+        };
+        valid_vec(constraint.min_position, "constraints.minPosition");
+        valid_vec(constraint.max_position, "constraints.maxPosition");
+        valid_vec(constraint.min_scale, "constraints.minScale");
+        valid_vec(constraint.max_scale, "constraints.maxScale");
+        if (!ordered(constraint.min_position, constraint.max_position) ||
+            !ordered(constraint.min_scale, constraint.max_scale))
+            error(report.errors, ErrorCode::invalid_asset, "constraints.bounds",
+                  "minimum bounds must not exceed maximum bounds");
+        if ((constraint.min_rotation_degrees &&
+             !std::isfinite(*constraint.min_rotation_degrees)) ||
+            (constraint.max_rotation_degrees &&
+             !std::isfinite(*constraint.max_rotation_degrees)) ||
+            (constraint.min_rotation_degrees && constraint.max_rotation_degrees &&
+             *constraint.min_rotation_degrees > *constraint.max_rotation_degrees))
+            error(report.errors, ErrorCode::invalid_asset, "constraints.rotationBounds",
+                  "rotation bounds must be finite and ordered");
         edges.emplace_back(constraint.source_node, constraint.target_node);
     }
 

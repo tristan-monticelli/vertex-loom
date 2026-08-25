@@ -87,6 +87,60 @@ core::Vec2 apply_transform(core::Vec2 point, const core::Transform& transform) {
             point.x * sine + point.y * cosine + transform.pivot.y + transform.position.y};
 }
 
+core::Vec2 clamp_vec(const core::Vec2 value,
+                    const std::optional<core::Vec2>& minimum,
+                    const std::optional<core::Vec2>& maximum) {
+    return {std::clamp(value.x, minimum ? minimum->x : value.x,
+                       maximum ? maximum->x : value.x),
+            std::clamp(value.y, minimum ? minimum->y : value.y,
+                       maximum ? maximum->y : value.y)};
+}
+
+bool resolve_constraints(std::vector<project::EntityNode>& nodes,
+                         const std::vector<project::AnimationConstraint>& constraints) {
+    const auto ordered = project::order_animation_constraints(constraints);
+    if (ordered.size() != constraints.size()) return false;
+    const auto find = [&](const std::string& id) {
+        return std::find_if(nodes.begin(), nodes.end(),
+            [&](const auto& node) { return node.id == id; });
+    };
+    for (const auto* constraint : ordered) {
+        auto target = find(constraint->target_node);
+        const auto source = find(constraint->source_node);
+        if (target == nodes.end() || source == nodes.end()) return false;
+        if (constraint->kind == project::AnimationConstraintKind::copy_transform) {
+            if (constraint->constrain_position) target->transform.position = source->transform.position;
+            if (constraint->constrain_rotation) target->transform.rotation_degrees = source->transform.rotation_degrees;
+            if (constraint->constrain_scale) target->transform.scale = source->transform.scale;
+        } else if (constraint->kind == project::AnimationConstraintKind::look_at) {
+            const auto delta = core::Vec2{source->transform.position.x - target->transform.position.x,
+                                          source->transform.position.y - target->transform.position.y};
+            if (constraint->constrain_rotation) {
+                if (std::abs(delta.x) > 1.0e-6F || std::abs(delta.y) > 1.0e-6F)
+                    target->transform.rotation_degrees = std::atan2(delta.y, delta.x) *
+                        180.0F / 3.14159265358979323846F;
+            }
+            if (constraint->constrain_position) target->transform.position = source->transform.position;
+        } else {
+            if (constraint->constrain_position)
+                target->transform.position = clamp_vec(target->transform.position,
+                    constraint->min_position, constraint->max_position);
+            if (constraint->constrain_rotation) {
+                if (constraint->min_rotation_degrees)
+                    target->transform.rotation_degrees = std::max(
+                        target->transform.rotation_degrees, *constraint->min_rotation_degrees);
+                if (constraint->max_rotation_degrees)
+                    target->transform.rotation_degrees = std::min(
+                        target->transform.rotation_degrees, *constraint->max_rotation_degrees);
+            }
+            if (constraint->constrain_scale)
+                target->transform.scale = clamp_vec(target->transform.scale,
+                    constraint->min_scale, constraint->max_scale);
+        }
+    }
+    return true;
+}
+
 core::Vec2 apply_node_transform(core::Vec2 point,
                                 const project::EntityDefinition& entity,
                                 std::size_t node_index,
@@ -407,19 +461,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             append_errors(errors_, entity.errors);
             return false;
         }
-        if (entity.entity->deformation_mesh || entity.entity->xpbd) {
+        auto resolved_entity = std::move(*entity.entity);
+        if (!resolve_constraints(resolved_entity.nodes, resolved_entity.constraints)) {
+            errors_.push_back("entity constraints could not be resolved");
+            return false;
+        }
+        if (resolved_entity.deformation_mesh || resolved_entity.xpbd) {
             Impl::EntitySimulation simulation{
-                .mesh = entity.entity->deformation_mesh,
-                .xpbd = entity.entity->xpbd,
+                .mesh = resolved_entity.deformation_mesh,
+                .xpbd = resolved_entity.xpbd,
                 .instance_transform = instance.transform};
-            simulation.poses.reserve(entity.entity->nodes.size());
-            for (const auto& node : entity.entity->nodes)
+            simulation.poses.reserve(resolved_entity.nodes.size());
+            for (const auto& node : resolved_entity.nodes)
                 simulation.poses.push_back({.node_id = node.id,
                                             .transform = node.transform});
             impl_->entity_simulations.emplace(instance.id, std::move(simulation));
         }
-        for (std::size_t node_index = 0; node_index < entity.entity->nodes.size(); ++node_index) {
-            const auto& node = entity.entity->nodes[node_index];
+        for (std::size_t node_index = 0; node_index < resolved_entity.nodes.size(); ++node_index) {
+            const auto& node = resolved_entity.nodes[node_index];
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
                 node.drawable.resource) {
                 auto vector = project::load_vector_asset(
@@ -471,7 +530,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         packet.fill_color.reset();
                         generate_planar_uvs(packet);
                     }
-                    transform_packet(packet, *entity.entity, node_index, instance.transform);
+                    transform_packet(packet, resolved_entity, node_index, instance.transform);
                     packet.node_id = instance.id + ":" + node.id + ":" + packet.node_id;
                     impl_->packet_base_transforms.emplace(
                         packet.node_id, Impl::PacketBaseTransform{
@@ -479,7 +538,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                             .rotation_degrees = node.transform.rotation_degrees,
                             .scale = node.transform.scale,
                             .world_origin = apply_node_transform(
-                                {0.0F, 0.0F}, *entity.entity, node_index,
+                                {0.0F, 0.0F}, resolved_entity, node_index,
                                 instance.transform)});
                     impl_->packets.push_back(std::move(packet));
                 }
@@ -513,7 +572,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
                     .closed_outline = true};
                 packet.fill_color.reset();
-                transform_packet(packet, *entity.entity, node_index, instance.transform);
+                transform_packet(packet, resolved_entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
                 impl_->packet_base_transforms.emplace(
                     packet.node_id, Impl::PacketBaseTransform{
@@ -521,7 +580,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         .rotation_degrees = node.transform.rotation_degrees,
                         .scale = node.transform.scale,
                         .world_origin = apply_node_transform(
-                            {0.0F, 0.0F}, *entity.entity, node_index,
+                            {0.0F, 0.0F}, resolved_entity, node_index,
                             instance.transform)});
                 impl_->packets.push_back(std::move(packet));
             }
