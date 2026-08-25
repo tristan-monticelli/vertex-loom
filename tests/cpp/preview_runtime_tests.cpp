@@ -173,6 +173,32 @@ fabric::project::MapDocument map_with_simulated_entity() {
     return result;
 }
 
+fabric::project::EntityDefinition render_deformed_entity() {
+    auto result = entity();
+    result.document.id = {.value = "render-deformed-entity"};
+    result.deformation_mesh = fabric::project::DeformationMesh{
+        .vertices = {
+            {.rest_position = {-1.0F, -1.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}},
+            {.rest_position = {1.0F, -1.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}},
+            {.rest_position = {1.0F, 1.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}},
+            {.rest_position = {-1.0F, 1.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}}},
+        .triangles = {{.first = 3, .second = 0, .third = 1},
+                      {.first = 1, .second = 2, .third = 3}}};
+    return result;
+}
+
+fabric::project::MapDocument map_with_render_deformed_entity() {
+    auto result = map();
+    result.instances.push_back({"deformed", fabric::project::ResourceReference{
+                                    {.value = "render-deformed-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_texture_entity() {
     auto result = map();
     result.instances.push_back({"textured",
@@ -315,6 +341,28 @@ TEST_CASE("preview runtime inherits animation bindings from prefabs") {
     REQUIRE(evaluated.has_value());
     REQUIRE(evaluated->ok());
     CHECK_FALSE(runtime.evaluate_instance_animation("missing", 0.5F).has_value());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime applies deformation positions to matching draw packets") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-render-deformation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_render_deformed_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), render_deformed_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().deformed_packets > 0U);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

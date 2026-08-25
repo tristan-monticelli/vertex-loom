@@ -45,6 +45,7 @@ struct PreviewRuntime::Impl {
         std::optional<project::DeformationMesh> mesh;
         std::optional<project::XpbdSystem> xpbd;
         std::vector<project::DeformationPose> poses;
+        core::Transform instance_transform;
     };
 
     SDL_Window* window{};
@@ -113,6 +114,21 @@ void transform_packet(render::VectorDrawPacket& packet,
     };
     for (auto& point : packet.outline) point = transform(point);
     for (auto& point : packet.fill_vertices) point = transform(point);
+}
+
+bool deformation_topology_matches(const project::DeformationMesh& mesh,
+                                  const render::VectorDrawPacket& packet) {
+    if (mesh.vertices.size() != packet.fill_vertices.size()) return false;
+    if (mesh.triangles.empty()) return true;
+    if (mesh.triangles.size() * 3U != packet.fill_indices.size()) return false;
+    for (std::size_t index = 0; index < mesh.triangles.size(); ++index) {
+        const auto& triangle = mesh.triangles[index];
+        if (packet.fill_indices[index * 3U] != triangle.first ||
+            packet.fill_indices[index * 3U + 1U] != triangle.second ||
+            packet.fill_indices[index * 3U + 2U] != triangle.third)
+            return false;
+    }
+    return true;
 }
 
 void apply_material(render::VectorDrawPacket& packet,
@@ -394,7 +410,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         if (entity.entity->deformation_mesh || entity.entity->xpbd) {
             Impl::EntitySimulation simulation{
                 .mesh = entity.entity->deformation_mesh,
-                .xpbd = entity.entity->xpbd};
+                .xpbd = entity.entity->xpbd,
+                .instance_transform = instance.transform};
             simulation.poses.reserve(entity.entity->nodes.size());
             for (const auto& node : entity.entity->nodes)
                 simulation.poses.push_back({.node_id = node.id,
@@ -707,6 +724,25 @@ bool PreviewRuntime::run() {
             const auto separator = packet.node_id.find(':');
             if (separator == std::string::npos) return packet;
             const auto instance_id = packet.node_id.substr(0, separator);
+            const auto simulation = impl_->entity_simulations.find(instance_id);
+            if (simulation != impl_->entity_simulations.end() &&
+                simulation->second.mesh &&
+                deformation_topology_matches(*simulation->second.mesh, packet)) {
+                const auto deformation = evaluate_instance_deformation(instance_id);
+                if (deformation && deformation->ok() &&
+                    deformation->positions.size() == packet.fill_vertices.size()) {
+                    for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index)
+                        packet.fill_vertices[index] = apply_transform(
+                            deformation->positions[index],
+                            simulation->second.instance_transform);
+                    if (packet.outline.size() == deformation->positions.size())
+                        for (std::size_t index = 0; index < packet.outline.size(); ++index)
+                            packet.outline[index] = apply_transform(
+                                deformation->positions[index],
+                                simulation->second.instance_transform);
+                    ++stats_.deformed_packets;
+                }
+            }
             const auto evaluation = evaluate_instance_animation(
                 instance_id, animation_time);
             if (!evaluation || !evaluation->ok()) return packet;

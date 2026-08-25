@@ -12,10 +12,10 @@ simulation par instance, construit les poses depuis les transforms des nœuds,
 expose une évaluation headless du maillage et exécute quatre itérations XPBD à
 chaque pas fixe de `1/60` seconde.
 
-Les draw packets restent inchangés dans cette tranche : le maillage simulé est
-accessible par l’API runtime et l’intégration de ses sommets au rendu sera une
-étape dédiée, afin de conserver une correspondance explicite entre topologie,
-triangles et packets.
+Les draw packets sont déformés lorsque leur nombre de sommets et leur topologie
+correspondent au maillage de l’entité. La correspondance est par indice et les
+triangles doivent correspondre exactement aux indices du packet ; un packet
+incompatible reste inchangé et le compteur runtime ne le compte pas.
 
 Quand `deformationMesh` et `xpbd` sont tous deux présents, le validateur exige
 une correspondance 1:1 entre sommets et particules. L’évaluation runtime

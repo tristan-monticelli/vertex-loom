@@ -94,7 +94,7 @@ C4Component
   influences pondérées et valide les triangles et références de poses.
 - `PreviewRuntime` charge ces simulations par instance avant SDL, expose leur
   évaluation headless et exécute XPBD à pas fixe ; l’injection des sommets
-  déformés dans les draw packets reste une tranche de rendu distincte.
+  déformés dans les draw packets est activée lorsque la topologie correspond.
   Lorsque les deux contrats sont associés, leurs sommets et particules sont
   validés en correspondance 1:1.
 - `MapDocument v1` est stocké sous `maps/<id>.map.json` et sépare calques,

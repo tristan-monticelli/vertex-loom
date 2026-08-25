@@ -257,6 +257,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   familles de contraintes validées headless.
 - [x] Charger les maillages et états XPBD par instance dans Preview Runtime,
   exposer leur évaluation headless et exécuter XPBD à pas fixe.
+- [x] Injecter les positions déformées dans les draw packets lorsque les
+  sommets et la topologie correspondent exactement.
 - [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
