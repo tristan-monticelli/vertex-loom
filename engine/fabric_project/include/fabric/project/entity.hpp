@@ -5,6 +5,7 @@
 #include "fabric/project/animation_constraints.hpp"
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/xpbd.hpp"
+#include "fabric/project/animation_ik.hpp"
 #include "fabric/core/types.hpp"
 
 #include <filesystem>
@@ -46,6 +47,7 @@ struct EntityDefinition {
     std::vector<AnimationConstraint> constraints;
     std::optional<DeformationMesh> deformation_mesh;
     std::optional<XpbdSystem> xpbd;
+    std::vector<FabrikChainDefinition> ik_chains;
     friend bool operator==(const EntityDefinition&, const EntityDefinition&) = default;
 };
 

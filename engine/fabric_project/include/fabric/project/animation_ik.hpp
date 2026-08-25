@@ -4,9 +4,20 @@
 #include "fabric/project/manifest.hpp"
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 namespace fabric::project {
+
+struct FabrikChainDefinition {
+    std::string id;
+    std::vector<std::string> joints;
+    std::string target_node;
+    std::size_t max_iterations{16};
+    float tolerance{1.0e-3F};
+    friend bool operator==(const FabrikChainDefinition&,
+                           const FabrikChainDefinition&) = default;
+};
 
 struct FabrikRequest {
     std::vector<core::Vec2> joints;

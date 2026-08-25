@@ -27,6 +27,8 @@ Json constraint_json(const AnimationConstraint& c){Json result={{"id",c.id},{"ki
 bool optional_number(const Json& o,const char* key,std::optional<float>& value,std::vector<Error>& e){auto i=o.find(key);if(i==o.end()||i->is_null())return true;if(!i->is_number()){error(e,ErrorCode::invalid_asset,key,"expected a finite number");return false;}float parsed=i->get<float>();if(!std::isfinite(parsed)){error(e,ErrorCode::invalid_asset,key,"must be finite");return false;}value=parsed;return true;}
 bool optional_vec(const Json& o,const char* key,std::optional<core::Vec2>& value,std::vector<Error>& e){auto i=o.find(key);if(i==o.end()||i->is_null())return true;if(!i->is_object()){error(e,ErrorCode::invalid_asset,key,"expected a Vec2");return false;}core::Vec2 parsed{};if(!vec_read(o,key,parsed,e))return false;value=parsed;return true;}
 bool constraint_read(const Json& o, AnimationConstraint& c, std::vector<Error>& e){text(o,"id",c.id,e);std::string kind;text(o,"kind",kind,e);if(kind=="copyTransform")c.kind=AnimationConstraintKind::copy_transform;else if(kind=="limits")c.kind=AnimationConstraintKind::limits;else if(kind=="lookAt")c.kind=AnimationConstraintKind::look_at;else error(e,ErrorCode::invalid_asset,"constraints.kind","unsupported constraint kind");text(o,"targetNode",c.target_node,e);text(o,"sourceNode",c.source_node,e);std::int64_t order{};auto i=o.find("order");if(i==o.end()||!i->is_number_integer())error(e,ErrorCode::invalid_asset,"constraints.order","expected an integer");else{order=i->get<std::int64_t>();c.order=static_cast<int>(order);}boolean(o,"constrainPosition",c.constrain_position,e);boolean(o,"constrainRotation",c.constrain_rotation,e);boolean(o,"constrainScale",c.constrain_scale,e);optional_vec(o,"minPosition",c.min_position,e);optional_vec(o,"maxPosition",c.max_position,e);optional_number(o,"minRotationDegrees",c.min_rotation_degrees,e);optional_number(o,"maxRotationDegrees",c.max_rotation_degrees,e);optional_vec(o,"minScale",c.min_scale,e);optional_vec(o,"maxScale",c.max_scale,e);return e.empty();}
+Json ik_chain_json(const FabrikChainDefinition& chain){return {{"id",chain.id},{"joints",chain.joints},{"targetNode",chain.target_node},{"maxIterations",chain.max_iterations},{"tolerance",chain.tolerance}};}
+bool ik_chain_read(const Json& o,FabrikChainDefinition& chain,std::vector<Error>& e){text(o,"id",chain.id,e);auto joints=o.find("joints");if(joints==o.end()||!joints->is_array()){error(e,ErrorCode::invalid_asset,"ikChains.joints","expected an array");}else for(const auto& value:*joints){if(!value.is_string())error(e,ErrorCode::invalid_asset,"ikChains.joints","expected strings");else chain.joints.push_back(value.get<std::string>());}text(o,"targetNode",chain.target_node,e);auto iterations=o.find("maxIterations");if(iterations==o.end()||!iterations->is_number_unsigned())error(e,ErrorCode::invalid_asset,"ikChains.maxIterations","expected an unsigned integer");else chain.max_iterations=iterations->get<std::size_t>();number(o,"tolerance",chain.tolerance,e);return e.empty();}
 Json deformation_mesh_json(const DeformationMesh& mesh){Json result={{"vertices",Json::array()},{"triangles",Json::array()}};for(const auto& vertex:mesh.vertices){Json influences=Json::array();for(const auto& influence:vertex.influences)influences.push_back({{"node",influence.node_id},{"weight",influence.weight}});result["vertices"].push_back({{"restPosition",vec(vertex.rest_position)},{"influences",std::move(influences)}});}for(const auto& triangle:mesh.triangles)result["triangles"].push_back({{"first",triangle.first},{"second",triangle.second},{"third",triangle.third}});return result;}
 bool deformation_mesh_read(const Json& o, DeformationMesh& mesh, std::vector<Error>& e){const auto vertices=o.find("vertices");if(vertices==o.end()||!vertices->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.vertices","expected an array");else for(const auto& item:*vertices){if(!item.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.vertices","expected objects");continue;}MeshVertex vertex;vec_read(item,"restPosition",vertex.rest_position,e);const auto influences=item.find("influences");if(influences==item.end()||!influences->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.influences","expected an array");else for(const auto& value:*influences){if(!value.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.influences","expected objects");continue;}MeshInfluence influence;text(value,"node",influence.node_id,e);number(value,"weight",influence.weight,e);vertex.influences.push_back(std::move(influence));}mesh.vertices.push_back(std::move(vertex));}const auto triangles=o.find("triangles");if(triangles==o.end()||!triangles->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.triangles","expected an array");else for(const auto& item:*triangles){if(!item.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.triangles","expected objects");continue;}MeshTriangle triangle;const auto read_index=[&](const char* key,std::size_t& output){auto value=item.find(key);if(value==item.end()||!value->is_number_unsigned()){error(e,ErrorCode::invalid_asset,std::string("deformationMesh.triangles.")+key,"expected an unsigned integer");return;}output=value->get<std::size_t>();};read_index("first",triangle.first);read_index("second",triangle.second);read_index("third",triangle.third);mesh.triangles.push_back(triangle);}return e.empty();}
 Json xpbd_json(const XpbdSystem& system){Json result={{"particles",Json::array()},{"distanceConstraints",Json::array()},{"pinConstraints",Json::array()},{"bendingConstraints",Json::array()},{"areaConstraints",Json::array()},{"collisionConstraints",Json::array()}};for(const auto& p:system.particles)result["particles"].push_back({{"position",vec(p.position)},{"inverseMass",p.inverse_mass}});for(const auto& c:system.distance_constraints)result["distanceConstraints"].push_back({{"first",c.first},{"second",c.second},{"restLength",c.rest_length},{"compliance",c.compliance},{"lambda",c.lambda}});for(const auto& c:system.pin_constraints)result["pinConstraints"].push_back({{"particle",c.particle},{"target",vec(c.target)},{"compliance",c.compliance},{"lambda",vec(c.lambda)}});for(const auto& c:system.bending_constraints)result["bendingConstraints"].push_back({{"first",c.first},{"middle",c.middle},{"third",c.third},{"restLength",c.rest_length},{"compliance",c.compliance},{"lambda",c.lambda}});for(const auto& c:system.area_constraints)result["areaConstraints"].push_back({{"first",c.first},{"second",c.second},{"third",c.third},{"restArea",c.rest_area},{"compliance",c.compliance},{"lambda",c.lambda}});for(const auto& c:system.collision_constraints)result["collisionConstraints"].push_back({{"particle",c.particle},{"normal",vec(c.normal)},{"offset",c.offset},{"compliance",c.compliance},{"lambda",c.lambda}});return result;}
@@ -158,10 +160,34 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
             error(r.errors, ErrorCode::invalid_asset, "xpbd.particles",
                   "XPBD particle count must match deformation mesh vertices");
     }
+    std::set<std::string> ik_ids;
+    for (const auto& chain : a.ik_chains) {
+        if (!core::ResourceId::is_valid(chain.id) || !ik_ids.insert(chain.id).second)
+            error(r.errors, ErrorCode::duplicate_resource, "ikChains.id",
+                  "IK chain ids must be valid and unique");
+        if (chain.joints.size() < 2 || chain.max_iterations == 0 ||
+            !std::isfinite(chain.tolerance) || chain.tolerance < 0.0F)
+            error(r.errors, ErrorCode::invalid_asset, "ikChains",
+                  "IK chains require at least two joints and valid solve settings");
+        std::set<std::string> joint_ids;
+        for (const auto& joint_id : chain.joints) {
+            if (!joint_ids.insert(joint_id).second ||
+                std::none_of(a.nodes.begin(), a.nodes.end(), [&](const auto& node) {
+                    return node.id == joint_id;
+                }))
+                error(r.errors, ErrorCode::missing_resource, "ikChains.joints",
+                      "IK joint node is missing or duplicated");
+        }
+        if (std::none_of(a.nodes.begin(), a.nodes.end(), [&](const auto& node) {
+                return node.id == chain.target_node;
+            }) || joint_ids.contains(chain.target_node))
+            error(r.errors, ErrorCode::missing_resource, "ikChains.targetNode",
+                  "IK target node must exist outside the joint chain");
+    }
     return r;
 }
 std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);}return r;}
-std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));return j.dump(2)+"\n";}
+std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)},{"ikChains",Json::array()}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));for(const auto& chain:a.ik_chains)j["ikChains"].push_back(ik_chain_json(chain));return j.dump(2)+"\n";}
 EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     EntityResult r;
     Json j;
@@ -215,6 +241,15 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     if (xp != j.end() && !xp->is_null()) {
         if (!xp->is_object()) error(r.errors, ErrorCode::invalid_asset, "xpbd", "expected an object or null");
         else { XpbdSystem system; if (xpbd_read(*xp, system, r.errors)) a.xpbd = std::move(system); }
+    }
+    const auto ik = j.find("ikChains");
+    if (ik != j.end()) {
+        if (!ik->is_array()) error(r.errors, ErrorCode::invalid_asset, "ikChains", "expected an array");
+        else for (const auto& value : *ik) {
+            FabrikChainDefinition chain;
+            if (value.is_object() && ik_chain_read(value, chain, r.errors)) a.ik_chains.push_back(std::move(chain));
+            else if (!value.is_object()) error(r.errors, ErrorCode::invalid_asset, "ikChains", "expected objects");
+        }
     }
     if (!r.errors.empty()) return r;
     auto v = validate_entity(m, a);

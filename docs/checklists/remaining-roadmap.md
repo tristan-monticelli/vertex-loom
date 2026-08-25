@@ -221,6 +221,7 @@ l’inspecteur. La transformation indépendante du fill reste ouverte.
   refuser les cycles avant résolution.
 - [x] Ajouter IK 2D par FABRIK avec racine fixe, tolérance et nombre maximal
   d’itérations déterministe.
+- [x] Persister les chaînes FABRIK dans EntityDefinition et les résoudre dans Preview Runtime.
 - [x] Ajouter XPBD distance, flexion, aire, pin et collision avec compliance,
   lambdas et quantification après sous-pas.
 - [x] Ajouter déformation par maillage triangulé et poids par nœud.

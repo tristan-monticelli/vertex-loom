@@ -4,6 +4,7 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/animation_ik.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/map_chunk_index.hpp"
 #include "fabric/project/material.hpp"
@@ -136,6 +137,37 @@ bool resolve_constraints(std::vector<project::EntityNode>& nodes,
             if (constraint->constrain_scale)
                 target->transform.scale = clamp_vec(target->transform.scale,
                     constraint->min_scale, constraint->max_scale);
+        }
+    }
+    return true;
+}
+
+bool resolve_ik_chains(std::vector<project::EntityNode>& nodes,
+                       const std::vector<project::FabrikChainDefinition>& chains) {
+    const auto find = [&](const std::string& id) {
+        return std::find_if(nodes.begin(), nodes.end(),
+            [&](const auto& node) { return node.id == id; });
+    };
+    for (const auto& chain : chains) {
+        std::vector<core::Vec2> joints;
+        joints.reserve(chain.joints.size());
+        for (const auto& joint_id : chain.joints) {
+            const auto joint = find(joint_id);
+            if (joint == nodes.end()) return false;
+            joints.push_back(joint->transform.position);
+        }
+        const auto target = find(chain.target_node);
+        if (target == nodes.end()) return false;
+        const auto result = project::solve_fabrik({
+            .joints = std::move(joints),
+            .target = target->transform.position,
+            .max_iterations = chain.max_iterations,
+            .tolerance = chain.tolerance});
+        if (!result.ok() || result.joints.size() != chain.joints.size()) return false;
+        for (std::size_t index = 0; index < chain.joints.size(); ++index) {
+            const auto joint = find(chain.joints[index]);
+            if (joint == nodes.end()) return false;
+            joint->transform.position = result.joints[index];
         }
     }
     return true;
@@ -464,6 +496,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         auto resolved_entity = std::move(*entity.entity);
         if (!resolve_constraints(resolved_entity.nodes, resolved_entity.constraints)) {
             errors_.push_back("entity constraints could not be resolved");
+            return false;
+        }
+        if (!resolve_ik_chains(resolved_entity.nodes, resolved_entity.ik_chains)) {
+            errors_.push_back("entity IK chains could not be resolved");
             return false;
         }
         if (resolved_entity.deformation_mesh || resolved_entity.xpbd) {

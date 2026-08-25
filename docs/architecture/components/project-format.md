@@ -87,7 +87,9 @@ C4Component
   sont refusés avant résolution ; les bornes optionnelles de `limits` doivent
   être finies et ordonnées. Preview Runtime résout ces contraintes avant les
   draw packets et les poses de déformation.
-- Le solveur FABRIK 2D conserve la racine, borne ses itérations, vérifie les
+- Les entités peuvent persister des chaînes FABRIK 2D (`ikChains`) ciblant des
+  nœuds par identifiant ; le runtime les résout dans l'ordre déclaré avant de
+  produire les poses et draw packets. Le solveur conserve la racine, borne ses itérations, vérifie les
   longueurs de segments et traite explicitement les cibles hors de portée.
 - Le système XPBD unifié expose distance, flexion, aire, pin et collision,
   conserve les lambdas, applique la compliance et quantifie l’état après

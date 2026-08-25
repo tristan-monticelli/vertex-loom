@@ -228,6 +228,31 @@ fabric::project::MapDocument map_with_constrained_entity() {
     return result;
 }
 
+fabric::project::EntityDefinition ik_entity() {
+    auto result = entity();
+    result.document.id = {.value = "ik-entity"};
+    result.nodes.push_back({.id = "joint", .name = "Joint"});
+    result.nodes.push_back({.id = "goal", .name = "Goal"});
+    result.nodes[1].transform.position = {1.0F, 0.0F};
+    result.nodes[2].transform.position = {0.0F, 1.0F};
+    result.ik_chains.push_back({.id = "arm", .joints = {"root", "joint"},
+                                .target_node = "goal", .max_iterations = 32,
+                                .tolerance = 1.0e-4F});
+    result.deformation_mesh = fabric::project::DeformationMesh{
+        .vertices = {{.rest_position = {0.0F, 0.0F},
+                      .influences = {{.node_id = "joint", .weight = 1.0F}}}},
+        .triangles = {}};
+    return result;
+}
+
+fabric::project::MapDocument map_with_ik_entity() {
+    auto result = map();
+    result.instances.push_back({"ik", fabric::project::ResourceReference{
+                                    {.value = "ik-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_texture_entity() {
     auto result = map();
     result.instances.push_back({"textured",
@@ -417,6 +442,29 @@ TEST_CASE("preview runtime resolves ordered entity constraints before deformatio
     REQUIRE(deformation->ok());
     REQUIRE(deformation->positions.size() == 1U);
     CHECK(deformation->positions.front() == fabric::core::Vec2{3.0F, 4.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves persisted FABRIK chains before deformation") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-ik-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_ik_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), ik_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto deformation = runtime.evaluate_instance_deformation("ik");
+    REQUIRE(deformation.has_value());
+    REQUIRE(deformation->ok());
+    REQUIRE(deformation->positions.size() == 1U);
+    CHECK(deformation->positions.front() == fabric::core::Vec2{0.0F, 1.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

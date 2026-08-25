@@ -136,6 +136,22 @@ TEST_CASE("entity constraints round-trip and require existing nodes") {
     REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
 }
 
+TEST_CASE("entity FABRIK chains round-trip and validate node references") {
+    auto source = entity();
+    source.nodes.push_back({.id = "goal", .name = "Goal"});
+    source.ik_chains.push_back({.id = "arm", .joints = {"root", "child"},
+                                .target_node = "goal", .max_iterations = 24,
+                                .tolerance = 1.0e-4F});
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(*parsed.entity == source);
+
+    auto invalid = source;
+    invalid.ik_chains.front().target_node = "child";
+    REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
+}
+
 TEST_CASE("entity deformation mesh round-trips and requires valid nodes") {
     auto source = entity();
     source.deformation_mesh = fabric::project::DeformationMesh{};
