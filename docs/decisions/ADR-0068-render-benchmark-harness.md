@@ -5,8 +5,9 @@
 `fabric_render_benchmark` génère par défaut 10 000 quads visibles dans une
 fenêtre SDL2/OpenGL cachée et mesure 600 frames sans synchronisation verticale.
 Il rapporte le nombre de packets dessinés, draw calls, triangles, durée totale,
-p95 frame time et FPS dérivé du p95. Les paramètres `--packets` et `--frames`
-permettent les comparaisons contrôlées.
+p95 frame time et FPS dérivé du p95. Les paramètres `--packets`, `--frames`,
+`--min-fps` et `--report` permettent respectivement les comparaisons contrôlées,
+un seuil explicite et l’archivage JSON des métriques.
 
 Le benchmark est un outil manuel/release et ne devient pas un test PR
 fluctuant. L’absence de contexte OpenGL est une erreur explicite ; aucun

@@ -9,6 +9,8 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <span>
 #include <string_view>
@@ -21,6 +23,8 @@ struct Options {
     std::size_t frames{600U};
     std::int32_t width{1440};
     std::int32_t height{900};
+    double minimum_fps{};
+    std::filesystem::path report;
 };
 
 bool parse_positive(const char* value, std::size_t& output) {
@@ -34,6 +38,17 @@ bool parse_positive(const char* value, std::size_t& output) {
     }
 }
 
+bool parse_non_negative(const char* value, double& output) {
+    try {
+        const auto parsed = std::stod(value);
+        if (!std::isfinite(parsed) || parsed < 0.0) return false;
+        output = parsed;
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
 bool parse_options(const int argc, char** argv, Options& options) {
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
@@ -41,8 +56,13 @@ bool parse_options(const int argc, char** argv, Options& options) {
             if (!parse_positive(argv[++index], options.packets)) return false;
         } else if (argument == "--frames" && index + 1 < argc) {
             if (!parse_positive(argv[++index], options.frames)) return false;
+        } else if (argument == "--min-fps" && index + 1 < argc) {
+            if (!parse_non_negative(argv[++index], options.minimum_fps)) return false;
+        } else if (argument == "--report" && index + 1 < argc) {
+            options.report = argv[++index];
+            if (options.report.empty()) return false;
         } else if (argument == "--help") {
-            std::cout << "usage: fabric_render_benchmark [--packets N] [--frames N]\n";
+            std::cout << "usage: fabric_render_benchmark [--packets N] [--frames N] [--min-fps N] [--report path]\n";
             return false;
         } else {
             return false;
@@ -164,6 +184,40 @@ int main(int argc, char** argv) {
     const auto p95_index = std::min(frame_times.size() - 1U,
         static_cast<std::size_t>(std::ceil(static_cast<double>(frame_times.size()) * 0.95)) - 1U);
     const auto p95 = frame_times[p95_index];
+    const auto fps = p95 > 0.0 ? 1000.0 / p95 : 0.0;
+    const bool passed = packets_drawn == options.packets && fps >= options.minimum_fps;
+    if (!options.report.empty()) {
+        std::ofstream report(options.report, std::ios::binary | std::ios::trunc);
+        if (!report) {
+            std::cerr << "error=report_open\n";
+            renderer.shutdown();
+            SDL_GL_DeleteContext(context);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+        report << "{\n"
+               << "  \"packets\": " << options.packets << ",\n"
+               << "  \"framesRequested\": " << options.frames << ",\n"
+               << "  \"minimumFps\": " << options.minimum_fps << ",\n"
+               << "  \"packetsDrawn\": " << packets_drawn << ",\n"
+               << "  \"frames\": " << options.frames << ",\n"
+               << "  \"drawCallsTotal\": " << total_draw_calls << ",\n"
+               << "  \"trianglesTotal\": " << total_triangles << ",\n"
+               << "  \"elapsedMs\": " << elapsed_ms << ",\n"
+               << "  \"p95FrameMs\": " << p95 << ",\n"
+               << "  \"fpsP95\": " << fps << ",\n"
+               << "  \"passed\": " << (passed ? "true" : "false") << "\n"
+               << "}\n";
+        if (!report) {
+            std::cerr << "error=report_write\n";
+            renderer.shutdown();
+            SDL_GL_DeleteContext(context);
+            SDL_DestroyWindow(window);
+            SDL_Quit();
+            return 1;
+        }
+    }
     std::cout << "packets=" << options.packets
               << " packets_drawn=" << packets_drawn
               << " frames=" << options.frames
@@ -171,10 +225,10 @@ int main(int argc, char** argv) {
               << " triangles_total=" << total_triangles
               << " elapsed_ms=" << elapsed_ms
               << " p95_frame_ms=" << p95
-              << " fps_p95=" << (p95 > 0.0 ? 1000.0 / p95 : 0.0) << '\n';
+              << " fps_p95=" << fps << '\n';
     renderer.shutdown();
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    return packets_drawn == options.packets ? 0 : 1;
+    return passed ? 0 : 1;
 }

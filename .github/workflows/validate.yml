@@ -63,7 +63,7 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
 
       - name: Build runtime benchmark
-        run: cmake --build build --config Release --target fabric_runtime_benchmark --parallel
+        run: cmake --build build --config Release --target fabric_runtime_benchmark fabric_render_benchmark --parallel
 
       - name: Run runtime benchmark on Linux
         if: runner.os == 'Linux'
@@ -78,9 +78,22 @@ jobs:
         shell: pwsh
         run: .\build\Release\fabric_runtime_benchmark.exe --instances 10000 --frames 600 --min-fps 60 --report runtime-benchmark-windows.json
 
-      - name: Archive runtime benchmark report
+      - name: Run renderer benchmark on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./build/fabric_render_benchmark --packets 10000 --frames 600 --min-fps 60 --report render-benchmark-linux.json
+
+      - name: Run renderer benchmark on macOS
+        if: runner.os == 'macOS'
+        run: ./build/fabric_render_benchmark --packets 10000 --frames 600 --min-fps 60 --report render-benchmark-macos.json
+
+      - name: Run renderer benchmark on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\Release\fabric_render_benchmark.exe --packets 10000 --frames 600 --min-fps 60 --report render-benchmark-windows.json
+
+      - name: Archive benchmark reports
         uses: actions/upload-artifact@v4
         with:
           name: runtime-benchmark-${{ runner.os }}
-          path: runtime-benchmark-*.json
+          path: '*-benchmark-*.json'
           if-no-files-found: error
