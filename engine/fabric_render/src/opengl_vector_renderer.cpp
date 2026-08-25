@@ -488,8 +488,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 glBindTexture(GL_TEXTURE_2D, texture->handle);
                 glColor4f(1.0F, 1.0F, 1.0F, packet.image_fill->opacity);
                 glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex),
-                                  reinterpret_cast<const void*>(
-                                      2U * sizeof(float)));
+                                  reinterpret_cast<const std::byte*>(
+                                      vertex_scratch_.data()) +
+                                      2U * sizeof(float));
             } else {
                 glDisable(GL_TEXTURE_2D);
                 glDisableClientState(GL_TEXTURE_COORD_ARRAY);
