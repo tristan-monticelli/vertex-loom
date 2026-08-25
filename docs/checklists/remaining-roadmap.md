@@ -299,6 +299,8 @@ une seule commande.
 Le canvas accepte maintenant `Delete`, les flèches directionnelles et `Ctrl+D`
 pour supprimer, nudger ou dupliquer la sélection, avec la même validation et
 le même historique que les boutons.
+`F` cadre la sélection et `Home` cadre toutes les instances visibles sans
+capturer les touches pendant l’édition de texte.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

@@ -464,6 +464,15 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             pan.y += io.MouseDelta.y;
         }
         if (!io.WantTextInput && !placement_mode && !gizmo.active &&
+            !point_gizmo.active && !selection_box.active) {
+            if (ImGui::IsKeyPressed(ImGuiKey_F, false))
+                status = frame_instances(true) ? "Selection framed"
+                                               : "No visible selected instance to frame";
+            if (ImGui::IsKeyPressed(ImGuiKey_Home, false))
+                status = frame_instances(false) ? "Map framed"
+                                                : "No visible instance to frame";
+        }
+        if (!io.WantTextInput && !placement_mode && !gizmo.active &&
             !point_gizmo.active && !selection_box.active && !selected_instances.empty()) {
             std::vector<fabric::core::ResourceId> ids;
             for (const auto& id : selected_instances) ids.push_back({.value = id});
