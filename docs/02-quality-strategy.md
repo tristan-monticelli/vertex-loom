@@ -103,6 +103,11 @@ bounds, ancrages, bindings, variantes et instances. Les tests vérifient la
 priorité défaut → variante → instance, la découverte des propriétés animables,
 la publication atomique, les types incompatibles, les cibles absentes et les
 cycles composant/composition dans le validateur headless.
+La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
+avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
+octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La
+régénération volontaire s'effectue sur une destination absente avec
+`FABRIC_UPDATE_STUDIO_PRESET_FIXTURE=1 ./build/fabric_visual_presets_tests`.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

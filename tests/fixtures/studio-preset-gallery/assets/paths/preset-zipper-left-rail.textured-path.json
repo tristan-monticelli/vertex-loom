@@ -1,0 +1,56 @@
+{
+  "cap": "round",
+  "closed": false,
+  "color": {
+    "alpha": 1.0,
+    "blue": 1.0,
+    "green": 1.0,
+    "red": 1.0
+  },
+  "commands": [
+    {
+      "kind": "move",
+      "point": {
+        "x": -0.41999998688697815,
+        "y": -2.0
+      }
+    },
+    {
+      "control1": {
+        "x": -0.5,
+        "y": -0.699999988079071
+      },
+      "control2": {
+        "x": -0.3399999737739563,
+        "y": 0.699999988079071
+      },
+      "kind": "cubic",
+      "point": {
+        "x": -0.41999998688697815,
+        "y": 2.0
+      }
+    }
+  ],
+  "id": "preset-zipper-left-rail",
+  "join": "round",
+  "miterLimit": 4.0,
+  "name": "Zipper Left rail",
+  "opacity": 1.0,
+  "schemaVersion": 1,
+  "texture": {
+    "expectedType": "texture",
+    "id": "cotton-thread"
+  },
+  "type": "texturedPath",
+  "uvMode": "repeat",
+  "uvOffset": {
+    "x": 0.0,
+    "y": 0.0
+  },
+  "uvScale": {
+    "x": 5.0,
+    "y": 1.0
+  },
+  "width": 0.11999999731779099,
+  "widthProfile": []
+}

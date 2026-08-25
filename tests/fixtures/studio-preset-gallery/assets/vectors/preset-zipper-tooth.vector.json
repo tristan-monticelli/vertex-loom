@@ -1,0 +1,60 @@
+{
+  "id": "preset-zipper-tooth",
+  "name": "Zipper Tooth",
+  "native": {
+    "nodes": [
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.47999998927116394,
+            "green": 0.7200000286102295,
+            "red": 0.8199999928474426
+          },
+          "kind": "solid"
+        },
+        "id": "tooth",
+        "locked": false,
+        "name": "Tooth",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.3100000023841858,
+              "y": -0.09000000357627869
+            },
+            "size": {
+              "x": 0.6200000047683716,
+              "y": 0.18000000715255737
+            }
+          },
+          "id": "tooth-shape",
+          "kind": "rectangle"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      }
+    ],
+    "origin": "center",
+    "size": {
+      "x": 0.6200000047683716,
+      "y": 0.18000000715255737
+    }
+  },
+  "schemaVersion": 2,
+  "sourceKind": "native",
+  "type": "vector"
+}

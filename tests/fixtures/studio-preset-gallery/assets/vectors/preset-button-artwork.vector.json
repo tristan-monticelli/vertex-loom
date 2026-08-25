@@ -1,0 +1,236 @@
+{
+  "id": "preset-button-artwork",
+  "name": "Button Artwork",
+  "native": {
+    "nodes": [
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.18000000715255737,
+            "green": 0.23999999463558197,
+            "red": 0.7200000286102295
+          },
+          "kind": "solid"
+        },
+        "id": "body",
+        "locked": false,
+        "name": "Button body",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.75,
+              "y": -0.75
+            },
+            "size": {
+              "x": 1.5,
+              "y": 1.5
+            }
+          },
+          "id": "body-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      },
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.05999999865889549,
+            "green": 0.07999999821186066,
+            "red": 0.11999999731779099
+          },
+          "kind": "solid"
+        },
+        "id": "hole-1",
+        "locked": false,
+        "name": "Thread hole",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.39000001549720764,
+              "y": -0.39000001549720764
+            },
+            "size": {
+              "x": 0.23999999463558197,
+              "y": 0.23999999463558197
+            }
+          },
+          "id": "hole-1-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      },
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.05999999865889549,
+            "green": 0.07999999821186066,
+            "red": 0.11999999731779099
+          },
+          "kind": "solid"
+        },
+        "id": "hole-2",
+        "locked": false,
+        "name": "Thread hole",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": 0.15000000596046448,
+              "y": -0.39000001549720764
+            },
+            "size": {
+              "x": 0.23999999463558197,
+              "y": 0.23999999463558197
+            }
+          },
+          "id": "hole-2-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      },
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.05999999865889549,
+            "green": 0.07999999821186066,
+            "red": 0.11999999731779099
+          },
+          "kind": "solid"
+        },
+        "id": "hole-3",
+        "locked": false,
+        "name": "Thread hole",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.39000001549720764,
+              "y": 0.15000000596046448
+            },
+            "size": {
+              "x": 0.23999999463558197,
+              "y": 0.23999999463558197
+            }
+          },
+          "id": "hole-3-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      },
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.05999999865889549,
+            "green": 0.07999999821186066,
+            "red": 0.11999999731779099
+          },
+          "kind": "solid"
+        },
+        "id": "hole-4",
+        "locked": false,
+        "name": "Thread hole",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": 0.15000000596046448,
+              "y": 0.15000000596046448
+            },
+            "size": {
+              "x": 0.23999999463558197,
+              "y": 0.23999999463558197
+            }
+          },
+          "id": "hole-4-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      }
+    ],
+    "origin": "center",
+    "size": {
+      "x": 1.5,
+      "y": 1.5
+    }
+  },
+  "schemaVersion": 2,
+  "sourceKind": "native",
+  "type": "vector"
+}

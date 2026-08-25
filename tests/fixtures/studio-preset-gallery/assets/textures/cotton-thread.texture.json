@@ -1,0 +1,10 @@
+{
+  "height": 2,
+  "id": "cotton-thread",
+  "name": "Cotton Thread",
+  "pixelFormat": "rgba8",
+  "schemaVersion": 1,
+  "source": "assets/textures/cotton-thread.png",
+  "type": "texture",
+  "width": 2
+}

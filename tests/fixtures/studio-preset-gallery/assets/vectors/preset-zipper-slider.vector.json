@@ -1,0 +1,104 @@
+{
+  "id": "preset-zipper-slider",
+  "name": "Zipper Slider",
+  "native": {
+    "nodes": [
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.30000001192092896,
+            "green": 0.5799999833106995,
+            "red": 0.7400000095367432
+          },
+          "kind": "solid"
+        },
+        "id": "body",
+        "locked": false,
+        "name": "Slider body",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.44999998807907104,
+              "y": -0.3499999940395355
+            },
+            "size": {
+              "x": 0.8999999761581421,
+              "y": 0.699999988079071
+            }
+          },
+          "id": "body-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      },
+      {
+        "fill": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.07999999821186066,
+            "green": 0.12999999523162842,
+            "red": 0.18000000715255737
+          },
+          "kind": "solid"
+        },
+        "id": "opening",
+        "locked": false,
+        "name": "Slider opening",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -0.18000000715255737,
+              "y": -0.14000000059604645
+            },
+            "size": {
+              "x": 0.36000001430511475,
+              "y": 0.2800000011920929
+            }
+          },
+          "id": "opening-shape",
+          "kind": "ellipse"
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      }
+    ],
+    "origin": "center",
+    "size": {
+      "x": 0.8999999761581421,
+      "y": 0.699999988079071
+    }
+  },
+  "schemaVersion": 2,
+  "sourceKind": "native",
+  "type": "vector"
+}

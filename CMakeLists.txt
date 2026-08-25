@@ -514,8 +514,10 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_visual_presets_tests
         tests/cpp/visual_presets_tests.cpp
     )
+    target_compile_definitions(fabric_visual_presets_tests PRIVATE
+        FABRIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(fabric_visual_presets_tests PRIVATE
-        fabric_editor Catch2::Catch2WithMain)
+        fabric_editor fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_visual_presets_tests
              COMMAND fabric_visual_presets_tests)
 

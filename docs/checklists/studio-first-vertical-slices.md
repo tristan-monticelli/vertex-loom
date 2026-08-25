@@ -40,9 +40,13 @@ PNG après sauvegarde, autosave et récupération.
   composants et chemins texturés.
 - [x] Ajouter `VisualComponent v1`, instances, variantes, ancrages, paramètres
   typés, bounds et propriétés animables.
-- [ ] Livrer les presets œil, bouton, couture et fermeture éclair composée de
+- [x] Livrer les presets œil, bouton, couture et fermeture éclair composée de
   deux rails texturés, dents répétées et curseur, sans logique spéciale dans le
   renderer.
+
+  Preuve : `tests/fixtures/studio-preset-gallery` est produit par
+  `ProjectSession`/`MapSession`, régénéré octet par octet en test, validé
+  headless et chargé par Preview Runtime avec 24 draw packets génériques.
 - [ ] Ajouter dans Asset Studio l'arbre de calques, le placement, le Z, la
   visibilité, les ancrages, la duplication et les paramètres.
 - [ ] Construire une tête textile avec crop raster, deux yeux paramétriques,

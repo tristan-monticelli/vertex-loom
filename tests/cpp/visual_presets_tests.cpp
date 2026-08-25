@@ -1,13 +1,21 @@
+#include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/map_session.hpp"
+#include "fabric/editor/project_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/runtime/preview_runtime.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -46,6 +54,100 @@ void publish_thread_texture(const std::filesystem::path& root) {
          .width = 8U,
          .height = 8U},
         input).ok());
+}
+
+void write_thread_png(const std::filesystem::path& path) {
+    constexpr std::array<unsigned char, 79> png{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00,
+        0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x02,
+        0x00, 0x00, 0x00, 0x02, 0x08, 0x06, 0x00, 0x00, 0x00, 0x72,
+        0xb6, 0x0d, 0x24, 0x00, 0x00, 0x00, 0x14, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0xda, 0x63, 0x64, 0x60, 0xf8, 0xff, 0x9f, 0x81,
+        0x81, 0x81, 0x81, 0x89, 0x01, 0x0a, 0x00, 0x1e, 0x04, 0x02,
+        0x01, 0x06, 0xca, 0xf1, 0x64, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    std::ofstream output(path, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(png.data()),
+                 static_cast<std::streamsize>(png.size()));
+}
+
+void create_studio_preset_fixture(const std::filesystem::path& root) {
+    fabric::editor::ProjectSession assets;
+    REQUIRE(assets.create(root, {
+        .schema_version = fabric::project::current_schema_version,
+        .id = {.value = "studio-preset-gallery"},
+        .name = "Studio Preset Gallery"}));
+
+    auto source = temporary_root("fabric-studio-thread");
+    source += ".png";
+    write_thread_png(source);
+    REQUIRE(assets.import_png(source, {.value = "cotton-thread"},
+                              "Cotton Thread"));
+    std::error_code ignored;
+    std::filesystem::remove(source, ignored);
+
+    const std::array presets{
+        std::pair{fabric::editor::VisualPresetKind::eye, "preset-eye"},
+        std::pair{fabric::editor::VisualPresetKind::button, "preset-button"},
+        std::pair{fabric::editor::VisualPresetKind::seam, "preset-seam"},
+        std::pair{fabric::editor::VisualPresetKind::zipper, "preset-zipper"}};
+    for (const auto [kind, id] : presets) {
+        REQUIRE(assets.create_visual_preset({
+            .kind = kind,
+            .id = {.value = id},
+            .name = std::string{fabric::editor::label(kind)},
+            .thread_texture = fabric::project::ResourceReference{
+                {.value = "cotton-thread"}, "texture"},
+            .zipper_tooth_count = 10U}));
+        fabric::editor::CreateEntityPrompt entity;
+        entity.name = std::string{id} + " entity";
+        entity.node_name = "Visual";
+        entity.drawable =
+            fabric::project::EntityDrawableKind::visual_component;
+        entity.resource_id = id;
+        REQUIRE(assets.create_entity(entity));
+    }
+
+    fabric::editor::MapSession map;
+    REQUIRE(map.create(root, {
+        .document = {.schema_version =
+                         fabric::project::current_map_schema_version,
+                     .type = "map",
+                     .id = {.value = "preset-gallery"},
+                     .name = "Preset Gallery"},
+        .layers = {{"instances", "Instances",
+                    fabric::project::MapLayerKind::instances,
+                    true, false, 0.0F}}}));
+    const std::array<float, 4> positions{-6.0F, -2.0F, 2.0F, 6.0F};
+    for (std::size_t index = 0; index < presets.size(); ++index) {
+        const auto id = std::string{presets[index].second};
+        REQUIRE(map.place_instance({
+            .id = id,
+            .entity = fabric::project::ResourceReference{
+                {.value = id + "-entity"}, "entity"},
+            .layer_id = "instances",
+            .transform = {.position = {positions[index], 0.0F}}},
+            {.enabled = false}));
+    }
+    REQUIRE(map.save());
+}
+
+std::vector<std::filesystem::path> fixture_files(
+    const std::filesystem::path& root) {
+    std::vector<std::filesystem::path> result;
+    for (const auto& entry :
+         std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file())
+            result.push_back(entry.path().lexically_relative(root));
+    }
+    std::ranges::sort(result);
+    return result;
+}
+
+std::string read_binary(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>{input},
+            std::istreambuf_iterator<char>{}};
 }
 
 } // namespace
@@ -149,4 +251,36 @@ TEST_CASE("preset publication creates a headless-valid resource graph") {
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("versioned preset gallery is generated by Studio and loads in runtime") {
+    const auto fixture = std::filesystem::path{FABRIC_SOURCE_DIR} /
+        "tests/fixtures/studio-preset-gallery";
+    if (std::getenv("FABRIC_UPDATE_STUDIO_PRESET_FIXTURE") != nullptr) {
+        REQUIRE_FALSE(std::filesystem::exists(fixture));
+        create_studio_preset_fixture(fixture);
+    }
+    REQUIRE(std::filesystem::is_directory(fixture));
+
+    const auto regenerated = temporary_root("fabric-regenerated-presets");
+    create_studio_preset_fixture(regenerated);
+    const auto expected_files = fixture_files(fixture);
+    const auto regenerated_files = fixture_files(regenerated);
+    REQUIRE(regenerated_files == expected_files);
+    for (const auto& relative : expected_files) {
+        CHECK(read_binary(regenerated / relative) ==
+              read_binary(fixture / relative));
+    }
+    REQUIRE(fabric::project::validate_project(fixture).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = fixture,
+                          .map_id = {.value = "preset-gallery"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.map()->instances.size() == 4U);
+    REQUIRE(runtime.run());
+    CHECK(runtime.last_frame_packets().size() == 24U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(regenerated, ignored);
 }
