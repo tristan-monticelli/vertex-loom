@@ -1534,12 +1534,33 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (clip.tracks.empty()) {
                 ImGui::TextDisabled("No tracks yet.");
             }
-            for (const auto& track : clip.tracks) {
+            bool key_removed = false;
+            for (std::size_t track_index = 0;
+                 track_index < clip.tracks.size() && !key_removed;
+                 ++track_index) {
+                const auto& track = clip.tracks[track_index];
                 ImGui::TextWrapped("%s / %s / %s (%zu keys)",
                                    track.binding.node_id.c_str(),
                                    track.binding.component_id.c_str(),
                                    track.binding.property_id.c_str(),
                                    track.keys.size());
+                for (std::size_t key_index = 0;
+                     key_index < track.keys.size(); ++key_index) {
+                    const auto& key = track.keys[key_index];
+                    ImGui::BulletText("key %zu · %.2f s", key_index, key.time);
+                    ImGui::SameLine();
+                    const auto button_id = "Remove##animation-key-" +
+                        std::to_string(track_index) + "-" +
+                        std::to_string(key_index);
+                    if (ImGui::SmallButton(button_id.c_str())) {
+                        key_removed = session.remove_selected_animation_key(
+                            track.binding, key_index);
+                        status = key_removed
+                            ? "Animation key removed."
+                            : "Animation key could not be removed; inspect diagnostics.";
+                        break;
+                    }
+                }
             }
         }
     } else {

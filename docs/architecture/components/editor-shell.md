@@ -155,4 +155,5 @@ C4Component
 - L’inspecteur d’animation expose une première timeline générique : durée,
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,
-  récupération et sauvegarde atomique que les autres documents éditables.
+  récupération et sauvegarde atomique que les autres documents éditables ; les
+  clés existantes peuvent être supprimées sauf la dernière clé d’une track.

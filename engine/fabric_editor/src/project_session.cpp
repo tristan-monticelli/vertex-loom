@@ -1315,6 +1315,22 @@ bool ProjectSession::insert_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::remove_selected_animation_key(
+    project::PropertyBinding binding, const std::size_t key_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.remove_key(binding, key_index)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys",
+                    "the key does not exist or is the last key of its track"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.undo()) {
         return false;

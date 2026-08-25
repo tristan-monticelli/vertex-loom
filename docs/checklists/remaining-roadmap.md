@@ -253,6 +253,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   suppressions qui laisseraient des enfants orphelins.
 - [x] Rendre les clips éditables : durée, boucle, première piste générique,
   clés `Vec2` et interpolation dans Asset Studio.
+- [x] Lister les clés d’une track et supprimer une clé de façon undoable, en
+  conservant au moins une clé par track.
 - [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
   viewport OpenGL, avec composition des transforms et matériaux.
 - [ ] Refuser cycles, références invalides et valeurs non finies.

@@ -283,6 +283,16 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_animation()->tracks.empty());
     REQUIRE(session.redo(start));
     REQUIRE(session.selected_animation()->tracks.size() == 1U);
+    REQUIRE(session.insert_selected_animation_key(
+        {.node_id = "root", .component_id = "transform",
+         .property_id = "position"},
+        2.0F, fabric::core::Vec2{3.0F, 4.0F},
+        fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.remove_selected_animation_key(
+        {.node_id = "root", .component_id = "transform",
+         .property_id = "position"},
+        1U, start));
+    CHECK(session.selected_animation()->tracks.front().keys.size() == 1U);
     REQUIRE(session.update_autosave(start + std::chrono::seconds{2}) ==
             fabric::editor::AutosaveStatus::saved);
     fabric::editor::ProjectSession recovered;
