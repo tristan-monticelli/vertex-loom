@@ -5,7 +5,7 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-        Container(runtime, "Game Runtime", "C++20 / CMake", "Point d'entrée du runtime ; SDL2, OpenGL et la boucle de jeu viendront dans les slices suivants")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge une map, exécute Box2D à pas fixe et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, fills, entités et animations")
         Container(map, "Map Studio", "C++20 / CMake", "Édite les maps, événements et triggers via MapSession ; UI Dear ImGui à venir")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique et exécute les pas fixes validés")
@@ -29,6 +29,7 @@ C4Container
     Rel(map, physics, "Construit et inspecte la physique")
     Rel(physics, runtime, "Fournit le monde physique")
     Rel(runtime, projectlib, "Charge")
+    Rel(runtime, renderlib, "Rend les draw packets")
     Rel(projectcli, projectlib, "Utilise")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")

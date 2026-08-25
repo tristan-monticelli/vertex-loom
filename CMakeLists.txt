@@ -87,7 +87,6 @@ target_include_directories(fabric_physics PUBLIC engine/fabric_physics/include)
 target_compile_features(fabric_physics PUBLIC cxx_std_20)
 target_link_libraries(fabric_physics PUBLIC box2d PRIVATE fabric_project)
 
-
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
@@ -147,6 +146,14 @@ target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
     SDL2::SDL2-static
     SDL2_image::SDL2_image-static
 )
+
+add_library(fabric_runtime STATIC
+    engine/fabric_runtime/src/preview_runtime.cpp
+)
+target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include)
+target_compile_features(fabric_runtime PUBLIC cxx_std_20)
+target_link_libraries(fabric_runtime PUBLIC fabric_project fabric_physics fabric_render
+    PRIVATE SDL2::SDL2-static)
 
 add_executable(fabric_asset_preview tools/asset_preview/main.cpp)
 target_link_libraries(fabric_asset_preview PRIVATE
@@ -217,7 +224,8 @@ endif()
 
 if(FABRIC_BUILD_RUNTIME)
     add_executable(game_runtime game/runtime/main.cpp)
-    target_link_libraries(game_runtime PRIVATE fabric_project)
+    target_compile_definitions(game_runtime PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(game_runtime PRIVATE fabric_runtime)
 endif()
 
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
@@ -330,6 +338,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_map_session_tests PRIVATE
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_map_session_tests COMMAND fabric_map_session_tests)
+
+    add_executable(fabric_preview_runtime_tests tests/cpp/preview_runtime_tests.cpp)
+    target_link_libraries(fabric_preview_runtime_tests PRIVATE
+        fabric_runtime Catch2::Catch2WithMain)
+    add_test(NAME fabric_preview_runtime_tests COMMAND fabric_preview_runtime_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp

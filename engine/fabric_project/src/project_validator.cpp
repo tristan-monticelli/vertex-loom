@@ -197,7 +197,7 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         ".animation.json", "assets.animations", load_animation,
         animation_resource_references, registry, result.errors);
     inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, ".",
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, "",
         ".map.json", "maps", load_map, map_resource_references,
         registry, result.errors);
     const auto entity_directory = project_root / loaded.manifest->directories.entities;
