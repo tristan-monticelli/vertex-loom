@@ -151,6 +151,34 @@ TEST_CASE("map session snaps placement on a configurable grid") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map session autosaves and offers newer valid recovery") {
+    using namespace std::chrono_literals;
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-map-recovery-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    fabric::editor::MapSession session;
+    REQUIRE(session.create(root, map()));
+    REQUIRE(session.place_instance(instance("hero", 3.0F)));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    CHECK(session.update_autosave(start) == fabric::editor::AutosaveStatus::not_due);
+    CHECK(session.update_autosave(start + 2s) == fabric::editor::AutosaveStatus::saved);
+
+    fabric::editor::MapSession reopened;
+    REQUIRE(reopened.open(root, {.value = "session"}));
+    REQUIRE(reopened.has_recovery());
+    CHECK(reopened.map()->instances.empty());
+    REQUIRE(reopened.accept_recovery(start + 3s));
+    CHECK(reopened.map()->instances.size() == 1U);
+    CHECK(reopened.map()->instances.front().id == "hero");
+    CHECK(reopened.dirty());
+    REQUIRE(reopened.save());
+    CHECK_FALSE(reopened.has_recovery());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("map session edits layer state and prefab overrides undoably") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-map-layer-" + std::to_string(

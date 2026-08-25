@@ -316,8 +316,13 @@ capturer les touches pendant l’édition de texte.
   et ajustent automatiquement le zoom sur les instances visibles.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
-- [ ] Appliquer commandes, autosave, récupération et validation headless à
-  toutes les opérations.
+- [x] Appliquer commandes, autosave, récupération proposée et validation
+  headless à toutes les opérations de `MapSession`.
+
+`MapSession` écrit désormais les maps dirty dans le miroir autosave après
+inactivité, valide le document avant publication atomique et propose la
+récupération uniquement pour un autosave valide plus récent. Le document
+principal reste inchangé jusqu’à un Save explicite.
 
 Gate : une map vectorielle de référence est éditable, sauvegardée, validée et
 inspectable avec collisions et événements.

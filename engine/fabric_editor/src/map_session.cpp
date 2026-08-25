@@ -1,4 +1,5 @@
 #include "fabric/editor/map_session.hpp"
+#include "fabric/project/document_storage.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -79,6 +80,12 @@ bool instance_locked(const project::MapDocument& map, const std::size_t index) {
     return layer && map.layers[*layer].locked;
 }
 
+project::ValidationReport validate_serialized_map(
+    const project::ProjectManifest& manifest, const std::string_view contents) {
+    const auto parsed = project::parse_map(manifest, contents);
+    return {.errors = parsed.errors};
+}
+
 } // namespace
 
 core::Vec2 MapSession::snap_position(const core::Vec2 position,
@@ -100,7 +107,11 @@ bool MapSession::create(const std::filesystem::path& project_root,
     if (!project::validate_map(*loaded.manifest, map).ok()) return false;
     manifest_ = std::move(*loaded.manifest);
     map_ = map;
+    map_document_path_ = project::map_document_path(
+        *manifest_, {.value = map.document.id.value});
+    recovery_map_.reset();
     commands_.clear();
+    autosave_.reset();
     errors_.clear();
     return save();
 }
@@ -116,8 +127,24 @@ bool MapSession::open(const std::filesystem::path& project_root,
     if (!loaded_map.ok()) { errors_ = std::move(loaded_map.errors); return false; }
     manifest_ = std::move(*loaded.manifest);
     map_ = std::move(*loaded_map.asset);
+    map_document_path_ = project::map_document_path(
+        *manifest_, map_->document.id);
+    recovery_map_.reset();
     commands_.clear();
+    autosave_.reset();
     errors_.clear();
+    const auto recovery = project::inspect_recovery(
+        project_root_, map_document_path_,
+        [this](const std::string_view contents) {
+            return validate_serialized_map(*manifest_, contents);
+        });
+    if (recovery.candidate.has_value()) {
+        const auto parsed = project::parse_map(
+            *manifest_, recovery.candidate->contents);
+        if (parsed.ok()) recovery_map_ = std::move(*parsed.asset);
+    } else if (!recovery.errors.empty()) {
+        errors_ = recovery.errors;
+    }
     return true;
 }
 
@@ -126,8 +153,51 @@ bool MapSession::save() {
     const auto result = project::publish_map(project_root_, *manifest_, *map_);
     if (!result.ok()) { errors_ = result.errors; return false; }
     commands_.mark_clean();
+    autosave_.reset();
     errors_.clear();
     return true;
+}
+
+AutosaveStatus MapSession::update_autosave(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!map_ || !manifest_ || map_document_path_.empty()) {
+        autosave_.reset();
+        return AutosaveStatus::not_due;
+    }
+    if (!commands_.dirty()) {
+        if (!autosave_.pending()) return AutosaveStatus::not_due;
+    } else if (!autosave_.pending()) {
+        autosave_.mark_changed(now);
+    }
+    if (!autosave_.due(now)) return AutosaveStatus::not_due;
+    const auto report = project::save_autosave_atomic(
+        project_root_, map_document_path_, project::serialize_map(*map_),
+        [this](const std::string_view contents) {
+            return validate_serialized_map(*manifest_, contents);
+        });
+    if (!report.ok()) {
+        errors_ = report.errors;
+        return AutosaveStatus::failed;
+    }
+    autosave_.mark_saved();
+    errors_.clear();
+    return AutosaveStatus::saved;
+}
+
+bool MapSession::accept_recovery(const AutosaveScheduler::Clock::time_point now) {
+    if (!recovery_map_) return false;
+    map_ = std::move(recovery_map_);
+    recovery_map_.reset();
+    commands_.clear();
+    commands_.mark_dirty();
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+void MapSession::decline_recovery() noexcept {
+    recovery_map_.reset();
+    errors_.clear();
 }
 
 bool MapSession::place_instance(project::MapInstance instance,

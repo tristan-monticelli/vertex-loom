@@ -16,12 +16,6 @@ namespace fabric::editor {
 
 struct CreateVectorArtworkPrompt;
 
-enum class AutosaveStatus {
-    not_due,
-    saved,
-    failed,
-};
-
 enum class StudioResourceKind {
     texture,
     vector,

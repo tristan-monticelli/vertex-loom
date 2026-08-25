@@ -5,6 +5,12 @@
 
 namespace fabric::editor {
 
+enum class AutosaveStatus {
+    not_due,
+    saved,
+    failed,
+};
+
 class AutosaveScheduler {
 public:
     using Clock = std::chrono::steady_clock;

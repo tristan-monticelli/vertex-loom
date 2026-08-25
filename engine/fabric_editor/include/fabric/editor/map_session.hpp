@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/map.hpp"
 
@@ -22,6 +23,11 @@ public:
     [[nodiscard]] bool open(const std::filesystem::path& project_root,
                             const core::ResourceId& map_id);
     [[nodiscard]] bool save();
+    [[nodiscard]] AutosaveStatus update_autosave(
+        AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool accept_recovery(
+        AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());
+    void decline_recovery() noexcept;
     [[nodiscard]] bool place_instance(project::MapInstance instance,
                                        MapSnapSettings snapping = {});
     [[nodiscard]] bool remove_instance(const core::ResourceId& instance_id);
@@ -69,14 +75,18 @@ public:
     [[nodiscard]] bool dirty() const noexcept { return commands_.dirty(); }
     [[nodiscard]] bool can_undo() const noexcept { return commands_.can_undo(); }
     [[nodiscard]] bool can_redo() const noexcept { return commands_.can_redo(); }
+    [[nodiscard]] bool has_recovery() const noexcept { return recovery_map_.has_value(); }
     [[nodiscard]] const std::optional<project::MapDocument>& map() const noexcept { return map_; }
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept { return errors_; }
 
 private:
     std::filesystem::path project_root_;
+    std::filesystem::path map_document_path_;
     std::optional<project::ProjectManifest> manifest_;
     std::optional<project::MapDocument> map_;
+    std::optional<project::MapDocument> recovery_map_;
     CommandStack commands_;
+    AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
 };
 

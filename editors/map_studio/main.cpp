@@ -874,6 +874,8 @@ int run(const std::filesystem::path& project_root,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+        if (session.update_autosave() == fabric::editor::AutosaveStatus::failed)
+            status = "Map autosave failed";
         ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
         ImGui::Begin("Map Studio", nullptr,
@@ -883,6 +885,21 @@ int run(const std::filesystem::path& project_root,
             ImGui::TextWrapped("Open a map with: map_studio <project-directory> <map-id>");
             draw_errors(session);
         } else {
+            if (session.has_recovery()) {
+                ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
+                                   "A newer valid map autosave is available.");
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Recover")) {
+                    status = session.accept_recovery()
+                        ? "Map autosave recovered; save to publish it"
+                        : "Map recovery failed";
+                }
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Dismiss recovery")) {
+                    session.decline_recovery();
+                    status = "Map recovery dismissed";
+                }
+            }
             const auto& map = *session.map();
             if (active_layer_id.empty() && !map.layers.empty())
                 active_layer_id = map.layers.front().id;
