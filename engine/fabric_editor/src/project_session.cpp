@@ -383,6 +383,20 @@ bool ProjectSession::create_vector_artwork(
             : project::VectorOrigin::top_left,
     };
     if (prompt.first_shape != InitialShape::empty) {
+        project::VectorFill fill;
+        if (prompt.initial_fill == InitialFill::color) {
+            fill.kind = project::VectorFillKind::solid;
+            fill.color = prompt.initial_color;
+        } else if (prompt.initial_fill == InitialFill::image) {
+            fill.kind = project::VectorFillKind::image;
+            fill.image = project::VectorImageFill{
+                .texture = {{.value = prompt.initial_image_id}, "texture"},
+                .fit = prompt.image_fit,
+                .transform = prompt.image_transform,
+                .opacity = static_cast<float>(prompt.image_opacity),
+                .deform_with_shape = prompt.deform_image_with_shape,
+            };
+        }
         const core::Vec2 shape_origin =
             prompt.origin == ArtworkOrigin::center
                 ? core::Vec2{-native.size.x * 0.5F, -native.size.y * 0.5F}
@@ -397,14 +411,7 @@ bool ProjectSession::create_vector_artwork(
                     : project::VectorShapeKind::rectangle,
                 .bounds = {.origin = shape_origin, .size = native.size},
             },
-            .fill = {
-                .kind = prompt.initial_fill == InitialFill::color
-                    ? project::VectorFillKind::solid
-                    : project::VectorFillKind::none,
-                .color = prompt.initial_fill == InitialFill::color
-                    ? std::optional<core::Color>{prompt.initial_color}
-                    : std::optional<core::Color>{},
-            },
+            .fill = std::move(fill),
         });
     }
     project::VectorAsset asset{

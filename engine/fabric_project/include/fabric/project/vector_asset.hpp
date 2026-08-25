@@ -34,16 +34,37 @@ enum class VectorShapeKind {
 
 enum class VectorFillKind {
     solid,
+    image,
     none,
+};
+
+enum class VectorImageFit {
+    contain,
+    cover,
+    stretch,
+    free,
 };
 
 [[nodiscard]] std::string_view to_string(VectorOrigin origin) noexcept;
 [[nodiscard]] std::string_view to_string(VectorShapeKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(VectorFillKind kind) noexcept;
+[[nodiscard]] std::string_view to_string(VectorImageFit fit) noexcept;
+
+struct VectorImageFill {
+    ResourceReference texture{{}, "texture"};
+    VectorImageFit fit{VectorImageFit::cover};
+    core::Transform transform;
+    float opacity{1.0F};
+    bool deform_with_shape{true};
+
+    friend bool operator==(const VectorImageFill&,
+                           const VectorImageFill&) = default;
+};
 
 struct VectorFill {
     VectorFillKind kind{VectorFillKind::none};
     std::optional<core::Color> color;
+    std::optional<VectorImageFill> image;
 
     friend bool operator==(const VectorFill&, const VectorFill&) = default;
 };
@@ -104,6 +125,8 @@ struct VectorAssetResult {
     const ProjectManifest& manifest, const core::ResourceId& id);
 [[nodiscard]] ValidationReport validate_vector_asset(
     const ProjectManifest& manifest, const VectorAsset& asset);
+[[nodiscard]] std::vector<ResourceReference> vector_resource_references(
+    const VectorAsset& asset);
 [[nodiscard]] std::string serialize_vector_asset(const VectorAsset& asset);
 [[nodiscard]] VectorAssetResult parse_vector_asset(
     const ProjectManifest& manifest, std::string_view json_text);

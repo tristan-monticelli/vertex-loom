@@ -191,13 +191,69 @@ bool read_fill_kind(const Json& object, VectorFillKind& destination,
         destination = VectorFillKind::solid;
         return true;
     }
+    if (value == "image") {
+        destination = VectorFillKind::image;
+        return true;
+    }
     if (value == "none") {
         destination = VectorFillKind::none;
         return true;
     }
     add_error(errors, ErrorCode::invalid_asset, field,
-              "must be solid or none");
+              "must be solid, image or none");
     return false;
+}
+
+bool read_image_fit(const Json& object, VectorImageFit& destination,
+                    std::vector<Error>& errors, const std::string& field) {
+    std::string value;
+    if (!read_string(object, "fit", value, errors)) {
+        return false;
+    }
+    if (value == "contain") destination = VectorImageFit::contain;
+    else if (value == "cover") destination = VectorImageFit::cover;
+    else if (value == "stretch") destination = VectorImageFit::stretch;
+    else if (value == "free") destination = VectorImageFit::free;
+    else {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "must be contain, cover, stretch or free");
+        return false;
+    }
+    return true;
+}
+
+std::optional<VectorImageFill> read_image_fill(
+    const Json& fill, std::vector<Error>& errors, const std::string& field) {
+    const auto image_iterator = fill.find("image");
+    if (image_iterator == fill.end() || !image_iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "image fills require an image object");
+        return std::nullopt;
+    }
+    VectorImageFill image;
+    const auto texture = image_iterator->find("texture");
+    if (texture == image_iterator->end() || !texture->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field + ".texture",
+                  "expected a resource reference");
+    } else {
+        read_string(*texture, "id", image.texture.id.value, errors);
+        read_string(*texture, "expectedType", image.texture.expected_type,
+                    errors);
+    }
+    read_image_fit(*image_iterator, image.fit, errors, field + ".fit");
+    const auto transform = image_iterator->find("transform");
+    if (transform == image_iterator->end()) {
+        add_error(errors, ErrorCode::invalid_asset, field + ".transform",
+                  "expected a transform object");
+    } else {
+        read_transform(*transform, image.transform, errors,
+                       field + ".transform");
+    }
+    read_float(*image_iterator, "opacity", image.opacity, errors,
+               field + ".opacity");
+    read_bool(*image_iterator, "deformWithShape", image.deform_with_shape,
+              errors, field + ".deformWithShape");
+    return image;
 }
 
 bool read_color(const Json& object, core::Color& destination,
@@ -283,24 +339,36 @@ std::optional<NativeVectorDefinition> read_native(
             add_error(errors, ErrorCode::invalid_asset, prefix + ".fill",
                       "expected a fill object");
         } else if (read_fill_kind(*fill, node.fill.kind, errors,
-                                  prefix + ".fill.kind") &&
-                   node.fill.kind == VectorFillKind::solid) {
-            const auto color = fill->find("color");
-            if (color == fill->end()) {
-                add_error(errors, ErrorCode::invalid_asset,
-                          prefix + ".fill.color", "expected a color object");
-            } else {
-                core::Color parsed_color;
-                if (read_color(*color, parsed_color, errors,
-                               prefix + ".fill.color")) {
-                    node.fill.color = parsed_color;
+                                  prefix + ".fill.kind")) {
+            if (node.fill.kind == VectorFillKind::solid) {
+                if (fill->contains("image")) {
+                    add_error(errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.image",
+                              "solid fills must not declare image data");
                 }
+                const auto color = fill->find("color");
+                if (color == fill->end()) {
+                    add_error(errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.color", "expected a color object");
+                } else {
+                    core::Color parsed_color;
+                    if (read_color(*color, parsed_color, errors,
+                                   prefix + ".fill.color")) {
+                        node.fill.color = parsed_color;
+                    }
+                }
+            } else if (node.fill.kind == VectorFillKind::image) {
+                if (fill->contains("color")) {
+                    add_error(errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.color",
+                              "image fills must not declare a color");
+                }
+                node.fill.image = read_image_fill(
+                    *fill, errors, prefix + ".fill.image");
+            } else if (fill->contains("color") || fill->contains("image")) {
+                add_error(errors, ErrorCode::invalid_asset, prefix + ".fill",
+                          "none fills must not declare color or image data");
             }
-        } else if (node.fill.kind == VectorFillKind::none &&
-                   fill->contains("color")) {
-            add_error(errors, ErrorCode::invalid_asset,
-                      prefix + ".fill.color",
-                      "none fills must not declare a color");
         }
         native.nodes.push_back(std::move(node));
     }
@@ -336,9 +404,20 @@ std::string_view to_string(const VectorShapeKind kind) noexcept {
 std::string_view to_string(const VectorFillKind kind) noexcept {
     switch (kind) {
     case VectorFillKind::solid: return "solid";
+    case VectorFillKind::image: return "image";
     case VectorFillKind::none: return "none";
     }
     return "none";
+}
+
+std::string_view to_string(const VectorImageFit fit) noexcept {
+    switch (fit) {
+    case VectorImageFit::contain: return "contain";
+    case VectorImageFit::cover: return "cover";
+    case VectorImageFit::stretch: return "stretch";
+    case VectorImageFit::free: return "free";
+    }
+    return "cover";
 }
 
 std::filesystem::path vector_source_path(const ProjectManifest& manifest,
@@ -460,14 +539,73 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                               prefix + ".fill.color",
                               "channels must be finite values from 0 to 1");
                 }
-            } else if (node.fill.color.has_value()) {
+                if (node.fill.image.has_value()) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.image",
+                              "solid fills must not contain image data");
+                }
+            } else if (node.fill.kind == VectorFillKind::image) {
+                if (node.fill.color.has_value() || !node.fill.image.has_value()) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill",
+                              "image fills require image data and no color");
+                    continue;
+                }
+                const auto& image = *node.fill.image;
+                if (!core::ResourceId::is_valid(image.texture.id.value)) {
+                    add_error(report.errors, ErrorCode::invalid_resource_id,
+                              prefix + ".fill.image.texture.id",
+                              "must be a valid texture identifier");
+                }
+                if (image.texture.expected_type != "texture") {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.image.texture.expectedType",
+                              "must be texture");
+                }
+                const auto& fill_transform = image.transform;
+                if (!finite(fill_transform.position.x) ||
+                    !finite(fill_transform.position.y) ||
+                    !finite(fill_transform.rotation_degrees) ||
+                    !finite(fill_transform.scale.x) ||
+                    !finite(fill_transform.scale.y) ||
+                    fill_transform.scale.x == 0.0F ||
+                    fill_transform.scale.y == 0.0F ||
+                    !finite(fill_transform.pivot.x) ||
+                    !finite(fill_transform.pivot.y)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.image.transform",
+                              "must contain finite values and non-zero scale");
+                }
+                if (!finite(image.opacity) || image.opacity < 0.0F ||
+                    image.opacity > 1.0F) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.image.opacity",
+                              "must be a finite value from 0 to 1");
+                }
+            } else if (node.fill.color.has_value() ||
+                       node.fill.image.has_value()) {
                 add_error(report.errors, ErrorCode::invalid_asset,
-                          prefix + ".fill.color",
-                          "none fills must not contain a color");
+                          prefix + ".fill",
+                          "none fills must not contain color or image data");
             }
         }
     }
     return report;
+}
+
+std::vector<ResourceReference> vector_resource_references(
+    const VectorAsset& asset) {
+    std::vector<ResourceReference> references;
+    if (!asset.native.has_value()) {
+        return references;
+    }
+    for (const auto& node : asset.native->nodes) {
+        if (node.fill.kind == VectorFillKind::image &&
+            node.fill.image.has_value()) {
+            references.push_back(node.fill.image->texture);
+        }
+    }
+    return references;
 }
 
 std::string serialize_vector_asset(const VectorAsset& asset) {
@@ -491,6 +629,18 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"green", node.fill.color->green},
                     {"blue", node.fill.color->blue},
                     {"alpha", node.fill.color->alpha},
+                };
+            } else if (node.fill.kind == VectorFillKind::image &&
+                       node.fill.image.has_value()) {
+                const auto& image = *node.fill.image;
+                fill["image"] = {
+                    {"texture",
+                     {{"id", image.texture.id.value},
+                      {"expectedType", image.texture.expected_type}}},
+                    {"fit", std::string(to_string(image.fit))},
+                    {"transform", serialize_transform(image.transform)},
+                    {"opacity", image.opacity},
+                    {"deformWithShape", image.deform_with_shape},
                 };
             }
             nodes.push_back({

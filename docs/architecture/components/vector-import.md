@@ -37,8 +37,10 @@ C4Component
   qui reste prévisualisé par NanoSVG.
 - Le contrat réserve `sourceKind = native` à une géométrie sans dépendance SVG.
   Le socle actuellement chargeable couvre taille, origine, nœuds stables,
-  transforms, rectangles, ellipses et fills couleur ou transparents. Chemins,
-  fills image, contours et clips restent des extensions explicites.
+  transforms, rectangles, ellipses et fills couleur, transparents ou image.
+  L’image possède cadrage, transform, opacité et liaison à la déformation ; le
+  registre vérifie sa référence texture. Chemins, contours et clips restent des
+  extensions explicites.
 - Une conversion de SVG lié vers natif est explicite et doit présenter les
   éléments non pris en charge avant publication.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un

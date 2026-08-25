@@ -303,6 +303,21 @@ TEST_CASE("headless project validation accepts a native-only vector asset") {
         .name = "Native Only Project",
     };
     REQUIRE(fabric::project::create_project(temporary.path(), manifest).ok());
+    const auto texture_input = temporary.path() / "fill-input.png";
+    std::ofstream{texture_input, std::ios::binary} << "texture-source";
+    const fabric::project::TextureAsset texture{
+        .document = {
+            .type = "texture",
+            .id = {.value = "panel-fill"},
+            .name = "Panel Fill",
+        },
+        .source = "assets/textures/panel-fill.png",
+        .width = 1,
+        .height = 1,
+    };
+    REQUIRE(fabric::project::publish_texture_asset(
+                temporary.path(), manifest, texture, texture_input)
+                .ok());
     const fabric::project::VectorAsset vector{
         .document = {
             .schema_version = fabric::project::current_vector_schema_version,
@@ -321,6 +336,14 @@ TEST_CASE("headless project validation accepts a native-only vector asset") {
                     .bounds = {.origin = {-5.0F, -5.0F},
                                .size = {10.0F, 10.0F}},
                 },
+                .fill = {
+                    .kind = fabric::project::VectorFillKind::image,
+                    .image = fabric::project::VectorImageFill{
+                        .texture = {{.value = "panel-fill"}, "texture"},
+                        .fit = fabric::project::VectorImageFit::cover,
+                        .deform_with_shape = true,
+                    },
+                },
             }},
         },
     };
@@ -329,4 +352,46 @@ TEST_CASE("headless project validation accepts a native-only vector asset") {
                 .ok());
 
     CHECK(fabric::project::validate_project(temporary.path()).ok());
+}
+
+TEST_CASE("headless project validation rejects a missing image fill texture") {
+    const TemporaryDirectory temporary;
+    const fabric::project::ProjectManifest manifest{
+        .id = {.value = "missing-fill-project"},
+        .name = "Missing Fill Project",
+    };
+    REQUIRE(fabric::project::create_project(temporary.path(), manifest).ok());
+    const fabric::project::VectorAsset vector{
+        .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
+            .type = "vector",
+            .id = {.value = "missing-fill-panel"},
+            .name = "Missing Fill Panel",
+        },
+        .source_kind = fabric::project::VectorSourceKind::native,
+        .native = fabric::project::NativeVectorDefinition{
+            .size = {1.0F, 1.0F},
+            .nodes = {{
+                .id = "node-1",
+                .name = "Panel",
+                .shape = {
+                    .id = "shape-1",
+                    .bounds = {.size = {1.0F, 1.0F}},
+                },
+                .fill = {
+                    .kind = fabric::project::VectorFillKind::image,
+                    .image = fabric::project::VectorImageFill{
+                        .texture = {{.value = "missing-texture"}, "texture"},
+                    },
+                },
+            }},
+        },
+    };
+    REQUIRE(fabric::project::publish_native_vector_asset(
+                temporary.path(), manifest, vector)
+                .ok());
+
+    const auto report = fabric::project::validate_project(temporary.path());
+    CHECK(contains_error(report,
+                         fabric::project::ErrorCode::missing_resource));
 }

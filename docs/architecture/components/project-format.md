@@ -52,8 +52,9 @@ C4Component
 - `sourceKind = linkedSvg` est actuellement chargeable et publiable.
   `sourceKind = native` stocke actuellement taille, origine, nœuds stables,
   visibilité, verrouillage, transform, rectangle ou ellipse et fill couleur ou
-  transparent. Sa publication utilise la sauvegarde atomique des documents et
-  ne crée aucune source SVG.
+  transparent. Un fill image référence un `TextureAsset`, conserve son mode de
+  cadrage, son transform indépendant, son opacité et son choix de suivre la
+  déformation de la forme. Sa publication est atomique et ne crée aucun SVG.
 - Le contrat hérité `SpriteSheetDefinition v1` déclare
   `assets/textures/<id>.sprite.json`, conserve
   sa source sous `<id>.aseprite` ou `<id>.source.png` et référence l’atlas

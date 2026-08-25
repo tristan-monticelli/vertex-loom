@@ -33,7 +33,8 @@ imports immuables conservent leur publication sans remplacement.
 `Create project` demande au minimum destination, nom, identifiant, unités,
 pixels par unité et preset explicite, puis affiche un résumé avant création.
 `Create vector artwork` demande nom, identifiant, taille de travail, origine,
-unités, première forme et fill initial.
+unités, première forme et fill initial. Le fill image demande une texture
+locale existante, son cadrage, transform, opacité et suivi de déformation.
 
 ## Alternatives
 

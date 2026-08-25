@@ -1002,6 +1002,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             std::string(fabric::editor::label(creation.artwork.initial_fill));
         if (ImGui::BeginCombo("Initial fill", fill_label.c_str())) {
             for (const auto fill : {fabric::editor::InitialFill::color,
+                                    fabric::editor::InitialFill::image,
                                     fabric::editor::InitialFill::transparent}) {
                 const bool selected = creation.artwork.initial_fill == fill;
                 const auto option = std::string(fabric::editor::label(fill));
@@ -1021,6 +1022,58 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.artwork.initial_color = {
                     color[0], color[1], color[2], color[3]};
             }
+        } else if (creation.artwork.initial_fill ==
+                   fabric::editor::InitialFill::image) {
+            ImGui::SetNextItemWidth(360.0F);
+            ImGui::InputText("Texture resource ID",
+                             &creation.artwork.initial_image_id);
+            const auto fit_label = std::string(fabric::project::to_string(
+                creation.artwork.image_fit));
+            if (ImGui::BeginCombo("Image fit", fit_label.c_str())) {
+                for (const auto fit : {
+                         fabric::project::VectorImageFit::contain,
+                         fabric::project::VectorImageFit::cover,
+                         fabric::project::VectorImageFit::stretch,
+                         fabric::project::VectorImageFit::free}) {
+                    const bool selected = creation.artwork.image_fit == fit;
+                    const auto option =
+                        std::string(fabric::project::to_string(fit));
+                    if (ImGui::Selectable(option.c_str(), selected)) {
+                        creation.artwork.image_fit = fit;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            float offset[] = {
+                creation.artwork.image_transform.position.x,
+                creation.artwork.image_transform.position.y};
+            if (ImGui::InputFloat2("Image offset", offset)) {
+                creation.artwork.image_transform.position = {
+                    offset[0], offset[1]};
+            }
+            float scale[] = {creation.artwork.image_transform.scale.x,
+                             creation.artwork.image_transform.scale.y};
+            if (ImGui::InputFloat2("Image scale", scale)) {
+                creation.artwork.image_transform.scale = {scale[0], scale[1]};
+            }
+            float pivot[] = {creation.artwork.image_transform.pivot.x,
+                             creation.artwork.image_transform.pivot.y};
+            if (ImGui::InputFloat2("Image pivot", pivot)) {
+                creation.artwork.image_transform.pivot = {
+                    pivot[0], pivot[1]};
+            }
+            ImGui::InputFloat(
+                "Image rotation",
+                &creation.artwork.image_transform.rotation_degrees,
+                1.0F, 10.0F, "%.2f deg");
+            float opacity = static_cast<float>(
+                creation.artwork.image_opacity);
+            if (ImGui::SliderFloat("Image opacity", &opacity, 0.0F, 1.0F,
+                                   "%.2f")) {
+                creation.artwork.image_opacity = opacity;
+            }
+            ImGui::Checkbox("Deform image with shape",
+                            &creation.artwork.deform_image_with_shape);
         }
         const auto validation = creation.artwork.validate(
             session.project_root(), *session.manifest());
@@ -1029,6 +1082,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "width");
         draw_prompt_error(validation, "height");
         draw_prompt_error(validation, "initialFill");
+        draw_prompt_error(validation, "initialImage");
+        draw_prompt_error(validation, "imageTransform");
+        draw_prompt_error(validation, "imageOpacity");
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Create artwork", {140.0F, 0.0F})) {

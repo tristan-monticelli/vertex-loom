@@ -132,6 +132,37 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
     CHECK(transparent.shape.bounds.origin == fabric::core::Vec2{});
     CHECK(transparent.fill.kind == fabric::project::VectorFillKind::none);
     CHECK_FALSE(transparent.fill.color.has_value());
+
+    const auto image_source = project.path() / "image-fill.png";
+    std::ofstream{image_source, std::ios::binary} << "source";
+    const fabric::project::TextureAsset texture{
+        .document = {
+            .type = "texture",
+            .id = {.value = "image-fill"},
+            .name = "Image Fill",
+        },
+        .source = "assets/textures/image-fill.png",
+        .width = 1,
+        .height = 1,
+    };
+    REQUIRE(fabric::project::publish_texture_asset(
+                project.path(), *session.manifest(), texture, image_source)
+                .ok());
+    prompt.name = "Image panel";
+    prompt.id = "image-panel";
+    prompt.initial_fill = fabric::editor::InitialFill::image;
+    prompt.initial_image_id = "image-fill";
+    prompt.image_fit = fabric::project::VectorImageFit::free;
+    prompt.image_transform.position = {0.2F, 0.3F};
+    prompt.image_transform.scale = {1.4F, 0.7F};
+    prompt.deform_image_with_shape = true;
+    REQUIRE(session.create_vector_artwork(prompt));
+    const auto& image =
+        *session.created_vector()->native->nodes.front().fill.image;
+    CHECK(image.texture.id.value == "image-fill");
+    CHECK(image.fit == fabric::project::VectorImageFit::free);
+    CHECK(image.transform.position == fabric::core::Vec2{0.2F, 0.3F});
+    CHECK(image.deform_with_shape);
 }
 
 TEST_CASE("undoing to clean neutralizes a previous autosave") {

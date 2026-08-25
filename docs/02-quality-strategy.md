@@ -68,7 +68,9 @@ dépendre d’une frame ou d’un atlas. `VectorAsset v2` couvre la lecture de v
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,
 identifiants dupliqués, rectangle/ellipse, fill couleur/transparent,
-publication atomique sans SVG et chargement par le validateur headless. Les
+publication atomique sans SVG et chargement par le validateur headless. Le fill
+image couvre round-trip du cadrage et du transform, opacité, liaison à la
+déformation, résolution de texture et refus d’une référence manquante. Les
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

@@ -27,7 +27,7 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | CONFORME | La création de projet valide le nom, l’identifiant et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage et enrichir le prompt. |
 | CONFORME | `CreateProjectPrompt` demande destination, nom, identifiant, unités monde, preset et `pixelsPerUnit`, puis affiche erreurs et résumé avant création. | Conserver les tests headless du modèle. |
 | MANQUE | Les états PNG, SVG, Aseprite et sprite PNG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
-| MANQUE | `VectorAsset v2` lit désormais v1 comme `linkedSvg`, mais le mode `native` est encore refusé tant que sa géométrie n’est pas livrée. | Définir et persister la géométrie native au lieu de valider un document vide. |
+| PARTIEL | `VectorAsset v2 native` persiste primitives et fills couleur/image, mais ne produit pas encore de draw packets ni d’édition de sommets. | Livrer chemins, contours, clips, tessellation et personnalisateur. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
 | MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
 | MANQUE | Le flux récemment livré privilégie les spritesheets et les atlas, contrairement à la cible clarifiée. | Geler ce flux comme héritage, ne plus en faire une dépendance des étapes suivantes et planifier une migration sans suppression automatique. |
@@ -116,16 +116,17 @@ l’extraction de l’orchestration d’import hors de `main.cpp` restent ouvert
 
 Tranche livrée : dimensions et origine du document, nœuds et formes à
 identifiants stables, visibilité, verrouillage, transform, rectangle, ellipse,
-fill couleur ou transparent, round-trip, publication atomique et validation
-headless. Les cases ci-dessous restent ouvertes lorsqu’elles contiennent encore
-des variantes non livrées.
+fill couleur, transparent ou image locale, cadrage et transform du fill,
+opacité, liaison à la déformation, round-trip, publication atomique et
+validation du graphe headless. Les cases ci-dessous restent ouvertes
+lorsqu’elles contiennent encore des variantes non livrées.
 
 - [ ] Définir des identifiants stables pour document, nœuds, formes et
   ressources de fill.
 - [ ] Stocker rectangle, ellipse, ligne et chemin `move/line/cubic/close`.
 - [ ] Stocker fill couleur, fill image, transform du fill, opacité, contour,
   largeur, jointure, extrémité et ordre de dessin.
-- [ ] Autoriser une image locale comme contenu d’une forme sans transformer la
+- [x] Autoriser une image locale comme contenu d’une forme sans transformer la
   forme en sprite ou en bitmap autonome.
 - [ ] Conserver hiérarchie, groupes, visibilité, verrouillage, transform, pivot
   et clipping.

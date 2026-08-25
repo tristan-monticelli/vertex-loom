@@ -5,8 +5,10 @@
 La cible est vectorielle native et ne dépendra d’aucune spritesheet. Le produit
 compilé n’a pas encore atteint toute cette cible : `VectorAsset v2` sait migrer
 un SVG opaque v1 vers `linkedSvg` et publier une première géométrie `native`.
-Les chemins, fills image, contours, clips et le renderer restent à livrer. Le
-pipeline sprite demeure compilé, validé et accessible sous `Legacy`.
+Les chemins, contours, clips et le renderer restent à livrer. Le fill image est
+persistant et ajustable, mais sa déformation visuelle attend encore les sommets
+et draw packets. Le pipeline sprite demeure compilé et accessible sous
+`Legacy`.
 
 Cette checklist distingue la construction de la voie vectorielle cible du
 retrait du legacy. Aucune case de suppression ne peut avancer sans confirmation
@@ -22,8 +24,9 @@ explicite.
   sauvegarde atomique.
 - [ ] Ajouter identifiants stables, formes, chemins, groupes, transforms,
   fills, contours et clips selon ADR-0022 et ADR-0023.
-- [ ] Permettre un fill image local avec transform UV indépendant et clipping
-  par la forme, sans atlas ni frame.
+- [x] Persister un fill image local avec cadrage, transform UV indépendant,
+  opacité et liaison à la déformation, sans atlas ni frame.
+- [ ] Rendre le clipping et la déformation du fill sur les sommets réels.
 - [x] Étendre le registre et le validateur headless aux deux `sourceKind`.
 - [ ] Ajouter migration, round-trip, validation stricte et fixtures natives.
 

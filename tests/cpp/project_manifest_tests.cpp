@@ -488,6 +488,38 @@ void vector_source_kinds_reject_ambiguous_payloads() {
             "linked SVG silently accepted native geometry");
 }
 
+void image_fill_round_trips_with_adjustable_shape_mapping() {
+    auto expected = native_rectangle_asset();
+    auto& fill = expected.native->nodes.front().fill;
+    fill.kind = fabric::project::VectorFillKind::image;
+    fill.color.reset();
+    fill.image = fabric::project::VectorImageFill{
+        .texture = {{.value = "fabric-photo"}, "texture"},
+        .fit = fabric::project::VectorImageFit::cover,
+        .transform = {
+            .position = {0.2F, -0.1F},
+            .rotation_degrees = 12.0F,
+            .scale = {1.4F, 0.8F},
+            .pivot = {0.5F, 0.5F},
+        },
+        .opacity = 0.75F,
+        .deform_with_shape = true,
+    };
+
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(),
+        fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "image fill vector did not round-trip");
+    require(*parsed.asset == expected,
+            "image fill mapping changed during round-trip");
+    const auto references =
+        fabric::project::vector_resource_references(*parsed.asset);
+    require(references.size() == 1 &&
+                references.front().id.value == "fabric-photo" &&
+                references.front().expected_type == "texture",
+            "image fill texture was not exposed to the resource graph");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
@@ -558,6 +590,7 @@ int main() {
     native_vector_round_trips_and_publishes_without_svg();
     native_vector_rejects_duplicate_stable_identifiers();
     vector_source_kinds_reject_ambiguous_payloads();
+    image_fill_round_trips_with_adjustable_shape_mapping();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

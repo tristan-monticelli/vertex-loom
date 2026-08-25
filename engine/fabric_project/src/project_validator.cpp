@@ -32,7 +32,7 @@ bool is_within_project(const std::filesystem::path& canonical_root,
     return true;
 }
 
-template <typename Loader>
+template <typename Loader, typename ReferenceCollector>
 void inspect_asset_documents(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
@@ -41,6 +41,7 @@ void inspect_asset_documents(
     const std::string_view document_suffix,
     const std::string_view error_field,
     Loader&& loader,
+    ReferenceCollector&& collect_references,
     ResourceRegistry& registry,
     std::vector<Error>& errors) {
     const auto asset_directory = project_root / manifest.directories.assets /
@@ -80,7 +81,7 @@ void inspect_asset_documents(
                 .document = loaded_asset.asset->document,
                 .document_path =
                     entry.path().lexically_relative(project_root),
-                .references = {},
+                .references = collect_references(*loaded_asset.asset),
             });
             errors.insert(
                 errors.end(),
@@ -172,18 +173,22 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
     }
 
     ResourceRegistry registry;
+    const auto no_references = [](const auto&) {
+        return std::vector<ResourceReference>{};
+    };
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, "textures",
         ".texture.json", "assets.textures", load_texture_asset,
+        no_references,
         registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, "vectors",
-        ".vector.json", "assets.vectors", load_vector_asset, registry,
-        result.errors);
+        ".vector.json", "assets.vectors", load_vector_asset,
+        vector_resource_references, registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, "textures",
-        ".sprite.json", "assets.sprites", load_sprite_sheet, registry,
-        result.errors);
+        ".sprite.json", "assets.sprites", load_sprite_sheet, no_references,
+        registry, result.errors);
     auto graph_validation = registry.validate();
     result.errors.insert(
         result.errors.end(),

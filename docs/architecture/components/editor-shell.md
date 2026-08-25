@@ -45,9 +45,9 @@ C4Component
   matériau, entité, animation et ajout existant restent désactivées jusqu’à
   l’arrivée de leur contrat.
 - L’assistant d’artwork valide taille de travail, origine, unités, première
-  forme, fill et conflit d’identifiant. Il conserve seulement une intention en
-  mémoire : la publication est volontairement différée à `VectorAsset v2` afin
-  de ne jamais produire un faux SVG opaque.
+  forme, fill et conflit d’identifiant. Un fill image référence une texture
+  locale et expose cadrage, offset, rotation, échelle, opacité et suivi de la
+  déformation. La confirmation publie un `VectorAsset v2 native` atomique.
 - Une ouverture échouée expose les erreurs structurées et ne remplace pas la
   dernière session valide.
 - SDL2 possède la fenêtre et les événements ; Dear ImGui possède uniquement

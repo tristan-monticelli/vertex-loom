@@ -1,5 +1,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 
+#include "fabric/project/texture_asset.hpp"
+
 #include <cmath>
 #include <system_error>
 #include <utility>
@@ -263,6 +265,7 @@ std::string_view label(const InitialShape shape) noexcept {
 std::string_view label(const InitialFill fill) noexcept {
     switch (fill) {
     case InitialFill::color: return "Solid color";
+    case InitialFill::image: return "Image in shape";
     case InitialFill::transparent: return "Transparent";
     }
     return "Transparent";
@@ -300,6 +303,45 @@ PromptValidation CreateVectorArtworkPrompt::validate(
         add_error(validation, "initialFill",
                   "Initial color channels must be finite values from 0 to 1.");
     }
+    if (initial_fill == InitialFill::image) {
+        if (first_shape == InitialShape::empty) {
+            add_error(validation, "initialFill",
+                      "An image fill requires an initial shape.");
+        }
+        const core::ResourceId texture_id{.value = initial_image_id};
+        if (!core::ResourceId::is_valid(initial_image_id)) {
+            add_error(validation, "initialImage",
+                      "Choose a valid imported texture resource ID.");
+        } else {
+            const auto loaded = project::load_texture_asset(
+                project_root, manifest,
+                project::texture_document_path(manifest, texture_id));
+            if (!loaded.ok()) {
+                add_error(validation, "initialImage",
+                          "The texture resource is missing or invalid.");
+            }
+        }
+        const auto finite = [](const float value) {
+            return std::isfinite(value);
+        };
+        if (!finite(image_transform.position.x) ||
+            !finite(image_transform.position.y) ||
+            !finite(image_transform.rotation_degrees) ||
+            !finite(image_transform.scale.x) ||
+            !finite(image_transform.scale.y) ||
+            image_transform.scale.x == 0.0F ||
+            image_transform.scale.y == 0.0F ||
+            !finite(image_transform.pivot.x) ||
+            !finite(image_transform.pivot.y)) {
+            add_error(validation, "imageTransform",
+                      "Image transform values must be finite with non-zero scale.");
+        }
+        if (!std::isfinite(image_opacity) || image_opacity < 0.0 ||
+            image_opacity > 1.0) {
+            add_error(validation, "imageOpacity",
+                      "Image opacity must be a finite value from 0 to 1.");
+        }
+    }
     if (core::ResourceId::is_valid(id) &&
         identifier_conflicts(project_root, manifest, id)) {
         add_error(validation, "id",
@@ -316,6 +358,16 @@ PromptValidation CreateVectorArtworkPrompt::validate(
         "Initial fill: " + std::string(label(initial_fill)),
         "Publish to: " + validation.destination.generic_string(),
     };
+    if (initial_fill == InitialFill::image) {
+        validation.summary.insert(
+            validation.summary.end() - 1,
+            {"Texture resource: " +
+                 (initial_image_id.empty() ? std::string{"<missing>"}
+                                           : initial_image_id),
+             "Image fit: " + std::string(project::to_string(image_fit)),
+             std::string{"Deforms with shape: "} +
+                 (deform_image_with_shape ? "yes" : "no")});
+    }
     return validation;
 }
 

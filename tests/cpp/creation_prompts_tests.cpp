@@ -1,7 +1,9 @@
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/project/texture_asset.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -40,6 +42,25 @@ fabric::project::ProjectManifest manifest() {
         .pixels_per_unit = 100.0,
         .directories = {},
     };
+}
+
+void write_texture_resource(const std::filesystem::path& project,
+                            const std::string& id) {
+    std::filesystem::create_directories(project / "assets/textures");
+    const fabric::project::TextureAsset texture{
+        .document = {
+            .type = "texture",
+            .id = {.value = id},
+            .name = "Fill texture",
+        },
+        .source = "assets/textures/" + id + ".png",
+        .width = 1,
+        .height = 1,
+    };
+    std::ofstream{project / texture.source, std::ios::binary} << "source";
+    std::ofstream{project / "assets/textures" / (id + ".texture.json"),
+                  std::ios::binary}
+        << fabric::project::serialize_texture_asset(texture);
 }
 
 } // namespace
@@ -166,4 +187,33 @@ TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     CHECK(artwork_prompt.name.empty());
     CHECK(artwork_prompt.width == 10.0);
     CHECK(project_prompt.pixels_per_unit == 100.0);
+}
+
+TEST_CASE("vector artwork image fill validates resource and adjustable mapping") {
+    TemporaryDirectory project;
+    write_texture_resource(project.path(), "woven-photo");
+    fabric::editor::CreateVectorArtworkPrompt prompt;
+    prompt.name = "Image panel";
+    prompt.id = "image-panel";
+    prompt.initial_fill = fabric::editor::InitialFill::image;
+    prompt.initial_image_id = "woven-photo";
+    prompt.image_fit = fabric::project::VectorImageFit::cover;
+    prompt.image_transform.position = {0.25F, -0.1F};
+    prompt.image_transform.scale = {1.5F, 0.75F};
+    prompt.image_opacity = 0.8;
+    prompt.deform_image_with_shape = true;
+
+    const auto valid = prompt.validate(project.path(), manifest());
+    REQUIRE(valid.ok());
+    CHECK(valid.summary.end() != std::find_if(
+              valid.summary.begin(), valid.summary.end(),
+              [](const std::string& line) {
+                  return line.find("Deforms with shape: yes") !=
+                         std::string::npos;
+              }));
+
+    prompt.initial_image_id = "missing";
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("initialImage")
+              .has_value());
 }

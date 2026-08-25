@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/core/types.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/vector_asset.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -86,6 +87,7 @@ enum class InitialShape {
 
 enum class InitialFill {
     color,
+    image,
     transparent,
 };
 
@@ -102,6 +104,11 @@ struct CreateVectorArtworkPrompt {
     InitialShape first_shape{InitialShape::rectangle};
     InitialFill initial_fill{InitialFill::color};
     core::Color initial_color{};
+    std::string initial_image_id;
+    project::VectorImageFit image_fit{project::VectorImageFit::cover};
+    core::Transform image_transform;
+    double image_opacity{1.0};
+    bool deform_image_with_shape{true};
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(
