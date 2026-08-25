@@ -142,9 +142,6 @@ bool functions_ready(const Functions& functions) {
            functions.get_program_info_log != nullptr &&
            functions.delete_program != nullptr &&
            functions.use_program != nullptr &&
-           functions.gen_vertex_arrays != nullptr &&
-           functions.bind_vertex_array != nullptr &&
-           functions.delete_vertex_arrays != nullptr &&
            functions.gen_buffers != nullptr &&
            functions.bind_buffer != nullptr &&
            functions.buffer_data != nullptr &&
@@ -207,13 +204,31 @@ bool OpenGLVectorRenderer::initialize() {
     const auto functions = load_functions();
     if (!functions_ready(functions)) return false;
 
-    constexpr const char* shader_version =
+    int context_major = 0;
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &context_major);
+    use_vertex_array_ = context_major >= 3 &&
+        functions.gen_vertex_arrays != nullptr &&
+        functions.bind_vertex_array != nullptr &&
+        functions.delete_vertex_arrays != nullptr;
+
+    const std::string vertex_source = context_major < 3
+        ? std::string{R"GLSL(#version 120
+attribute vec2 position;
+attribute vec2 uv;
+varying vec2 fragmentUv;
+uniform mat4 worldToClip;
+void main() {
+    fragmentUv = uv;
+    gl_Position = worldToClip * vec4(position, 0.0, 1.0);
+}
+)GLSL"}
+        : std::string{
 #if defined(__APPLE__)
-        "#version 150\n";
+            "#version 150\n"
 #else
-        "#version 130\n";
+            "#version 130\n"
 #endif
-    const std::string vertex_source = shader_version + std::string{R"GLSL(
+R"GLSL(
 in vec2 position;
 in vec2 uv;
 out vec2 fragmentUv;
@@ -223,7 +238,26 @@ void main() {
     gl_Position = worldToClip * vec4(position, 0.0, 1.0);
 }
 )GLSL"};
-    const std::string fragment_source = shader_version + std::string{R"GLSL(
+    const std::string fragment_source = context_major < 3
+        ? std::string{R"GLSL(#version 120
+uniform vec4 color;
+uniform sampler2D imageTexture;
+uniform int textured;
+uniform float opacity;
+varying vec2 fragmentUv;
+void main() {
+    gl_FragColor = textured == 1
+        ? texture2D(imageTexture, fragmentUv) * opacity
+        : color;
+}
+)GLSL"}
+        : std::string{
+#if defined(__APPLE__)
+            "#version 150\n"
+#else
+            "#version 130\n"
+#endif
+R"GLSL(
 uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
@@ -260,10 +294,10 @@ void main() {
         functions.delete_program(program);
         return false;
     }
-    functions.gen_vertex_arrays(1, &vertex_array_);
+    if (use_vertex_array_) functions.gen_vertex_arrays(1, &vertex_array_);
     functions.gen_buffers(1, &vertex_buffer_);
     functions.gen_buffers(1, &index_buffer_);
-    functions.bind_vertex_array(vertex_array_);
+    if (use_vertex_array_) functions.bind_vertex_array(vertex_array_);
     functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
     const GLint position = 0;
     functions.enable_vertex_attrib_array(position);
@@ -275,7 +309,7 @@ void main() {
                                      sizeof(Vertex),
                                      reinterpret_cast<const void*>(
                                          2U * sizeof(float)));
-    functions.bind_vertex_array(0U);
+    if (use_vertex_array_) functions.bind_vertex_array(0U);
     program_ = program;
     world_to_clip_uniform_ = functions.get_uniform_location(
         program_, "worldToClip");
@@ -287,7 +321,7 @@ void main() {
         image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
         functions.delete_buffers(1, &vertex_buffer_);
         functions.delete_buffers(1, &index_buffer_);
-        functions.delete_vertex_arrays(1, &vertex_array_);
+        if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
         functions.delete_program(program_);
         program_ = 0U;
         return false;
@@ -301,11 +335,12 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     if (functions.delete_buffers != nullptr) {
         functions.delete_buffers(1, &vertex_buffer_);
         functions.delete_buffers(1, &index_buffer_);
-        functions.delete_vertex_arrays(1, &vertex_array_);
+        if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
         functions.delete_program(program_);
     }
     program_ = 0U;
     vertex_array_ = 0U;
+    use_vertex_array_ = false;
     vertex_buffer_ = 0U;
     index_buffer_ = 0U;
     world_to_clip_uniform_ = -1;
@@ -345,7 +380,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     const auto matrix = world_to_clip(viewport);
     functions.uniform_matrix_4fv(world_to_clip_uniform_, 1, GL_FALSE,
                                  matrix.data());
-    functions.bind_vertex_array(vertex_array_);
+    if (use_vertex_array_) functions.bind_vertex_array(vertex_array_);
 
     const auto upload_buffer = [&](const GLenum target, const std::size_t size,
                                    const void* data, std::size_t& capacity) {
@@ -614,7 +649,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         ++packet_index;
     }
     if (stencil_ready) glDisable(GL_STENCIL_TEST);
-    functions.bind_vertex_array(0U);
+    if (use_vertex_array_) functions.bind_vertex_array(0U);
     functions.use_program(0U);
     return stats;
 }

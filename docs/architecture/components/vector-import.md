@@ -79,8 +79,11 @@ C4Component
   même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
   Les sommets sont exprimés dans l’espace monde après application du transform
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.
-  Le backend OpenGL 3 compile ses shaders et possède ses buffers via les
-  fonctions chargées par SDL ; il refuse explicitement les fills image tant
+  Le backend OpenGL compile ses shaders et possède ses buffers via les
+  fonctions chargées par SDL. Il utilise OpenGL 3 avec VAO sur les contextes
+  modernes, et un chemin de compatibilité OpenGL 2.1 avec GLSL 1.20 et VBO
+  sans VAO sur Windows lorsque le contexte 3.x n’est pas disponible. Il refuse
+  explicitement les fills image tant
   qu’aucun résolveur de textures n’est fourni, mais dessine les contours
   ouverts et fermés avec le même packet. Un `clipNodeId` applique un masque
   stencil de premier niveau au fill et au contour ; les clips imbriqués ou les

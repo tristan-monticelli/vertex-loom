@@ -66,6 +66,7 @@ private:
 
     std::uint32_t program_{};
     std::uint32_t vertex_array_{};
+    bool use_vertex_array_{};
     std::uint32_t vertex_buffer_{};
     std::uint32_t index_buffer_{};
     std::int32_t world_to_clip_uniform_{-1};

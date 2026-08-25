@@ -939,6 +939,10 @@ bool PreviewRuntime::run() {
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+#elif defined(_WIN32)
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
 #else
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -961,6 +965,7 @@ bool PreviewRuntime::run() {
         errors_.push_back(SDL_GetError());
         return false;
     }
+    if (options_.mode == RuntimeMode::benchmark) SDL_GL_SetSwapInterval(0);
     impl_->camera.set_viewport(options_.width, options_.height);
     impl_->camera.set_limits(options_.camera_limits);
     if (impl_->audio_clip) {
