@@ -576,15 +576,20 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         }
         bool packet_drawn = false;
         if (packet.clip_node_id.has_value()) {
-            if (!stencil_ready) continue;
+            if (!stencil_ready) {
+                ++packet_index;
+                continue;
+            }
             const auto clip = packets_by_id.find(*packet.clip_node_id);
             if (clip == packets_by_id.end()) {
                 stats.errors.push_back("OpenGL clip node could not be resolved: " +
                                        *packet.clip_node_id);
+                ++packet_index;
                 continue;
             }
             if (clip->second->clip_node_id.has_value()) {
                 stats.errors.push_back("nested OpenGL vector clips are unsupported");
+                ++packet_index;
                 continue;
             }
             glClearStencil(0);
@@ -597,6 +602,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             if (!clip_drawn) {
                 stats.errors.push_back("OpenGL clip node has no fill geometry: " +
                                        *packet.clip_node_id);
+                ++packet_index;
                 continue;
             }
             glStencilFunc(GL_EQUAL, 1, 0xffU);
