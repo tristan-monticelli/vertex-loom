@@ -176,8 +176,8 @@ avec historique et validation ; l’arbre de calques, la sélection multiple et
 les groupes restent ouverts.
 - [ ] Ajouter plume Bézier, primitives, édition des nœuds et poignées
   liées/libres, ouverture et fermeture de contour.
-- [ ] Ajouter gizmos rotation, échelle, pivot et transform du fill
-  indépendamment du transform de la forme.
+- [x] Ajouter gizmos rotation, échelle et pivot ; la transform du fill reste
+  indépendante du transform de la forme et ouverte.
 - [ ] Ajouter sélecteur de fill : couleur, image, motif et matériau référencé.
 - [ ] Ajouter modes de cadrage image (`contain`, `cover`, `stretch`, libre),
   offset, rotation et échelle dans le masque.
@@ -190,9 +190,10 @@ les groupes restent ouverts.
 Gate : l’utilisateur fabrique et personnalise entièrement un asset esthétique
 dans Asset Studio sans préparer une spritesheet externe.
 
-Le canvas permet désormais de déplacer le nœud sélectionné par glisser gauche,
-via la même commande réversible que l’inspecteur ; rotation, échelle, pivot et
-transform du fill restent ouverts.
+Le canvas permet désormais de déplacer, faire pivoter et mettre à l’échelle le
+nœud sélectionné par poignées, ainsi que de déplacer son pivot sans changer la
+géométrie visuelle ; chaque geste utilise la même commande réversible que
+l’inspecteur. La transformation indépendante du fill reste ouverte.
 
 ## Étape E — Keyframes génériques et intelligentes
 

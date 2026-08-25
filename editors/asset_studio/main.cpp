@@ -79,10 +79,21 @@ struct ProjectSettingsUiState {
 };
 
 struct CanvasUiState {
+    enum class Tool {
+        move,
+        rotate,
+        scale,
+        pivot,
+    };
+
     float zoom{1.0F};
     ImVec2 pan{};
     std::size_t selected_node{};
     bool native_canvas{};
+    Tool tool{Tool::move};
+    bool dragging{};
+    ImVec2 drag_start_mouse{};
+    fabric::core::Transform drag_start_transform;
     ImVec2 native_origin{};
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
@@ -319,6 +330,27 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         return ImVec2{center.x + canvas.pan.x + point.x * pixels_per_unit,
                       center.y + canvas.pan.y - point.y * pixels_per_unit};
     };
+    const auto to_world = [&](const ImVec2 point) {
+        return fabric::core::Vec2{
+            (point.x - center.x - canvas.pan.x) / pixels_per_unit,
+            -(point.y - center.y - canvas.pan.y) / pixels_per_unit};
+    };
+    const auto transform_point = [](const fabric::project::VectorNode& node,
+                                    const fabric::core::Vec2 point) {
+        const float x = (point.x - node.transform.pivot.x) *
+            node.transform.scale.x;
+        const float y = (point.y - node.transform.pivot.y) *
+            node.transform.scale.y;
+        const float angle = node.transform.rotation_degrees *
+            std::numbers::pi_v<float> / 180.0F;
+        const float cosine = std::cos(angle);
+        const float sine = std::sin(angle);
+        return fabric::core::Vec2{
+            node.transform.position.x + node.transform.pivot.x +
+                x * cosine - y * sine,
+            node.transform.position.y + node.transform.pivot.y +
+                x * sine + y * cosine};
+    };
     auto* draw_list = ImGui::GetWindowDrawList();
     const float target_grid_pixels = 48.0F;
     const float raw_grid_step = target_grid_pixels / pixels_per_unit;
@@ -343,18 +375,134 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     const int last_vertical = static_cast<int>(std::ceil(world_right / grid_step));
     const int first_horizontal = static_cast<int>(std::floor(world_bottom / grid_step));
     const int last_horizontal = static_cast<int>(std::ceil(world_top / grid_step));
-    if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left) &&
+    const fabric::project::VectorNode* selected_node =
         !asset.native->nodes.empty() &&
-        canvas.selected_node < asset.native->nodes.size()) {
-        auto node = asset.native->nodes[canvas.selected_node];
-        if (!node.locked) {
-            const ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
-            node.transform.position.x += delta.x / pixels_per_unit;
-            node.transform.position.y -= delta.y / pixels_per_unit;
-            static_cast<void>(session.set_selected_vector_node(
-                canvas.selected_node, std::move(node)));
+                canvas.selected_node < asset.native->nodes.size()
+            ? &asset.native->nodes[canvas.selected_node]
+            : nullptr;
+    ImVec2 rotate_handle{};
+    ImVec2 scale_handle{};
+    ImVec2 pivot_handle{};
+    ImVec2 transform_center{};
+    if (selected_node != nullptr) {
+        const auto& bounds = selected_node->shape.bounds;
+        const fabric::core::Vec2 local_center{
+            bounds.origin.x + bounds.size.x * 0.5F,
+            bounds.origin.y + bounds.size.y * 0.5F};
+        const auto world_center = transform_point(*selected_node, local_center);
+        const auto world_top = transform_point(
+            *selected_node,
+            {local_center.x, bounds.origin.y + bounds.size.y});
+        const auto world_bottom_right = transform_point(
+            *selected_node,
+            {bounds.origin.x + bounds.size.x,
+             bounds.origin.y});
+        transform_center = to_screen(world_center);
+        const ImVec2 top = to_screen(world_top);
+        rotate_handle = {top.x, top.y - 30.0F};
+        scale_handle = to_screen(world_bottom_right);
+        pivot_handle = to_screen(
+            transform_point(*selected_node, selected_node->transform.pivot));
+    }
+    if (hovered && selected_node != nullptr && !selected_node->locked &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        const ImVec2 mouse = io.MousePos;
+        const auto distance = [](const ImVec2 left, const ImVec2 right) {
+            return std::hypot(left.x - right.x, left.y - right.y);
+        };
+        if (distance(mouse, rotate_handle) <= 12.0F) {
+            canvas.tool = CanvasUiState::Tool::rotate;
+        } else if (distance(mouse, scale_handle) <= 12.0F) {
+            canvas.tool = CanvasUiState::Tool::scale;
+        } else if (distance(mouse, pivot_handle) <= 12.0F) {
+            canvas.tool = CanvasUiState::Tool::pivot;
         }
-        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
+        canvas.dragging = true;
+        canvas.drag_start_mouse = mouse;
+        canvas.drag_start_transform = selected_node->transform;
+    }
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        canvas.dragging = false;
+    }
+    if (hovered && canvas.dragging && selected_node != nullptr &&
+        !selected_node->locked &&
+        (io.MousePos.x != canvas.drag_start_mouse.x ||
+         io.MousePos.y != canvas.drag_start_mouse.y)) {
+        auto changed = *selected_node;
+        const auto& start = canvas.drag_start_transform;
+        const auto start_mouse = to_world(canvas.drag_start_mouse);
+        const auto current_mouse = to_world(io.MousePos);
+        if (canvas.tool == CanvasUiState::Tool::move) {
+            changed.transform.position = {
+                start.position.x + current_mouse.x - start_mouse.x,
+                start.position.y + current_mouse.y - start_mouse.y};
+        } else if (canvas.tool == CanvasUiState::Tool::rotate) {
+            const auto start_vector = fabric::core::Vec2{
+                start_mouse.x - (start.position.x + start.pivot.x),
+                start_mouse.y - (start.position.y + start.pivot.y)};
+            const auto current_vector = fabric::core::Vec2{
+                current_mouse.x - (start.position.x + start.pivot.x),
+                current_mouse.y - (start.position.y + start.pivot.y)};
+            const float start_angle = std::atan2(start_vector.y, start_vector.x);
+            const float current_angle =
+                std::atan2(current_vector.y, current_vector.x);
+            changed.transform.rotation_degrees =
+                start.rotation_degrees +
+                (current_angle - start_angle) * 180.0F /
+                    std::numbers::pi_v<float>;
+        } else if (canvas.tool == CanvasUiState::Tool::scale) {
+            const auto local_from_world = [&](const fabric::core::Vec2 world) {
+                const float angle = -start.rotation_degrees *
+                    std::numbers::pi_v<float> / 180.0F;
+                const float cosine = std::cos(angle);
+                const float sine = std::sin(angle);
+                const float x = world.x - start.position.x - start.pivot.x;
+                const float y = world.y - start.position.y - start.pivot.y;
+                return fabric::core::Vec2{
+                    (x * cosine + y * sine) /
+                        std::max(std::abs(start.scale.x), 0.0001F),
+                    (-x * sine + y * cosine) /
+                        std::max(std::abs(start.scale.y), 0.0001F)};
+            };
+            const auto start_local = local_from_world(start_mouse);
+            const auto current_local = local_from_world(current_mouse);
+            const float ratio_x = std::abs(start_local.x) > 0.0001F
+                ? current_local.x / start_local.x
+                : 1.0F;
+            const float ratio_y = std::abs(start_local.y) > 0.0001F
+                ? current_local.y / start_local.y
+                : 1.0F;
+            changed.transform.scale = {
+                std::copysign(std::max(0.01F, std::abs(start.scale.x * ratio_x)),
+                              start.scale.x),
+                std::copysign(std::max(0.01F, std::abs(start.scale.y * ratio_y)),
+                              start.scale.y)};
+        } else if (canvas.tool == CanvasUiState::Tool::pivot) {
+            const fabric::core::Vec2 next_pivot{
+                current_mouse.x - start.position.x,
+                current_mouse.y - start.position.y};
+            const float angle = start.rotation_degrees *
+                std::numbers::pi_v<float> / 180.0F;
+            const float cosine = std::cos(angle);
+            const float sine = std::sin(angle);
+            const auto apply_linear = [&](const fabric::core::Vec2 value) {
+                return fabric::core::Vec2{
+                    cosine * start.scale.x * value.x -
+                        sine * start.scale.y * value.y,
+                    sine * start.scale.x * value.x +
+                        cosine * start.scale.y * value.y};
+            };
+            const auto pivot_delta = fabric::core::Vec2{
+                start.pivot.x - next_pivot.x,
+                start.pivot.y - next_pivot.y};
+            const auto transformed_delta = apply_linear(pivot_delta);
+            changed.transform.position = {
+                start.position.x + pivot_delta.x - transformed_delta.x,
+                start.position.y + pivot_delta.y - transformed_delta.y};
+            changed.transform.pivot = next_pivot;
+        }
+        static_cast<void>(session.set_selected_vector_node(
+            canvas.selected_node, std::move(changed)));
     }
     draw_list->PushClipRect(origin, {origin.x + available.x,
                                      origin.y + available.y}, true);
@@ -385,20 +533,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         if (!node.visible) {
             continue;
         }
-        const auto transform_point = [&](const fabric::core::Vec2 point) {
-            const float x = (point.x - node.transform.pivot.x) *
-                node.transform.scale.x;
-            const float y = (point.y - node.transform.pivot.y) *
-                node.transform.scale.y;
-            const float angle = node.transform.rotation_degrees *
-                std::numbers::pi_v<float> / 180.0F;
-            const float cosine = std::cos(angle);
-            const float sine = std::sin(angle);
-            return fabric::core::Vec2{
-                node.transform.position.x + node.transform.pivot.x +
-                    x * cosine - y * sine,
-                node.transform.position.y + node.transform.pivot.y +
-                    x * sine + y * cosine};
+        const auto node_transform_point = [&](const fabric::core::Vec2 point) {
+            return transform_point(node, point);
         };
         const auto& bounds = node.shape.bounds;
         std::vector<ImVec2> points;
@@ -411,14 +547,14 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             for (int segment = 0; segment < segments; ++segment) {
                 const float angle = 2.0F * std::numbers::pi_v<float> *
                     static_cast<float>(segment) / static_cast<float>(segments);
-                points.push_back(to_screen(transform_point({
+                points.push_back(to_screen(node_transform_point({
                     ellipse_center.x + std::cos(angle) * bounds.size.x * 0.5F,
                     ellipse_center.y + std::sin(angle) * bounds.size.y * 0.5F})));
             }
         } else if (node.shape.kind == fabric::project::VectorShapeKind::line &&
                    node.shape.points.size() == 2U) {
-            points = {to_screen(transform_point(node.shape.points[0])),
-                      to_screen(transform_point(node.shape.points[1]))};
+            points = {to_screen(node_transform_point(node.shape.points[0])),
+                      to_screen(node_transform_point(node.shape.points[1]))};
         } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
             fabric::core::Vec2 current{};
             fabric::core::Vec2 first{};
@@ -428,11 +564,11 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     current = command.point;
                     first = current;
                     has_current = true;
-                    points.push_back(to_screen(transform_point(current)));
+                    points.push_back(to_screen(node_transform_point(current)));
                 } else if (command.kind == fabric::project::VectorPathCommandKind::line &&
                            has_current) {
                     current = command.point;
-                    points.push_back(to_screen(transform_point(current)));
+                    points.push_back(to_screen(node_transform_point(current)));
                 } else if (command.kind == fabric::project::VectorPathCommandKind::cubic &&
                            has_current) {
                     const auto start = current;
@@ -448,22 +584,22 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                                 3.0F * inverse * inverse * t * command.control1.y +
                                 3.0F * inverse * t * t * command.control2.y +
                                 t * t * t * command.point.y};
-                        points.push_back(to_screen(transform_point(current)));
+                        points.push_back(to_screen(node_transform_point(current)));
                     }
                 } else if (command.kind == fabric::project::VectorPathCommandKind::close &&
                            has_current) {
                     current = first;
-                    points.push_back(to_screen(transform_point(current)));
+                    points.push_back(to_screen(node_transform_point(current)));
                 }
             }
         } else {
             points = {
-                to_screen(transform_point(bounds.origin)),
-                to_screen(transform_point({bounds.origin.x + bounds.size.x,
+                to_screen(node_transform_point(bounds.origin)),
+                to_screen(node_transform_point({bounds.origin.x + bounds.size.x,
                                            bounds.origin.y})),
-                to_screen(transform_point({bounds.origin.x + bounds.size.x,
+                to_screen(node_transform_point({bounds.origin.x + bounds.size.x,
                                            bounds.origin.y + bounds.size.y})),
-                to_screen(transform_point({bounds.origin.x,
+                to_screen(node_transform_point({bounds.origin.x,
                                            bounds.origin.y + bounds.size.y})),
             };
         }
@@ -506,9 +642,24 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 : ImDrawFlags_Closed,
             stroke_width);
     }
+    if (selected_node != nullptr && !selected_node->locked) {
+        draw_list->AddLine(transform_center, rotate_handle,
+                           IM_COL32(236, 180, 75, 220), 1.5F);
+        draw_list->AddCircleFilled(rotate_handle, 6.0F,
+                                   IM_COL32(236, 180, 75, 255));
+        draw_list->AddRectFilled({scale_handle.x - 6.0F, scale_handle.y - 6.0F},
+                                 {scale_handle.x + 6.0F, scale_handle.y + 6.0F},
+                                 IM_COL32(98, 180, 240, 255));
+        draw_list->AddLine({pivot_handle.x - 7.0F, pivot_handle.y},
+                           {pivot_handle.x + 7.0F, pivot_handle.y},
+                           IM_COL32(180, 110, 235, 255), 2.0F);
+        draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
+                           {pivot_handle.x, pivot_handle.y + 7.0F},
+                           IM_COL32(180, 110, 235, 255), 2.0F);
+    }
     draw_list->PopClipRect();
     if (hovered) {
-        ImGui::SetTooltip("Left drag: move selected node  |  Middle drag: pan  |  Wheel: zoom %.0f%%",
+        ImGui::SetTooltip("Drag shape to move, orange dot to rotate, blue square to scale, purple cross to move pivot | Middle drag: pan | Wheel: zoom %.0f%%",
                           canvas.zoom * 100.0F);
     }
 }
@@ -601,7 +752,29 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             fabric::editor::StudioResourceKind::vector &&
         session.selected_resource()->native && session.created_vector();
     if (native_selected) {
-        draw_native_vector_canvas(session, canvas, available);
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
+        ImGui::TextUnformatted("Gizmo");
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Move", canvas.tool == CanvasUiState::Tool::move)) {
+            canvas.tool = CanvasUiState::Tool::move;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Rotate", canvas.tool == CanvasUiState::Tool::rotate)) {
+            canvas.tool = CanvasUiState::Tool::rotate;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Scale", canvas.tool == CanvasUiState::Tool::scale)) {
+            canvas.tool = CanvasUiState::Tool::scale;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Pivot", canvas.tool == CanvasUiState::Tool::pivot)) {
+            canvas.tool = CanvasUiState::Tool::pivot;
+        }
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
+        draw_native_vector_canvas(
+            session, canvas,
+            {std::max(1.0F, available.x - 16.0F),
+             std::max(1.0F, available.y - 42.0F)});
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);

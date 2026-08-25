@@ -94,6 +94,11 @@ C4Component
   de fill image. Les sélecteurs parent et clip proposent uniquement les autres
   nœuds du document ; la validation de session refuse ensuite les cycles ou
   références invalides.
+- Le canvas natif expose les outils déplacement, rotation, échelle et pivot.
+  Les poignées de rotation, d’échelle et de pivot sont dessinées autour du
+  nœud sélectionné ; un geste continu est fusionné par `CommandStack` en une
+  seule mutation undoable. Le déplacement du pivot compense la position afin
+  de ne pas déplacer visuellement la forme.
 - Le canvas natif envoie les draw packets validés au backend OpenGL 3 dans le
   viewport courant. Le resolver charge à la demande les `TextureAsset` locaux,
   les met en cache GPU pendant la session et les fournit au sampler image ; le

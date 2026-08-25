@@ -202,8 +202,14 @@ TEST_CASE("native vector edits use history save and recovery") {
         auto node = session.created_vector()->native->nodes.front();
         node.name = "Moved panel";
         node.transform.position = {3.0F, -2.0F};
+        node.transform.rotation_degrees = 22.5F;
+        node.transform.scale = {1.25F, 0.75F};
+        node.transform.pivot = {0.5F, -0.25F};
         node.fill.color = fabric::core::Color{0.9F, 0.2F, 0.1F, 1.0F};
         REQUIRE(session.set_selected_vector_node(0, node, start));
+        auto second = node;
+        second.transform.position.x = 4.0F;
+        REQUIRE(session.set_selected_vector_node(0, second, start + 1ms));
         CHECK(session.dirty());
         CHECK(session.can_undo());
         REQUIRE(session.undo(start + 1ms));
@@ -212,6 +218,8 @@ TEST_CASE("native vector edits use history save and recovery") {
         REQUIRE(session.redo(start + 2ms));
         CHECK(session.created_vector()->native->nodes.front().name ==
               "Moved panel");
+        CHECK(session.created_vector()->native->nodes.front().transform ==
+              second.transform);
         REQUIRE(session.update_autosave(start + 3s) ==
                 fabric::editor::AutosaveStatus::saved);
     }
@@ -230,6 +238,12 @@ TEST_CASE("native vector edits use history save and recovery") {
     REQUIRE(recovered.accept_recovery(start + 3s));
     CHECK(recovered.created_vector()->native->nodes.front().name ==
           "Moved panel");
+    CHECK(recovered.created_vector()->native->nodes.front().transform ==
+          fabric::core::Transform{
+              .position = {4.0F, -2.0F},
+              .rotation_degrees = 22.5F,
+              .scale = {1.25F, 0.75F},
+              .pivot = {0.5F, -0.25F}});
     CHECK(recovered.dirty());
     REQUIRE(recovered.save());
     CHECK_FALSE(recovered.dirty());
@@ -238,8 +252,12 @@ TEST_CASE("native vector edits use history save and recovery") {
         project.path(), *recovered.manifest(),
         "assets/vectors/editable-panel.vector.json");
     REQUIRE(saved.ok());
-    CHECK(saved.asset->native->nodes.front().transform.position ==
-          fabric::core::Vec2{3.0F, -2.0F});
+    CHECK(saved.asset->native->nodes.front().transform ==
+          fabric::core::Transform{
+              .position = {4.0F, -2.0F},
+              .rotation_degrees = 22.5F,
+              .scale = {1.25F, 0.75F},
+              .pivot = {0.5F, -0.25F}});
 }
 
 TEST_CASE("autosave follows inactivity and leaves primary untouched") {
