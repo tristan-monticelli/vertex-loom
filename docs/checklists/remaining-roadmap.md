@@ -275,7 +275,8 @@ inspectable avec collisions et événements.
   stable et caméra interpolée.
 - [ ] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre avec interpolation.
 - [x] Ajouter smoke test, benchmark et replay par checkpoints.
-- [ ] Tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
+- [x] Réduire les draw calls des packets contigus compatibles par batching stable
+- [ ] Mesurer puis tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
   de référence.
 
 Gate : une map produite par les deux ateliers fonctionne directement sur les

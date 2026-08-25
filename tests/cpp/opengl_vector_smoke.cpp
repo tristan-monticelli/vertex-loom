@@ -75,7 +75,9 @@ int main() {
         .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
         .closed_outline = true,
     };
-    const std::array packets{packet};
+    auto second_packet = packet;
+    second_packet.node_id = "smoke-2";
+    const std::array packets{packet, second_packet};
     glViewport(0, 0, 64, 64);
     glClearColor(0.0F, 0.0F, 0.0F, 1.0F);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -87,8 +89,9 @@ int main() {
     glFinish();
     std::array<std::uint8_t, 4> pixel{};
     glReadPixels(32, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel.data());
-    const bool rendered = stats.ok() && stats.packets_drawn == 1U &&
-        stats.triangles_drawn == 2U && pixel[0] > 200U && pixel[1] < 40U;
+    const bool rendered = stats.ok() && stats.packets_drawn == 2U &&
+        stats.draw_calls == 1U && stats.triangles_drawn == 4U &&
+        pixel[0] > 200U && pixel[1] < 40U;
     const fabric::render::VectorDrawPacket clip{
         .node_id = "clip",
         .outline = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}},

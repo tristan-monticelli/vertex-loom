@@ -12,7 +12,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, prompts typés, historique réversible, autosave et orchestration d’authoring")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie et compositing vectoriels")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie, compositing vectoriels et batching stable des draw packets")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }

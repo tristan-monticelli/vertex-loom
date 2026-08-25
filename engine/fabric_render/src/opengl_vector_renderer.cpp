@@ -427,6 +427,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.fill_indices.size()),
             GL_UNSIGNED_INT, nullptr);
+        ++stats.draw_calls;
         if (count_stats) {
             stats.triangles_drawn += static_cast<std::uint32_t>(
                 packet.fill_indices.size() / 3U);
@@ -457,10 +458,122 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         functions.uniform_1f(opacity_uniform, 1.0F);
         functions.draw_arrays(packet.closed_outline ? GL_LINE_LOOP : GL_LINE_STRIP,
                               0, static_cast<GLsizei>(vertices.size()));
+        ++stats.draw_calls;
         return true;
     };
 
-    for (const auto& packet : packets) {
+    const auto same_fill_material = [](const VectorDrawPacket& left,
+                                       const VectorDrawPacket& right) {
+        if (left.image_fill.has_value() != right.image_fill.has_value()) return false;
+        if (left.image_fill) {
+            return left.image_fill->texture.id == right.image_fill->texture.id &&
+                left.image_fill->opacity == right.image_fill->opacity;
+        }
+        if (left.fill_color.has_value() != right.fill_color.has_value()) return false;
+        if (!left.fill_color) return true;
+        return left.fill_color->red == right.fill_color->red &&
+            left.fill_color->green == right.fill_color->green &&
+            left.fill_color->blue == right.fill_color->blue &&
+            left.fill_color->alpha == right.fill_color->alpha;
+    };
+
+    const auto draw_fill_batch = [&](const std::span<const VectorDrawPacket* const> batch) {
+        if (batch.empty()) return false;
+        const auto& first = *batch.front();
+        std::optional<OpenGLTextureHandle> texture;
+        if (first.image_fill) {
+            if (!texture_resolver) {
+                stats.errors.push_back(
+                    "OpenGL vector renderer requires a texture resolver for image fills");
+                return false;
+            }
+            texture = texture_resolver(first.image_fill->texture.id);
+            if (!texture || texture->handle == 0U) {
+                stats.errors.push_back(
+                    "OpenGL vector texture reference could not be resolved: " +
+                    first.image_fill->texture.id.value);
+                return false;
+            }
+        } else if (!first.fill_color) {
+            return false;
+        }
+
+        std::vector<Vertex> vertices;
+        std::vector<std::uint32_t> indices;
+        for (const auto* packet : batch) {
+            if (packet == nullptr || packet->fill_vertices.empty() ||
+                packet->fill_indices.empty() || !same_fill_material(first, *packet))
+                return false;
+            if (packet->image_fill) {
+                const auto resolved = texture_resolver(packet->image_fill->texture.id);
+                if (!resolved || resolved->handle != texture->handle) return false;
+                if (packet->fill_uv.size() != packet->fill_vertices.size()) {
+                    stats.errors.push_back("OpenGL image fill UV count does not match silhouette");
+                    return false;
+                }
+            }
+            const auto base = static_cast<std::uint32_t>(vertices.size());
+            vertices.reserve(vertices.size() + packet->fill_vertices.size());
+            for (std::size_t index = 0; index < packet->fill_vertices.size(); ++index) {
+                const auto point = packet->fill_vertices[index];
+                const auto uv = packet->fill_uv.size() == packet->fill_vertices.size()
+                    ? packet->fill_uv[index] : core::Vec2{};
+                vertices.push_back({point.x, point.y, uv.x, uv.y});
+            }
+            indices.reserve(indices.size() + packet->fill_indices.size());
+            for (const auto index : packet->fill_indices) indices.push_back(base + index);
+        }
+
+        functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
+        functions.buffer_data(GL_ARRAY_BUFFER,
+                              static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
+                              vertices.data(), GL_STREAM_DRAW);
+        functions.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
+        functions.buffer_data(GL_ELEMENT_ARRAY_BUFFER,
+                              static_cast<GLsizeiptr>(indices.size() * sizeof(std::uint32_t)),
+                              indices.data(), GL_STREAM_DRAW);
+        const GLint color_uniform = functions.get_uniform_location(program_, "color");
+        const GLint textured_uniform = functions.get_uniform_location(program_, "textured");
+        const GLint opacity_uniform = functions.get_uniform_location(program_, "opacity");
+        if (texture) {
+            const GLint sampler_uniform = functions.get_uniform_location(program_, "imageTexture");
+            functions.uniform_4f(color_uniform, 1.0F, 1.0F, 1.0F, 1.0F);
+            functions.uniform_1i(textured_uniform, 1);
+            functions.uniform_1f(opacity_uniform, first.image_fill->opacity);
+            functions.uniform_1i(sampler_uniform, 0);
+            functions.active_texture(GL_TEXTURE0);
+            functions.bind_texture(GL_TEXTURE_2D, texture->handle);
+        } else {
+            const auto& color = *first.fill_color;
+            functions.uniform_4f(color_uniform, color.red, color.green, color.blue, color.alpha);
+            functions.uniform_1i(textured_uniform, 0);
+            functions.uniform_1f(opacity_uniform, 1.0F);
+        }
+        functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()),
+                                GL_UNSIGNED_INT, nullptr);
+        ++stats.draw_calls;
+        stats.packets_drawn += static_cast<std::uint32_t>(batch.size());
+        stats.triangles_drawn += static_cast<std::uint32_t>(indices.size() / 3U);
+        return true;
+    };
+
+    for (std::size_t packet_index = 0; packet_index < packets.size();) {
+        const auto& packet = packets[packet_index];
+        if (!packet.clip_node_id && !packet.stroke && !packet.fill_indices.empty()) {
+            std::vector<const VectorDrawPacket*> batch{&packet};
+            std::size_t next = packet_index + 1U;
+            while (next < packets.size()) {
+                const auto& candidate = packets[next];
+                if (candidate.clip_node_id || candidate.stroke || candidate.fill_indices.empty() ||
+                    !same_fill_material(packet, candidate)) break;
+                batch.push_back(&candidate);
+                ++next;
+            }
+            if (batch.size() > 1U && draw_fill_batch(batch)) {
+                packet_index = next;
+                continue;
+            }
+        }
         bool packet_drawn = false;
         if (packet.clip_node_id.has_value()) {
             if (!stencil_ready) continue;
@@ -492,6 +605,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         packet_drawn = draw_fill(packet, false, true) || packet_drawn;
         packet_drawn = draw_stroke(packet) || packet_drawn;
         if (packet_drawn) ++stats.packets_drawn;
+        ++packet_index;
     }
     if (stencil_ready) glDisable(GL_STENCIL_TEST);
     functions.bind_vertex_array(0U);

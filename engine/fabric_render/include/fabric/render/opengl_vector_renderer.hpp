@@ -24,6 +24,7 @@ struct OpenGLVectorViewport {
 struct OpenGLVectorRenderStats {
     std::uint32_t packets_submitted{};
     std::uint32_t packets_drawn{};
+    std::uint32_t draw_calls{};
     std::uint32_t triangles_drawn{};
     std::vector<std::string> errors;
 

@@ -574,7 +574,7 @@ bool PreviewRuntime::run() {
             return false;
         }
         stats_.visible_instances = render_stats.packets_drawn;
-        stats_.draw_calls += render_stats.packets_drawn;
+        stats_.draw_calls += render_stats.draw_calls;
         stats_.triangles += render_stats.triangles_drawn;
         ++stats_.frames;
         SDL_GL_SwapWindow(impl_->window);

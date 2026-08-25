@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
                   << " p95_frame_ms=" << runtime.stats().p95_frame_ms
                   << " replay_events=" << runtime.stats().replay_events
                   << " replay_checkpoints=" << runtime.stats().replay_checkpoints
+                  << " gameplay_events=" << runtime.stats().gameplay_events
                   << " character_x=" << runtime.stats().character_x
                   << " character_y=" << runtime.stats().character_y << '\n';
     }
