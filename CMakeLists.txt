@@ -20,6 +20,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+set(BOX2D_BUILD_TESTBED OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+set(BOX2D_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    box2d
+    GIT_REPOSITORY https://github.com/erincatto/box2d.git
+    GIT_TAG v3.1.1
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(box2d)
+
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     FetchContent_Declare(
         Catch2
@@ -68,6 +79,13 @@ target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE
 
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)
+
+add_library(fabric_physics STATIC
+    engine/fabric_physics/src/physics_world.cpp
+)
+target_include_directories(fabric_physics PUBLIC engine/fabric_physics/include)
+target_compile_features(fabric_physics PUBLIC cxx_std_20)
+target_link_libraries(fabric_physics PUBLIC box2d PRIVATE fabric_project)
 
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
@@ -193,7 +211,7 @@ if(FABRIC_BUILD_EDITORS)
         nfd
     )
     add_executable(map_studio editors/map_studio/main.cpp)
-    target_link_libraries(map_studio PRIVATE fabric_project)
+    target_link_libraries(map_studio PRIVATE fabric_project fabric_physics)
 endif()
 
 if(FABRIC_BUILD_RUNTIME)
@@ -301,6 +319,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_map_chunk_index_tests
              COMMAND fabric_map_chunk_index_tests)
+
+    add_executable(fabric_physics_tests tests/cpp/physics_tests.cpp)
+    target_link_libraries(fabric_physics_tests PRIVATE
+        fabric_physics Catch2::Catch2WithMain)
+    add_test(NAME fabric_physics_tests COMMAND fabric_physics_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp

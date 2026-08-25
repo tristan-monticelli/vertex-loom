@@ -258,7 +258,9 @@ même résultat visible après sauvegarde, rechargement et replay.
   100 000 éléments et la cible 10 000 visibles restent à mesurer.
 - [ ] Ajouter placement, overrides typés, snapping, profondeur, sélection,
   visibilité et verrouillage.
-- [ ] Intégrer Box2D 3.1.1, formes validées, capteurs et événements nommés.
+- [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
+  et validation headless. La création des formes, capteurs et événements dans
+  le monde reste à relier.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à
   toutes les opérations.
 
