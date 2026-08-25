@@ -5,6 +5,7 @@ C4Component
     title Vertex Loom — migration de l’import SVG vers l’authoring natif
     Container_Boundary(render, "fabric_render") {
         Component(loader, "SVG preview loader", "C++20 / SDL2_image / NanoSVG", "Valide la taille du fichier et rasterise un aperçu RGBA8 borné")
+        Component(converter, "SVG native converter", "C++20 / NanoSVG", "Convertit explicitement les chemins Bézier et styles simples vers VectorAsset v2 et rapporte les pertes")
         Component(image, "RasterImage", "C++20", "Aperçu possédé par le moteur sans type SDL ou OpenGL public")
         Component(geometry, "Native vector renderer", "C++20 / OpenGL", "Valide les contours, applique les transforms, aplatit, triangule, met en cache et produit des draw packets déterministes")
         Component(gl_renderer, "OpenGL vector backend", "OpenGL 3 / SDL loader", "Compile le programme couleur, gère VAO/VBO/IBO et dessine les triangles des packets")
@@ -21,6 +22,7 @@ C4Component
     ContainerDb(files, "Local Files", "SVG", "Source vectorielle choisie par l'utilisateur")
     Rel(import_ui, importer, "Demande l'import")
     Rel(importer, loader, "Valide et rasterise")
+    Rel(importer, converter, "Convertit sur action explicite")
     Rel(importer, project, "Publie source et document")
     Rel(loader, files, "Lit")
     Rel(loader, image, "Produit")
@@ -44,7 +46,10 @@ C4Component
   registre vérifie sa référence texture. Chemins, contours et clips restent des
   extensions explicites.
 - Une conversion de SVG lié vers natif est explicite et doit présenter les
-  éléments non pris en charge avant publication.
+  éléments non pris en charge avant publication. Le convertisseur NanoSVG
+  couvre les chemins cubiques, fills couleur et contours simples ; gradients et
+  autres paints non supportés produisent un diagnostic et ne sont jamais
+  supprimés silencieusement.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un
   carré de 2048 pixels de côté sans dépasser 4194304 pixels.
 - L'import refuse tout identifiant ou SVG invalide et ne remplace jamais un

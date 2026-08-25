@@ -1,4 +1,5 @@
 #include "fabric/render/raster_image.hpp"
+#include "fabric/render/svg_vector.hpp"
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 
@@ -137,6 +138,28 @@ void invalid_svg_inputs_are_rejected_before_publication() {
                 oversized.error->code ==
                     fabric::render::RasterErrorCode::source_too_large,
             "oversized SVG reached the decoder");
+}
+
+void svg_can_be_converted_to_native_paths() {
+    const auto path = temporary_path(".svg");
+    {
+        std::ofstream output(path, std::ios::binary);
+        output << R"(<svg xmlns="http://www.w3.org/2000/svg" width="4" height="2" viewBox="0 0 4 2"><path id="panel" d="M0 0h4v2H0z" fill="#d9a441" stroke="#112233" stroke-width="0.5"/></svg>)";
+    }
+    const auto converted = fabric::render::convert_svg_to_native(
+        path, fabric::core::ResourceId{.value = "panel-native"}, "Panel");
+    std::filesystem::remove(path);
+
+    require(converted.ok() && converted.asset->native.has_value(),
+            "SVG native conversion failed");
+    require(converted.asset->native->size == fabric::core::Vec2{4.0F, 2.0F} &&
+                converted.asset->native->nodes.size() == 1U,
+            "SVG native conversion lost document or node dimensions");
+    const auto& node = converted.asset->native->nodes.front();
+    require(node.name == "panel" && node.fill.kind ==
+                fabric::project::VectorFillKind::solid && node.stroke.has_value() &&
+                node.shape.path.size() >= 2U,
+            "SVG native conversion lost path style or commands");
 }
 
 fabric::project::VectorAsset native_geometry_fixture() {
@@ -281,6 +304,7 @@ int main() {
     invalid_inputs_are_rejected();
     valid_svg_is_rasterized_to_a_bounded_preview();
     invalid_svg_inputs_are_rejected_before_publication();
+    svg_can_be_converted_to_native_paths();
     native_geometry_produces_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();

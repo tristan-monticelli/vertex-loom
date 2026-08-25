@@ -108,9 +108,11 @@ find_package(OpenGL REQUIRED)
 add_library(fabric_render STATIC
     engine/fabric_render/src/raster_image.cpp
     engine/fabric_render/src/opengl_vector_renderer.cpp
+    engine/fabric_render/src/svg_vector.cpp
     engine/fabric_render/src/vector_geometry.cpp
 )
-target_include_directories(fabric_render PUBLIC engine/fabric_render/include)
+target_include_directories(fabric_render PUBLIC engine/fabric_render/include
+    PRIVATE ${SDL2_image_SOURCE_DIR}/src)
 target_compile_features(fabric_render PUBLIC cxx_std_20)
 target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
     SDL2::SDL2-static

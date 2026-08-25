@@ -36,8 +36,10 @@ La migration `v1 -> v2` est automatique et sans perte :
    ultérieurement un SVG lié en document natif.
 
 Le renderer cible consomme la géométrie native et ses draw packets. NanoSVG
-reste le lecteur borné des SVG liés. Aucun atlas, frame ou spritesheet n’est
-requis par Asset Studio, Map Studio, les entités, les animations ou le runtime.
+reste le lecteur borné des SVG liés et fournit aussi le convertisseur explicite
+vers le sous-ensemble natif : chemins cubiques, fills couleur et contours
+simples. Aucun atlas, frame ou spritesheet n’est requis par Asset Studio, Map
+Studio, les entités, les animations ou le runtime.
 
 ADR-0025 retire le contrat et son pipeline après confirmation explicite.
 
@@ -47,7 +49,9 @@ Utiliser le DOM SVG comme document natif lie l’éditeur à un format trop larg
 rend la validation et l’animation de propriétés ambiguës et expose des fonctions
 non prises en charge. Continuer par spritesheets perd l’indépendance de
 résolution et empêche l’édition du contour et du fill. Convertir automatiquement
-tous les SVG serait destructif pour les éléments non compris.
+tous les SVG serait destructif pour les éléments non compris ; la conversion
+reste donc une action explicite et échoue avec un rapport si elle rencontre des
+paints non supportés.
 
 ## Consequences
 

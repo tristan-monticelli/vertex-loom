@@ -133,15 +133,18 @@ lorsqu’elles contiennent encore des variantes non livrées.
   auto-intersections au lieu de produire une géométrie ambiguë.
 - [x] Aplatir les Bézier selon une tolérance fournie par la vue, trianguler de
   façon déterministe et mettre en cache la géométrie par version de document.
-- [ ] Charger les SVG liés avec NanoSVG ; convertir uniquement les primitives
-  explicitement prises en charge et signaler toute perte avant validation.
+- [x] Charger les SVG liés avec NanoSVG ; convertir explicitement les chemins
+  cubiques, fills couleur et contours simples, et signaler gradients ou paints
+  non pris en charge avant validation.
 - [ ] Ajouter round-trip, migration v1, validation stricte, chemins sûrs,
   tessellation et rendu headless.
 
 Gate : un artwork combinant contour vectoriel et image remplissante est créé,
 sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
-Le payload headless de fill image et la triangulation de sa silhouette sont
+Le convertisseur NanoSVG produit désormais un `VectorAsset v2 native` pour les
+chemins cubiques, fills couleur et contours simples ; les pertes sont
+diagnostiquées avant publication. Le payload headless de fill image et la triangulation de sa silhouette sont
 désormais disponibles. Les draw packets appliquent les transforms locales et
 parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
 initialise et dessine les triangles de fills couleur dans le canvas Asset

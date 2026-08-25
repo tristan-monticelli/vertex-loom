@@ -68,6 +68,8 @@ identifiants dupliqués, rectangle/ellipse, fill couleur/transparent,
 publication atomique sans SVG et chargement par le validateur headless. Le fill
 image couvre round-trip du cadrage et du transform, opacité, liaison à la
 déformation, résolution de texture et refus d’une référence manquante. Les
+SVG liés couvrent aussi la conversion NanoSVG explicite vers chemins cubiques,
+fills couleur et contours, ainsi que le diagnostic des gradients non supportés.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts
