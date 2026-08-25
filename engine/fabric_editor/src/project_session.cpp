@@ -1,5 +1,7 @@
 #include "fabric/editor/project_session.hpp"
 
+#include "fabric/editor/animation_timeline.hpp"
+
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/render/svg_vector.hpp"
@@ -246,8 +248,10 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     recovery_manifest_.reset();
     recovery_vector_.reset();
     recovery_entity_.reset();
+    recovery_animation_.reset();
     selected_vector_document_path_.clear();
     selected_entity_document_path_.clear();
+    selected_animation_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -295,8 +299,10 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     recovery_manifest_ = std::move(recovery_manifest);
     recovery_vector_.reset();
     recovery_entity_.reset();
+    recovery_animation_.reset();
     selected_vector_document_path_.clear();
     selected_entity_document_path_.clear();
+    selected_animation_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -798,6 +804,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         recovery_vector_.reset();
         selected_entity_document_path_.clear();
         recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
     } else if (kind == StudioResourceKind::vector) {
         auto loaded = project::load_vector_asset(
             project_root_, *manifest_, match->document_path);
@@ -849,6 +857,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         }
         selected_entity_document_path_.clear();
         recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
     } else if (kind == StudioResourceKind::material) {
         auto loaded = project::load_material(
             project_root_, *manifest_, match->document_path);
@@ -866,6 +876,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         recovery_vector_.reset();
         selected_entity_document_path_.clear();
         recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
     } else if (kind == StudioResourceKind::entity) {
         auto loaded = project::load_entity(
             project_root_, *manifest_, match->document_path);
@@ -896,6 +908,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             if (parsed.ok()) recovery_entity_ = std::move(parsed.entity);
             else recovery.errors = std::move(parsed.errors);
         }
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
         if (!recovery.errors.empty()) {
             selection_warnings = std::move(recovery.errors);
         }
@@ -916,6 +930,24 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         recovery_vector_.reset();
         selected_entity_document_path_.clear();
         recovery_entity_.reset();
+        selected_animation_document_path_ = match->document_path;
+        recovery_animation_.reset();
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_animation_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_animation(*manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_animation(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok()) recovery_animation_ = std::move(parsed.asset);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty()) {
+            selection_warnings = std::move(recovery.errors);
+        }
     }
     selected_resource_index_ = index;
     errors_ = std::move(selection_warnings);
@@ -930,9 +962,10 @@ bool ProjectSession::set_project_name(
         return false;
     }
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::vector ||
-                              dirty_document_ == DirtyDocument::entity)) {
+                              dirty_document_ == DirtyDocument::entity ||
+                              dirty_document_ == DirtyDocument::animation)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
-                    "save vector changes before editing project settings"}};
+                    "save current asset changes before editing project settings"}};
         return false;
     }
     if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
@@ -974,9 +1007,10 @@ bool ProjectSession::set_pixels_per_unit(
         return false;
     }
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::vector ||
-                              dirty_document_ == DirtyDocument::entity)) {
+                              dirty_document_ == DirtyDocument::entity ||
+                              dirty_document_ == DirtyDocument::animation)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
-                    "save vector changes before editing project settings"}};
+                    "save current asset changes before editing project settings"}};
         return false;
     }
     if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
@@ -1210,6 +1244,77 @@ bool ProjectSession::remove_selected_entity_node(
     return true;
 }
 
+bool ProjectSession::prepare_animation_edit(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_animation_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an animation before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::animation) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing an animation"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    return true;
+}
+
+bool ProjectSession::set_selected_animation_duration(
+    const float duration, const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.set_duration(duration)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "duration",
+                    "animation duration is invalid"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_animation_loop(
+    const bool loop, const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.set_loop(loop)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "loop",
+                    "animation loop flag could not be changed"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::insert_selected_animation_key(
+    project::PropertyBinding binding, const float time,
+    project::AnimationValue value,
+    const project::AnimationInterpolation interpolation,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.insert_key(std::move(binding), time, std::move(value),
+                             interpolation)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks",
+                    "animation key is invalid or conflicts with its track"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.undo()) {
         return false;
@@ -1262,6 +1367,20 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::animation) {
+        if (!selected_animation_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_animation(
+            project_root_, *manifest_, *selected_animation_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else {
         auto report = project::save_manifest_atomic(project_root_, *manifest_);
         if (!report.ok()) {
@@ -1290,13 +1409,17 @@ AutosaveStatus ProjectSession::update_autosave(
             created_vector_ && !selected_vector_document_path_.empty();
         const bool entity_document = dirty_document_ == DirtyDocument::entity &&
             selected_entity_ && !selected_entity_document_path_.empty();
+        const bool animation_document = dirty_document_ == DirtyDocument::animation &&
+            selected_animation_ && !selected_animation_document_path_.empty();
         auto report = project::save_autosave_atomic(
             project_root_,
             vector_document ? selected_vector_document_path_
             : entity_document ? selected_entity_document_path_
+            : animation_document ? selected_animation_document_path_
                             : std::filesystem::path{"project.json"},
             vector_document ? project::serialize_vector_asset(*created_vector_)
             : entity_document ? project::serialize_entity(*selected_entity_)
+            : animation_document ? project::serialize_animation(*selected_animation_)
                             : project::serialize_manifest(*manifest_),
             vector_document
                 ? project::DocumentValidator{[this](const std::string_view contents) {
@@ -1307,6 +1430,12 @@ AutosaveStatus ProjectSession::update_autosave(
                 : entity_document
                 ? project::DocumentValidator{[this](const std::string_view contents) {
                       auto parsed = project::parse_entity(*manifest_, contents);
+                      return project::ValidationReport{
+                          .errors = std::move(parsed.errors)};
+                  }}
+                : animation_document
+                ? project::DocumentValidator{[this](const std::string_view contents) {
+                      auto parsed = project::parse_animation(*manifest_, contents);
                       return project::ValidationReport{
                           .errors = std::move(parsed.errors)};
                   }}
@@ -1326,13 +1455,17 @@ AutosaveStatus ProjectSession::update_autosave(
         created_vector_ && !selected_vector_document_path_.empty();
     const bool entity_document = dirty_document_ == DirtyDocument::entity &&
         selected_entity_ && !selected_entity_document_path_.empty();
+    const bool animation_document = dirty_document_ == DirtyDocument::animation &&
+        selected_animation_ && !selected_animation_document_path_.empty();
     auto report = project::save_autosave_atomic(
         project_root_,
         vector_document ? selected_vector_document_path_
         : entity_document ? selected_entity_document_path_
+        : animation_document ? selected_animation_document_path_
                         : std::filesystem::path{"project.json"},
         vector_document ? project::serialize_vector_asset(*created_vector_)
         : entity_document ? project::serialize_entity(*selected_entity_)
+        : animation_document ? project::serialize_animation(*selected_animation_)
                         : project::serialize_manifest(*manifest_),
         vector_document
             ? project::DocumentValidator{[this](const std::string_view contents) {
@@ -1343,6 +1476,12 @@ AutosaveStatus ProjectSession::update_autosave(
             : entity_document
             ? project::DocumentValidator{[this](const std::string_view contents) {
                   auto parsed = project::parse_entity(*manifest_, contents);
+                  return project::ValidationReport{
+                      .errors = std::move(parsed.errors)};
+              }}
+            : animation_document
+            ? project::DocumentValidator{[this](const std::string_view contents) {
+                  auto parsed = project::parse_animation(*manifest_, contents);
                   return project::ValidationReport{
                       .errors = std::move(parsed.errors)};
               }}
@@ -1378,6 +1517,16 @@ bool ProjectSession::accept_recovery(
         errors_.clear();
         return true;
     }
+    if (recovery_animation_) {
+        selected_animation_ = std::move(recovery_animation_);
+        recovery_animation_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::animation;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (!recovery_manifest_.has_value()) {
         return false;
     }
@@ -1395,6 +1544,7 @@ void ProjectSession::decline_recovery() noexcept {
     recovery_manifest_.reset();
     recovery_vector_.reset();
     recovery_entity_.reset();
+    recovery_animation_.reset();
     errors_.clear();
 }
 
@@ -1416,7 +1566,7 @@ bool ProjectSession::can_redo() const noexcept {
 
 bool ProjectSession::has_recovery() const noexcept {
     return recovery_manifest_.has_value() || recovery_vector_.has_value() ||
-        recovery_entity_.has_value();
+        recovery_entity_.has_value() || recovery_animation_.has_value();
 }
 
 const std::filesystem::path& ProjectSession::project_root() const noexcept {

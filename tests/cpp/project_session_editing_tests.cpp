@@ -271,6 +271,29 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_animation()->duration == 2.0F);
     REQUIRE(session.selected_animation()->markers.size() == 1U);
     CHECK(session.selected_animation()->markers.front().id == "loop-point");
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.set_selected_animation_duration(3.0F, start));
+    REQUIRE(session.set_selected_animation_loop(true, start));
+    REQUIRE(session.insert_selected_animation_key(
+        {.node_id = "root", .component_id = "transform",
+         .property_id = "position"},
+        0.0F, fabric::core::Vec2{1.0F, 2.0F},
+        fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_animation()->tracks.empty());
+    REQUIRE(session.redo(start));
+    REQUIRE(session.selected_animation()->tracks.size() == 1U);
+    REQUIRE(session.update_autosave(start + std::chrono::seconds{2}) ==
+            fabric::editor::AutosaveStatus::saved);
+    fabric::editor::ProjectSession recovered;
+    REQUIRE(recovered.open(project.path()));
+    REQUIRE(recovered.select_resource(
+        fabric::editor::StudioResourceKind::animation, {.value = "walk-cycle"}));
+    REQUIRE(recovered.has_recovery());
+    REQUIRE(recovered.accept_recovery(start + std::chrono::seconds{3}));
+    REQUIRE(recovered.selected_animation()->tracks.size() == 1U);
+    REQUIRE(recovered.save());
+    REQUIRE(session.save());
     const auto loaded = fabric::project::load_animation(
         project.path(), *session.manifest(),
         fabric::project::animation_document_path(

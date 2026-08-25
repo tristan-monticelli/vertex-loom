@@ -108,6 +108,16 @@ struct CanvasUiState {
     fabric::core::Rect entity_world_bounds{{-5.0F, -5.0F}, {10.0F, 10.0F}};
 };
 
+struct AnimationUiState {
+    std::string node_id{"root"};
+    std::string component_id{"transform"};
+    std::string property_id{"position"};
+    float key_time{};
+    float key_value[2]{};
+    fabric::project::AnimationInterpolation interpolation{
+        fabric::project::AnimationInterpolation::linear};
+};
+
 struct EntityPreviewResult {
     std::vector<fabric::render::VectorDrawPacket> packets;
     fabric::core::Rect bounds{{-5.0F, -5.0F}, {10.0F, 10.0F}};
@@ -943,6 +953,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AssetPreview& pending_import_preview,
                     CanvasUiState& canvas,
                     const EntityPreviewResult& entity_preview,
+                    AnimationUiState& animation_ui,
                     ProjectSettingsUiState& project_settings,
                     bool& request_open,
                     bool& request_png,
@@ -1458,6 +1469,77 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.z_order = z_order;
                 commit_entity_node(node);
             }
+            }
+        }
+        if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::animation &&
+            session.selected_animation()) {
+            auto& clip = *session.selected_animation();
+            ImGui::SeparatorText("Animation timeline");
+            float duration = clip.duration;
+            if (ImGui::InputFloat("Duration", &duration, 0.1F, 1.0F, "%.2f s")) {
+                if (!session.set_selected_animation_duration(duration)) {
+                    status = "Animation duration rejected; inspect diagnostics.";
+                }
+            }
+            bool loop = clip.loop;
+            if (ImGui::Checkbox("Loop", &loop)) {
+                if (!session.set_selected_animation_loop(loop)) {
+                    status = "Animation loop rejected; inspect diagnostics.";
+                }
+            }
+            ImGui::SeparatorText("Insert key");
+            ImGui::InputText("Node id", &animation_ui.node_id);
+            ImGui::InputText("Component", &animation_ui.component_id);
+            ImGui::InputText("Property", &animation_ui.property_id);
+            animation_ui.key_time = std::clamp(animation_ui.key_time, 0.0F,
+                                                std::max(0.0F, clip.duration));
+            ImGui::SliderFloat("Key time", &animation_ui.key_time, 0.0F,
+                               std::max(0.01F, clip.duration), "%.2f s");
+            ImGui::InputFloat2("Vec2 value", animation_ui.key_value);
+            const auto interpolation_label = std::string(
+                fabric::project::to_string(animation_ui.interpolation));
+            if (ImGui::BeginCombo("Interpolation", interpolation_label.c_str())) {
+                for (const auto option : {
+                         fabric::project::AnimationInterpolation::step,
+                         fabric::project::AnimationInterpolation::linear,
+                         fabric::project::AnimationInterpolation::cubic}) {
+                    const bool selected_option = option == animation_ui.interpolation;
+                    const auto label = std::string(fabric::project::to_string(option));
+                    if (ImGui::Selectable(label.c_str(), selected_option)) {
+                        animation_ui.interpolation = option;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::BeginDisabled(animation_ui.node_id.empty() ||
+                                 animation_ui.component_id.empty() ||
+                                 animation_ui.property_id.empty());
+            if (ImGui::Button("Insert Vec2 key")) {
+                if (session.insert_selected_animation_key(
+                        {.node_id = animation_ui.node_id,
+                         .component_id = animation_ui.component_id,
+                         .property_id = animation_ui.property_id},
+                        animation_ui.key_time,
+                        fabric::core::Vec2{animation_ui.key_value[0],
+                                           animation_ui.key_value[1]},
+                        animation_ui.interpolation)) {
+                    status = "Animation key inserted.";
+                } else {
+                    status = "Animation key rejected; inspect diagnostics.";
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::SeparatorText("Tracks");
+            if (clip.tracks.empty()) {
+                ImGui::TextDisabled("No tracks yet.");
+            }
+            for (const auto& track : clip.tracks) {
+                ImGui::TextWrapped("%s / %s / %s (%zu keys)",
+                                   track.binding.node_id.c_str(),
+                                   track.binding.component_id.c_str(),
+                                   track.binding.property_id.c_str(),
+                                   track.keys.size());
             }
         }
     } else {
@@ -2193,6 +2275,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     AssetPreview preview;
     AssetPreview pending_import_preview;
     CanvasUiState canvas;
+    AnimationUiState animation_ui;
     ProjectSettingsUiState project_settings;
     bool request_open = false;
     bool request_png = false;
@@ -2352,6 +2435,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
         draw_workspace(session, window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, entity_preview,
+                       animation_ui,
                        project_settings,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);

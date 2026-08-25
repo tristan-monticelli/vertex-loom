@@ -152,3 +152,7 @@ C4Component
   les transforms parent/enfant et applique le matériau avant d’envoyer les
   draw packets au renderer OpenGL. Les textures locales sont résolues par le
   même cache GPU que les artworks natifs.
+- L’inspecteur d’animation expose une première timeline générique : durée,
+  boucle, binding `node/component/property`, interpolation et insertion de
+  clés `Vec2`. Les clips suivent le même historique de commandes, autosave,
+  récupération et sauvegarde atomique que les autres documents éditables.

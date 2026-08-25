@@ -103,6 +103,19 @@ public:
         std::size_t node_index,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_animation_duration(
+        float duration,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_animation_loop(
+        bool loop,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool insert_selected_animation_key(
+        project::PropertyBinding binding, float time,
+        project::AnimationValue value, project::AnimationInterpolation interpolation,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -149,6 +162,7 @@ private:
         manifest,
         vector,
         entity,
+        animation,
     };
 
     std::filesystem::path project_root_;
@@ -164,12 +178,17 @@ private:
     std::optional<project::ProjectManifest> recovery_manifest_;
     std::optional<project::VectorAsset> recovery_vector_;
     std::optional<project::EntityDefinition> recovery_entity_;
+    std::optional<project::AnimationClip> recovery_animation_;
     std::filesystem::path selected_vector_document_path_;
     std::filesystem::path selected_entity_document_path_;
+    std::filesystem::path selected_animation_document_path_;
     DirtyDocument dirty_document_{DirtyDocument::none};
     CommandStack commands_;
     AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
+
+    [[nodiscard]] bool prepare_animation_edit(
+        AutosaveScheduler::Clock::time_point now);
 
 };
 

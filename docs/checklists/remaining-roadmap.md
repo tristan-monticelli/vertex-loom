@@ -251,6 +251,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
   suppressions qui laisseraient des enfants orphelins.
+- [x] Rendre les clips éditables : durée, boucle, première piste générique,
+  clés `Vec2` et interpolation dans Asset Studio.
 - [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
   viewport OpenGL, avec composition des transforms et matériaux.
 - [ ] Refuser cycles, références invalides et valeurs non finies.
