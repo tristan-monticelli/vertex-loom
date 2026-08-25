@@ -5,6 +5,7 @@
 #include "fabric/project/map.hpp"
 #include "fabric/project/replay.hpp"
 #include "fabric/runtime/character_controller.hpp"
+#include "fabric/runtime/audio_mixer.hpp"
 #include "fabric/runtime/input.hpp"
 
 #include <cstddef>
@@ -24,6 +25,7 @@ struct PreviewRuntimeOptions {
     core::ResourceId map_id;
     std::optional<core::ResourceId> replay_id;
     bool enable_character{};
+    std::optional<std::filesystem::path> audio_wav;
     RuntimeMode mode{RuntimeMode::interactive};
     std::int32_t width{1440};
     std::int32_t height{900};

@@ -34,6 +34,9 @@ struct PreviewRuntime::Impl {
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
+    PcmAudioMixer audio_mixer;
+    PcmAudioDevice audio_device;
+    std::optional<PcmWavClip> audio_clip;
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
@@ -144,6 +147,7 @@ bool packet_visible(const render::VectorDrawPacket& packet,
 PreviewRuntime::PreviewRuntime() : impl_(std::make_unique<Impl>()) {}
 
 PreviewRuntime::~PreviewRuntime() {
+    impl_->audio_device.close();
     if (impl_->context != nullptr) {
         for (const auto& [id, texture] : impl_->texture_handles) {
             const auto handle = static_cast<GLuint>(texture.handle);
@@ -172,6 +176,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packets.clear();
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
+    impl_->audio_clip.reset();
 
     if (options_.project_root.empty() || !core::ResourceId::is_valid(options_.map_id.value)) {
         errors_.push_back("project and a valid map id are required");
@@ -201,6 +206,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             return false;
         }
         replay_ = std::move(loaded_replay.asset);
+    }
+    if (options_.audio_wav) {
+        const auto loaded_audio = load_pcm_wav(*options_.audio_wav);
+        if (!loaded_audio.ok()) {
+            errors_.push_back("audio: " + loaded_audio.error);
+            return false;
+        }
+        impl_->audio_clip = std::move(loaded_audio.clip);
     }
 
     manifest_ = std::move(loaded_project.manifest);
@@ -405,6 +418,18 @@ bool PreviewRuntime::run() {
         errors_.push_back(SDL_GetError());
         return false;
     }
+    if (impl_->audio_clip) {
+        if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
+                                          impl_->audio_clip->channels) ||
+            !impl_->audio_device.open(impl_->audio_clip->sample_rate,
+                                      impl_->audio_clip->channels) ||
+            !impl_->audio_mixer.play(*impl_->audio_clip)) {
+            errors_.push_back("audio: " + (impl_->audio_device.error().empty()
+                ? std::string("could not start PCM playback")
+                : impl_->audio_device.error()));
+            return false;
+        }
+    }
 
     for (const auto& [id, source] : impl_->texture_sources) {
         const auto image = render::load_png(source.path);
@@ -525,6 +550,13 @@ bool PreviewRuntime::run() {
         stats_.triangles += render_stats.triangles_drawn;
         ++stats_.frames;
         SDL_GL_SwapWindow(impl_->window);
+        if (impl_->audio_clip) {
+            const auto audio = impl_->audio_mixer.mix(1024);
+            if (!audio.empty() && !impl_->audio_device.submit(audio)) {
+                errors_.push_back("audio: could not queue PCM samples");
+                return false;
+            }
+        }
         frame_times_ms.push_back(static_cast<double>(SDL_GetPerformanceCounter() - frame_start) /
                                  performance_frequency * 1000.0);
     }

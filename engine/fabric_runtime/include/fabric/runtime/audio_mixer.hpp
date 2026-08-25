@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -43,6 +44,25 @@ private:
     std::uint32_t sample_rate_{};
     std::uint16_t channels_{};
     std::vector<Voice> voices_;
+};
+
+class PcmAudioDevice {
+public:
+    PcmAudioDevice() noexcept = default;
+    ~PcmAudioDevice();
+    PcmAudioDevice(const PcmAudioDevice&) = delete;
+    PcmAudioDevice& operator=(const PcmAudioDevice&) = delete;
+
+    [[nodiscard]] bool open(std::uint32_t sample_rate, std::uint16_t channels,
+                            std::uint16_t buffer_frames = 1024) noexcept;
+    [[nodiscard]] bool submit(std::span<const std::int16_t> samples) noexcept;
+    void close() noexcept;
+    [[nodiscard]] bool opened() const noexcept { return device_id_ != 0U; }
+    [[nodiscard]] const std::string& error() const noexcept { return error_; }
+
+private:
+    std::uint32_t device_id_{};
+    std::string error_;
 };
 
 } // namespace fabric::runtime

@@ -88,4 +88,55 @@ std::vector<std::int16_t> PcmAudioMixer::mix(const std::size_t frames) noexcept 
     return output;
 }
 
+PcmAudioDevice::~PcmAudioDevice() { close(); }
+
+bool PcmAudioDevice::open(const std::uint32_t sample_rate,
+                          const std::uint16_t channels,
+                          const std::uint16_t buffer_frames) noexcept {
+    close();
+    error_.clear();
+    if (sample_rate == 0U || (channels != 1 && channels != 2) || buffer_frames == 0U) {
+        error_ = "invalid PCM audio device format";
+        return false;
+    }
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+        error_ = SDL_GetError();
+        return false;
+    }
+    SDL_AudioSpec desired{.freq = static_cast<int>(sample_rate),
+                          .format = AUDIO_S16LSB,
+                          .channels = static_cast<Uint8>(channels),
+                          .samples = buffer_frames};
+    SDL_AudioSpec obtained{};
+    const auto device = SDL_OpenAudioDevice(nullptr, 0, &desired, &obtained, 0);
+    if (device == 0U) {
+        error_ = SDL_GetError();
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        return false;
+    }
+    if (obtained.freq != desired.freq || obtained.format != desired.format ||
+        obtained.channels != desired.channels) {
+        SDL_CloseAudioDevice(device);
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+        error_ = "audio device did not provide the requested PCM format";
+        return false;
+    }
+    device_id_ = device;
+    SDL_PauseAudioDevice(device_id_, 0);
+    return true;
+}
+
+bool PcmAudioDevice::submit(const std::span<const std::int16_t> samples) noexcept {
+    if (device_id_ == 0U || samples.empty()) return false;
+    return SDL_QueueAudio(device_id_, samples.data(),
+                          static_cast<Uint32>(samples.size_bytes())) == 0;
+}
+
+void PcmAudioDevice::close() noexcept {
+    if (device_id_ == 0U) return;
+    SDL_CloseAudioDevice(device_id_);
+    device_id_ = 0U;
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+}
+
 } // namespace fabric::runtime

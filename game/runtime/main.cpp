@@ -15,6 +15,7 @@ void usage() {
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
                  "[--character] "
+                 "[--audio <wav>] "
                  "[--smoke-test [frames]] [--benchmark [frames]]\n";
 }
 
@@ -38,6 +39,8 @@ int main(int argc, char** argv) {
             save_slot = argv[++index];
         } else if (argument == "--character") {
             options.enable_character = true;
+        } else if (argument == "--audio" && index + 1 < argc) {
+            options.audio_wav = argv[++index];
         } else if (argument == "--smoke-test") {
             options.mode = fabric::runtime::RuntimeMode::smoke_test;
             if (index + 1 < argc && argv[index + 1][0] != '-')

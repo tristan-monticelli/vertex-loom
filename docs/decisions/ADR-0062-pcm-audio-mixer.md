@@ -15,3 +15,6 @@ rééchantillonnage ou format compressé n’est introduit dans cette tranche.
 Le mixage est déterministe et testable sans périphérique audio. L’ouverture
 d’un périphérique SDL et la lecture des sons du runtime pourront consommer les
 buffers produits sans déplacer la logique de mixage.
+
+`game_runtime --audio <wav>` ouvre désormais le périphérique SDL au format du
+clip, met en file les buffers mixés et ferme proprement le sous-système audio.
