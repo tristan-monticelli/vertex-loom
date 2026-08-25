@@ -2,7 +2,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <filesystem>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -29,6 +32,11 @@ fabric::project::MapPackageManifest package_manifest() {
                 .document_path = "assets/textures/yarn-fill.texture.json",
                 .payload_paths = {"assets/textures/yarn-fill.png"}},
         }};
+}
+
+std::filesystem::path fixture(const std::string_view name) {
+    return std::filesystem::path{__FILE__}.parent_path().parent_path() /
+        "fixtures" / name;
 }
 
 } // namespace
@@ -97,4 +105,49 @@ TEST_CASE("map package parser rejects unknown fields and a missing root") {
     auto invalid = package_manifest();
     invalid.root_map.id.value = "another-map";
     CHECK_FALSE(fabric::project::validate_map_package_manifest(invalid).ok());
+}
+
+TEST_CASE("map package planning closes the rotating platform graph") {
+    const auto planned = fabric::project::plan_map_package(
+        fixture("studio-rotating-platform"), {.value = "platform-preview"});
+    REQUIRE(planned.ok());
+    const std::vector<std::pair<std::string, std::string>> expected{
+        {"entity", "platform-visual"},
+        {"map", "platform-preview"},
+        {"mechanic", "rotating-platform"},
+        {"texture", "platform-thread"},
+        {"texturedPath", "platform-strip-rail"},
+        {"visualComponent", "platform-strip"},
+        {"visualComposition", "platform-strip-composition"},
+    };
+    REQUIRE(planned.manifest->resources.size() == expected.size());
+    for (std::size_t index = 0; index < expected.size(); ++index) {
+        CHECK(planned.manifest->resources[index].resource.expected_type ==
+              expected[index].first);
+        CHECK(planned.manifest->resources[index].resource.id.value ==
+              expected[index].second);
+    }
+    CHECK(planned.manifest->resources[3].payload_paths ==
+          std::vector<std::filesystem::path>{
+              "assets/textures/platform-thread.png"});
+    CHECK(std::ranges::count_if(
+              planned.manifest->resources, [](const auto& resource) {
+                  return resource.document_path ==
+                      "maps/platform-preview.map.json";
+              }) == 1);
+    const auto repeated = fabric::project::plan_map_package(
+        fixture("studio-rotating-platform"), {.value = "platform-preview"});
+    REQUIRE(repeated.ok());
+    CHECK(fabric::project::serialize_map_package_manifest(*repeated.manifest) ==
+          fabric::project::serialize_map_package_manifest(*planned.manifest));
+}
+
+TEST_CASE("map package planning includes native vector dependencies") {
+    const auto planned = fabric::project::plan_map_package(
+        fixture("studio-textile-head"), {.value = "textile-head-preview"});
+    REQUIRE(planned.ok());
+    CHECK(std::ranges::count_if(
+              planned.manifest->resources, [](const auto& resource) {
+                  return resource.resource.expected_type == "vector";
+              }) == 2);
 }

@@ -1,5 +1,19 @@
 #include "fabric/project/map_package.hpp"
 
+#include "fabric/project/animation.hpp"
+#include "fabric/project/entity.hpp"
+#include "fabric/project/input.hpp"
+#include "fabric/project/map.hpp"
+#include "fabric/project/material.hpp"
+#include "fabric/project/mechanic_graph.hpp"
+#include "fabric/project/replay.hpp"
+#include "fabric/project/scene.hpp"
+#include "fabric/project/texture_asset.hpp"
+#include "fabric/project/textured_path.hpp"
+#include "fabric/project/vector_asset.hpp"
+#include "fabric/project/visual_component.hpp"
+#include "fabric/project/visual_composition.hpp"
+
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
@@ -20,6 +34,11 @@ struct SemanticVersion {
     std::uint32_t patch{};
     friend auto operator<=>(const SemanticVersion&,
                             const SemanticVersion&) = default;
+};
+
+struct ResolvedPackageResource {
+    MapPackageResource package_resource;
+    std::vector<ResourceReference> references;
 };
 
 void error(std::vector<Error>& errors, const ErrorCode code, std::string field,
@@ -103,6 +122,135 @@ bool read_reference(const Json& value, ResourceReference& destination,
     return read_text(value, "id", destination.id.value, errors, prefix) &&
         read_text(value, "expectedType", destination.expected_type, errors,
                   prefix);
+}
+
+void append_errors(std::vector<Error>& destination,
+                   const std::vector<Error>& source) {
+    destination.insert(destination.end(), source.begin(), source.end());
+}
+
+std::optional<ResolvedPackageResource> resolve_package_resource(
+    const std::filesystem::path& root, const ProjectManifest& manifest,
+    const ResourceReference& reference, std::vector<Error>& errors) {
+    const auto result = [&](const DocumentHeader& document,
+                            std::filesystem::path path,
+                            std::vector<ResourceReference> references,
+                            std::vector<std::filesystem::path> payloads = {}) {
+        return ResolvedPackageResource{
+            .package_resource = {
+                .resource = {{.value = document.id.value}, document.type},
+                .document_path = std::move(path),
+                .payload_paths = std::move(payloads)},
+            .references = std::move(references)};
+    };
+    const auto missing = [&] {
+        error(errors, ErrorCode::resource_type_mismatch, reference.id.value,
+              "unsupported package resource type: " + reference.expected_type);
+        return std::optional<ResolvedPackageResource>{};
+    };
+
+    if (reference.expected_type == "texture") {
+        const auto path = texture_document_path(manifest, reference.id);
+        const auto loaded = load_texture_asset(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path, {}, {loaded.asset->source});
+    }
+    if (reference.expected_type == "vector") {
+        const auto path = vector_document_path(manifest, reference.id);
+        const auto loaded = load_vector_asset(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        std::vector<std::filesystem::path> payloads;
+        if (loaded.asset->source_kind == VectorSourceKind::linked_svg)
+            payloads.push_back(loaded.asset->source);
+        return result(loaded.asset->document, path,
+                      vector_resource_references(*loaded.asset),
+                      std::move(payloads));
+    }
+    if (reference.expected_type == "material") {
+        const auto path = material_document_path(manifest, reference.id);
+        const auto loaded = load_material(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      material_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "visualComposition") {
+        const auto path = visual_composition_document_path(manifest, reference.id);
+        const auto loaded = load_visual_composition(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      visual_composition_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "visualComponent") {
+        const auto path = visual_component_document_path(manifest, reference.id);
+        const auto loaded = load_visual_component(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      visual_component_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "texturedPath") {
+        const auto path = textured_path_document_path(manifest, reference.id);
+        const auto loaded = load_textured_path(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      textured_path_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "mechanic") {
+        const auto path = mechanic_graph_document_path(manifest, reference.id);
+        const auto loaded = load_mechanic_graph(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      mechanic_graph_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "animation") {
+        const auto path = animation_document_path(manifest, reference.id);
+        const auto loaded = load_animation(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      animation_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "entity") {
+        const auto path = entity_document_path(manifest, reference.id);
+        const auto loaded = load_entity(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.entity->document, path,
+                      entity_resource_references(*loaded.entity));
+    }
+    if (reference.expected_type == "map") {
+        const auto path = map_document_path(manifest, reference.id);
+        const auto loaded = load_map(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      map_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "scene") {
+        const auto path = scene_document_path(manifest, reference.id);
+        const auto loaded = load_scene(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      scene_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "replay") {
+        const auto path = replay_document_path(manifest, reference.id);
+        const auto loaded = load_replay(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      replay_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "input") {
+        const auto path = input_document_path(manifest, reference.id);
+        const auto loaded = load_input(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.input->document, path, {});
+    }
+    return missing();
+}
+
+void enqueue_property_references(const std::vector<MapProperty>& properties,
+                                 std::vector<ResourceReference>& references) {
+    for (const auto& property : properties)
+        if (const auto* reference =
+                std::get_if<ResourceReference>(&property.value))
+            references.push_back(*reference);
 }
 
 } // namespace
@@ -297,6 +445,95 @@ MapPackageManifestResult parse_map_package_manifest(
     }
     result.manifest = std::move(manifest);
     return result;
+}
+
+MapPackageManifestResult plan_map_package(
+    const std::filesystem::path& project_root, const core::ResourceId& map_id,
+    const std::string_view minimum_runtime_version) {
+    MapPackageManifestResult output;
+    const auto loaded_manifest = load_manifest(project_root);
+    if (!loaded_manifest.ok()) {
+        output.errors = loaded_manifest.errors;
+        return output;
+    }
+    const auto root_path = map_document_path(*loaded_manifest.manifest, map_id);
+    const auto loaded_map = load_map(project_root, *loaded_manifest.manifest,
+                                     root_path);
+    if (!loaded_map.ok()) {
+        output.errors = loaded_map.errors;
+        return output;
+    }
+
+    MapPackageManifest package{
+        .schema_version = current_map_package_schema_version,
+        .type = "map-package",
+        .id = map_id,
+        .name = loaded_map.asset->document.name,
+        .minimum_runtime_version = std::string(minimum_runtime_version),
+        .root_map = {map_id, "map"}};
+    using Key = std::pair<std::string, std::string>;
+    std::set<Key> pending{{"map", map_id.value}};
+    std::set<Key> processed;
+    while (!pending.empty()) {
+        const auto key = *pending.begin();
+        pending.erase(pending.begin());
+        if (!processed.insert(key).second) continue;
+        const ResourceReference reference{{.value = key.second}, key.first};
+        if (reference.expected_type == "prefab") {
+            const auto prefab = std::find_if(
+                loaded_map.asset->prefabs.begin(), loaded_map.asset->prefabs.end(),
+                [&](const PrefabDefinition& value) {
+                    return value.id == reference.id.value;
+                });
+            if (prefab == loaded_map.asset->prefabs.end()) {
+                error(output.errors, ErrorCode::missing_resource,
+                      reference.id.value, "inline prefab is missing from root map");
+                continue;
+            }
+            std::vector<ResourceReference> references{prefab->entity};
+            if (prefab->mechanic) references.push_back(*prefab->mechanic);
+            auto mechanic_references =
+                mechanic_parameter_override_resource_references(
+                    prefab->mechanic_overrides);
+            references.insert(references.end(), mechanic_references.begin(),
+                              mechanic_references.end());
+            enqueue_property_references(prefab->overrides, references);
+            for (const auto& dependency : references)
+                pending.emplace(dependency.expected_type, dependency.id.value);
+            continue;
+        }
+        auto resolved = resolve_package_resource(
+            project_root, *loaded_manifest.manifest, reference, output.errors);
+        if (!resolved) continue;
+        if (resolved->package_resource.resource != reference) {
+            error(output.errors, ErrorCode::resource_type_mismatch,
+                  reference.id.value, "loaded resource identity does not match reference");
+            continue;
+        }
+        if (reference.expected_type == "map") {
+            for (const auto& prefab : loaded_map.asset->prefabs)
+                enqueue_property_references(prefab.overrides,
+                                            resolved->references);
+        }
+        for (const auto& dependency : resolved->references)
+            pending.emplace(dependency.expected_type, dependency.id.value);
+        package.resources.push_back(std::move(resolved->package_resource));
+    }
+    if (!output.errors.empty()) return output;
+    std::ranges::sort(package.resources, [](const auto& left, const auto& right) {
+        return std::pair{left.resource.expected_type, left.resource.id.value} <
+            std::pair{right.resource.expected_type, right.resource.id.value};
+    });
+    for (auto& resource : package.resources)
+        std::ranges::sort(resource.payload_paths, {},
+                          [](const auto& path) { return path.generic_string(); });
+    const auto validation = validate_map_package_manifest(package);
+    if (!validation.ok()) {
+        output.errors = validation.errors;
+        return output;
+    }
+    output.manifest = std::move(package);
+    return output;
 }
 
 bool runtime_can_load_map_package(const MapPackageManifest& manifest,

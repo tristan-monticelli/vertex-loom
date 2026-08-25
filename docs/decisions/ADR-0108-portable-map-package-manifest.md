@@ -43,5 +43,10 @@ interplateformes sans bénéfice pour cette première version.
   du contrat v1.
 - La fermeture transitive produira les entrées et payloads du manifeste dans
   un incrément séparé.
+- La fermeture est calculée à la demande depuis la map racine. Elle suit les
+  références typées des documents et les prefabs inline, traite ces prefabs
+  comme une partie du fichier map et trie le résultat par type puis identifiant.
+  Une texture ajoute son PNG et un SVG lié ajoute sa source aux payloads ; la
+  géométrie vectorielle native n'ajoute aucun fichier dérivé.
 - Preview Runtime et le futur catalogue partageront le même contrôle de
   compatibilité avant chargement.

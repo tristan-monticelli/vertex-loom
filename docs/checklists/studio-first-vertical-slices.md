@@ -203,8 +203,17 @@ plateforme tournante pilotée par la présence du personnage.
   compatibilité compare la version minimale à la version réelle de
   `fabric_core`. Le round-trip déterministe et ces refus sont couverts par la
   suite `fabric_map_package_tests`.
-- [ ] Calculer la fermeture transitive déterministe des ressources référencées
+- [x] Calculer la fermeture transitive déterministe des ressources référencées
   par une map, ses prefabs, compositions et mécaniques.
+
+  Preuve : `plan_map_package` part du `MapDocument`, résout chaque référence
+  typée avec les loaders partagés et utilise une frontière ordonnée par type et
+  identifiant. Les prefabs inline suivent entité, mécanique, overrides et
+  références de propriétés sans ajouter une seconde copie du fichier map. Les
+  textures ajoutent leur PNG, les SVG liés leur source et les vecteurs natifs
+  aucun payload. Les fixtures Studio `studio-rotating-platform` et
+  `studio-textile-head` vérifient la fermeture complète, l'ordre stable, la
+  déduplication et la sérialisation répétable.
 - [ ] Refuser chemins absolus, fichiers externes, références manquantes, cycles
   invalides et collision d'identifiants avant export.
 - [ ] Ajouter Preview, Validate et Publish dans Map Studio en réutilisant les

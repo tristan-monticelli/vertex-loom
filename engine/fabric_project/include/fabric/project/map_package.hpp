@@ -51,6 +51,9 @@ struct MapPackageManifestResult {
     const MapPackageManifest&);
 [[nodiscard]] MapPackageManifestResult parse_map_package_manifest(
     std::string_view);
+[[nodiscard]] MapPackageManifestResult plan_map_package(
+    const std::filesystem::path& project_root, const core::ResourceId& map_id,
+    std::string_view minimum_runtime_version = core::version());
 [[nodiscard]] bool runtime_can_load_map_package(
     const MapPackageManifest&,
     std::string_view runtime_version = core::version()) noexcept;

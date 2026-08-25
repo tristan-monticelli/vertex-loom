@@ -91,6 +91,11 @@ Le contrat `MapPackageManifest v1` est testé séparément par round-trip strict
 version de schéma, compatibilité SemVer minimale, ordre des ressources,
 collisions de chemins et refus des chemins absolus, traversants ou à séparateur
 Windows avant l'ajout du copieur de fermeture transitive.
+La planification de paquet est testée sur les maps Studio de plateforme et de
+tête textile, qui traversent prefab, entité, composition, composant, chemin
+texturé, mécanique, vectoriel et texture. L'ordre du parcours ne doit pas
+influencer le manifeste sérialisé et les prefabs inline ne doivent pas
+dupliquer le fichier map.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
