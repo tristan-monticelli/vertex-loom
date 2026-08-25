@@ -417,8 +417,14 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        const auto same_color = [](const VectorDrawPacket& left,
-                                   const VectorDrawPacket& right) {
+        const auto same_material = [](const VectorDrawPacket& left,
+                                      const VectorDrawPacket& right) {
+            if (left.image_fill.has_value() != right.image_fill.has_value()) return false;
+            if (left.image_fill) {
+                return right.image_fill &&
+                    left.image_fill->texture.id == right.image_fill->texture.id &&
+                    left.image_fill->opacity == right.image_fill->opacity;
+            }
             if (!left.fill_color || !right.fill_color) return false;
             return left.fill_color->red == right.fill_color->red &&
                 left.fill_color->green == right.fill_color->green &&
@@ -427,38 +433,69 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         };
         for (std::size_t packet_index = 0; packet_index < packets.size();) {
             const auto& packet = packets[packet_index];
-            if (packet.image_fill) {
-                stats.errors.push_back(
-                    "legacy OpenGL renderer does not support image fills");
-                ++packet_index;
-                continue;
-            }
-            if (packet.stroke || !packet.fill_color || packet.fill_vertices.empty() ||
+            if (packet.stroke || (!packet.fill_color && !packet.image_fill) ||
+                packet.fill_vertices.empty() ||
                 packet.fill_indices.empty()) {
                 ++packet_index;
                 continue;
+            }
+            std::optional<OpenGLTextureHandle> texture;
+            if (packet.image_fill) {
+                if (!texture_resolver) {
+                    stats.errors.push_back(
+                        "legacy OpenGL renderer requires a texture resolver for image fills");
+                    ++packet_index;
+                    continue;
+                }
+                texture = texture_resolver(packet.image_fill->texture.id);
+                if (!texture || texture->handle == 0U ||
+                    packet.fill_uv.size() != packet.fill_vertices.size()) {
+                    stats.errors.push_back(
+                        "legacy OpenGL texture fill could not be resolved");
+                    ++packet_index;
+                    continue;
+                }
             }
             vertex_scratch_.clear();
             index_scratch_.clear();
             std::size_t next = packet_index;
             while (next < packets.size()) {
                 const auto& candidate = packets[next];
-                if (candidate.image_fill || candidate.stroke ||
+                if (candidate.stroke ||
+                    (!candidate.fill_color && !candidate.image_fill) ||
                     candidate.fill_vertices.empty() || candidate.fill_indices.empty() ||
-                    !same_color(packet, candidate)) break;
+                    !same_material(packet, candidate)) break;
+                if (candidate.image_fill &&
+                    candidate.fill_uv.size() != candidate.fill_vertices.size()) break;
                 const auto base = static_cast<std::uint32_t>(vertex_scratch_.size());
                 vertex_scratch_.reserve(vertex_scratch_.size() +
                                         candidate.fill_vertices.size());
-                for (const auto point : candidate.fill_vertices)
-                    vertex_scratch_.push_back({point.x, point.y, 0.0F, 0.0F});
+                for (std::size_t index = 0; index < candidate.fill_vertices.size(); ++index) {
+                    const auto point = candidate.fill_vertices[index];
+                    const auto uv = candidate.image_fill
+                        ? candidate.fill_uv[index] : core::Vec2{};
+                    vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
+                }
                 index_scratch_.reserve(index_scratch_.size() +
                                        candidate.fill_indices.size());
                 for (const auto index : candidate.fill_indices)
                     index_scratch_.push_back(base + index);
                 ++next;
             }
-            const auto& color = *packet.fill_color;
-            glColor4f(color.red, color.green, color.blue, color.alpha);
+            if (packet.image_fill) {
+                glEnable(GL_TEXTURE_2D);
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                glBindTexture(GL_TEXTURE_2D, texture->handle);
+                glColor4f(1.0F, 1.0F, 1.0F, packet.image_fill->opacity);
+                glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex),
+                                  reinterpret_cast<const void*>(
+                                      2U * sizeof(float)));
+            } else {
+                glDisable(GL_TEXTURE_2D);
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+                const auto& color = *packet.fill_color;
+                glColor4f(color.red, color.green, color.blue, color.alpha);
+            }
             glVertexPointer(2, GL_FLOAT, sizeof(Vertex), vertex_scratch_.data());
             glDrawElements(GL_TRIANGLES,
                            static_cast<GLsizei>(index_scratch_.size()),
