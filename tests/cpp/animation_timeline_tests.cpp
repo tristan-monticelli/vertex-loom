@@ -29,10 +29,14 @@ TEST_CASE("animation timeline edits are undoable and redoable") {
 
     REQUIRE(timeline.move_key(binding, 1, 1.0F));
     REQUIRE(source.tracks.front().keys.back().time == 1.0F);
+    const auto history_after_first_move = commands.size();
+    REQUIRE(timeline.move_key(binding, 1, 1.5F));
+    REQUIRE(commands.size() == history_after_first_move);
+    REQUIRE(source.tracks.front().keys.back().time == 1.5F);
     REQUIRE(commands.undo());
     REQUIRE(source.tracks.front().keys.back().time == 2.0F);
     REQUIRE(commands.redo());
-    REQUIRE(source.tracks.front().keys.back().time == 1.0F);
+    REQUIRE(source.tracks.front().keys.back().time == 1.5F);
 
     REQUIRE(timeline.remove_key(binding, 1));
     REQUIRE(source.tracks.front().keys.size() == 1);

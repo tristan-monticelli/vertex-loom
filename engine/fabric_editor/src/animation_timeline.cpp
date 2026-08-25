@@ -11,8 +11,9 @@ class AnimationSnapshotCommand final : public Command {
 public:
     AnimationSnapshotCommand(project::AnimationClip& target,
                              project::AnimationClip before,
-                             project::AnimationClip after)
-        : target_(target), before_(std::move(before)), after_(std::move(after)) {}
+                             project::AnimationClip after, bool mergeable)
+        : target_(target), before_(std::move(before)), after_(std::move(after)),
+          mergeable_(mergeable) {}
 
     bool execute() override {
         target_ = after_;
@@ -24,10 +25,19 @@ public:
         return true;
     }
 
+    bool merge_with(const Command& newer) override {
+        const auto* next = dynamic_cast<const AnimationSnapshotCommand*>(&newer);
+        if (!next || !mergeable_ || !next->mergeable_ || &next->target_ != &target_)
+            return false;
+        after_ = next->after_;
+        return true;
+    }
+
 private:
     project::AnimationClip& target_;
     project::AnimationClip before_;
     project::AnimationClip after_;
+    bool mergeable_{};
 };
 
 project::AnimationTrack* find_track(project::AnimationClip& clip,
@@ -44,11 +54,12 @@ bool same_value_type(const project::AnimationValue& left,
 }
 
 bool commit(CommandStack& commands, project::AnimationClip& target,
-            project::AnimationClip before, project::AnimationClip after) {
+            project::AnimationClip before, project::AnimationClip after,
+            bool mergeable = false) {
     if (!project::validate_animation(project::ProjectManifest{}, after).ok())
         return false;
     return commands.execute(std::make_unique<AnimationSnapshotCommand>(
-        target, std::move(before), std::move(after)));
+        target, std::move(before), std::move(after), mergeable));
 }
 
 } // namespace
@@ -91,7 +102,7 @@ bool AnimationTimeline::move_key(const project::PropertyBinding& binding,
                          return left.time < right.time;
                      });
     auto before = clip_;
-    return commit(commands_, clip_, std::move(before), std::move(next));
+    return commit(commands_, clip_, std::move(before), std::move(next), true);
 }
 
 bool AnimationTimeline::remove_key(const project::PropertyBinding& binding,
