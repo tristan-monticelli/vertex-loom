@@ -154,6 +154,9 @@ ci-dessous restent ouvertes jusqu'au support complet de tous les nœuds et des
 draw packets du renderer.
 
 - [ ] Ajouter canvas avec pan, zoom sous le curseur, cadrage, grille et unités.
+
+Le canvas natif affiche désormais une grille adaptative et son pas en unités
+monde ; le cadrage explicite et les interactions de gizmo restent ouverts.
 - [ ] Ajouter arbre de calques/nœuds, sélection multiple, verrouillage,
   visibilité, groupes et ordre Z.
 

@@ -308,6 +308,48 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                       center.y + canvas.pan.y - point.y * pixels_per_unit};
     };
     auto* draw_list = ImGui::GetWindowDrawList();
+    const float target_grid_pixels = 48.0F;
+    const float raw_grid_step = target_grid_pixels / pixels_per_unit;
+    const float grid_power = std::pow(10.0F,
+                                      std::floor(std::log10(raw_grid_step)));
+    const float normalized_grid = raw_grid_step / grid_power;
+    const float grid_step = (normalized_grid <= 1.0F ? 1.0F
+                              : normalized_grid <= 2.0F ? 2.0F
+                              : normalized_grid <= 5.0F ? 5.0F
+                                                       : 10.0F) * grid_power;
+    const float world_half_width = available.x / (2.0F * pixels_per_unit);
+    const float world_half_height = available.y / (2.0F * pixels_per_unit);
+    const float world_left = -world_half_width - canvas.pan.x / pixels_per_unit;
+    const float world_right = world_half_width - canvas.pan.x / pixels_per_unit;
+    const float world_bottom = -world_half_height + canvas.pan.y / pixels_per_unit;
+    const float world_top = world_half_height + canvas.pan.y / pixels_per_unit;
+    const int first_vertical = static_cast<int>(std::floor(world_left / grid_step));
+    const int last_vertical = static_cast<int>(std::ceil(world_right / grid_step));
+    const int first_horizontal = static_cast<int>(std::floor(world_bottom / grid_step));
+    const int last_horizontal = static_cast<int>(std::ceil(world_top / grid_step));
+    draw_list->PushClipRect(origin, {origin.x + available.x,
+                                     origin.y + available.y}, true);
+    for (int index = first_vertical; index <= last_vertical; ++index) {
+        const auto line_start = to_screen({static_cast<float>(index) * grid_step,
+                                           world_bottom});
+        const auto line_end = to_screen({static_cast<float>(index) * grid_step,
+                                         world_top});
+        draw_list->AddLine(line_start, line_end,
+                           index == 0 ? IM_COL32(135, 155, 165, 150)
+                                      : IM_COL32(90, 105, 115, 70));
+    }
+    for (int index = first_horizontal; index <= last_horizontal; ++index) {
+        const auto line_start = to_screen({world_left,
+                                           static_cast<float>(index) * grid_step});
+        const auto line_end = to_screen({world_right,
+                                         static_cast<float>(index) * grid_step});
+        draw_list->AddLine(line_start, line_end,
+                           index == 0 ? IM_COL32(135, 155, 165, 150)
+                                      : IM_COL32(90, 105, 115, 70));
+    }
+    draw_list->AddText({origin.x + 10.0F, origin.y + 10.0F},
+                       IM_COL32(185, 200, 205, 220),
+                       ("Grid: " + std::to_string(grid_step) + " world units").c_str());
     for (std::size_t node_index = 0;
          node_index < asset.native->nodes.size(); ++node_index) {
         const auto& node = asset.native->nodes[node_index];
@@ -435,6 +477,7 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                 : ImDrawFlags_Closed,
             stroke_width);
     }
+    draw_list->PopClipRect();
     if (hovered) {
         ImGui::SetTooltip("Middle drag: pan  |  Wheel: zoom %.0f%%",
                           canvas.zoom * 100.0F);

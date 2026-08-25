@@ -88,7 +88,8 @@ C4Component
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.
 - La tranche native intégrée rend rectangles et ellipses, cadre le document,
-  zoome sous le curseur et permet le pan. L'inspecteur sélectionne et édite un nœud :
+  zoome sous le curseur, permet le pan et affiche une grille adaptative en
+  unités monde. L'inspecteur sélectionne et édite un nœud :
   nom, visibilité, verrouillage, parent, clip, transform, couleur et paramètres
   de fill image. Les sélecteurs parent et clip proposent uniquement les autres
   nœuds du document ; la validation de session refuse ensuite les cycles ou
