@@ -217,6 +217,8 @@ l’inspecteur. La transformation indépendante du fill reste ouverte.
   animables par le registre.
 - [x] Définir des états et transitions déterministes avec conditions
   booléennes/numériques, priorités et exit time normalisé.
+- [x] Persister les state machines d’entité et les évaluer dans Preview Runtime
+  avec paramètres d’instance booléens/numériques.
 - [x] Définir l’ordre des contraintes copy-transform, limites et look-at et
   refuser les cycles avant résolution.
 - [x] Ajouter IK 2D par FABRIK avec racine fixe, tolérance et nombre maximal

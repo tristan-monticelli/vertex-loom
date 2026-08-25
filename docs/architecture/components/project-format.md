@@ -91,6 +91,9 @@ C4Component
   nœuds par identifiant ; le runtime les résout dans l'ordre déclaré avant de
   produire les poses et draw packets. Le solveur conserve la racine, borne ses itérations, vérifie les
   longueurs de segments et traite explicitement les cibles hors de portée.
+- Une entité peut persister `animationStateMachine` ; ses états référencent des
+  clips, ses transitions sont évaluées par priorité et `exitTime`, et les
+  paramètres d'instance utilisent les propriétés `animationParameter.<id>`.
 - Le système XPBD unifié expose distance, flexion, aire, pin et collision,
   conserve les lambdas, applique la compliance et quantifie l’état après
   chaque sous-pas.

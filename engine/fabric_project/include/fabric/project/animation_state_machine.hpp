@@ -14,6 +14,7 @@ using AnimationParameterValue = std::variant<float, bool>;
 struct AnimationParameter {
     std::string id;
     AnimationParameterValue value{false};
+    friend bool operator==(const AnimationParameter&, const AnimationParameter&) = default;
 };
 
 enum class AnimationConditionOperator {
@@ -29,11 +30,13 @@ struct AnimationCondition {
     std::string parameter_id;
     AnimationConditionOperator operation{AnimationConditionOperator::equal};
     AnimationParameterValue value{false};
+    friend bool operator==(const AnimationCondition&, const AnimationCondition&) = default;
 };
 
 struct AnimationState {
     std::string id;
     ResourceReference clip;
+    friend bool operator==(const AnimationState&, const AnimationState&) = default;
 };
 
 struct AnimationTransition {
@@ -43,12 +46,14 @@ struct AnimationTransition {
     std::vector<AnimationCondition> conditions;
     std::optional<float> exit_time;
     int priority{};
+    friend bool operator==(const AnimationTransition&, const AnimationTransition&) = default;
 };
 
 struct AnimationStateMachine {
     std::string initial_state;
     std::vector<AnimationState> states;
     std::vector<AnimationTransition> transitions;
+    friend bool operator==(const AnimationStateMachine&, const AnimationStateMachine&) = default;
 };
 
 [[nodiscard]] ValidationReport validate_animation_state_machine(

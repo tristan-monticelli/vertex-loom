@@ -62,6 +62,8 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
     std::unordered_map<std::string, std::string> animation_instances;
+    std::unordered_map<std::string, project::AnimationStateMachine> animation_state_machines;
+    std::unordered_map<std::string, std::vector<project::AnimationParameter>> animation_parameters;
     std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     project::MapChunkIndex chunk_index;
@@ -171,6 +173,43 @@ bool resolve_ik_chains(std::vector<project::EntityNode>& nodes,
         }
     }
     return true;
+}
+
+struct ResolvedAnimation {
+    std::string clip_id;
+    float local_time{};
+};
+
+std::optional<ResolvedAnimation> resolve_state_machine_animation(
+    const project::AnimationStateMachine& machine,
+    const std::unordered_map<std::string, project::AnimationClip>& clips,
+    const std::vector<project::AnimationParameter>& parameters,
+    float time) {
+    std::string state_id = machine.initial_state;
+    float remaining = std::max(0.0F, time);
+    for (std::size_t guard = 0; guard < machine.transitions.size() + 64U; ++guard) {
+        const auto* state = project::find_animation_state(machine, state_id);
+        if (!state) return std::nullopt;
+        const auto clip = clips.find(state->clip.id.value);
+        if (clip == clips.end()) return std::nullopt;
+        const float duration = std::max(0.0F, clip->second.duration);
+        const float local = duration > 0.0F ? std::min(remaining, duration) : 0.0F;
+        const float normalized = duration > 0.0F ? local / duration : 1.0F;
+        const auto* transition = project::select_animation_transition(
+            machine, state_id, parameters, normalized);
+        if (transition) {
+            state_id = transition->to_state;
+            const float transition_time = transition->exit_time
+                ? duration * *transition->exit_time : local;
+            remaining = std::max(0.0F, remaining - transition_time);
+            continue;
+        }
+        float local_time = local;
+        if (clip->second.loop && duration > 0.0F)
+            local_time = std::fmod(remaining, duration);
+        return ResolvedAnimation{.clip_id = clip->first, .local_time = local_time};
+    }
+    return std::nullopt;
 }
 
 core::Vec2 apply_node_transform(core::Vec2 point,
@@ -307,6 +346,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->texture_handles.clear();
     impl_->animation_clips.clear();
     impl_->animation_instances.clear();
+    impl_->animation_state_machines.clear();
+    impl_->animation_parameters.clear();
     impl_->packet_base_transforms.clear();
     impl_->entity_simulations.clear();
     impl_->packet_indices_by_instance.clear();
@@ -396,6 +437,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     }
     for (const auto& instance : map_->instances) {
         std::vector<project::MapProperty> properties;
+        std::vector<project::AnimationParameter> animation_parameters;
         if (instance.prefab) {
             const auto prefab = std::find_if(
                 map_->prefabs.begin(), map_->prefabs.end(),
@@ -412,6 +454,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             else properties.push_back(property);
         }
         for (const auto& property : properties) {
+            constexpr std::string_view parameter_prefix = "animationParameter.";
+            if (property.id.starts_with(parameter_prefix)) {
+                const auto parameter_id = property.id.substr(parameter_prefix.size());
+                if (!core::ResourceId::is_valid(parameter_id)) {
+                    errors_.push_back("instances.animationParameter: invalid parameter id");
+                    return false;
+                }
+                if (const auto* value = std::get_if<bool>(&property.value))
+                    animation_parameters.push_back({parameter_id, *value});
+                else if (const auto* value = std::get_if<float>(&property.value))
+                    animation_parameters.push_back({parameter_id, *value});
+                else {
+                    errors_.push_back(
+                        "instances.animationParameter: expected bool or float");
+                    return false;
+                }
+                continue;
+            }
             if (property.id != "animation") continue;
             const auto* reference = std::get_if<project::ResourceReference>(
                 &property.value);
@@ -426,6 +486,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             }
             impl_->animation_instances.emplace(instance.id, reference->id.value);
         }
+        impl_->animation_parameters.emplace(instance.id, std::move(animation_parameters));
     }
     triggers_ = std::make_unique<TriggerRuntime>(*map_);
     impl_->chunk_index_ready = impl_->chunk_index.rebuild(*map_);
@@ -501,6 +562,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         if (!resolve_ik_chains(resolved_entity.nodes, resolved_entity.ik_chains)) {
             errors_.push_back("entity IK chains could not be resolved");
             return false;
+        }
+        if (resolved_entity.animation_state_machine) {
+            impl_->animation_state_machines.emplace(
+                instance.id, *resolved_entity.animation_state_machine);
         }
         if (resolved_entity.deformation_mesh || resolved_entity.xpbd) {
             Impl::EntitySimulation simulation{
@@ -990,6 +1055,17 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
 std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_animation(
     const std::string& instance_id, const float time) const {
     if (!impl_) return std::nullopt;
+    const auto machine = impl_->animation_state_machines.find(instance_id);
+    if (machine != impl_->animation_state_machines.end()) {
+        const auto parameters = impl_->animation_parameters.find(instance_id);
+        const std::vector<project::AnimationParameter> empty_parameters;
+        const auto& values = parameters == impl_->animation_parameters.end()
+            ? empty_parameters : parameters->second;
+        const auto resolved = resolve_state_machine_animation(
+            machine->second, impl_->animation_clips, values, time);
+        if (!resolved) return std::nullopt;
+        return evaluate_animation({.value = resolved->clip_id}, resolved->local_time);
+    }
     const auto animation = impl_->animation_instances.find(instance_id);
     if (animation == impl_->animation_instances.end()) return std::nullopt;
     return evaluate_animation({.value = animation->second}, time);

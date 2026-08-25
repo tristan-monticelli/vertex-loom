@@ -152,6 +152,23 @@ TEST_CASE("entity FABRIK chains round-trip and validate node references") {
     REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
 }
 
+TEST_CASE("entity animation state machines round-trip and expose clip references") {
+    auto source = entity();
+    source.animation_state_machine = fabric::project::AnimationStateMachine{
+        .initial_state = "idle",
+        .states = {{"idle", {{.value = "idle-clip"}, "animation"}},
+                   {"run", {{.value = "run-clip"}, "animation"}}},
+        .transitions = {{"start", "idle", "run", {}, 0.5F, 3}}};
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(*parsed.entity == source);
+    const auto references = fabric::project::entity_resource_references(source);
+    REQUIRE(std::ranges::any_of(references, [](const auto& reference) {
+        return reference.id.value == "idle-clip";
+    }));
+}
+
 TEST_CASE("entity deformation mesh round-trips and requires valid nodes") {
     auto source = entity();
     source.deformation_mesh = fabric::project::DeformationMesh{};

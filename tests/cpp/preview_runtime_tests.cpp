@@ -253,6 +253,28 @@ fabric::project::MapDocument map_with_ik_entity() {
     return result;
 }
 
+fabric::project::EntityDefinition state_machine_entity() {
+    auto result = entity();
+    result.document.id = {.value = "state-machine-entity"};
+    result.animation_state_machine = fabric::project::AnimationStateMachine{
+        .initial_state = "idle",
+        .states = {{"idle", {{.value = "runtime-animation"}, "animation"}},
+                   {"run", {{.value = "runtime-animation"}, "animation"}}},
+        .transitions = {{"start", "idle", "run",
+                         {{"speed", fabric::project::AnimationConditionOperator::greater,
+                           0.1F}}, 0.5F, 1}}};
+    return result;
+}
+
+fabric::project::MapDocument map_with_state_machine_entity() {
+    auto result = map();
+    result.instances.push_back({"state-machine", fabric::project::ResourceReference{
+                                    {.value = "state-machine-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0,
+                                {{"animationParameter.speed", 1.0F}}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_texture_entity() {
     auto result = map();
     result.instances.push_back({"textured",
@@ -307,6 +329,33 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
     const auto position = std::get<fabric::core::Vec2>(
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime evaluates entity animation state transitions") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-state-machine-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_state_machine_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), state_machine_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto evaluated = runtime.evaluate_instance_animation("state-machine", 0.75F);
+    REQUIRE(evaluated.has_value());
+    REQUIRE(evaluated->ok());
+    REQUIRE(evaluated->properties.size() == 1U);
+    CHECK(std::get<fabric::core::Vec2>(evaluated->properties.front().value) ==
+          fabric::core::Vec2{0.5F, 1.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
