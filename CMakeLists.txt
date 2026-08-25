@@ -55,6 +55,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/resource_registry.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
+    engine/fabric_project/src/xpbd.cpp
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
 target_compile_features(fabric_project PUBLIC cxx_std_20)
@@ -271,6 +272,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_animation_ik_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_animation_ik_tests COMMAND fabric_animation_ik_tests)
+
+    add_executable(fabric_xpbd_tests tests/cpp/xpbd_tests.cpp)
+    target_link_libraries(fabric_xpbd_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_xpbd_tests COMMAND fabric_xpbd_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp

@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -77,6 +77,8 @@ C4Component
   sont refusés avant résolution.
 - Le solveur FABRIK 2D conserve la racine, borne ses itérations, vérifie les
   longueurs de segments et traite explicitement les cibles hors de portée.
+- Le système XPBD unifié expose distance et pin, conserve les lambdas,
+  applique la compliance et quantifie l’état après chaque sous-pas.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
