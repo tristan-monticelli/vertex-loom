@@ -20,10 +20,10 @@ et `PreviewRuntime::load` vérifie que le clip correspondant est chargé avant
 d’initialiser la physique ou SDL.
 
 Pendant le rendu, le runtime évalue le clip à l’horloge fixe de simulation.
-Les pistes `transform.position`, `transform.rotationDegrees` et
-`transform.scale` sont appliquées aux draw packets du nœud ciblé par rapport à
-sa transformation de base. Les autres propriétés restent évaluables headless
-mais ne modifient pas encore les packets.
+Les pistes `transform.position`, `transform.rotationDegrees`, `transform.scale`,
+`material.color` et `material.opacity` sont appliquées aux draw packets du nœud
+ciblé. Les couleurs et opacités remplacent les valeurs rendues ; les autres
+propriétés restent évaluables headless mais ne modifient pas encore les packets.
 
 ## Conséquences
 

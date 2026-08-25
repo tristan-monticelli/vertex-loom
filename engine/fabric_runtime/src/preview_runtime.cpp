@@ -691,19 +691,38 @@ bool PreviewRuntime::run() {
             std::optional<core::Vec2> position;
             std::optional<float> rotation_degrees;
             std::optional<core::Vec2> scale;
+            std::optional<core::Color> color;
+            std::optional<float> opacity;
             for (const auto& property : evaluation->properties) {
-                if (property.binding.node_id != node_id ||
-                    property.binding.component_id != "transform") continue;
-                if (property.binding.property_id == "position") {
+                if (property.binding.node_id != node_id) continue;
+                if (property.binding.component_id == "transform" &&
+                    property.binding.property_id == "position") {
                     if (const auto* value = std::get_if<core::Vec2>(&property.value))
                         position = *value;
-                } else if (property.binding.property_id == "rotationDegrees") {
+                } else if (property.binding.component_id == "transform" &&
+                           property.binding.property_id == "rotationDegrees") {
                     if (const auto* value = std::get_if<float>(&property.value))
                         rotation_degrees = *value;
-                } else if (property.binding.property_id == "scale") {
+                } else if (property.binding.component_id == "transform" &&
+                           property.binding.property_id == "scale") {
                     if (const auto* value = std::get_if<core::Vec2>(&property.value))
                         scale = *value;
+                } else if (property.binding.component_id == "material" &&
+                           property.binding.property_id == "color") {
+                    if (const auto* value = std::get_if<core::Color>(&property.value))
+                        color = *value;
+                } else if (property.binding.component_id == "material" &&
+                           property.binding.property_id == "opacity") {
+                    if (const auto* value = std::get_if<float>(&property.value))
+                        opacity = *value;
                 }
+            }
+            if (!position && !rotation_degrees && !scale && !color && !opacity)
+                return packet;
+            if (color && packet.fill_color) packet.fill_color = *color;
+            if (opacity) {
+                if (packet.fill_color) packet.fill_color->alpha = *opacity;
+                if (packet.image_fill) packet.image_fill->opacity = *opacity;
             }
             if (!position && !rotation_degrees && !scale) return packet;
             const auto& base = base_transform->second;

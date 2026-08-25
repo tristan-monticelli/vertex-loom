@@ -363,6 +363,8 @@ inspectable avec collisions et événements.
   réservée `animation` et appliquer sa position animée aux draw packets.
 - [x] Appliquer aussi rotation et échelle des pistes `transform` aux draw
   packets d’une instance liée.
+- [x] Appliquer couleur et opacité des pistes `material` aux draw packets
+  vectoriels d’une instance liée.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
