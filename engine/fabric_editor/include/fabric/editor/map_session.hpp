@@ -30,6 +30,9 @@ public:
                                                MapSnapSettings snapping = {});
     [[nodiscard]] bool set_instance_property(const core::ResourceId& instance_id,
                                               project::MapProperty property);
+    [[nodiscard]] bool translate_instances(
+        const std::vector<core::ResourceId>& instance_ids, core::Vec2 delta,
+        MapSnapSettings snapping = {});
     [[nodiscard]] bool set_layer_visibility(const core::ResourceId& layer_id, bool visible);
     [[nodiscard]] bool set_layer_locked(const core::ResourceId& layer_id, bool locked);
     [[nodiscard]] bool set_layer_depth(const core::ResourceId& layer_id, float depth);

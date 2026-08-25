@@ -132,4 +132,29 @@ TEST_CASE("map session edits layer state and prefab overrides undoably") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map session translates a selection atomically and respects layer locks") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-map-selection-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    auto source = map();
+    source.instances = {instance("hero", 1.0F), instance("crate", 3.0F)};
+    fabric::editor::MapSession session;
+    REQUIRE(session.create(root, source));
+    REQUIRE(session.translate_instances({{.value = "hero"}, {.value = "crate"}},
+                                         {2.0F, 0.0F}, {.enabled = false}));
+    CHECK(session.map()->instances[0].transform.position.x == 3.0F);
+    CHECK(session.map()->instances[1].transform.position.x == 5.0F);
+    REQUIRE(session.undo());
+    CHECK(session.map()->instances[0].transform.position.x == 1.0F);
+    REQUIRE(session.set_layer_locked({.value = "instances"}, true));
+    CHECK_FALSE(session.translate_instances({{.value = "hero"}}, {1.0F, 0.0F},
+                                             {.enabled = false}));
+    CHECK_FALSE(session.set_instance_property({.value = "hero"}, {"blocked", true}));
+    CHECK_FALSE(session.remove_instance({.value = "hero"}));
+    CHECK_FALSE(session.place_instance(instance("new", 0.0F)));
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 } // namespace

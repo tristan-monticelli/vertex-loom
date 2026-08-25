@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <set>
 #include <utility>
 
 namespace fabric::editor {
@@ -72,6 +73,12 @@ void set_chunk(project::MapInstance& instance) {
         std::floor(instance.transform.position.y / project::map_chunk_size));
 }
 
+bool instance_locked(const project::MapDocument& map, const std::size_t index) {
+    const auto& instance = map.instances[index];
+    const auto layer = find_layer(map, {.value = instance.layer_id});
+    return layer && map.layers[*layer].locked;
+}
+
 } // namespace
 
 core::Vec2 MapSession::snap_position(const core::Vec2 position,
@@ -126,6 +133,8 @@ bool MapSession::save() {
 bool MapSession::place_instance(project::MapInstance instance,
                                 const MapSnapSettings snapping) {
     if (!map_ || find_instance(*map_, {.value = instance.id})) return false;
+    const auto layer = find_layer(*map_, {.value = instance.layer_id});
+    if (!layer || map_->layers[*layer].locked) return false;
     instance.transform.position = snap_position(instance.transform.position, snapping);
     set_chunk(instance);
     auto next = *map_;
@@ -138,6 +147,7 @@ bool MapSession::remove_instance(const core::ResourceId& instance_id) {
     if (!map_) return false;
     const auto found = find_instance(*map_, instance_id);
     if (!found) return false;
+    if (instance_locked(*map_, *found)) return false;
     auto next = *map_;
     next.instances.erase(next.instances.begin() + static_cast<std::ptrdiff_t>(*found));
     auto before = *map_;
@@ -150,6 +160,7 @@ bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
     if (!map_) return false;
     const auto found = find_instance(*map_, instance_id);
     if (!found) return false;
+    if (instance_locked(*map_, *found)) return false;
     auto next = *map_;
     transform.position = snap_position(transform.position, snapping);
     next.instances[*found].transform = transform;
@@ -163,12 +174,39 @@ bool MapSession::set_instance_property(const core::ResourceId& instance_id,
     if (!map_ || property.id.empty()) return false;
     const auto found = find_instance(*map_, instance_id);
     if (!found) return false;
+    if (instance_locked(*map_, *found)) return false;
     auto next = *map_;
     auto& properties = next.instances[*found].properties;
     const auto existing = std::find_if(properties.begin(), properties.end(),
         [&](const auto& candidate) { return candidate.id == property.id; });
     if (existing != properties.end()) existing->value = std::move(property.value);
     else properties.push_back(std::move(property));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::translate_instances(
+    const std::vector<core::ResourceId>& instance_ids, const core::Vec2 delta,
+    const MapSnapSettings snapping) {
+    if (!map_ || instance_ids.empty() || !std::isfinite(delta.x) ||
+        !std::isfinite(delta.y)) return false;
+    std::set<std::string> unique_ids;
+    std::vector<std::size_t> indices;
+    indices.reserve(instance_ids.size());
+    for (const auto& id : instance_ids) {
+        if (!unique_ids.insert(id.value).second) return false;
+        const auto found = find_instance(*map_, id);
+        if (!found || instance_locked(*map_, *found)) return false;
+        indices.push_back(*found);
+    }
+    auto next = *map_;
+    for (const auto index : indices) {
+        auto& transform = next.instances[index].transform;
+        transform.position.x += delta.x;
+        transform.position.y += delta.y;
+        transform.position = snap_position(transform.position, snapping);
+        set_chunk(next.instances[index]);
+    }
     auto before = *map_;
     return commit(commands_, *map_, std::move(before), std::move(next));
 }

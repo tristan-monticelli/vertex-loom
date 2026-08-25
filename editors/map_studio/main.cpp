@@ -8,8 +8,10 @@
 #include <imgui_stdlib.h>
 
 #include <filesystem>
+#include <algorithm>
 #include <iostream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -73,6 +75,7 @@ int run(const std::filesystem::path& project_root,
         else status = "Map opened";
     }
     std::string event_id;
+    std::vector<std::string> selected_instances;
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -145,6 +148,24 @@ int run(const std::filesystem::path& project_root,
             if (layer_changed) ImGui::TextDisabled("Layer edit recorded in undo history");
             ImGui::SeparatorText("Content");
             ImGui::Text("Instances: %zu", map.instances.size());
+            for (const auto& instance : map.instances) {
+                bool selected = std::find(selected_instances.begin(), selected_instances.end(),
+                                          instance.id) != selected_instances.end();
+                if (ImGui::Checkbox((instance.id + "##selected").c_str(), &selected)) {
+                    if (selected) selected_instances.push_back(instance.id);
+                    else selected_instances.erase(std::remove(selected_instances.begin(),
+                                                               selected_instances.end(), instance.id),
+                                                  selected_instances.end());
+                }
+            }
+            ImGui::BeginDisabled(selected_instances.empty());
+            if (ImGui::Button("Nudge selected +1")) {
+                std::vector<fabric::core::ResourceId> ids;
+                for (const auto& id : selected_instances) ids.push_back({.value = id});
+                status = session.translate_instances(ids, {1.0F, 0.0F})
+                    ? "Selected instances moved" : "Selection contains a locked instance";
+            }
+            ImGui::EndDisabled();
             ImGui::Text("Collisions: %zu", map.collisions.size());
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
