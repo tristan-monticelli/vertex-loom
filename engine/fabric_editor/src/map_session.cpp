@@ -335,6 +335,20 @@ bool MapSession::remove_event(const core::ResourceId& event_id) {
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::set_event_payload(const core::ResourceId& event_id,
+                                   std::vector<project::MapProperty> payload) {
+    if (!map_) return false;
+    const auto found = find_event(*map_, event_id);
+    if (!found) return false;
+    std::set<std::string> property_ids;
+    for (const auto& property : payload)
+        if (property.id.empty() || !property_ids.insert(property.id).second) return false;
+    auto next = *map_;
+    next.events[*found].payload = std::move(payload);
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::add_trigger(project::TriggerDefinition trigger) {
     if (!map_ || !core::ResourceId::is_valid(trigger.id) ||
         find_trigger(*map_, {.value = trigger.id}) ||

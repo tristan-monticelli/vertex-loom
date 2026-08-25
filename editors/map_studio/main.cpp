@@ -596,6 +596,12 @@ int run(const std::filesystem::path& project_root,
         else status = "Map opened";
     }
     std::string event_id;
+    std::string selected_event_id;
+    int event_editor_index = -1;
+    std::vector<fabric::project::MapProperty> event_payload_editor;
+    std::string event_property_id;
+    std::string event_property_value;
+    int event_property_kind = 2;
     std::string trigger_id;
     std::string trigger_event_id;
     int trigger_collision_index = 0;
@@ -807,8 +813,70 @@ int run(const std::filesystem::path& project_root,
                 } else status = "Event declaration rejected";
             }
             ImGui::EndDisabled();
-            for (const auto& event_definition : map.events)
-                ImGui::BulletText("%s", event_definition.id.value.c_str());
+            for (const auto& event_definition : map.events) {
+                const auto selected = selected_event_id == event_definition.id.value;
+                if (ImGui::Selectable(event_definition.id.value.c_str(), selected))
+                    selected_event_id = event_definition.id.value;
+            }
+            if (!selected_event_id.empty()) {
+                const auto event_definition = std::find_if(
+                    map.events.begin(), map.events.end(), [&](const auto& event) {
+                        return event.id.value == selected_event_id;
+                    });
+                if (event_definition != map.events.end()) {
+                    if (event_editor_index != static_cast<int>(
+                            std::distance(map.events.begin(), event_definition))) {
+                        event_editor_index = static_cast<int>(
+                            std::distance(map.events.begin(), event_definition));
+                        event_payload_editor = event_definition->payload;
+                    }
+                    ImGui::SeparatorText("Selected event payload");
+                    for (std::size_t property_index = 0;
+                         property_index < event_payload_editor.size(); ++property_index) {
+                        ImGui::PushID(static_cast<int>(property_index));
+                        ImGui::BulletText("%s = %s", event_payload_editor[property_index].id.c_str(),
+                                          property_value_text(
+                                              event_payload_editor[property_index].value).c_str());
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("Remove"))
+                            event_payload_editor.erase(event_payload_editor.begin() +
+                                                       static_cast<std::ptrdiff_t>(property_index));
+                        ImGui::PopID();
+                        if (property_index >= event_payload_editor.size()) break;
+                    }
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::InputText("Payload property id", &event_property_id);
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::Combo("Payload type", &event_property_kind,
+                                 "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::InputText("Payload value", &event_property_value);
+                    ImGui::BeginDisabled(event_property_id.empty() ||
+                                         event_property_value.empty());
+                    if (ImGui::Button("Apply payload property")) {
+                        const auto value = parse_override_value(event_property_kind,
+                                                                 event_property_value);
+                        if (value) {
+                            const auto existing = std::find_if(
+                                event_payload_editor.begin(), event_payload_editor.end(),
+                                [&](const auto& property) {
+                                    return property.id == event_property_id;
+                                });
+                            if (existing != event_payload_editor.end()) existing->value = *value;
+                            else event_payload_editor.push_back({event_property_id, *value});
+                            const auto applied = session.set_event_payload(
+                                {.value = selected_event_id}, event_payload_editor);
+                            status = applied ? "Event payload updated" :
+                                               "Event payload rejected";
+                            if (applied) {
+                                event_property_id.clear();
+                                event_property_value.clear();
+                            }
+                        } else status = "Event payload value rejected";
+                    }
+                    ImGui::EndDisabled();
+                }
+            }
             ImGui::SeparatorText("Triggers");
             for (std::size_t trigger_index = 0; trigger_index < map.triggers.size();
                  ++trigger_index) {
@@ -860,6 +928,16 @@ int run(const std::filesystem::path& project_root,
                 ImGui::InputText("Event id", &trigger_editor.event_id.value);
                 ImGui::SetNextItemWidth(220.0F);
                 ImGui::InputInt("Collision index", &trigger_editor_collision_index);
+                const auto event_definition = std::find_if(
+                    map.events.begin(), map.events.end(), [&](const auto& event) {
+                        return event.id == trigger_editor.event_id;
+                    });
+                if (event_definition != map.events.end()) {
+                    ImGui::Text("Payload:");
+                    for (const auto& property : event_definition->payload)
+                        ImGui::BulletText("%s = %s", property.id.c_str(),
+                                          property_value_text(property.value).c_str());
+                }
                 ImGui::BeginDisabled(trigger_editor_collision_index < 0 ||
                                      trigger_editor.event_id.value.empty());
                 if (ImGui::Button("Apply trigger")) {

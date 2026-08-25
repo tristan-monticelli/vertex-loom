@@ -49,6 +49,8 @@ public:
                                                   MapSnapSettings snapping = {}) noexcept;
     [[nodiscard]] bool declare_event(project::MapEventDefinition event);
     [[nodiscard]] bool remove_event(const core::ResourceId& event_id);
+    [[nodiscard]] bool set_event_payload(const core::ResourceId& event_id,
+                                         std::vector<project::MapProperty> payload);
     [[nodiscard]] bool add_trigger(project::TriggerDefinition trigger);
     [[nodiscard]] bool remove_trigger(const core::ResourceId& trigger_id);
     [[nodiscard]] bool set_trigger(std::size_t trigger_index,

@@ -280,6 +280,9 @@ Les poignées de points du canvas permettent en plus de déplacer directement
 un sommet sélectionné, avec un commit atomique.
 Les triggers sont maintenant sélectionnables, éditables (événement et
 collision référencée) et annotés dans le canvas avec le nom de leur événement.
+Les payloads d’événements sont maintenant éditables avec les six types de
+propriété partagés, remplaçables par identifiant et visibles depuis le trigger
+qui les consomme.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

@@ -70,6 +70,13 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.set_trigger(0, trigger));
     CHECK(session.map()->triggers.front().event_id.value == "on-exit");
     REQUIRE(session.undo());
+    REQUIRE(session.set_event_payload({.value = "on-exit"},
+                                      {{"reason", std::string{"leave"}}}));
+    REQUIRE(session.map()->events.back().payload.size() == 1);
+    CHECK(std::get<std::string>(session.map()->events.back().payload.front().value) == "leave");
+    REQUIRE(session.undo());
+    REQUIRE_FALSE(session.set_event_payload({.value = "on-exit"},
+                                            {{"reason", false}, {"reason", true}}));
     REQUIRE(session.remove_trigger({.value = "enter"}));
     REQUIRE(session.remove_event({.value = "on-enter"}));
     REQUIRE(session.remove_event({.value = "on-exit"}));
