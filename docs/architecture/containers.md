@@ -30,6 +30,7 @@ C4Container
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
     Rel(editorlib, renderlib, "Valide les sources raster et vectorielles")
+    Rel(renderlib, projectlib, "Construit les draw packets VectorAsset v2")
     Rel(projectlib, project, "Valide, lit et écrit")
 ```
 

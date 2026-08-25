@@ -52,4 +52,5 @@ C4Component
 - L'aperçu OpenGL utilise exactement les pixels validés lors de l'import.
 - Le renderer natif et le personnalisateur représentés ici sont les composants
   cibles de l’étape suivante ; le document natif est déjà persistant mais ne
-  possède pas encore de draw packets, et l’import opaque reste fonctionnel.
+  possède désormais des draw packets headless déterministes pour la géométrie
+  native ; l’import opaque reste fonctionnel.

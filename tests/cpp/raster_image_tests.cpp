@@ -1,4 +1,5 @@
 #include "fabric/render/raster_image.hpp"
+#include "fabric/render/vector_geometry.hpp"
 
 #include <array>
 #include <chrono>
@@ -137,6 +138,49 @@ void invalid_svg_inputs_are_rejected_before_publication() {
             "oversized SVG reached the decoder");
 }
 
+fabric::project::VectorAsset native_geometry_fixture() {
+    fabric::project::VectorAsset asset{
+        .source_kind = fabric::project::VectorSourceKind::native,
+        .native = fabric::project::NativeVectorDefinition{
+            .size = {10.0F, 10.0F},
+            .nodes = {{
+                .id = "node-1",
+                .name = "Triangle",
+                .shape = {
+                    .id = "shape-1",
+                    .kind = fabric::project::VectorShapeKind::path,
+                    .bounds = {.origin = {0.0F, 0.0F}, .size = {10.0F, 10.0F}},
+                    .path = {
+                        {.kind = fabric::project::VectorPathCommandKind::move,
+                         .point = {0.0F, 0.0F}},
+                        {.kind = fabric::project::VectorPathCommandKind::line,
+                         .point = {10.0F, 0.0F}},
+                        {.kind = fabric::project::VectorPathCommandKind::line,
+                         .point = {5.0F, 10.0F}},
+                        {.kind = fabric::project::VectorPathCommandKind::close},
+                    },
+                },
+                .fill = {.kind = fabric::project::VectorFillKind::solid,
+                         .color = fabric::core::Color{1.0F, 0.0F, 0.0F, 1.0F}},
+            }},
+        },
+    };
+    return asset;
+}
+
+void native_geometry_produces_deterministic_packets() {
+    const auto first = fabric::render::build_native_draw_packets(
+        native_geometry_fixture());
+    const auto second = fabric::render::build_native_draw_packets(
+        native_geometry_fixture());
+    require(first.ok() && second.ok(), "native geometry packet build failed");
+    require(first.packets == second.packets,
+            "native geometry packets were not deterministic");
+    require(first.packets.size() == 1U &&
+                first.packets.front().fill_indices.size() == 3U,
+            "triangle did not produce one deterministic fill triangle");
+}
+
 } // namespace
 
 int main() {
@@ -144,5 +188,6 @@ int main() {
     invalid_inputs_are_rejected();
     valid_svg_is_rasterized_to_a_bounded_preview();
     invalid_svg_inputs_are_rejected_before_publication();
+    native_geometry_produces_deterministic_packets();
     return 0;
 }

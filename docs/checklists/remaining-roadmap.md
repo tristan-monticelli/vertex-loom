@@ -26,7 +26,7 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | CONFORME | La création de projet valide le nom, l’identifiant généré et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage. |
 | CONFORME | `CreateProjectPrompt` demande destination, nom, unités monde, preset et `pixelsPerUnit`, puis affiche l’identifiant calculé, les erreurs et le résumé avant création. | Conserver les tests headless du modèle. |
 | CONFORME | Les états PNG et SVG sont isolés, l’aperçu précède la publication et `Add existing` sélectionne désormais une ressource indexée sans créer de document. | Conserver la séparation sélection, validation/décodage, aperçu et publication. |
-| PARTIEL | `VectorAsset v2 native` persiste primitives et fills couleur/image, mais ne produit pas encore de draw packets ni d’édition de sommets. | Livrer chemins, contours, clips, tessellation et personnalisateur. |
+| PARTIEL | `VectorAsset v2 native` persiste primitives, chemins, fills, contours et clips et produit désormais des draw packets headless ; l’édition de sommets et le cache GPU restent ouverts. | Livrer personnalisateur et cache de géométrie. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
 | MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
 | CONFORME | Le pipeline sprite a été retiré du build, des contrats, du validateur et de l’interface par ADR-0025. | Empêcher sa réintroduction dans les futurs contrats. |
