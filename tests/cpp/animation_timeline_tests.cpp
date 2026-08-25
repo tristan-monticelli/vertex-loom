@@ -44,6 +44,29 @@ TEST_CASE("animation timeline edits are undoable and redoable") {
     REQUIRE(source.tracks.front().keys.size() == 2);
 }
 
+TEST_CASE("animation timeline lists registered animatable properties for a node") {
+    fabric::project::PropertyDescriptorRegistry registry;
+    REQUIRE(registry.register_descriptor({
+        .component_id = "transform", .property_id = "position",
+        .display_path = "Transform/Position",
+        .value_kind = fabric::project::PropertyValueKind::vec2}).ok());
+    REQUIRE(registry.register_descriptor({
+        .component_id = "transform", .property_id = "rotation",
+        .display_path = "Transform/Rotation",
+        .value_kind = fabric::project::PropertyValueKind::angle,
+        .readable = true, .writable = true, .animatable = false}).ok());
+    REQUIRE(registry.register_descriptor({
+        .component_id = "material", .property_id = "opacity",
+        .display_path = "Material/Opacity",
+        .value_kind = fabric::project::PropertyValueKind::scalar}).ok());
+
+    const auto bindings = fabric::editor::AnimationTimeline::animatable_bindings("root", registry);
+    REQUIRE(bindings.size() == 2);
+    CHECK(bindings[0] == fabric::project::PropertyBinding{"root", "transform", "position"});
+    CHECK(bindings[1] == fabric::project::PropertyBinding{"root", "material", "opacity"});
+    CHECK(fabric::editor::AnimationTimeline::animatable_bindings("", registry).empty());
+}
+
 TEST_CASE("animation timeline rejects invalid key edits") {
     auto source = clip();
     fabric::editor::CommandStack commands;

@@ -205,7 +205,7 @@ transform du fill restent ouverts.
 - [x] Définir `AnimationClip v1` : durée, boucle, markers, pistes typées et clés.
 - [x] Supporter step, linear et cubic ; tangentes, easing et rotation par
   chemin angulaire court restent à définir.
-- [ ] Lister automatiquement dans la timeline toutes les propriétés déclarées
+- [x] Lister automatiquement dans la timeline toutes les propriétés déclarées
   animables par le registre.
 - [x] Définir des états et transitions déterministes avec conditions
   booléennes/numériques, priorités et exit time normalisé.

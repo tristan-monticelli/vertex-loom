@@ -68,6 +68,18 @@ AnimationTimeline::AnimationTimeline(project::AnimationClip& clip,
                                      CommandStack& commands) noexcept
     : clip_(clip), commands_(commands) {}
 
+std::vector<project::PropertyBinding> AnimationTimeline::animatable_bindings(
+    const std::string_view node_id,
+    const project::PropertyDescriptorRegistry& registry) {
+    std::vector<project::PropertyBinding> result;
+    if (node_id.empty()) return result;
+    for (const auto* descriptor : registry.animatable()) {
+        result.push_back({std::string{node_id}, descriptor->component_id,
+                          descriptor->property_id});
+    }
+    return result;
+}
+
 bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
                                    float time, project::AnimationValue value,
                                    project::AnimationInterpolation interpolation) {

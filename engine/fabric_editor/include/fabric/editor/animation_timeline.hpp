@@ -2,14 +2,20 @@
 
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/animation.hpp"
+#include "fabric/project/property.hpp"
 
 #include <cstddef>
+#include <string_view>
+#include <vector>
 
 namespace fabric::editor {
 
 class AnimationTimeline {
 public:
     AnimationTimeline(project::AnimationClip& clip, CommandStack& commands) noexcept;
+
+    [[nodiscard]] static std::vector<project::PropertyBinding> animatable_bindings(
+        std::string_view node_id, const project::PropertyDescriptorRegistry& registry);
 
     [[nodiscard]] bool insert_key(const project::PropertyBinding& binding,
                                   float time, project::AnimationValue value,
