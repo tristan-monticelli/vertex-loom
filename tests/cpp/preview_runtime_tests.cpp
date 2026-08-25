@@ -681,6 +681,7 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     REQUIRE(runtime.stats().vector_geometry_cache_entries == 1U);
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
+    CHECK(runtime.stats().culled_packets >= 1U);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

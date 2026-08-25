@@ -106,6 +106,9 @@ int main(int argc, char** argv) {
         std::cout << "frames=" << runtime.stats().frames
                   << " physics_steps=" << runtime.stats().physics_steps
                   << " visible=" << runtime.stats().visible_instances
+                  << " culling_candidates=" << runtime.stats().culling_candidates
+                  << " culled_packets=" << runtime.stats().culled_packets
+                  << " direct_render_frames=" << runtime.stats().direct_render_frames
                   << " draw_calls=" << runtime.stats().draw_calls
                   << " triangles=" << runtime.stats().triangles
                   << " elapsed_ms=" << runtime.stats().elapsed_ms

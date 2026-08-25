@@ -16,6 +16,11 @@ réutilisés pendant le culling. Les packets liés à une animation, une contrai
 une IK ou une déformation repassent par le culling géométrique après évaluation
 pour ne jamais sacrifier la précision des éléments dynamiques.
 
+Les statistiques runtime cumulent le nombre de candidats retournés par les
+chunks, les packets éliminés et les frames servies directement depuis le
+tableau statique. Elles rendent le benchmark et les overlays capables de
+distinguer un coût de rendu d’un coût de sélection spatiale.
+
 ## Conséquences
 
 Le coût de la recherche des candidats dépend des chunks visibles plutôt que du

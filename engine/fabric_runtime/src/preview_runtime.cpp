@@ -1194,6 +1194,7 @@ bool PreviewRuntime::run() {
             };
             if (impl_->chunk_index_ready) {
                 const auto candidate_instances = impl_->chunk_index.query(bounds);
+                stats_.culling_candidates += candidate_instances.size();
                 for (const auto& instance_id : candidate_instances) {
                     const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
                     if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
@@ -1209,6 +1210,8 @@ bool PreviewRuntime::run() {
         const auto render_packets = direct_render
             ? std::span<const render::VectorDrawPacket>(impl_->packets)
             : std::span<const render::VectorDrawPacket>(visible_packets);
+        if (direct_render) ++stats_.direct_render_frames;
+        stats_.culled_packets += impl_->packets.size() - render_packets.size();
         glViewport(0, 0, options_.width, options_.height);
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);

@@ -148,6 +148,9 @@ int main(const int argc, char** argv) {
     const auto& stats = runtime.stats();
     std::cout << "instances=" << options.instances
               << " visible=" << stats.visible_instances
+              << " culling_candidates=" << stats.culling_candidates
+              << " culled_packets=" << stats.culled_packets
+              << " direct_render_frames=" << stats.direct_render_frames
               << " frames=" << stats.frames
               << " draw_calls_total=" << stats.draw_calls
               << " triangles_total=" << stats.triangles
