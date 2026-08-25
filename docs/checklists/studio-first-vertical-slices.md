@@ -104,11 +104,19 @@ Preview Runtime.
   les mêmes sommets, UV, indices, couleurs et référence de texture. Le canvas
   Map Studio dessine ces packets avec le backend OpenGL partagé, derrière ses
   overlays ImGui.
-- [ ] Vérifier explicitement qu'aucune collision n'est générée sans référence
+- [x] Vérifier explicitement qu'aucune collision n'est générée sans référence
   de collision déclarée.
+
+  Preuve : la map Beam ne déclare ni collision ni trigger et son entité ne
+  possède aucun système XPBD. Le test résout pourtant ses packets visuels puis
+  vérifie de nouveau que ces trois états physiques restent absents.
 
 Gate : une bordure textile et un Beam animé sont produits depuis le studio,
 sauvegardés et rendus sans rasterisation persistante.
+
+Gate validé : la fixture Studio sauvegarde le chemin texturé, le composant,
+l'animation, l'entité et la map sans image dérivée ; ses packets coïncident
+dans les trois previews et aucune donnée de collision implicite n'apparaît.
 
 ## Tranche 3 — Graphe de mécanique et plateforme tournante
 

@@ -576,6 +576,31 @@ TEST_CASE("one animated Beam matches Asset Studio Map Studio and runtime") {
     std::filesystem::remove_all(regenerated, ignored);
 }
 
+TEST_CASE("visual Beam does not synthesize collision data") {
+    const auto fixture = std::filesystem::path{FABRIC_SOURCE_DIR} /
+        "tests/fixtures/studio-beam";
+    const auto loaded_manifest = fabric::project::load_manifest(fixture);
+    REQUIRE(loaded_manifest.ok());
+    const auto map = fabric::project::load_map(
+        fixture, *loaded_manifest.manifest,
+        "maps/beam-preview.map.json");
+    const auto entity = fabric::project::load_entity(
+        fixture, *loaded_manifest.manifest,
+        "entities/beam-entity.entity.json");
+    REQUIRE(map.ok());
+    REQUIRE(entity.ok());
+    CHECK(map.asset->collisions.empty());
+    CHECK(map.asset->triggers.empty());
+    CHECK_FALSE(entity.entity->xpbd.has_value());
+
+    const auto preview = fabric::render::resolve_map_preview(
+        fixture, *loaded_manifest.manifest, *map.asset, 1.0F / 60.0F);
+    REQUIRE(preview.ok());
+    CHECK_FALSE(preview.packets.empty());
+    CHECK(map.asset->collisions.empty());
+    CHECK_FALSE(entity.entity->xpbd.has_value());
+}
+
 TEST_CASE("textile head fixture is composed and cropped through Studio") {
     const auto fixture = std::filesystem::path{FABRIC_SOURCE_DIR} /
         "tests/fixtures/studio-textile-head";
