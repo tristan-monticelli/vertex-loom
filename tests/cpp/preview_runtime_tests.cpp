@@ -639,6 +639,12 @@ TEST_CASE("preview runtime evaluates entity animation state transitions") {
     REQUIRE(evaluated->properties.size() == 1U);
     CHECK(std::get<fabric::core::Vec2>(evaluated->properties.front().value) ==
           fabric::core::Vec2{0.5F, 1.0F});
+    const auto state = runtime.evaluate_instance_state("state-machine", 0.75F);
+    REQUIRE(state.has_value());
+    CHECK(state->state_id == "run");
+    CHECK(state->clip_id.value == "runtime-animation");
+    CHECK(state->local_time == 0.25F);
+    CHECK_FALSE(runtime.evaluate_instance_state("missing", 0.75F).has_value());
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

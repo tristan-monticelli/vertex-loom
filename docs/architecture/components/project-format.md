@@ -112,6 +112,8 @@ C4Component
 - Une entité peut persister `animationStateMachine` ; ses états référencent des
   clips, ses transitions sont évaluées par priorité et `exitTime`, et les
   paramètres d'instance utilisent les propriétés `animationParameter.<id>`.
+  `PreviewRuntime::evaluate_instance_state` expose l’état, le clip et le temps
+  local effectivement sélectionnés pour l’inspection headless.
 - `PreviewRuntime` met en cache les `VectorAsset` convertis et les résultats de
   géométrie par ressource ; chaque instance reçoit ensuite une copie mutable
   avant matériau et transformation. Les packets sont triés de façon stable par

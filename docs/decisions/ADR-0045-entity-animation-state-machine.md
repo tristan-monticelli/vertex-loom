@@ -14,7 +14,9 @@ booléennes ou numériques et `exitTime` normalisé.
 Les paramètres propres à une instance de map sont fournis par les propriétés
 `animationParameter.<id>` et restent limités aux valeurs booléennes et réelles.
 Le Preview Runtime résout l’état et le temps local du clip avant d’évaluer les
-pistes ; les animations directes par propriété `animation` restent supportées.
+pistes ; cette résolution est inspectable headless par `state_id`, `clip_id` et
+`local_time`. Les animations directes par propriété `animation` restent
+supportées.
 
 ## Conséquences
 

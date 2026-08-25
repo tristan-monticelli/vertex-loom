@@ -70,6 +70,14 @@ struct PreviewRuntimeStats {
     float character_y{};
 };
 
+struct AnimationStateEvaluation {
+    std::string state_id;
+    core::ResourceId clip_id;
+    float local_time{};
+    friend bool operator==(const AnimationStateEvaluation&,
+                           const AnimationStateEvaluation&) = default;
+};
+
 class PreviewRuntime {
 public:
     PreviewRuntime();
@@ -107,6 +115,8 @@ public:
         const core::ResourceId& animation_id, float from_time, float to_time) const;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_instance_animation(
         const std::string& instance_id, float time) const;
+    [[nodiscard]] std::optional<AnimationStateEvaluation>
+    evaluate_instance_state(const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::MeshDeformationResult>
     evaluate_instance_deformation(const std::string& instance_id) const;
     [[nodiscard]] std::optional<project::MeshDeformationResult>

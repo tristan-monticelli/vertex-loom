@@ -252,6 +252,7 @@ void apply_animation_to_nodes(std::vector<project::EntityNode>& nodes,
 }
 
 struct ResolvedAnimation {
+    std::string state_id;
     std::string clip_id;
     float local_time{};
 };
@@ -283,7 +284,9 @@ std::optional<ResolvedAnimation> resolve_state_machine_animation(
         float local_time = local;
         if (clip->second.loop && duration > 0.0F)
             local_time = std::fmod(remaining, duration);
-        return ResolvedAnimation{.clip_id = clip->first, .local_time = local_time};
+        return ResolvedAnimation{.state_id = state_id,
+                                 .clip_id = clip->first,
+                                 .local_time = local_time};
     }
     return std::nullopt;
 }
@@ -1460,6 +1463,25 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_anima
     }
     impl_->animation_evaluation_cache.emplace(instance_id, result);
     return result;
+}
+
+std::optional<AnimationStateEvaluation>
+PreviewRuntime::evaluate_instance_state(const std::string& instance_id,
+                                        const float time) const {
+    if (!impl_) return std::nullopt;
+    const auto machine = impl_->animation_state_machines.find(instance_id);
+    if (machine == impl_->animation_state_machines.end()) return std::nullopt;
+    const auto parameters = impl_->animation_parameters.find(instance_id);
+    const std::vector<project::AnimationParameter> empty_parameters;
+    const auto& values = parameters == impl_->animation_parameters.end()
+        ? empty_parameters : parameters->second;
+    const auto resolved = resolve_state_machine_animation(
+        machine->second, impl_->animation_clips, values, time);
+    if (!resolved) return std::nullopt;
+    return AnimationStateEvaluation{
+        .state_id = resolved->state_id,
+        .clip_id = {.value = resolved->clip_id},
+        .local_time = resolved->local_time};
 }
 
 std::optional<project::MeshDeformationResult>
