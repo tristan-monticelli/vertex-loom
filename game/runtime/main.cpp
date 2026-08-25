@@ -1,6 +1,6 @@
 #include "fabric/runtime/preview_runtime.hpp"
 #include "fabric/runtime/progress_store.hpp"
-#include "fabric/project/scene.hpp"
+#include "fabric/runtime/scene_session.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -78,22 +78,13 @@ int main(int argc, char** argv) {
     }
 
     if (scene_id) {
-        const auto project = fabric::project::load_project(options.project_root);
-        if (!project.ok()) {
-            for (const auto& error : project.errors)
-                std::cerr << "error: " << error.field << ": " << error.message << '\n';
+        fabric::runtime::SceneRuntimeSession scene_session;
+        if (!scene_session.load(options.project_root, *scene_id)) {
+            for (const auto& error : scene_session.errors())
+                std::cerr << "error: " << error << '\n';
             return 1;
         }
-        const auto scene = fabric::project::load_scene(
-            options.project_root, *project.manifest,
-            fabric::project::scene_document_path(*project.manifest, *scene_id));
-        if (!scene.ok() || !scene.asset->entry_map) {
-            if (scene.ok()) std::cerr << "error: scene has no entry map\n";
-            else for (const auto& error : scene.errors)
-                std::cerr << "error: " << error.field << ": " << error.message << '\n';
-            return 1;
-        }
-        options.map_id = scene.asset->entry_map->id;
+        options.map_id = scene_session.map()->document.id;
     }
 
     fabric::runtime::PreviewRuntime runtime;

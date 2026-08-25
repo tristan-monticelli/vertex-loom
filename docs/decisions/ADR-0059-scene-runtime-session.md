@@ -7,6 +7,9 @@ projet, puis résout les transitions par `ResourceId`. Une transition est
 préparée dans des documents temporaires ; la scène courante n’est remplacée
 que si la cible et sa map sont valides.
 
+`game_runtime --scene <id>` réutilise directement cette session pour résoudre
+la map d’entrée avant d’initialiser `PreviewRuntime`.
+
 ## Conséquences
 
 La résolution des scènes est testable sans SDL ni fenêtre et peut être
