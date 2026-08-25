@@ -426,6 +426,8 @@ déclencher une transition de scène via un hand-off propre ; les autres
 
 `game_runtime` expose aussi le suivi de caméra et les limites monde via des
 options CLI validées.
+Les bindings d’actions peuvent être fournis par `--bind` sans modifier le
+programme.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement

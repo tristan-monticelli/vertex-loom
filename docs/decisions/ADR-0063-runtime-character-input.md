@@ -14,6 +14,10 @@ Elle doit déclarer les trois actions de locomotion ; sinon le chargement est
 refusé avant la création de la fenêtre. En l’absence de table, les bindings
 SDL historiques restent utilisés.
 
+La table peut aussi être construite sans code avec des options répétables
+`--bind <action> <keyboard|gamepad> <code>` de `game_runtime`. Les doublons,
+codes négatifs et identifiants d’action invalides sont refusés au parsing.
+
 Les commandes sont appliquées avant chaque pas physique fixe de `1/60 s`.
 
 ## Conséquences

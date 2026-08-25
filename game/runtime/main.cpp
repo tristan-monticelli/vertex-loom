@@ -2,13 +2,16 @@
 #include "fabric/runtime/progress_store.hpp"
 #include "fabric/runtime/scene_session.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
+#include <iterator>
 #include <iostream>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace {
 
@@ -19,6 +22,7 @@ void usage() {
                  "[--character] "
                  "[--follow-character] "
                  "[--camera-limits <x> <y> <width> <height>] "
+                 "[--bind <action> <keyboard|gamepad> <code>]... "
                  "[--audio <wav>] "
                  "[--smoke-test [frames]] [--benchmark [frames]]\n";
 }
@@ -34,12 +38,31 @@ bool parse_float(const char* value, float& output) {
     }
 }
 
+bool parse_non_negative_int(const char* value, int& output) {
+    try {
+        std::size_t consumed = 0;
+        const std::string text(value);
+        output = std::stoi(text, &consumed);
+        return consumed == text.size() && output >= 0;
+    } catch (...) {
+        return false;
+    }
+}
+
+std::optional<fabric::runtime::InputDevice> parse_input_device(
+    const std::string_view value) {
+    if (value == "keyboard") return fabric::runtime::InputDevice::keyboard;
+    if (value == "gamepad") return fabric::runtime::InputDevice::gamepad;
+    return std::nullopt;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     fabric::runtime::PreviewRuntimeOptions options;
     std::optional<fabric::core::ResourceId> scene_id;
     std::optional<std::string> save_slot;
+    std::vector<fabric::runtime::InputActionDefinition> configured_actions;
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
         if (argument == "--project" && index + 1 < argc) {
@@ -65,6 +88,28 @@ int main(int argc, char** argv) {
                 return 2;
             }
             options.camera_limits = fabric::core::Rect{{x, y}, {width, height}};
+        } else if (argument == "--bind" && index + 3 < argc) {
+            const std::string action(argv[++index]);
+            const auto device = parse_input_device(argv[++index]);
+            int code{};
+            if (!fabric::core::ResourceId::is_valid(action) || !device ||
+                !parse_non_negative_int(argv[++index], code)) {
+                std::cerr << "error: --bind expects a valid action, keyboard/gamepad and code\n";
+                return 2;
+            }
+            auto definition = std::find_if(configured_actions.begin(), configured_actions.end(),
+                [&](const auto& candidate) { return candidate.id == action; });
+            if (definition == configured_actions.end()) {
+                configured_actions.push_back({action, {}});
+                definition = std::prev(configured_actions.end());
+            }
+            const fabric::runtime::InputBinding binding{*device, code};
+            if (std::find(definition->bindings.begin(), definition->bindings.end(), binding) !=
+                definition->bindings.end()) {
+                std::cerr << "error: duplicate --bind entry\n";
+                return 2;
+            }
+            definition->bindings.push_back(binding);
         } else if (argument == "--audio" && index + 1 < argc) {
             options.audio_wav = argv[++index];
         } else if (argument == "--smoke-test") {
@@ -83,6 +128,8 @@ int main(int argc, char** argv) {
             return 2;
         }
     }
+
+    if (!configured_actions.empty()) options.input_actions = std::move(configured_actions);
 
     fabric::runtime::ProgressStore progress_store;
     if (save_slot) {
