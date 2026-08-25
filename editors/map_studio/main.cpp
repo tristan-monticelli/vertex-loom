@@ -138,6 +138,9 @@ int run(const std::filesystem::path& project_root,
         else status = "Map opened";
     }
     std::string event_id;
+    std::string trigger_id;
+    std::string trigger_event_id;
+    int trigger_collision_index = 0;
     std::vector<std::string> selected_instances;
     std::string selected_prefab;
     std::string override_id;
@@ -268,8 +271,37 @@ int run(const std::filesystem::path& project_root,
             for (const auto& event_definition : map.events)
                 ImGui::BulletText("%s", event_definition.id.value.c_str());
             ImGui::SeparatorText("Triggers");
-            for (const auto& trigger : map.triggers)
-                ImGui::BulletText("%s -> %s", trigger.id.c_str(), trigger.event_id.value.c_str());
+            for (const auto& trigger : map.triggers) {
+                ImGui::PushID(trigger.id.c_str());
+                ImGui::BulletText("%s -> %s (collision %zu)", trigger.id.c_str(),
+                                  trigger.event_id.value.c_str(), trigger.collision_index);
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Remove")) {
+                    status = session.remove_trigger({.value = trigger.id})
+                        ? "Trigger removed" : "Trigger removal rejected";
+                }
+                ImGui::PopID();
+            }
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("New trigger id", &trigger_id);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("Trigger event id", &trigger_event_id);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputInt("Collision index", &trigger_collision_index);
+            ImGui::BeginDisabled(trigger_id.empty() || trigger_event_id.empty() ||
+                                 trigger_collision_index < 0);
+            if (ImGui::Button("Add trigger")) {
+                const auto added = session.add_trigger(
+                    {trigger_id, "triggers", static_cast<std::size_t>(trigger_collision_index),
+                     {.value = trigger_event_id}, {}});
+                status = added ? "Trigger added" : "Trigger rejected";
+                if (added) {
+                    trigger_id.clear();
+                    trigger_event_id.clear();
+                    trigger_collision_index = 0;
+                }
+            }
+            ImGui::EndDisabled();
             if (selected_instances.size() == 1U) {
                 const fabric::core::ResourceId selected_id{selected_instances.front()};
                 ImGui::SeparatorText("Selected instance properties");

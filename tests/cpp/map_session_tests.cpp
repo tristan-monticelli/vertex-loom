@@ -61,6 +61,8 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.redo());
     REQUIRE(session.declare_event({{.value = "on-enter"}, {}}));
     REQUIRE(session.add_trigger({"enter", "triggers", 0, {.value = "on-enter"}, {}}));
+    REQUIRE_FALSE(session.add_trigger({"invalid-collision", "triggers", 4,
+                                       {.value = "on-enter"}, {}}));
     REQUIRE_FALSE(session.remove_event({.value = "on-enter"}));
     REQUIRE(session.remove_trigger({.value = "enter"}));
     REQUIRE(session.remove_event({.value = "on-enter"}));
