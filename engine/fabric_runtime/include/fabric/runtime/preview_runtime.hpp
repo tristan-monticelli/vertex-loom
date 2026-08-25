@@ -7,6 +7,7 @@
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
 #include "fabric/runtime/input.hpp"
+#include "fabric/runtime/trigger_runtime.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -42,6 +43,7 @@ struct PreviewRuntimeStats {
     double p95_frame_ms{};
     std::size_t replay_events{};
     std::size_t replay_checkpoints{};
+    std::size_t gameplay_events{};
     float character_x{};
     float character_y{};
 };
@@ -79,6 +81,7 @@ private:
     std::unique_ptr<class ReplayPlayer> replay_player_;
     InputActionMap input_;
     std::unique_ptr<CharacterController> character_;
+    std::unique_ptr<TriggerRuntime> triggers_;
     physics::PhysicsWorld physics_;
     std::unique_ptr<Impl> impl_;
     std::vector<std::string> errors_;

@@ -175,6 +175,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     replay_player_.reset();
     input_ = {};
     character_.reset();
+    triggers_.reset();
     errors_.clear();
     stats_ = {};
     impl_->packets.clear();
@@ -222,6 +223,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
 
     manifest_ = std::move(loaded_project.manifest);
     map_ = std::move(loaded_map.asset);
+    triggers_ = std::make_unique<TriggerRuntime>(*map_);
     if (replay_) replay_player_ = std::make_unique<ReplayPlayer>(*replay_);
     if (!physics_.create() || !physics_.load_map_collisions(*map_)) {
         errors_.push_back("could not create the map physics world");
@@ -537,6 +539,8 @@ bool PreviewRuntime::run() {
                 const auto position = character_->position();
                 stats_.character_x = position.x;
                 stats_.character_y = position.y;
+                if (triggers_)
+                    stats_.gameplay_events += triggers_->update(position).size();
             }
             return true;
         };
