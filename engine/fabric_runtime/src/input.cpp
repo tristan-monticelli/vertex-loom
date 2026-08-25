@@ -25,6 +25,18 @@ bool InputActionMap::bind(const std::string_view action, const InputBinding bind
     return false;
 }
 
+bool InputActionMap::configure(
+    const std::span<const InputActionDefinition> definitions) {
+    InputActionMap configured;
+    for (const auto& definition : definitions) {
+        if (!configured.define_action(definition.id)) return false;
+        for (const auto binding : definition.bindings)
+            if (!configured.bind(definition.id, binding)) return false;
+    }
+    *this = std::move(configured);
+    return true;
+}
+
 std::string InputActionMap::key(const InputDevice device, const int code) const {
     return std::to_string(static_cast<int>(device)) + ":" + std::to_string(code);
 }

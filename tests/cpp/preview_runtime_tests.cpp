@@ -435,6 +435,30 @@ TEST_CASE("preview runtime handler can stop after a gameplay event") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime accepts a custom locomotion binding table") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-input-config-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .input_actions = {
+                              {"move_left", {{fabric::runtime::InputDevice::keyboard, 74}}},
+                              {"move_right", {{fabric::runtime::InputDevice::keyboard, 76}}},
+                              {"jump", {{fabric::runtime::InputDevice::gamepad, 1}}}},
+                          .enable_character = true,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().physics_steps == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-runtime-scene-handoff-" + std::to_string(

@@ -9,6 +9,11 @@ et espace sont traduites en actions logiques `move_left`, `move_right` et
 Les boutons D-pad gauche/droite et A d’un contrôleur SDL sont également
 reliés à ces actions.
 
+Le programme peut fournir une table de bindings à `PreviewRuntimeOptions`.
+Elle doit déclarer les trois actions de locomotion ; sinon le chargement est
+refusé avant la création de la fenêtre. En l’absence de table, les bindings
+SDL historiques restent utilisés.
+
 Les commandes sont appliquées avant chaque pas physique fixe de `1/60 s`.
 
 ## Conséquences

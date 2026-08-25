@@ -613,21 +613,36 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         return false;
     }
     if (options_.enable_character) {
-        for (const auto action : {"move_left", "move_right", "jump"})
-            if (!input_.define_action(action)) {
-                errors_.push_back("could not define character input action");
+        if (!options_.input_actions.empty()) {
+            if (!input_.configure(options_.input_actions)) {
+                errors_.push_back("could not configure character input actions");
                 return false;
             }
-        if (!input_.bind("move_left", {InputDevice::keyboard, SDLK_a}) ||
-            !input_.bind("move_left", {InputDevice::keyboard, SDLK_LEFT}) ||
-            !input_.bind("move_right", {InputDevice::keyboard, SDLK_d}) ||
-            !input_.bind("move_right", {InputDevice::keyboard, SDLK_RIGHT}) ||
-            !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE}) ||
-            !input_.bind("move_left", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_LEFT}) ||
-            !input_.bind("move_right", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT}) ||
-            !input_.bind("jump", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_A})) {
-            errors_.push_back("could not bind character input actions");
-            return false;
+        } else {
+            for (const auto action : {"move_left", "move_right", "jump"})
+                if (!input_.define_action(action)) {
+                    errors_.push_back("could not define character input action");
+                    return false;
+                }
+            if (!input_.bind("move_left", {InputDevice::keyboard, SDLK_a}) ||
+                !input_.bind("move_left", {InputDevice::keyboard, SDLK_LEFT}) ||
+                !input_.bind("move_right", {InputDevice::keyboard, SDLK_d}) ||
+                !input_.bind("move_right", {InputDevice::keyboard, SDLK_RIGHT}) ||
+                !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE}) ||
+                !input_.bind("move_left", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_LEFT}) ||
+                !input_.bind("move_right", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT}) ||
+                !input_.bind("jump", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_A})) {
+                errors_.push_back("could not bind character input actions");
+                return false;
+            }
+        }
+        for (const auto action : {"move_left", "move_right", "jump"}) {
+            const auto found = std::find_if(input_.actions().begin(), input_.actions().end(),
+                [&](const auto& definition) { return definition.id == action; });
+            if (found == input_.actions().end()) {
+                errors_.push_back("character input action is missing: " + std::string(action));
+                return false;
+            }
         }
         character_ = std::make_unique<CharacterController>();
         if (!character_->create(physics_, {0.0F, 0.0F})) {

@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -26,6 +27,7 @@ class InputActionMap {
 public:
     [[nodiscard]] bool define_action(std::string id);
     [[nodiscard]] bool bind(std::string_view action, InputBinding binding);
+    [[nodiscard]] bool configure(std::span<const InputActionDefinition> definitions);
     void begin_frame() noexcept;
     void press(InputDevice device, int code, bool repeat = false) noexcept;
     void release(InputDevice device, int code) noexcept;

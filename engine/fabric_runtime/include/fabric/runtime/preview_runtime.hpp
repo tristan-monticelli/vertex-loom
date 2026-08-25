@@ -35,6 +35,7 @@ struct PreviewRuntimeOptions {
     std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;
     GameplayEventHandler gameplay_event_handler;
+    std::vector<InputActionDefinition> input_actions;
     bool enable_character{};
     std::optional<std::filesystem::path> audio_wav;
     RuntimeMode mode{RuntimeMode::interactive};
