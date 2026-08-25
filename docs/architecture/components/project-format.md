@@ -66,6 +66,12 @@ C4Component
   des markers et des pistes liées par `nodeId + componentId + propertyId`.
   Les valeurs v1 sont scalaire, `Vec2`, couleur, booléen ou référence de
   ressource ; les interpolations disponibles sont step, linear et cubic.
+- `PreviewRuntime` énumère les documents `*.animation.json` sous
+  `assets/animations` avant l’initialisation SDL. Chaque document est chargé
+  avec un chemin relatif au projet, validé puis indexé par `ResourceId` ; un
+  document invalide empêche le chargement du runtime. L’évaluation headless
+  d’un clip est disponible par identifiant et instant, tandis que la liaison
+  aux nœuds d’une entité reste une étape ultérieure du contrat de scène.
 - `PropertyDescriptorRegistry` décrit les propriétés exposées par les
   composants, résout les bindings stables et filtre les propriétés animables
   et inscriptibles pour les outils d’édition.

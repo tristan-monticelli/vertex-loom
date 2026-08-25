@@ -44,6 +44,7 @@ struct PreviewRuntime::Impl {
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
+    std::unordered_map<std::string, project::AnimationClip> animation_clips;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -185,6 +186,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packets.clear();
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
+    impl_->animation_clips.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -229,6 +231,47 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
 
     manifest_ = std::move(loaded_project.manifest);
     map_ = std::move(loaded_map.asset);
+    const auto animation_directory = options_.project_root /
+        manifest_->directories.assets / "animations";
+    std::error_code directory_error;
+    const bool animations_exist =
+        std::filesystem::exists(animation_directory, directory_error);
+    if (directory_error) {
+        errors_.push_back("animations: could not inspect animation directory");
+        return false;
+    }
+    if (animations_exist) {
+        for (const auto& entry : std::filesystem::directory_iterator(
+                 animation_directory, directory_error)) {
+            if (directory_error) break;
+            const auto filename = entry.path().filename().string();
+            if (!entry.is_regular_file(directory_error) ||
+                filename.size() <= std::string_view{".animation.json"}.size() ||
+                filename.compare(filename.size() -
+                                     std::string_view{".animation.json"}.size(),
+                                 std::string_view{".animation.json"}.size(),
+                                 ".animation.json") != 0) {
+                continue;
+            }
+            auto animation = project::load_animation(
+                options_.project_root, *manifest_,
+                std::filesystem::relative(entry.path(), options_.project_root));
+            if (!animation.ok()) {
+                append_errors(errors_, animation.errors);
+                return false;
+            }
+            const auto [_, inserted] = impl_->animation_clips.emplace(
+                animation.asset->document.id.value, std::move(*animation.asset));
+            if (!inserted) {
+                errors_.push_back("animations: duplicate resource id");
+                return false;
+            }
+        }
+    }
+    if (directory_error) {
+        errors_.push_back("animations: could not enumerate animation documents");
+        return false;
+    }
     triggers_ = std::make_unique<TriggerRuntime>(*map_);
     impl_->chunk_index_ready = impl_->chunk_index.rebuild(*map_);
     if (replay_) replay_player_ = std::make_unique<ReplayPlayer>(*replay_);
@@ -623,6 +666,18 @@ bool PreviewRuntime::run() {
         stats_.p95_frame_ms = frame_times_ms[index];
     }
     return true;
+}
+
+std::size_t PreviewRuntime::animation_count() const noexcept {
+    return impl_ ? impl_->animation_clips.size() : 0U;
+}
+
+std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
+    const core::ResourceId& animation_id, const float time) const {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->animation_clips.find(animation_id.value);
+    if (found == impl_->animation_clips.end()) return std::nullopt;
+    return project::evaluate_animation(found->second, time);
 }
 
 } // namespace fabric::runtime

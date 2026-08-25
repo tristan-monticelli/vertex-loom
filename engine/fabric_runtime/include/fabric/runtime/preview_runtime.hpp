@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
+#include "fabric/project/animation.hpp"
 #include "fabric/project/replay.hpp"
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
@@ -70,6 +71,9 @@ public:
         return errors_;
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
+    [[nodiscard]] std::size_t animation_count() const noexcept;
+    [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(
+        const core::ResourceId& animation_id, float time) const;
 
 private:
     struct Impl;

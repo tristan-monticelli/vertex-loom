@@ -30,6 +30,20 @@ fabric::project::MapDocument map() {
                         fabric::project::MapLayerKind::instances, true, false, 0.0F}}};
 }
 
+fabric::project::AnimationClip animation() {
+    return {.document = {.schema_version = 1,
+                         .type = "animation",
+                         .id = {.value = "runtime-animation"},
+                         .name = "Runtime Animation"},
+            .duration = 1.0F,
+            .tracks = {{{.node_id = "root",
+                         .component_id = "transform",
+                         .property_id = "position"},
+                       fabric::project::AnimationInterpolation::linear,
+                       {{0.0F, fabric::core::Vec2{0.0F, 0.0F}},
+                        {1.0F, fabric::core::Vec2{2.0F, 4.0F}}}}}};
+}
+
 fabric::project::ReplayDocument replay() {
     return {.document = {.schema_version = 1,
                          .type = "replay",
@@ -126,6 +140,31 @@ TEST_CASE("preview runtime validates and loads a map before graphics") {
     REQUIRE(runtime.stats().frames == 1);
     REQUIRE(runtime.stats().physics_steps == 1);
     REQUIRE(runtime.stats().p95_frame_ms >= 0.0);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime loads and evaluates project animations") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-animation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.animation_count() == 1U);
+    const auto evaluated = runtime.evaluate_animation(
+        {.value = "runtime-animation"}, 0.5F);
+    REQUIRE(evaluated.has_value());
+    REQUIRE(evaluated->ok());
+    REQUIRE(evaluated->properties.size() == 1U);
+    const auto position = std::get<fabric::core::Vec2>(
+        evaluated->properties.front().value);
+    CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
