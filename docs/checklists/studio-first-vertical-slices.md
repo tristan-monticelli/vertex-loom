@@ -120,8 +120,14 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
 
 ## Tranche 3 — Graphe de mécanique et plateforme tournante
 
-- [ ] Ajouter `MechanicGraph v1`, ports typés, paramètres d'instance,
+- [x] Ajouter `MechanicGraph v1`, ports typés, paramètres d'instance,
   validation, sérialisation et enregistrement comme ressource.
+
+  Preuve : le document strict `*.mechanic.json` conserve paramètres typés,
+  nœuds, propriétés, ports orientés et connexions. Les tests couvrent
+  round-trip, champs inconnus, valeurs non finies ou incompatibles, ports et
+  nœuds absents, entrée liée plusieurs fois, doublons, cycles, sauvegarde
+  atomique et résolution des références par le validateur headless.
 - [ ] Ajouter les nœuds corps, pivot, joint, moteur, capteur, contrainte et
   événement en réutilisant `fabric_physics` et les événements map.
 - [ ] Ajouter dans Map Studio l'édition du graphe, l'inspecteur, la simulation,

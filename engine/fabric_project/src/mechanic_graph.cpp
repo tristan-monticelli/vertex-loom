@@ -1,0 +1,622 @@
+#include "fabric/project/mechanic_graph.hpp"
+
+#include "fabric/project/document_storage.hpp"
+
+#include <nlohmann/json.hpp>
+
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <ranges>
+#include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+
+namespace fabric::project {
+namespace {
+
+using Json = nlohmann::json;
+
+void error(std::vector<Error>& errors, const ErrorCode code,
+           std::string field, std::string message) {
+    errors.push_back({code, std::move(field), std::move(message)});
+}
+
+void reject_unknown(const Json& object,
+                    const std::initializer_list<std::string_view> allowed,
+                    const std::string& field, std::vector<Error>& errors) {
+    for (const auto& [key, _] : object.items()) {
+        if (!std::ranges::any_of(allowed,
+                [&](const auto candidate) { return key == candidate; }))
+            error(errors, ErrorCode::invalid_asset,
+                  field.empty() ? key : field + "." + key, "unknown field");
+    }
+}
+
+std::string_view value_type_name(const MechanicValueType type) {
+    switch (type) {
+    case MechanicValueType::boolean: return "bool";
+    case MechanicValueType::integer: return "integer";
+    case MechanicValueType::scalar: return "scalar";
+    case MechanicValueType::text: return "text";
+    case MechanicValueType::vec2: return "vec2";
+    case MechanicValueType::resource: return "resource";
+    }
+    return "scalar";
+}
+
+std::optional<MechanicValueType> parse_value_type(const std::string_view type) {
+    if (type == "bool") return MechanicValueType::boolean;
+    if (type == "integer") return MechanicValueType::integer;
+    if (type == "scalar") return MechanicValueType::scalar;
+    if (type == "text") return MechanicValueType::text;
+    if (type == "vec2") return MechanicValueType::vec2;
+    if (type == "resource") return MechanicValueType::resource;
+    return std::nullopt;
+}
+
+bool read_text(const Json& object, const char* key, std::string& value,
+               std::vector<Error>& errors, const std::string& prefix = {}) {
+    const auto found = object.find(key);
+    const auto field = prefix.empty() ? std::string{key} : prefix + "." + key;
+    if (found == object.end() || !found->is_string()) {
+        error(errors, ErrorCode::invalid_asset, field, "expected a string");
+        return false;
+    }
+    value = found->get<std::string>();
+    return true;
+}
+
+bool read_value_type(const Json& object, const char* key,
+                     MechanicValueType& value, std::vector<Error>& errors,
+                     const std::string& prefix) {
+    std::string text;
+    if (!read_text(object, key, text, errors, prefix)) return false;
+    const auto parsed = parse_value_type(text);
+    if (!parsed) {
+        error(errors, ErrorCode::invalid_asset, prefix + "." + key,
+              "unsupported mechanic value type");
+        return false;
+    }
+    value = *parsed;
+    return true;
+}
+
+Json serialize_value(const MechanicValue& value) {
+    return std::visit([](const auto& item) -> Json {
+        using Value = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Value, bool>)
+            return {{"kind", "bool"}, {"value", item}};
+        else if constexpr (std::is_same_v<Value, std::int64_t>)
+            return {{"kind", "integer"}, {"value", item}};
+        else if constexpr (std::is_same_v<Value, float>)
+            return {{"kind", "scalar"}, {"value", item}};
+        else if constexpr (std::is_same_v<Value, std::string>)
+            return {{"kind", "text"}, {"value", item}};
+        else if constexpr (std::is_same_v<Value, core::Vec2>)
+            return {{"kind", "vec2"},
+                    {"value", {{"x", item.x}, {"y", item.y}}}};
+        else
+            return {{"kind", "resource"},
+                    {"value", {{"id", item.id.value},
+                               {"expectedType", item.expected_type}}}};
+    }, value);
+}
+
+std::optional<MechanicValue> parse_value(
+    const Json& object, const std::string& field, std::vector<Error>& errors) {
+    if (!object.is_object()) {
+        error(errors, ErrorCode::invalid_asset, field, "expected an object");
+        return std::nullopt;
+    }
+    reject_unknown(object, {"kind", "value"}, field, errors);
+    std::string kind;
+    if (!read_text(object, "kind", kind, errors, field)) return std::nullopt;
+    const auto value = object.find("value");
+    if (value == object.end()) {
+        error(errors, ErrorCode::invalid_asset, field + ".value",
+              "field is required");
+        return std::nullopt;
+    }
+    if (kind == "bool" && value->is_boolean())
+        return value->get<bool>();
+    if (kind == "integer" && value->is_number_integer())
+        return value->get<std::int64_t>();
+    if (kind == "scalar" && value->is_number())
+        return static_cast<float>(value->get<double>());
+    if (kind == "text" && value->is_string())
+        return value->get<std::string>();
+    if (kind == "vec2" && value->is_object()) {
+        reject_unknown(*value, {"x", "y"}, field + ".value", errors);
+        const auto x = value->find("x");
+        const auto y = value->find("y");
+        if (x != value->end() && y != value->end() && x->is_number() &&
+            y->is_number())
+            return core::Vec2{static_cast<float>(x->get<double>()),
+                              static_cast<float>(y->get<double>())};
+    }
+    if (kind == "resource" && value->is_object()) {
+        reject_unknown(*value, {"id", "expectedType"}, field + ".value",
+                       errors);
+        ResourceReference reference;
+        if (read_text(*value, "id", reference.id.value, errors,
+                      field + ".value") &&
+            read_text(*value, "expectedType", reference.expected_type,
+                      errors, field + ".value"))
+            return reference;
+        return std::nullopt;
+    }
+    error(errors, ErrorCode::invalid_asset, field,
+          "kind and value are incompatible");
+    return std::nullopt;
+}
+
+bool finite_value(const MechanicValue& value) {
+    if (const auto* scalar = std::get_if<float>(&value))
+        return std::isfinite(*scalar);
+    if (const auto* vector = std::get_if<core::Vec2>(&value))
+        return std::isfinite(vector->x) && std::isfinite(vector->y);
+    return true;
+}
+
+void validate_value(const MechanicValue& value, const std::string& field,
+                    std::vector<Error>& errors) {
+    if (!finite_value(value))
+        error(errors, ErrorCode::invalid_asset, field, "must be finite");
+    if (const auto* reference = std::get_if<ResourceReference>(&value);
+        reference != nullptr &&
+        (!core::ResourceId::is_valid(reference->id.value) ||
+         reference->expected_type.empty()))
+        error(errors, ErrorCode::resource_type_mismatch, field,
+              "resource reference must have a valid id and expected type");
+}
+
+const MechanicNodeDefinition* find_node(const MechanicGraph& graph,
+                                        const std::string& id) {
+    const auto found = std::ranges::find(graph.nodes, id,
+                                         &MechanicNodeDefinition::id);
+    return found == graph.nodes.end() ? nullptr : &*found;
+}
+
+const MechanicPortDefinition* find_port(const MechanicNodeDefinition* node,
+                                        const std::string& id) {
+    if (node == nullptr) return nullptr;
+    const auto found = std::ranges::find(node->ports, id,
+                                         &MechanicPortDefinition::id);
+    return found == node->ports.end() ? nullptr : &*found;
+}
+
+bool has_connection_cycle(const MechanicGraph& graph) {
+    std::unordered_map<std::string, std::vector<std::string>> edges;
+    for (const auto& connection : graph.connections)
+        edges[connection.from_node].push_back(connection.to_node);
+    std::unordered_map<std::string, int> state;
+    const std::function<bool(const std::string&)> visit =
+        [&](const std::string& node) {
+            if (state[node] == 1) return true;
+            if (state[node] == 2) return false;
+            state[node] = 1;
+            for (const auto& target : edges[node])
+                if (visit(target)) return true;
+            state[node] = 2;
+            return false;
+        };
+    for (const auto& node : graph.nodes)
+        if (visit(node.id)) return true;
+    return false;
+}
+
+ValidationReport parse_validation(const ProjectManifest& manifest,
+                                  const std::string_view text) {
+    const auto parsed = parse_mechanic_graph(manifest, text);
+    return {.errors = parsed.errors};
+}
+
+} // namespace
+
+bool mechanic_value_matches(const MechanicValueType type,
+                            const MechanicValue& value) noexcept {
+    switch (type) {
+    case MechanicValueType::boolean: return std::holds_alternative<bool>(value);
+    case MechanicValueType::integer:
+        return std::holds_alternative<std::int64_t>(value);
+    case MechanicValueType::scalar: return std::holds_alternative<float>(value);
+    case MechanicValueType::text:
+        return std::holds_alternative<std::string>(value);
+    case MechanicValueType::vec2: return std::holds_alternative<core::Vec2>(value);
+    case MechanicValueType::resource:
+        return std::holds_alternative<ResourceReference>(value);
+    }
+    return false;
+}
+
+std::filesystem::path mechanic_graph_document_path(
+    const ProjectManifest& manifest, const core::ResourceId& id) {
+    return manifest.directories.assets / "mechanics" /
+        (id.value + ".mechanic.json");
+}
+
+ValidationReport validate_mechanic_graph(const ProjectManifest&,
+                                         const MechanicGraph& graph) {
+    ValidationReport report;
+    if (graph.document.schema_version != current_mechanic_graph_schema_version)
+        error(report.errors, ErrorCode::unsupported_schema_version,
+              "schemaVersion", "only mechanic schema version 1 is supported");
+    if (graph.document.type != "mechanic")
+        error(report.errors, ErrorCode::invalid_asset, "type",
+              "must be mechanic");
+    if (!core::ResourceId::is_valid(graph.document.id.value))
+        error(report.errors, ErrorCode::invalid_resource_id, "id",
+              "must be valid");
+    if (graph.document.name.empty())
+        error(report.errors, ErrorCode::invalid_asset, "name",
+              "must not be empty");
+
+    std::unordered_set<std::string> parameter_ids;
+    for (std::size_t index = 0; index < graph.parameters.size(); ++index) {
+        const auto& parameter = graph.parameters[index];
+        const auto field = "parameters[" + std::to_string(index) + "]";
+        if (!core::ResourceId::is_valid(parameter.id))
+            error(report.errors, ErrorCode::invalid_resource_id,
+                  field + ".id", "must be valid");
+        if (!parameter_ids.insert(parameter.id).second)
+            error(report.errors, ErrorCode::duplicate_resource,
+                  field + ".id", "parameter is duplicated");
+        if (parameter.name.empty())
+            error(report.errors, ErrorCode::invalid_asset,
+                  field + ".name", "must not be empty");
+        if (!mechanic_value_matches(parameter.type, parameter.default_value))
+            error(report.errors, ErrorCode::resource_type_mismatch,
+                  field + ".defaultValue", "does not match parameter type");
+        validate_value(parameter.default_value, field + ".defaultValue",
+                       report.errors);
+    }
+
+    std::unordered_set<std::string> node_ids;
+    for (std::size_t node_index = 0; node_index < graph.nodes.size(); ++node_index) {
+        const auto& node = graph.nodes[node_index];
+        const auto field = "nodes[" + std::to_string(node_index) + "]";
+        if (!core::ResourceId::is_valid(node.id))
+            error(report.errors, ErrorCode::invalid_resource_id,
+                  field + ".id", "must be valid");
+        if (!node_ids.insert(node.id).second)
+            error(report.errors, ErrorCode::duplicate_resource,
+                  field + ".id", "node is duplicated");
+        if (!core::ResourceId::is_valid(node.type))
+            error(report.errors, ErrorCode::invalid_resource_id,
+                  field + ".nodeType", "must be valid");
+        std::unordered_set<std::string> port_ids;
+        for (std::size_t port_index = 0; port_index < node.ports.size(); ++port_index) {
+            const auto& port = node.ports[port_index];
+            const auto port_field = field + ".ports[" +
+                std::to_string(port_index) + "]";
+            if (!core::ResourceId::is_valid(port.id))
+                error(report.errors, ErrorCode::invalid_resource_id,
+                      port_field + ".id", "must be valid");
+            if (!port_ids.insert(port.id).second)
+                error(report.errors, ErrorCode::duplicate_resource,
+                      port_field + ".id", "port is duplicated");
+            if (port.name.empty())
+                error(report.errors, ErrorCode::invalid_asset,
+                      port_field + ".name", "must not be empty");
+        }
+        std::unordered_set<std::string> property_ids;
+        for (std::size_t property_index = 0;
+             property_index < node.properties.size(); ++property_index) {
+            const auto& property = node.properties[property_index];
+            const auto property_field = field + ".properties[" +
+                std::to_string(property_index) + "]";
+            if (!core::ResourceId::is_valid(property.id))
+                error(report.errors, ErrorCode::invalid_resource_id,
+                      property_field + ".id", "must be valid");
+            if (!property_ids.insert(property.id).second)
+                error(report.errors, ErrorCode::duplicate_resource,
+                      property_field + ".id", "property is duplicated");
+            validate_value(property.value, property_field + ".value",
+                           report.errors);
+        }
+    }
+
+    std::unordered_set<std::string> connections;
+    std::unordered_set<std::string> connected_inputs;
+    for (std::size_t index = 0; index < graph.connections.size(); ++index) {
+        const auto& connection = graph.connections[index];
+        const auto field = "connections[" + std::to_string(index) + "]";
+        const auto* from_node = find_node(graph, connection.from_node);
+        const auto* to_node = find_node(graph, connection.to_node);
+        const auto* from_port = find_port(from_node, connection.from_port);
+        const auto* to_port = find_port(to_node, connection.to_port);
+        if (from_node == nullptr || to_node == nullptr)
+            error(report.errors, ErrorCode::missing_resource, field,
+                  "connection node is missing");
+        else if (from_port == nullptr || to_port == nullptr)
+            error(report.errors, ErrorCode::missing_resource, field,
+                  "connection port is missing");
+        else {
+            if (from_port->direction != MechanicPortDirection::output ||
+                to_port->direction != MechanicPortDirection::input)
+                error(report.errors, ErrorCode::invalid_asset, field,
+                      "connection must go from output to input");
+            if (from_port->type != to_port->type)
+                error(report.errors, ErrorCode::resource_type_mismatch, field,
+                      "connected port types must match");
+        }
+        const auto key = connection.from_node + "." + connection.from_port +
+            "->" + connection.to_node + "." + connection.to_port;
+        if (!connections.insert(key).second)
+            error(report.errors, ErrorCode::duplicate_resource, field,
+                  "connection is duplicated");
+        const auto input = connection.to_node + "." + connection.to_port;
+        if (!connected_inputs.insert(input).second)
+            error(report.errors, ErrorCode::invalid_asset, field,
+                  "input port already has a connection");
+    }
+    if (has_connection_cycle(graph))
+        error(report.errors, ErrorCode::resource_cycle, "connections",
+              "mechanic control graph must be acyclic");
+    return report;
+}
+
+std::vector<ResourceReference> mechanic_graph_resource_references(
+    const MechanicGraph& graph) {
+    std::vector<ResourceReference> references;
+    const auto collect = [&](const MechanicValue& value) {
+        if (const auto* reference = std::get_if<ResourceReference>(&value))
+            references.push_back(*reference);
+    };
+    for (const auto& parameter : graph.parameters)
+        collect(parameter.default_value);
+    for (const auto& node : graph.nodes)
+        for (const auto& property : node.properties) collect(property.value);
+    return references;
+}
+
+std::string serialize_mechanic_graph(const MechanicGraph& graph) {
+    Json json{{"schemaVersion", graph.document.schema_version},
+              {"type", graph.document.type},
+              {"id", graph.document.id.value},
+              {"name", graph.document.name},
+              {"parameters", Json::array()},
+              {"nodes", Json::array()},
+              {"connections", Json::array()}};
+    for (const auto& parameter : graph.parameters)
+        json["parameters"].push_back({
+            {"id", parameter.id}, {"name", parameter.name},
+            {"valueType", value_type_name(parameter.type)},
+            {"defaultValue", serialize_value(parameter.default_value)}});
+    for (const auto& node : graph.nodes) {
+        Json item{{"id", node.id}, {"nodeType", node.type},
+                  {"ports", Json::array()}, {"properties", Json::array()}};
+        for (const auto& port : node.ports)
+            item["ports"].push_back({
+                {"id", port.id}, {"name", port.name},
+                {"direction", port.direction == MechanicPortDirection::input
+                    ? "input" : "output"},
+                {"valueType", value_type_name(port.type)}});
+        for (const auto& property : node.properties)
+            item["properties"].push_back({
+                {"id", property.id}, {"value", serialize_value(property.value)}});
+        json["nodes"].push_back(std::move(item));
+    }
+    for (const auto& connection : graph.connections)
+        json["connections"].push_back({
+            {"fromNode", connection.from_node},
+            {"fromPort", connection.from_port},
+            {"toNode", connection.to_node},
+            {"toPort", connection.to_port}});
+    return json.dump(2) + "\n";
+}
+
+MechanicGraphResult parse_mechanic_graph(
+    const ProjectManifest& manifest, const std::string_view serialized) {
+    MechanicGraphResult result;
+    Json json;
+    try { json = Json::parse(serialized); }
+    catch (...) {
+        error(result.errors, ErrorCode::invalid_json, "mechanic",
+              "cannot parse mechanic JSON");
+        return result;
+    }
+    if (!json.is_object()) {
+        error(result.errors, ErrorCode::invalid_asset, "mechanic",
+              "top-level value must be an object");
+        return result;
+    }
+    reject_unknown(json, {"schemaVersion", "type", "id", "name",
+                          "parameters", "nodes", "connections"},
+                   {}, result.errors);
+    MechanicGraph graph;
+    const auto schema = json.find("schemaVersion");
+    if (schema != json.end() && schema->is_number_unsigned())
+        graph.document.schema_version = schema->get<std::uint32_t>();
+    else
+        error(result.errors, ErrorCode::invalid_asset, "schemaVersion",
+              "expected an unsigned integer");
+    read_text(json, "type", graph.document.type, result.errors);
+    read_text(json, "id", graph.document.id.value, result.errors);
+    read_text(json, "name", graph.document.name, result.errors);
+
+    const auto parameters = json.find("parameters");
+    if (parameters == json.end() || !parameters->is_array())
+        error(result.errors, ErrorCode::invalid_asset, "parameters",
+              "expected an array");
+    else for (std::size_t index = 0; index < parameters->size(); ++index) {
+        const auto& item = (*parameters)[index];
+        const auto field = "parameters[" + std::to_string(index) + "]";
+        if (!item.is_object()) {
+            error(result.errors, ErrorCode::invalid_asset, field,
+                  "expected an object");
+            continue;
+        }
+        reject_unknown(item, {"id", "name", "valueType", "defaultValue"},
+                       field, result.errors);
+        MechanicParameterDefinition parameter;
+        read_text(item, "id", parameter.id, result.errors, field);
+        read_text(item, "name", parameter.name, result.errors, field);
+        read_value_type(item, "valueType", parameter.type, result.errors, field);
+        const auto value = item.find("defaultValue");
+        if (value == item.end())
+            error(result.errors, ErrorCode::invalid_asset,
+                  field + ".defaultValue", "field is required");
+        else if (auto parsed = parse_value(*value, field + ".defaultValue",
+                                           result.errors))
+            parameter.default_value = std::move(*parsed);
+        graph.parameters.push_back(std::move(parameter));
+    }
+
+    const auto nodes = json.find("nodes");
+    if (nodes == json.end() || !nodes->is_array())
+        error(result.errors, ErrorCode::invalid_asset, "nodes",
+              "expected an array");
+    else for (std::size_t node_index = 0; node_index < nodes->size(); ++node_index) {
+        const auto& item = (*nodes)[node_index];
+        const auto field = "nodes[" + std::to_string(node_index) + "]";
+        if (!item.is_object()) {
+            error(result.errors, ErrorCode::invalid_asset, field,
+                  "expected an object");
+            continue;
+        }
+        reject_unknown(item, {"id", "nodeType", "ports", "properties"},
+                       field, result.errors);
+        MechanicNodeDefinition node;
+        read_text(item, "id", node.id, result.errors, field);
+        read_text(item, "nodeType", node.type, result.errors, field);
+        const auto ports = item.find("ports");
+        if (ports == item.end() || !ports->is_array())
+            error(result.errors, ErrorCode::invalid_asset, field + ".ports",
+                  "expected an array");
+        else for (std::size_t port_index = 0; port_index < ports->size(); ++port_index) {
+            const auto& port_json = (*ports)[port_index];
+            const auto port_field = field + ".ports[" +
+                std::to_string(port_index) + "]";
+            if (!port_json.is_object()) {
+                error(result.errors, ErrorCode::invalid_asset, port_field,
+                      "expected an object");
+                continue;
+            }
+            reject_unknown(port_json,
+                           {"id", "name", "direction", "valueType"},
+                           port_field, result.errors);
+            MechanicPortDefinition port;
+            read_text(port_json, "id", port.id, result.errors, port_field);
+            read_text(port_json, "name", port.name, result.errors, port_field);
+            std::string direction;
+            if (read_text(port_json, "direction", direction, result.errors,
+                          port_field)) {
+                if (direction == "input")
+                    port.direction = MechanicPortDirection::input;
+                else if (direction == "output")
+                    port.direction = MechanicPortDirection::output;
+                else error(result.errors, ErrorCode::invalid_asset,
+                           port_field + ".direction",
+                           "expected input or output");
+            }
+            read_value_type(port_json, "valueType", port.type,
+                            result.errors, port_field);
+            node.ports.push_back(std::move(port));
+        }
+        const auto properties = item.find("properties");
+        if (properties == item.end() || !properties->is_array())
+            error(result.errors, ErrorCode::invalid_asset,
+                  field + ".properties", "expected an array");
+        else for (std::size_t property_index = 0;
+                 property_index < properties->size(); ++property_index) {
+            const auto& property_json = (*properties)[property_index];
+            const auto property_field = field + ".properties[" +
+                std::to_string(property_index) + "]";
+            if (!property_json.is_object()) {
+                error(result.errors, ErrorCode::invalid_asset, property_field,
+                      "expected an object");
+                continue;
+            }
+            reject_unknown(property_json, {"id", "value"}, property_field,
+                           result.errors);
+            MechanicNodeProperty property;
+            read_text(property_json, "id", property.id, result.errors,
+                      property_field);
+            const auto value = property_json.find("value");
+            if (value == property_json.end())
+                error(result.errors, ErrorCode::invalid_asset,
+                      property_field + ".value", "field is required");
+            else if (auto parsed = parse_value(*value,
+                                               property_field + ".value",
+                                               result.errors))
+                property.value = std::move(*parsed);
+            node.properties.push_back(std::move(property));
+        }
+        graph.nodes.push_back(std::move(node));
+    }
+
+    const auto connections = json.find("connections");
+    if (connections == json.end() || !connections->is_array())
+        error(result.errors, ErrorCode::invalid_asset, "connections",
+              "expected an array");
+    else for (std::size_t index = 0; index < connections->size(); ++index) {
+        const auto& item = (*connections)[index];
+        const auto field = "connections[" + std::to_string(index) + "]";
+        if (!item.is_object()) {
+            error(result.errors, ErrorCode::invalid_asset, field,
+                  "expected an object");
+            continue;
+        }
+        reject_unknown(item, {"fromNode", "fromPort", "toNode", "toPort"},
+                       field, result.errors);
+        MechanicConnection connection;
+        read_text(item, "fromNode", connection.from_node, result.errors, field);
+        read_text(item, "fromPort", connection.from_port, result.errors, field);
+        read_text(item, "toNode", connection.to_node, result.errors, field);
+        read_text(item, "toPort", connection.to_port, result.errors, field);
+        graph.connections.push_back(std::move(connection));
+    }
+
+    const auto validation = validate_mechanic_graph(manifest, graph);
+    result.errors.insert(result.errors.end(), validation.errors.begin(),
+                         validation.errors.end());
+    if (result.errors.empty()) result.asset = std::move(graph);
+    return result;
+}
+
+MechanicGraphResult load_mechanic_graph(
+    const std::filesystem::path& root, const ProjectManifest& manifest,
+    const std::filesystem::path& path) {
+    const auto stored = load_document(root, path,
+        [&](const std::string_view text) {
+            return parse_validation(manifest, text);
+        });
+    MechanicGraphResult result;
+    result.errors = stored.errors;
+    if (!stored.contents) return result;
+    result = parse_mechanic_graph(manifest, *stored.contents);
+    if (result.ok() && path != mechanic_graph_document_path(
+            manifest, result.asset->document.id)) {
+        result.asset.reset();
+        error(result.errors, ErrorCode::invalid_path, "document",
+              "document filename does not match its id");
+    }
+    return result;
+}
+
+MechanicGraphResult publish_mechanic_graph(
+    const std::filesystem::path& root, const ProjectManifest& manifest,
+    const MechanicGraph& graph) {
+    MechanicGraphResult result;
+    const auto validation = validate_mechanic_graph(manifest, graph);
+    if (!validation.ok()) {
+        result.errors = validation.errors;
+        return result;
+    }
+    const auto path = mechanic_graph_document_path(manifest, graph.document.id);
+    const auto saved = save_document_atomic(
+        root, path, serialize_mechanic_graph(graph),
+        [&](const std::string_view text) {
+            return parse_validation(manifest, text);
+        });
+    if (!saved.ok()) {
+        result.errors = saved.errors;
+        return result;
+    }
+    return load_mechanic_graph(root, manifest, path);
+}
+
+} // namespace fabric::project

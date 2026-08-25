@@ -62,6 +62,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/map.cpp
     engine/fabric_project/src/map_chunk_index.cpp
+    engine/fabric_project/src/mechanic_graph.cpp
     engine/fabric_project/src/mesh_deformation.cpp
     engine/fabric_project/src/material.cpp
     engine/fabric_project/src/migrations.cpp
@@ -316,6 +317,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_textured_path_tests
              COMMAND fabric_textured_path_tests)
+
+    add_executable(fabric_mechanic_graph_tests
+        tests/cpp/mechanic_graph_tests.cpp
+    )
+    target_link_libraries(fabric_mechanic_graph_tests PRIVATE
+        fabric_project
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_mechanic_graph_tests
+             COMMAND fabric_mechanic_graph_tests)
 
     add_executable(fabric_textured_path_geometry_tests
         tests/cpp/textured_path_geometry_tests.cpp

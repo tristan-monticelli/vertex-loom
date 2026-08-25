@@ -77,9 +77,15 @@ C4Component
   échelle/offset UV, couleur, opacité, raccords et terminaisons. Le ruban et
   ses UV sont dérivés à l'exécution ; aucune collision ni géométrie
   triangulée n'est persistée par ce document.
-- `MechanicGraph v1` composera corps, pivots, joints, moteurs, capteurs,
-  contraintes et liaisons événementielles. Ses instances exposeront des
-  paramètres typés et seront simulables dans Map Studio avant le runtime.
+- `MechanicGraph v1` est stocké sous
+  `assets/mechanics/<id>.mechanic.json`. Il déclare des paramètres d'instance
+  typés (`bool`, entier, scalaire, texte, `Vec2` ou référence), des nœuds à
+  identifiant stable avec ports d'entrée/sortie typés et des connexions
+  orientées. Le parseur refuse identifiants dupliqués, valeurs incompatibles,
+  extrémités ou ports absents, connexions de types différents, entrées liées
+  plusieurs fois et cycles. Les références portées par les valeurs sont
+  enregistrées dans le graphe global de ressources. Les types et propriétés
+  physiques des nœuds sont ajoutés par l'incrément suivant.
 - `VectorAsset v2` est la version écrite. Un document v1 est accepté en lecture,
   conserve sa source `assets/vectors/<id>.svg` et devient
   `sourceKind = linkedSvg` sans modifier le fichier source.
