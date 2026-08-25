@@ -322,7 +322,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
 
     add_executable(fabric_physics_tests tests/cpp/physics_tests.cpp)
     target_link_libraries(fabric_physics_tests PRIVATE
-        fabric_physics Catch2::Catch2WithMain)
+        fabric_physics fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_physics_tests COMMAND fabric_physics_tests)
 
     add_executable(fabric_document_storage_tests

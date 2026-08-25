@@ -2,6 +2,8 @@
 
 #include <cstddef>
 
+namespace fabric::project { struct MapDocument; }
+
 namespace fabric::physics {
 
 class PhysicsWorld {
@@ -17,6 +19,7 @@ public:
     void destroy() noexcept;
     [[nodiscard]] bool valid() const noexcept;
     [[nodiscard]] bool step(float time_step, std::size_t sub_steps = 4) noexcept;
+    [[nodiscard]] bool load_map_collisions(const project::MapDocument&) noexcept;
 
 private:
     struct Impl;

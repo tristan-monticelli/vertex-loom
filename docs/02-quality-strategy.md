@@ -105,6 +105,8 @@ L’index de chunks couvre 100 000 instances, coordonnées négatives, ordre
 déterministe et extraction par viewport.
 `fabric_physics` couvre la création/destruction d’un monde Box2D v3.1.1,
 pas fixe valide et rejet des pas nuls ou négatifs.
+Le chargement physique couvre instanciation de cercle, capsule, polygone,
+segments de chaîne et capteur depuis une map validée.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts
