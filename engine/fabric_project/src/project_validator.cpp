@@ -4,6 +4,7 @@
 #include "fabric/project/material.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/resource_registry.hpp"
+#include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
@@ -199,6 +200,10 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, "",
         ".map.json", "maps", load_map, map_resource_references,
+        registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.scenes, "",
+        ".scene.json", "scenes", load_scene, scene_resource_references,
         registry, result.errors);
     const auto entity_directory = project_root / loaded.manifest->directories.entities;
     std::error_code entity_error;

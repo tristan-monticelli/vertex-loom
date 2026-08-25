@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1, map events, fabric_physics shapes et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, SceneDocument v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1, map events, fabric_physics shapes et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -88,6 +88,9 @@ C4Component
   ensemble de types fermé.
 - `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
   extrait les instances visibles d’un viewport sans accès disque.
+- `SceneDocument v1` est stocké sous `scenes/<id>.scene.json`. Il référence les
+  maps de la scène, son `entryMap` et des transitions vers d’autres scènes avec
+  un point d’entrée. Toutes ces références sont vérifiées par le registre global.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.

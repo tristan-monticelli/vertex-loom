@@ -67,6 +67,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_creator.cpp
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/resource_registry.cpp
+    engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
     engine/fabric_project/src/xpbd.cpp
@@ -322,6 +323,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_map_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_map_tests COMMAND fabric_map_tests)
+
+    add_executable(fabric_scene_tests tests/cpp/scene_tests.cpp)
+    target_link_libraries(fabric_scene_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_scene_tests COMMAND fabric_scene_tests)
 
     add_executable(fabric_map_chunk_index_tests
         tests/cpp/map_chunk_index_tests.cpp
