@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1 et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -82,6 +82,10 @@ C4Component
   chaque sous-pas.
 - La déformation maillée applique les poses de nœuds aux sommets de repos par
   influences pondérées et valide les triangles et références de poses.
+- `MapDocument v1` est stocké sous `maps/<id>.map.json` et sépare calques,
+  prefabs, instances, collisions et triggers. Les instances sont indexées par
+  chunks de `64 × 64` unités et les propriétés custom ont un ensemble de types
+  fermé.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.

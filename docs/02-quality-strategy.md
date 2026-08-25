@@ -96,6 +96,9 @@ XPBD couvre distance, flexion, aire, pin, collision, compliance, lambda,
 quantification, masses et indices invalides sans modifier l’état en cas d’échec.
 La déformation maillée couvre mélange pondéré, transforms, triangles invalides,
 poids nuls, poses dupliquées et références de poses manquantes.
+`MapDocument v1` couvre round-trip, publication atomique, chunks 64 × 64,
+calques, prefabs, instances, formes de collision, capteurs, triggers,
+événements et propriétés custom strictement typées.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

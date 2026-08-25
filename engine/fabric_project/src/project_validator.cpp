@@ -2,6 +2,7 @@
 #include "fabric/project/entity.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/material.hpp"
+#include "fabric/project/map.hpp"
 #include "fabric/project/resource_registry.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -39,6 +40,7 @@ void inspect_asset_documents(
     const std::filesystem::path& project_root,
     const ProjectManifest& manifest,
     const std::filesystem::path& canonical_root,
+    const std::filesystem::path& base_directory,
     const std::string_view directory_name,
     const std::string_view document_suffix,
     const std::string_view error_field,
@@ -46,8 +48,7 @@ void inspect_asset_documents(
     ReferenceCollector&& collect_references,
     ResourceRegistry& registry,
     std::vector<Error>& errors) {
-    const auto asset_directory = project_root / manifest.directories.assets /
-        directory_name;
+    const auto asset_directory = project_root / base_directory / directory_name;
     std::error_code filesystem_error;
     if (!std::filesystem::exists(asset_directory, filesystem_error)) {
         if (filesystem_error) {
@@ -179,22 +180,26 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         return std::vector<ResourceReference>{};
     };
     inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, "textures",
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "textures",
         ".texture.json", "assets.textures", load_texture_asset,
         no_references,
         registry, result.errors);
     inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, "vectors",
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "vectors",
         ".vector.json", "assets.vectors", load_vector_asset,
         vector_resource_references, registry, result.errors);
     inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, "materials",
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "materials",
         ".material.json", "assets.materials", load_material,
         material_resource_references, registry, result.errors);
     inspect_asset_documents(
-        project_root, *loaded.manifest, canonical_root, "animations",
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "animations",
         ".animation.json", "assets.animations", load_animation,
         animation_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, ".",
+        ".map.json", "maps", load_map, map_resource_references,
+        registry, result.errors);
     const auto entity_directory = project_root / loaded.manifest->directories.entities;
     std::error_code entity_error;
     if (std::filesystem::exists(entity_directory, entity_error)) {

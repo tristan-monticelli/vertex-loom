@@ -252,10 +252,10 @@ même résultat visible après sauvegarde, rechargement et replay.
 
 - [ ] Réutiliser la session, les prompts typés, le personnalisateur de
   propriétés et le renderer vectoriel d’Asset Studio.
-- [ ] Définir maps, calques, prefabs, instances, collisions et triggers sans
-  référence obligatoire à une frame de sprite.
-- [ ] Indexer 100 000 éléments par chunks de 64 × 64 unités et viser 10 000
-  éléments visibles.
+- [x] Définir `MapDocument v1`, calques, prefabs, instances, collisions et
+  triggers sans référence obligatoire à une frame de sprite.
+- [x] Indexer les instances par chunks de 64 × 64 unités ; le benchmark
+  100 000 éléments et la cible 10 000 visibles restent à mesurer.
 - [ ] Ajouter placement, overrides typés, snapping, profondeur, sélection,
   visibilité et verrouillage.
 - [ ] Intégrer Box2D 3.1.1, formes validées, capteurs et événements nommés.

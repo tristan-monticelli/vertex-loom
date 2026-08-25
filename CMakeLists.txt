@@ -48,6 +48,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/document_storage.cpp
     engine/fabric_project/src/entity.cpp
     engine/fabric_project/src/manifest.cpp
+    engine/fabric_project/src/map.cpp
     engine/fabric_project/src/mesh_deformation.cpp
     engine/fabric_project/src/material.cpp
     engine/fabric_project/src/migrations.cpp
@@ -286,6 +287,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_mesh_deformation_tests
              COMMAND fabric_mesh_deformation_tests)
+
+    add_executable(fabric_map_tests tests/cpp/map_tests.cpp)
+    target_link_libraries(fabric_map_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_map_tests COMMAND fabric_map_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp
