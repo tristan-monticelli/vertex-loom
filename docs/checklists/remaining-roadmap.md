@@ -229,6 +229,8 @@ l’inspecteur. La transformation indépendante du fill reste ouverte.
 - [x] Supporter création explicite de clé, déplacement et suppression de clés
   par commandes undo/redo. Auto-key, multi-sélection, copier/coller, snapping
   et scrubbing restent à ajouter.
+- [x] Exposer dans Asset Studio l’insertion de clés `Vec2`, scalaires et
+  couleurs déjà supportées par `AnimationClip v1`.
 - [ ] Permettre valeurs absolues, offsets relatifs et composition additive sans
   coder une animation particulière dans le moteur.
 - [ ] Prévisualiser une animation sur n’importe quelle propriété compatible et

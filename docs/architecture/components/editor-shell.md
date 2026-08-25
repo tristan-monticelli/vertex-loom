@@ -77,6 +77,9 @@ C4Component
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.
+- L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires ou
+  couleurs, puis réutilise le même historique et le même parseur strict pour
+  les évaluer et les sauvegarder.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,

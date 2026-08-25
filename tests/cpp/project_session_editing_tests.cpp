@@ -503,3 +503,34 @@ TEST_CASE("invalid autosave is diagnosed and never offered") {
     CHECK(session.manifest()->name == "Primary");
     CHECK_FALSE(session.errors().empty());
 }
+
+TEST_CASE("animation session accepts scalar and color key values") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateAnimationPrompt prompt;
+    prompt.name = "Typed animation";
+    prompt.duration = 1.0;
+    REQUIRE(session.create_animation(prompt));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    const fabric::project::PropertyBinding opacity{
+        "root", "material", "opacity"};
+    const fabric::project::PropertyBinding tint{
+        "root", "material", "color"};
+    REQUIRE(session.insert_selected_animation_key(
+        opacity, 0.0F, 0.0F, fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.insert_selected_animation_key(
+        opacity, 1.0F, 1.0F, fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.insert_selected_animation_key(
+        tint, 0.0F, fabric::core::Color{1.0F, 0.0F, 0.0F, 1.0F},
+        fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.insert_selected_animation_key(
+        tint, 1.0F, fabric::core::Color{0.0F, 1.0F, 0.0F, 1.0F},
+        fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.selected_animation()->tracks.size() == 2U);
+    CHECK(std::holds_alternative<float>(
+        session.selected_animation()->tracks[0].keys.front().value));
+    CHECK(std::holds_alternative<fabric::core::Color>(
+        session.selected_animation()->tracks[1].keys.front().value));
+}

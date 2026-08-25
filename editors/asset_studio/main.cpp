@@ -117,6 +117,9 @@ struct AnimationUiState {
     float key_time{};
     float marker_time{};
     float key_value[2]{};
+    int key_kind{};
+    float key_scalar{};
+    float key_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
 };
@@ -1536,7 +1539,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                 std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Key time", &animation_ui.key_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
-            ImGui::InputFloat2("Vec2 value", animation_ui.key_value);
+            ImGui::Combo("Key type", &animation_ui.key_kind,
+                         "Vec2\0Scalar\0Color\0");
+            if (animation_ui.key_kind == 0) {
+                ImGui::InputFloat2("Vec2 value", animation_ui.key_value);
+            } else if (animation_ui.key_kind == 1) {
+                ImGui::InputFloat("Scalar value", &animation_ui.key_scalar);
+            } else {
+                ImGui::ColorEdit4("Color value", animation_ui.key_color);
+            }
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
             if (ImGui::BeginCombo("Interpolation", interpolation_label.c_str())) {
@@ -1555,14 +1566,25 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::BeginDisabled(animation_ui.node_id.empty() ||
                                  animation_ui.component_id.empty() ||
                                  animation_ui.property_id.empty());
-            if (ImGui::Button("Insert Vec2 key")) {
+            if (ImGui::Button("Insert key")) {
+                fabric::project::AnimationValue value;
+                if (animation_ui.key_kind == 0) {
+                    value = fabric::core::Vec2{animation_ui.key_value[0],
+                                               animation_ui.key_value[1]};
+                } else if (animation_ui.key_kind == 1) {
+                    value = animation_ui.key_scalar;
+                } else {
+                    value = fabric::core::Color{animation_ui.key_color[0],
+                                                animation_ui.key_color[1],
+                                                animation_ui.key_color[2],
+                                                animation_ui.key_color[3]};
+                }
                 if (session.insert_selected_animation_key(
                         {.node_id = animation_ui.node_id,
                          .component_id = animation_ui.component_id,
                          .property_id = animation_ui.property_id},
                         animation_ui.key_time,
-                        fabric::core::Vec2{animation_ui.key_value[0],
-                                           animation_ui.key_value[1]},
+                        std::move(value),
                         animation_ui.interpolation)) {
                     status = "Animation key inserted.";
                 } else {
