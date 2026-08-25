@@ -24,6 +24,12 @@ Studio construit, inspecte, démarre, met en pause et réinitialise sa simulatio
 Chaque modification passe par `CommandStack` et reconstruit la preview depuis
 le document validé.
 
+L'édition du graphe utilise une session de document dédiée : elle ne rend pas
+la map dirty et ne mélange pas leurs historiques. La simulation conserve le
+plan compilé mais aucun handle Box2D dans les fichiers ; chaque ouverture,
+mutation ou reset reconstruit ces handles. Le pas manuel est fixé à `1/60 s` et
+le mode lecture accumule uniquement du temps de frame borné.
+
 La première mécanique de référence est une plateforme tournante avec pivot,
 vitesse, direction, accélération, limites optionnelles, capteur de présence,
 activation événementielle, collision et transport du personnage.

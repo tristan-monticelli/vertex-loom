@@ -1,5 +1,6 @@
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/physics/mechanic_plan.hpp"
+#include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/project/map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -169,4 +170,34 @@ TEST_CASE("mechanic compilation rejects missing wiring and map events") {
                    connection.to_port == "joint";
         }));
     CHECK_FALSE(fabric::physics::compile_mechanic_graph(graph, map).ok());
+}
+
+TEST_CASE("mechanic simulation owns ephemeral bodies and fixed-step controls") {
+    auto graph = complete_mechanic();
+    auto& body = graph.nodes.front();
+    body.properties.front().value = std::string{"dynamic"};
+    graph.connections.erase(std::ranges::find_if(
+        graph.connections, [](const auto& connection) {
+            return connection.to_node == "motor" &&
+                   connection.to_port == "enabled";
+        }));
+    const auto compiled = fabric::physics::compile_mechanic_graph(
+        graph, mechanic_map());
+    REQUIRE(compiled.ok());
+    fabric::physics::MechanicSimulation simulation;
+    REQUIRE(simulation.load(*compiled.plan));
+    REQUIRE(simulation.valid());
+    REQUIRE_FALSE(simulation.playing());
+    REQUIRE(simulation.step_once());
+    CHECK(simulation.step_count() == 1U);
+    REQUIRE(simulation.body_states().size() == 1U);
+    simulation.play();
+    REQUIRE_FALSE(simulation.step_once());
+    REQUIRE(simulation.update(1.0F / 30.0F));
+    CHECK(simulation.step_count() == 3U);
+    simulation.pause();
+    REQUIRE(simulation.reset());
+    CHECK(simulation.step_count() == 0U);
+    CHECK(simulation.body_states().front().position ==
+          fabric::core::Vec2{1.0F, 1.0F});
 }

@@ -1,4 +1,5 @@
 #include "fabric/editor/map_session.hpp"
+#include "fabric/editor/mechanic_session.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
@@ -123,6 +124,262 @@ struct TransformEditorState {
     std::string instance_id;
     fabric::core::Transform value{};
 };
+
+struct MechanicEditorState {
+    std::string open_id;
+    std::string new_id;
+    std::string new_name;
+    std::string selected_node;
+    std::string new_node_id;
+    int new_node_kind{};
+    std::string from_node;
+    std::string from_port;
+    std::string to_node;
+    std::string to_port;
+};
+
+void draw_mechanic_value_editor(
+    fabric::editor::MechanicSession& session,
+    const fabric::project::MechanicNodeDefinition& node,
+    const fabric::project::MechanicNodeProperty& property,
+    std::string& status) {
+    ImGui::PushID(property.id.c_str());
+    auto value = property.value;
+    bool changed = false;
+    std::visit([&](auto& item) {
+        using Value = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Value, bool>) {
+            changed = ImGui::Checkbox(property.id.c_str(), &item);
+        } else if constexpr (std::is_same_v<Value, std::int64_t>) {
+            auto edited = static_cast<int>(item);
+            if (ImGui::InputInt(property.id.c_str(), &edited) &&
+                ImGui::IsItemDeactivatedAfterEdit()) {
+                item = edited;
+                changed = true;
+            }
+        } else if constexpr (std::is_same_v<Value, float>) {
+            changed = ImGui::DragFloat(property.id.c_str(), &item, 0.1F) &&
+                      ImGui::IsItemDeactivatedAfterEdit();
+        } else if constexpr (std::is_same_v<Value, std::string>) {
+            changed = ImGui::InputText(property.id.c_str(), &item) &&
+                      ImGui::IsItemDeactivatedAfterEdit();
+        } else if constexpr (std::is_same_v<Value, fabric::core::Vec2>) {
+            changed = ImGui::DragFloat2(property.id.c_str(), &item.x, 0.1F) &&
+                      ImGui::IsItemDeactivatedAfterEdit();
+        } else {
+            changed = ImGui::InputText(property.id.c_str(), &item.id.value) &&
+                      ImGui::IsItemDeactivatedAfterEdit();
+        }
+    }, value);
+    if (changed) {
+        status = session.set_node_property(
+            {.value = node.id}, property.id, std::move(value))
+            ? "Mechanic property changed"
+            : "Mechanic property rejected";
+    }
+    ImGui::PopID();
+}
+
+void draw_mechanic_editor(fabric::editor::MechanicSession& session,
+                          const fabric::editor::MapSession& map_session,
+                          MechanicEditorState& state,
+                          std::string& status) {
+    ImGui::Begin("Mechanics");
+    if (!map_session.map()) {
+        ImGui::TextDisabled("Open a map before editing mechanics.");
+        ImGui::End();
+        return;
+    }
+
+    if (map_session.manifest()) {
+        const auto directory = map_session.project_root() /
+            map_session.manifest()->directories.assets / "mechanics";
+        std::error_code error;
+        if (std::filesystem::exists(directory, error)) {
+            ImGui::TextDisabled("Project mechanics:");
+            for (std::filesystem::directory_iterator iterator{directory, error}, end;
+                 !error && iterator != end; iterator.increment(error)) {
+                if (!iterator->is_regular_file(error)) continue;
+                auto filename = iterator->path().filename().string();
+                constexpr std::string_view suffix = ".mechanic.json";
+                if (!filename.ends_with(suffix)) continue;
+                filename.resize(filename.size() - suffix.size());
+                ImGui::SameLine();
+                if (ImGui::SmallButton(filename.c_str())) state.open_id = filename;
+            }
+        }
+    }
+
+    ImGui::SetNextItemWidth(180.0F);
+    ImGui::InputText("Mechanic id", &state.open_id);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(state.open_id.empty());
+    if (ImGui::Button("Open")) {
+        status = session.open(map_session.project_root(), *map_session.map(),
+                              {.value = state.open_id})
+            ? "Mechanic opened" : "Mechanic could not be opened";
+        state.selected_node.clear();
+    }
+    ImGui::EndDisabled();
+    ImGui::SetNextItemWidth(140.0F);
+    ImGui::InputText("New id", &state.new_id);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(160.0F);
+    ImGui::InputText("New name", &state.new_name);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
+    if (ImGui::Button("Create")) {
+        fabric::project::MechanicGraph graph;
+        graph.document.id = {.value = state.new_id};
+        graph.document.name = state.new_name;
+        status = session.create(map_session.project_root(), *map_session.map(), graph)
+            ? "Mechanic created" : "Mechanic creation rejected";
+        if (session.has_graph()) {
+            state.open_id = state.new_id;
+            state.new_id.clear();
+            state.new_name.clear();
+            state.selected_node.clear();
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (!session.has_graph()) {
+        for (const auto& error : session.errors())
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
+                               error.field.c_str(), error.message.c_str());
+        ImGui::End();
+        return;
+    }
+    const auto& graph = *session.graph();
+    if (session.has_recovery()) {
+        ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
+                           "A newer valid mechanic autosave is available.");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Recover graph"))
+            status = session.accept_recovery() ? "Mechanic autosave recovered"
+                                                : "Mechanic recovery failed";
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Dismiss graph recovery")) {
+            session.decline_recovery();
+            status = "Mechanic recovery dismissed";
+        }
+    }
+    ImGui::SeparatorText(graph.document.name.c_str());
+    ImGui::TextColored(session.dirty() ? ImVec4{1.0F, 0.75F, 0.25F, 1.0F}
+                                       : ImVec4{0.45F, 0.9F, 0.55F, 1.0F},
+                       session.dirty() ? "dirty" : "saved");
+    ImGui::SameLine();
+    if (ImGui::Button("Save graph"))
+        status = session.save() ? "Mechanic saved" : "Mechanic save failed";
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!session.can_undo());
+    if (ImGui::Button("Undo graph")) static_cast<void>(session.undo());
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!session.can_redo());
+    if (ImGui::Button("Redo graph")) static_cast<void>(session.redo());
+    ImGui::EndDisabled();
+
+    ImGui::Columns(2, "mechanic-columns", true);
+    ImGui::SeparatorText("Graph");
+    for (const auto& node : graph.nodes) {
+        const auto label = node.id + " [" + node.type + "]";
+        if (ImGui::Selectable(label.c_str(), state.selected_node == node.id))
+            state.selected_node = node.id;
+    }
+    ImGui::Combo("Node type", &state.new_node_kind,
+                 "body\0pivot\0joint\0motor\0sensor\0constraint\0event\0");
+    ImGui::InputText("Node id", &state.new_node_id);
+    ImGui::BeginDisabled(state.new_node_id.empty());
+    if (ImGui::Button("Add node")) {
+        status = session.add_node(
+            static_cast<fabric::project::MechanicNodeKind>(state.new_node_kind),
+            state.new_node_id) ? "Mechanic node added" : "Mechanic node rejected";
+        if (status == "Mechanic node added") {
+            state.selected_node = state.new_node_id;
+            state.new_node_id.clear();
+        }
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SeparatorText("Connections");
+    for (std::size_t index = 0; index < graph.connections.size(); ++index) {
+        const auto& connection = graph.connections[index];
+        ImGui::PushID(static_cast<int>(index));
+        ImGui::TextWrapped("%s.%s -> %s.%s", connection.from_node.c_str(),
+                           connection.from_port.c_str(), connection.to_node.c_str(),
+                           connection.to_port.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Disconnect")) {
+            status = session.disconnect(index) ? "Connection removed"
+                                               : "Connection removal rejected";
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    ImGui::InputText("From node", &state.from_node);
+    ImGui::InputText("From port", &state.from_port);
+    ImGui::InputText("To node", &state.to_node);
+    ImGui::InputText("To port", &state.to_port);
+    if (ImGui::Button("Connect ports")) {
+        status = session.connect({state.from_node, state.from_port,
+                                  state.to_node, state.to_port})
+            ? "Ports connected" : "Connection rejected (types, direction or cycle)";
+    }
+
+    ImGui::NextColumn();
+    ImGui::SeparatorText("Inspector");
+    const auto selected = std::find_if(graph.nodes.begin(), graph.nodes.end(),
+        [&](const auto& node) { return node.id == state.selected_node; });
+    if (selected != graph.nodes.end()) {
+        const auto selected_node = *selected;
+        ImGui::Text("%s [%s]", selected_node.id.c_str(), selected_node.type.c_str());
+        for (const auto& property : selected_node.properties)
+            draw_mechanic_value_editor(session, selected_node, property, status);
+        if (ImGui::Button("Remove selected node")) {
+            status = session.remove_node({.value = selected_node.id})
+                ? "Mechanic node removed" : "Mechanic node removal rejected";
+            if (status == "Mechanic node removed") state.selected_node.clear();
+        }
+        ImGui::TextDisabled("Ports:");
+        for (const auto& port : selected_node.ports)
+            ImGui::BulletText("%s · %s · %s", port.id.c_str(),
+                port.direction == fabric::project::MechanicPortDirection::input
+                    ? "input" : "output",
+                std::string{fabric::project::to_string(port.type)}.c_str());
+    } else {
+        ImGui::TextDisabled("Select a node to edit its properties.");
+    }
+
+    ImGui::SeparatorText("Simulation");
+    const auto& simulation = session.simulation();
+    ImGui::BeginDisabled(!simulation.valid());
+    if (ImGui::Button(simulation.playing() ? "Pause" : "Play")) {
+        if (simulation.playing()) session.pause(); else session.play();
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(simulation.playing());
+    if (ImGui::Button("Step 1/60"))
+        status = session.step_once() ? "Simulation advanced one fixed step"
+                                     : "Simulation step rejected";
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Reset"))
+        status = session.reset_preview() ? "Simulation reset"
+                                         : "Simulation reset failed";
+    ImGui::EndDisabled();
+    ImGui::Text("Fixed steps: %zu", simulation.step_count());
+    for (const auto& body : simulation.body_states())
+        ImGui::BulletText("%s  pos %.2f, %.2f  rot %.2f deg",
+                          body.node_id.c_str(), body.position.x, body.position.y,
+                          body.rotation_degrees);
+    for (const auto& error : session.preview_errors())
+        ImGui::TextColored({1.0F, 0.62F, 0.25F, 1.0F}, "%s: %s",
+                           error.field.c_str(), error.message.c_str());
+    ImGui::Columns(1);
+    ImGui::End();
+}
 
 enum class CanvasGizmoMode { translate, rotate, scale };
 
@@ -900,6 +1157,8 @@ int run(const std::filesystem::path& project_root,
 #endif
 
     fabric::editor::MapSession session;
+    fabric::editor::MechanicSession mechanic_session;
+    MechanicEditorState mechanic_editor;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
     if (!map_renderer.initialize()) {
@@ -967,6 +1226,11 @@ int run(const std::filesystem::path& project_root,
         ImGui::NewFrame();
         if (session.update_autosave() == fabric::editor::AutosaveStatus::failed)
             status = "Map autosave failed";
+        if (mechanic_session.update_autosave() ==
+            fabric::editor::AutosaveStatus::failed)
+            status = "Mechanic autosave failed";
+        if (mechanic_session.simulation().playing())
+            static_cast<void>(mechanic_session.update_preview(ImGui::GetIO().DeltaTime));
         ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
         ImGui::Begin("Map Studio", nullptr,
@@ -1416,6 +1680,7 @@ int run(const std::filesystem::path& project_root,
             draw_errors(session);
         }
         ImGui::End();
+        draw_mechanic_editor(mechanic_session, session, mechanic_editor, status);
         ImGui::Render();
         glViewport(0, 0, static_cast<GLsizei>(ImGui::GetIO().DisplaySize.x),
                    static_cast<GLsizei>(ImGui::GetIO().DisplaySize.y));

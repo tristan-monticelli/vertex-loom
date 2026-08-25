@@ -13,6 +13,7 @@ C4Component
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
+        Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph par commandes, sauvegarde atomique, autosave et récupération, puis pilote sa preview Box2D contre la map ouverte")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
         Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
@@ -38,6 +39,9 @@ C4Component
     Rel(session, project, "Crée ou charge")
     Rel(session, history, "Porte les mutations éditables")
     Rel(session, scheduler, "Signale les modifications")
+    Rel(shell, mechanic_session, "Édite, inspecte et contrôle la simulation")
+    Rel(mechanic_session, history, "Porte les mutations du graphe")
+    Rel(mechanic_session, scheduler, "Signale les modifications")
     Rel(shell, transition, "Demande une transition")
     Rel(scheduler, project, "Demande un autosave validé")
     Rel(project, files, "Lit et écrit")
@@ -224,6 +228,15 @@ C4Component
   animations, applique les transforms d'instance et l'ordre calque/Z ; le
   canvas les transmet au même backend OpenGL et conserve les overlays ImGui
   de sélection, collisions et triggers.
+- Map Studio liste les `MechanicGraph` du projet et ouvre un seul graphe à la
+  fois dans `MechanicSession`. L'inspecteur peut ajouter ou retirer un nœud
+  depuis les sept schémas intégrés, modifier ses propriétés typées et connecter
+  deux ports compatibles. Undo/redo, autosave, récupération et sauvegarde
+  atomique s'appliquent au graphe sans modifier le document map.
+- Toute mutation valide recompile le graphe contre les événements de la map et
+  invalide la preview précédente. Le monde Box2D reconstruit expose les états
+  de corps par identifiant de nœud ; lecture, pause, pas à `1/60 s` et reset
+  restent des commandes de preview non persistantes.
 - L’inspecteur d’animation expose une première timeline générique : durée,
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,

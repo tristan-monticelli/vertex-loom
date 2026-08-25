@@ -7,8 +7,8 @@ C4Container
     System_Boundary(fabric, "Vertex Loom") {
     Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge directement une scène et son entryMap ou une map, évalue les AnimationClip v1 et leurs markers franchis, publie les événements de markers des instances animées, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, expose les packets de la dernière frame pour inspection headless, résout les transitions atomiques et les transitions associées aux événements gameplay, remet proprement la boucle au runtime après une transition, traduit les actions SDL configurables vers le CharacterController, interpole Camera2D avec suivi de personnage et limites monde, interpole les positions XPBD, émet les entrées et sorties de zones, culling par chunks avec bounds statiques précalculés, chemin direct des packets statiques visibles et culling géométrique dynamique, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, vues raster non destructives, compositions par calques, composants paramétriques, chemins texturés, matériaux, entités, animations et InputDocument v1")
-        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose et simule maps, assets visuels, composants, mécaniques physiques, événements, collisions et dépendances avant publication portable")
-        Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés en descriptions déterministes et exécute les pas fixes")
+        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps et édite les graphes mécaniques par commandes ; inspecte leur simulation avec lecture, pause, pas fixe et reset avant publication portable")
+        Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés en descriptions déterministes, reconstruit leur preview éphémère et exécute les pas fixes")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées par les studios, prompts typés, historique réversible, autosave, preview et publication")
@@ -78,6 +78,12 @@ headless ordonné de corps, pivots, joints, moteurs, capteurs, contraintes et
 liaisons vers les événements déclarés par la map. Ce plan ne contient aucun
 identifiant Box2D persistant ; ces handles restent la propriété du monde
 physique éphémère.
+
+Map Studio ouvre un `MechanicGraph` dans une session distincte du document map.
+Les mutations de nœuds, propriétés et connexions passent par son propre
+`CommandStack`, puis la preview recompile et reconstruit entièrement le monde
+Box2D. Lecture, pause, pas fixe et reset n'écrivent jamais d'état de simulation
+dans le document.
 
 Une tranche fonctionnelle suit la même direction de données dans les outils et
 le runtime : contrat partagé, commande d'authoring, preview du studio,

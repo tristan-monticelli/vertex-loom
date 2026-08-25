@@ -90,6 +90,7 @@ target_link_libraries(fabric_project_validate PRIVATE fabric_project)
 
 add_library(fabric_physics STATIC
     engine/fabric_physics/src/mechanic_plan.cpp
+    engine/fabric_physics/src/mechanic_simulation.cpp
     engine/fabric_physics/src/physics_world.cpp
 )
 target_include_directories(fabric_physics PUBLIC engine/fabric_physics/include)
@@ -197,13 +198,14 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/map_session.cpp
+    engine/fabric_editor/src/mechanic_session.cpp
     engine/fabric_editor/src/project_session.cpp
     engine/fabric_editor/src/session_transition.cpp
     engine/fabric_editor/src/visual_presets.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)
-target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render)
+target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render fabric_physics)
 
 if(FABRIC_BUILD_EDITORS)
     set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -483,6 +485,13 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_map_session_tests PRIVATE
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_map_session_tests COMMAND fabric_map_session_tests)
+
+    add_executable(fabric_mechanic_session_tests
+        tests/cpp/mechanic_session_tests.cpp)
+    target_link_libraries(fabric_mechanic_session_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_mechanic_session_tests
+             COMMAND fabric_mechanic_session_tests)
 
     add_executable(fabric_preview_runtime_tests tests/cpp/preview_runtime_tests.cpp)
     target_link_libraries(fabric_preview_runtime_tests PRIVATE

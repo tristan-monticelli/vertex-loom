@@ -137,8 +137,18 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
   plan headless contenant les sept descriptions, sans handle Box2D persistant.
   Les événements sont résolus contre ceux de la map ; câblages obligatoires,
   événements absents et configurations physiques invalides sont refusés.
-- [ ] Ajouter dans Map Studio l'édition du graphe, l'inspecteur, la simulation,
+- [x] Ajouter dans Map Studio l'édition du graphe, l'inspecteur, la simulation,
   pause, pas-à-pas et reset.
+
+  Preuve : le panneau `Mechanics` liste, crée et ouvre les documents du projet,
+  ajoute ou retire les sept nœuds, édite leurs propriétés typées et relie leurs
+  ports avec validation immédiate. `MechanicSession` applique CommandStack,
+  undo/redo, sauvegarde atomique, autosave et récupération sans rendre la map
+  dirty. Chaque mutation recompile puis reconstruit une preview Box2D
+  éphémère ; Play, Pause, Step `1/60`, Reset, compteur de pas et états des corps
+  sont disponibles dans l'inspecteur. Les tests headless couvrent authoring,
+  connexions, rejet de preview incomplète, undo/redo, sauvegarde/reload,
+  récupération et contrôles à pas fixe.
 - [ ] Livrer une plateforme tournante paramétrique avec activation par capteur
   ou événement et limites angulaires optionnelles.
 - [ ] Faire transporter le personnage et exposer début, fin et état de la
