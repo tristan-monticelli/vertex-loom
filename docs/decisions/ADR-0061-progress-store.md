@@ -15,3 +15,7 @@ lecture applicative ou le remplacement atomique.
 Le runtime jouable peut choisir plusieurs slots portables sans dépendre du
 répertoire du projet. Aucun fichier utilisateur n’est créé par une simple
 lecture d’un slot absent.
+
+`game_runtime --scene <id> --save-slot <slot>` charge le slot avant l’exécution
+et refuse une sauvegarde existante invalide ; après une exécution réussie, il
+publie atomiquement la scène active et le build runtime dans ce slot.
