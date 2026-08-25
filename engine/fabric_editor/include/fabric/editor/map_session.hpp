@@ -33,6 +33,10 @@ public:
     [[nodiscard]] bool set_instance_transform(const core::ResourceId& instance_id,
                                                core::Transform transform,
                                                MapSnapSettings snapping = {});
+    [[nodiscard]] bool set_instance_layer(const core::ResourceId& instance_id,
+                                           const core::ResourceId& layer_id);
+    [[nodiscard]] bool set_instances_layer(const std::vector<core::ResourceId>& instance_ids,
+                                            const core::ResourceId& layer_id);
     [[nodiscard]] bool set_instance_property(const core::ResourceId& instance_id,
                                               project::MapProperty property);
     [[nodiscard]] bool translate_instances(

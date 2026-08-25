@@ -283,6 +283,9 @@ collision référencée) et annotés dans le canvas avec le nom de leur événem
 Les payloads d’événements sont maintenant éditables avec les six types de
 propriété partagés, remplaçables par identifiant et visibles depuis le trigger
 qui les consomme.
+Un calque peut être choisi comme calque actif ; les instances sélectionnées
+peuvent y être déplacées en une commande atomique, avec refus des calques
+verrouillés.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

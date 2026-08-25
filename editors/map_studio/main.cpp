@@ -190,11 +190,13 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      int selected_collision_index,
                      CollisionPointGizmoState& point_gizmo,
                      int selected_trigger_index,
+                     const std::string& active_layer_id,
                      fabric::editor::MapSnapSettings& snapping,
                      std::string& status) {
     if (!session.map()) return;
     const auto& map = *session.map();
     ImGui::SeparatorText("Canvas");
+    ImGui::TextDisabled("Active layer: %s", active_layer_id.c_str());
     ImGui::Checkbox("Snap translation", &snapping.enabled);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100.0F);
@@ -613,6 +615,7 @@ int run(const std::filesystem::path& project_root,
     int trigger_editor_collision_index = 0;
     fabric::project::TriggerDefinition trigger_editor;
     std::vector<std::string> selected_instances;
+    std::string active_layer_id;
     std::string selected_prefab;
     std::string override_id;
     std::string override_value;
@@ -646,6 +649,8 @@ int run(const std::filesystem::path& project_root,
             draw_errors(session);
         } else {
             const auto& map = *session.map();
+            if (active_layer_id.empty() && !map.layers.empty())
+                active_layer_id = map.layers.front().id;
             ImGui::Text("Map: %s (%s)", map.document.name.c_str(),
                         map.document.id.value.c_str());
             ImGui::SameLine();
@@ -683,6 +688,9 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::SameLine();
                 ImGui::TextUnformatted(layer.name.c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton(active_layer_id == layer.id ? "Active" : "Use"))
+                    active_layer_id = layer.id;
                 ImGui::SameLine();
                 float depth = layer.depth;
                 ImGui::SetNextItemWidth(90.0F);
@@ -729,9 +737,18 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            ImGui::BeginDisabled(selected_instances.empty() || active_layer_id.empty());
+            if (ImGui::Button("Move selected to active layer")) {
+                std::vector<fabric::core::ResourceId> ids;
+                for (const auto& id : selected_instances) ids.push_back({.value = id});
+                status = session.set_instances_layer(ids, {.value = active_layer_id})
+                    ? "Instances moved to active layer"
+                    : "Layer move rejected (locked or invalid)";
+            }
+            ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
-                            selected_trigger_index, canvas_snapping, status);
+                            selected_trigger_index, active_layer_id, canvas_snapping, status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();

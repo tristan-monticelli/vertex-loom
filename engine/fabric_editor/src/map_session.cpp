@@ -204,6 +204,38 @@ bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::set_instance_layer(const core::ResourceId& instance_id,
+                                    const core::ResourceId& layer_id) {
+    if (!map_) return false;
+    const auto instance_index = find_instance(*map_, instance_id);
+    const auto target_layer = find_layer(*map_, layer_id);
+    if (!instance_index || !target_layer ||
+        map_->layers[*target_layer].kind != project::MapLayerKind::instances ||
+        instance_locked(*map_, *instance_index) || map_->layers[*target_layer].locked)
+        return false;
+    auto next = *map_;
+    next.instances[*instance_index].layer_id = layer_id.value;
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_instances_layer(const std::vector<core::ResourceId>& instance_ids,
+                                     const core::ResourceId& layer_id) {
+    if (!map_ || instance_ids.empty()) return false;
+    const auto target_layer = find_layer(*map_, layer_id);
+    if (!target_layer ||
+        map_->layers[*target_layer].kind != project::MapLayerKind::instances ||
+        map_->layers[*target_layer].locked) return false;
+    auto next = *map_;
+    for (const auto& instance_id : instance_ids) {
+        const auto instance_index = find_instance(*map_, instance_id);
+        if (!instance_index || instance_locked(*map_, *instance_index)) return false;
+        next.instances[*instance_index].layer_id = layer_id.value;
+    }
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_instance_property(const core::ResourceId& instance_id,
                                        project::MapProperty property) {
     if (!map_ || property.id.empty()) return false;

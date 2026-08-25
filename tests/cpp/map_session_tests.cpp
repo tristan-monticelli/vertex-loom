@@ -19,6 +19,8 @@ fabric::project::MapDocument map() {
                          .id = {.value = "session"}, .name = "Session"},
             .layers = {{"instances", "Instances",
                         fabric::project::MapLayerKind::instances, true, false, 0.0F},
+                       {"instances-secondary", "Instances Secondary",
+                        fabric::project::MapLayerKind::instances, true, false, 1.0F},
                        {"collision", "Collision",
                         fabric::project::MapLayerKind::collision, true, false, 0.0F},
                        {"triggers", "Triggers",
@@ -59,6 +61,12 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.undo());
     REQUIRE(session.map()->instances.front().chunk_x == 1);
     REQUIRE(session.redo());
+    REQUIRE(session.set_instance_layer({.value = "hero"}, {.value = "instances-secondary"}));
+    CHECK(session.map()->instances.front().layer_id == "instances-secondary");
+    REQUIRE(session.undo());
+    REQUIRE(session.set_instances_layer({{.value = "hero"}}, {.value = "instances-secondary"}));
+    CHECK(session.map()->instances.front().layer_id == "instances-secondary");
+    REQUIRE(session.undo());
     REQUIRE(session.declare_event({{.value = "on-enter"}, {}}));
     REQUIRE(session.add_trigger({"enter", "triggers", 0, {.value = "on-enter"}, {}}));
     REQUIRE_FALSE(session.add_trigger({"invalid-collision", "triggers", 4,
