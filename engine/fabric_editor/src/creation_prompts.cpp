@@ -216,23 +216,27 @@ void CreateProjectPrompt::select_preset(
 
 PromptValidation CreateProjectPrompt::validate() const {
     PromptValidation validation;
-    validation.destination = destination / "project.json";
+    const auto root = project_root();
+    validation.destination = root / "project.json";
     validate_name(validation, name);
-    if (destination.empty()) {
-        add_error(validation, "destination", "Choose a project destination.");
+    if (parent_directory.empty()) {
+        add_error(validation, "destination", "Choose a parent folder.");
     } else {
         std::error_code error;
-        if (std::filesystem::exists(destination, error)) {
-            if (error || !std::filesystem::is_directory(destination, error)) {
+        if (!std::filesystem::is_directory(parent_directory, error) || error) {
+            add_error(validation, "destination",
+                      "Parent folder must be an existing directory.");
+        } else if (std::filesystem::exists(root, error)) {
+            if (error || !std::filesystem::is_directory(root, error)) {
                 add_error(validation, "destination",
-                          "Destination must be a directory.");
-            } else if (!std::filesystem::is_empty(destination, error) || error) {
+                          "The calculated project path must be a directory.");
+            } else if (!std::filesystem::is_empty(root, error) || error) {
                 add_error(validation, "destination",
-                          "Destination must be empty.");
+                          "A non-empty project folder already uses this name.");
             }
         } else if (error) {
             add_error(validation, "destination",
-                      "Destination cannot be inspected.");
+                      "The calculated project path cannot be inspected.");
         }
     }
     if (!std::isfinite(pixels_per_unit) || pixels_per_unit <= 0.0 ||
@@ -250,6 +254,10 @@ PromptValidation CreateProjectPrompt::validate() const {
         "Publish to: " + validation.destination.generic_string(),
     };
     return validation;
+}
+
+std::filesystem::path CreateProjectPrompt::project_root() const {
+    return parent_directory / resource_id().value;
 }
 
 core::ResourceId CreateProjectPrompt::resource_id() const {

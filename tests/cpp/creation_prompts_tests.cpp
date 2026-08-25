@@ -68,12 +68,13 @@ void write_texture_resource(const std::filesystem::path& project,
 TEST_CASE("project creation prompt exposes typed defaults and exact output") {
     TemporaryDirectory parent;
     fabric::editor::CreateProjectPrompt prompt;
-    prompt.destination = parent.path() / "new-project";
+    prompt.parent_directory = parent.path();
     prompt.name = "Needlework";
 
     const auto validation = prompt.validate();
     REQUIRE(validation.ok());
-    CHECK(validation.destination == prompt.destination / "project.json");
+    CHECK(prompt.project_root() == parent.path() / "needlework");
+    CHECK(validation.destination == prompt.project_root() / "project.json");
     CHECK(prompt.manifest().pixels_per_unit == 100.0);
     CHECK(prompt.manifest().id.value == "needlework");
     CHECK(validation.summary.back().find(
@@ -89,18 +90,33 @@ TEST_CASE("visible names produce stable internal identifiers") {
 
 TEST_CASE("project prompt reports field errors without publishing") {
     TemporaryDirectory occupied;
-    std::ofstream{occupied.path() / "keep.txt"} << "keep";
+    std::filesystem::create_directory(occupied.path() / "invalid");
+    std::ofstream{occupied.path() / "invalid/keep.txt"} << "keep";
     fabric::editor::CreateProjectPrompt prompt;
-    prompt.destination = occupied.path();
-    prompt.name = "   ";
+    prompt.parent_directory = occupied.path();
+    prompt.name = "Invalid";
     prompt.pixels_per_unit = 0.0;
 
     const auto validation = prompt.validate();
     CHECK_FALSE(validation.ok());
     CHECK(validation.error_for("destination").has_value());
-    CHECK(validation.error_for("name").has_value());
+    CHECK_FALSE(validation.error_for("name").has_value());
     CHECK(validation.error_for("pixelsPerUnit").has_value());
     CHECK_FALSE(std::filesystem::exists(occupied.path() / "project.json"));
+}
+
+TEST_CASE("project parent may contain unrelated files") {
+    TemporaryDirectory parent;
+    std::ofstream{parent.path() / "keep.txt"} << "keep";
+    fabric::editor::CreateProjectPrompt prompt;
+    prompt.parent_directory = parent.path();
+    prompt.name = "New project";
+
+    const auto validation = prompt.validate();
+    REQUIRE(validation.ok());
+    CHECK(prompt.project_root() == parent.path() / "new-project");
+    CHECK(validation.destination ==
+          parent.path() / "new-project/project.json");
 }
 
 TEST_CASE("selecting a project preset updates scale without hidden state") {

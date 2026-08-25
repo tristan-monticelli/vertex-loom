@@ -960,16 +960,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a versioned Vertex Loom project");
         ImGui::Spacing();
-        std::string destination = creation.project.destination.string();
+        std::string destination = creation.project.parent_directory.string();
         ImGui::SetNextItemWidth(560.0F);
-        if (ImGui::InputText("Destination", &destination)) {
-            creation.project.destination = destination;
+        if (ImGui::InputText("Parent folder", &destination)) {
+            creation.project.parent_directory = destination;
         }
         ImGui::SameLine();
         if (ImGui::Button("Browse...")) {
             std::array<char, 1024> selected{};
             if (choose_folder(window, selected, status)) {
-                creation.project.destination = selected.data();
+                creation.project.parent_directory = selected.data();
             }
         }
         ImGui::SetNextItemWidth(560.0F);
@@ -1011,7 +1011,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Create project", {140.0F, 0.0F})) {
             creation.project_publish_attempted = true;
-            if (session.create(creation.project.destination,
+            if (session.create(creation.project.project_root(),
                                creation.project.manifest())) {
                 clear_asset_preview(preview);
                 creation.prepared_artwork.reset();

@@ -35,7 +35,7 @@ en minuscules ASCII et rendus uniques par suffixe numérique. L’utilisateur ne
 les saisit pas. Le résumé montre l’identifiant et la destination calculés pour
 rendre la publication prévisible.
 
-`Create project` demande au minimum destination, nom, unités,
+`Create project` demande au minimum dossier parent, nom, unités,
 pixels par unité et preset explicite, puis affiche un résumé avant création.
 `Create vector artwork` demande nom, taille de travail, origine,
 unités, première forme et fill initial. Le fill image demande une texture

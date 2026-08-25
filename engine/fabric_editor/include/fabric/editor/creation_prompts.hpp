@@ -41,7 +41,7 @@ enum class ProjectScalePreset {
 [[nodiscard]] double preset_pixels_per_unit(ProjectScalePreset preset) noexcept;
 
 struct CreateProjectPrompt {
-    std::filesystem::path destination;
+    std::filesystem::path parent_directory;
     std::string name;
     ProjectScalePreset preset{ProjectScalePreset::standard};
     double pixels_per_unit{project::default_pixels_per_unit};
@@ -49,6 +49,7 @@ struct CreateProjectPrompt {
     void reset() noexcept;
     void select_preset(ProjectScalePreset selected) noexcept;
     [[nodiscard]] PromptValidation validate() const;
+    [[nodiscard]] std::filesystem::path project_root() const;
     [[nodiscard]] core::ResourceId resource_id() const;
     [[nodiscard]] project::ProjectManifest manifest() const;
 };

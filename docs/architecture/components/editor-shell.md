@@ -39,7 +39,9 @@ C4Component
 
 - Le chemin peut être fourni au démarrage ; les actions interactives utilisent
   le sélecteur natif de dossier ou de fichier.
-- La création demande un nom et un dossier de destination absent ou vide.
+- La création demande un nom et un dossier parent existant. Le dossier projet
+  final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
+  vide ; le dossier parent peut contenir d'autres fichiers.
   L’identifiant interne est généré depuis le nom et rendu unique sans saisie
   utilisateur. Son modèle typé porte unités monde,
   `pixelsPerUnit`, preset d’échelle, erreurs par champ, destination exacte et
