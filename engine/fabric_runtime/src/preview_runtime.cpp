@@ -406,8 +406,11 @@ bool PreviewRuntime::run() {
     auto previous_counter = SDL_GetPerformanceCounter();
     double accumulator = 0.0;
     const auto start_counter = previous_counter;
+    std::vector<double> frame_times_ms;
+    frame_times_ms.reserve(limit == 0U ? 256U : limit);
     bool running = true;
     while (running && (limit == 0U || stats_.frames < limit)) {
+        const auto frame_start = SDL_GetPerformanceCounter();
         SDL_Event event{};
         while (SDL_PollEvent(&event) != 0) {
             if (event.type == SDL_QUIT) running = false;
@@ -464,9 +467,18 @@ bool PreviewRuntime::run() {
         stats_.triangles += render_stats.triangles_drawn;
         ++stats_.frames;
         SDL_GL_SwapWindow(impl_->window);
+        frame_times_ms.push_back(static_cast<double>(SDL_GetPerformanceCounter() - frame_start) /
+                                 performance_frequency * 1000.0);
     }
     stats_.elapsed_ms = static_cast<double>(SDL_GetPerformanceCounter() - start_counter) /
         performance_frequency * 1000.0;
+    if (!frame_times_ms.empty()) {
+        std::ranges::sort(frame_times_ms);
+        const auto index = std::min(frame_times_ms.size() - 1U,
+            static_cast<std::size_t>(std::ceil(
+                static_cast<double>(frame_times_ms.size()) * 0.95)) - 1U);
+        stats_.p95_frame_ms = frame_times_ms[index];
+    }
     return true;
 }
 

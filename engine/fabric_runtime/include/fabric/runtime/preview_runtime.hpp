@@ -32,6 +32,7 @@ struct PreviewRuntimeStats {
     std::size_t draw_calls{};
     std::size_t triangles{};
     double elapsed_ms{};
+    double p95_frame_ms{};
 };
 
 class PreviewRuntime {

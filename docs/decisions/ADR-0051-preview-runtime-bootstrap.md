@@ -16,5 +16,5 @@ mode `--benchmark` exécute par défaut 600 frames. La première tranche rend le
 instances de map sous forme de draw packets de diagnostic ; la résolution des
 drawables, matériaux et animations réels sera ajoutée dans les tranches de
 chargement suivantes. La physique avance avec un pas fixe de 1/60 seconde ;
-les modes finis rapportent les frames, pas physiques, draw calls, triangles et
-la durée mesurée.
+les modes finis rapportent les frames, pas physiques, draw calls, triangles, la
+durée mesurée et le p95 du temps de frame.

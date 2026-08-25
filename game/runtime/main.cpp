@@ -48,7 +48,8 @@ int main(int argc, char** argv) {
                   << " visible=" << runtime.stats().visible_instances
                   << " draw_calls=" << runtime.stats().draw_calls
                   << " triangles=" << runtime.stats().triangles
-                  << " elapsed_ms=" << runtime.stats().elapsed_ms << '\n';
+                  << " elapsed_ms=" << runtime.stats().elapsed_ms
+                  << " p95_frame_ms=" << runtime.stats().p95_frame_ms << '\n';
     }
     return 0;
 }
