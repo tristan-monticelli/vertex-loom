@@ -1,7 +1,9 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
+#include "fabric/render/vector_geometry.hpp"
 #include "import_workflow.hpp"
 
 #include <SDL.h>
@@ -79,6 +81,10 @@ struct CanvasUiState {
     float zoom{1.0F};
     ImVec2 pan{};
     std::size_t selected_node{};
+    bool native_canvas{};
+    ImVec2 native_origin{};
+    ImVec2 native_size{};
+    fabric::core::Rect native_world_bounds;
 };
 
 void copy_path_to_buffer(const std::filesystem::path& path,
@@ -277,6 +283,9 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
     const ImVec2 origin = ImGui::GetItemRectMin();
+    canvas.native_canvas = true;
+    canvas.native_origin = origin;
+    canvas.native_size = available;
     const ImVec2 center{origin.x + available.x * 0.5F,
                         origin.y + available.y * 0.5F};
     const float fit = std::min((available.x - 80.0F) / asset.native->size.x,
@@ -323,6 +332,10 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
     const float world_right = world_half_width - canvas.pan.x / pixels_per_unit;
     const float world_bottom = -world_half_height + canvas.pan.y / pixels_per_unit;
     const float world_top = world_half_height + canvas.pan.y / pixels_per_unit;
+    canvas.native_world_bounds = {
+        .origin = {world_left, world_bottom},
+        .size = {world_right - world_left, world_top - world_bottom},
+    };
     const int first_vertical = static_cast<int>(std::floor(world_left / grid_step));
     const int last_vertical = static_cast<int>(std::ceil(world_right / grid_step));
     const int first_horizontal = static_cast<int>(std::floor(world_bottom / grid_step));
@@ -499,6 +512,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     fabric::editor::SessionTransitionGuard& transition_guard,
                     bool& running,
                     std::string& status) {
+    canvas.native_canvas = false;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
@@ -1328,6 +1342,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     }
 
     fabric::editor::ProjectSession session;
+    fabric::render::OpenGLVectorRenderer native_renderer;
+    if (!native_renderer.initialize()) {
+        std::cerr << "native OpenGL vector renderer initialization failed\n";
+    }
     std::array<char, 1024> path_buffer{};
     CreationUiState creation;
     ImportUiState imports;
@@ -1501,6 +1519,33 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         glClearColor(0.035F, 0.041F, 0.052F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (canvas.native_canvas && session.created_vector() &&
+            session.created_vector()->native) {
+            const auto packets = fabric::render::build_native_draw_packets(
+                *session.created_vector());
+            const auto display_size = ImGui::GetIO().DisplaySize;
+            const float scale_x = display_size.x > 0.0F
+                ? static_cast<float>(drawable_width) / display_size.x
+                : 1.0F;
+            const float scale_y = display_size.y > 0.0F
+                ? static_cast<float>(drawable_height) / display_size.y
+                : 1.0F;
+            const auto native_viewport = fabric::render::OpenGLVectorViewport{
+                .width = std::max(1, static_cast<std::int32_t>(
+                    canvas.native_size.x * scale_x)),
+                .height = std::max(1, static_cast<std::int32_t>(
+                    canvas.native_size.y * scale_y)),
+                .world_bounds = canvas.native_world_bounds,
+                .x = std::max(0, static_cast<std::int32_t>(
+                    canvas.native_origin.x * scale_x)),
+                .y = std::max(0, drawable_height - static_cast<std::int32_t>(
+                    (canvas.native_origin.y + canvas.native_size.y) * scale_y)),
+            };
+            glDisable(GL_SCISSOR_TEST);
+            glDisable(GL_BLEND);
+            static_cast<void>(native_renderer.draw(
+                packets.packets, native_viewport));
+        }
         SDL_GL_SwapWindow(window);
     }
 
@@ -1512,6 +1557,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     }
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
+    native_renderer.shutdown();
     ImGui::DestroyContext();
     SDL_GL_DeleteContext(gl_context);
     NFD_Quit();

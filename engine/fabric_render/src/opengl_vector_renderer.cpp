@@ -265,6 +265,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         return stats;
     }
     if (viewport.width <= 0 || viewport.height <= 0 ||
+        viewport.x < 0 || viewport.y < 0 ||
         !std::isfinite(viewport.world_bounds.size.x) ||
         !std::isfinite(viewport.world_bounds.size.y) ||
         viewport.world_bounds.size.x <= 0.0F ||
@@ -273,6 +274,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         return stats;
     }
     const auto functions = load_functions();
+    glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
     functions.use_program(program_);
     const auto matrix = world_to_clip(viewport);
     functions.uniform_matrix_4fv(world_to_clip_uniform_, 1, GL_FALSE,

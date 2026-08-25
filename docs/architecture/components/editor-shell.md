@@ -94,6 +94,9 @@ C4Component
   de fill image. Les sélecteurs parent et clip proposent uniquement les autres
   nœuds du document ; la validation de session refuse ensuite les cycles ou
   références invalides.
+- Le canvas natif envoie les draw packets validés au backend OpenGL 3 dans le
+  viewport courant. Le fallback ImGui conserve l’aperçu des contours et des
+  fills image tant que le backend ne possède pas encore de résolveur texture.
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.

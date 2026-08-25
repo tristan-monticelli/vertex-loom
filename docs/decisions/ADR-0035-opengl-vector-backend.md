@@ -20,8 +20,10 @@ packets soumis, packets dessinés, triangles et diagnostics.
 
 Les fills image sont refusés explicitement tant qu’un résolveur de textures
 local n’est pas passé au backend. Aucun upload ou atlas implicite n’est créé.
-Les tests headless couvrent l’état non initialisé ; le smoke-test avec contexte
-OpenGL et l’intégration visuelle du canvas restent des étapes dédiées.
+Les tests headless couvrent l’état non initialisé. Asset Studio appelle le
+backend après le rendu ImGui dans le viewport natif courant ; le smoke-test
+avec contexte OpenGL automatisé et le résolveur de textures restent des étapes
+dédiées.
 
 ## Consequences
 

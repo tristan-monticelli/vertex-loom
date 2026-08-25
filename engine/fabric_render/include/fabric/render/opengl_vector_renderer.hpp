@@ -14,6 +14,8 @@ struct OpenGLVectorViewport {
     std::int32_t width{};
     std::int32_t height{};
     core::Rect world_bounds;
+    std::int32_t x{};
+    std::int32_t y{};
 };
 
 struct OpenGLVectorRenderStats {

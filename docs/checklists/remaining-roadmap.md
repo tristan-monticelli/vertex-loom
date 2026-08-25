@@ -142,11 +142,11 @@ Gate : un artwork combinant contour vectoriel et image remplissante est créé,
 sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
 Le payload headless de fill image et la triangulation de sa silhouette sont
-désormais disponibles ; le rendu OpenGL effectif et la validation visuelle du
-gate restent ouverts. Les draw packets appliquent désormais les transforms
-locales et parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3
-compile, initialise et dessine les triangles de fills couleur ; le résolveur
-de textures et l’intégration visuelle au canvas restent ouverts.
+désormais disponibles. Les draw packets appliquent les transforms locales et
+parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
+initialise et dessine les triangles de fills couleur dans le canvas Asset
+Studio ; le résolveur de textures et la validation visuelle complète du gate
+restent ouverts.
 
 ## Étape D — Personnalisateur intégré
 
