@@ -150,10 +150,11 @@ target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
 add_library(fabric_runtime STATIC
     engine/fabric_runtime/src/preview_runtime.cpp
 )
-target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include)
+target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include
+    PRIVATE ${SDL2_image_SOURCE_DIR}/include)
 target_compile_features(fabric_runtime PUBLIC cxx_std_20)
 target_link_libraries(fabric_runtime PUBLIC fabric_project fabric_physics fabric_render
-    PRIVATE SDL2::SDL2-static)
+    PRIVATE SDL2::SDL2-static SDL2_image::SDL2_image-static)
 
 add_executable(fabric_asset_preview tools/asset_preview/main.cpp)
 target_link_libraries(fabric_asset_preview PRIVATE

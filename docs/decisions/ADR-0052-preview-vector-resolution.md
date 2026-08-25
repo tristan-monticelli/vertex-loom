@@ -12,7 +12,8 @@ SVG liés sont convertis en géométrie bornée à l’exécution ; les vecteurs
 sont tessellés par le même constructeur de draw packets que l’éditeur.
 
 Les transforms de nœuds parents sont appliqués avant la transform d’instance,
-et le matériau multiplie la couleur et l’opacité du packet. Les nœuds texture
-ont temporairement un placeholder déterministe jusqu’à l’arrivée du resolver
-de textures OpenGL ; aucune texture n’est silencieusement traitée comme une
-géométrie persistante.
+et le matériau multiplie la couleur et l’opacité du packet. Les textures sont
+chargées depuis leur `TextureAsset`, décodées en RGBA8 après l’initialisation
+SDL, uploadées une fois dans le contexte OpenGL puis résolues par identifiant.
+Les packets sont triés par identifiant stable et les géométries hors du
+viewport sont écartées avant l’appel au renderer.

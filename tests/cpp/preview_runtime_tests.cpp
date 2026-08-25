@@ -1,10 +1,13 @@
 #include "fabric/runtime/preview_runtime.hpp"
 
 #include "fabric/project/entity.hpp"
+#include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
+#include <array>
 #include <chrono>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -61,6 +64,32 @@ fabric::project::MapDocument map_with_entity() {
                                 fabric::project::ResourceReference{
                                     {.value = "runtime-entity"}, "entity"},
                                 std::nullopt, "instances", {}, 0, 0, {}});
+    result.instances.push_back({"offscreen",
+                                fabric::project::ResourceReference{
+                                    {.value = "runtime-entity"}, "entity"},
+                                std::nullopt, "instances",
+                                {.position = {10000.0F, 10000.0F}}, 156, 156, {}});
+    return result;
+}
+
+fabric::project::EntityDefinition texture_entity() {
+    return {.document = {.schema_version = 1,
+                         .type = "entity",
+                         .id = {.value = "runtime-texture-entity"},
+                         .name = "Runtime Texture Entity"},
+            .nodes = {{.id = "root",
+                       .name = "Root",
+                       .drawable = {.kind = fabric::project::EntityDrawableKind::texture,
+                                     .resource = fabric::project::ResourceReference{
+                                         {.value = "runtime-texture"}, "texture"}}}}};
+}
+
+fabric::project::MapDocument map_with_texture_entity() {
+    auto result = map();
+    result.instances.push_back({"textured",
+                                fabric::project::ResourceReference{
+                                    {.value = "runtime-texture-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
     return result;
 }
 
@@ -104,6 +133,48 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     REQUIRE(fabric::project::publish_native_vector_asset(root, manifest(), vector_asset()).ok());
     REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
     REQUIRE(fabric::project::publish_map(root, manifest(), map_with_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.stats().visible_instances == 1);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime uploads texture entity drawables") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-texture-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    const auto input = root / "input.png";
+    constexpr std::array<unsigned char, 70> png{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63, 0x60, 0xf8, 0xcf, 0xc0,
+        0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xdd,
+        0x8d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    std::ofstream output(input, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(png.data()),
+                 static_cast<std::streamsize>(png.size()));
+    output.close();
+    REQUIRE(fabric::project::publish_texture_asset(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "runtime-texture"},
+                      .name = "Runtime Texture"},
+         .source = "assets/textures/runtime-texture.png",
+         .width = 1,
+         .height = 1}, input).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), texture_entity()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_texture_entity()).ok());
 
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
