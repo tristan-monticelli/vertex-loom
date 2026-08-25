@@ -132,6 +132,10 @@ C4Component
   `VisualComponent`. Une fermeture possède deux rails, des instances de dent
   et un curseur transformable ; son futur suivi de rail restera une contrainte
   générique de composition.
+- `ProjectSession` indexe et sélectionne aussi les chemins texturés,
+  compositions et composants. Asset Studio expose la factory par un prompt
+  typé qui choisit le preset, la texture de fil et le nombre borné de dents,
+  puis sélectionne le composant publié.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

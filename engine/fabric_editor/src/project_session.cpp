@@ -3,6 +3,7 @@
 #include "fabric/editor/animation_timeline.hpp"
 
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/render/svg_vector.hpp"
 
@@ -102,8 +103,35 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.input->document.id,
                                    loaded.input->document.name, relative, false});
-            } else {
+            } else if (kind == StudioResourceKind::animation) {
                 auto loaded = project::load_animation(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
+            } else if (kind == StudioResourceKind::textured_path) {
+                auto loaded = project::load_textured_path(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
+            } else if (kind == StudioResourceKind::visual_composition) {
+                auto loaded = project::load_visual_composition(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
+            } else {
+                auto loaded = project::load_visual_component(
                     project_root, manifest, relative);
                 if (!loaded.ok()) {
                     errors = std::move(loaded.errors);
@@ -134,7 +162,13 @@ std::optional<std::vector<StudioResource>> index_project_resources(
         !inspect(StudioResourceKind::input,
                  assets / "input", ".input.json") ||
         !inspect(StudioResourceKind::animation,
-                 assets / "animations", ".animation.json")) {
+                 assets / "animations", ".animation.json") ||
+        !inspect(StudioResourceKind::textured_path,
+                 assets / "paths", ".textured-path.json") ||
+        !inspect(StudioResourceKind::visual_composition,
+                 assets / "compositions", ".composition.json") ||
+        !inspect(StudioResourceKind::visual_component,
+                 assets / "components", ".component.json")) {
         return std::nullopt;
     }
     std::ranges::sort(indexed, [](const StudioResource& left,
@@ -255,6 +289,9 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     selected_entity_.reset();
     selected_animation_.reset();
     selected_input_.reset();
+    selected_textured_path_.reset();
+    selected_visual_composition_.reset();
+    selected_visual_component_.reset();
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
@@ -310,6 +347,9 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     selected_entity_.reset();
     selected_animation_.reset();
     selected_input_.reset();
+    selected_textured_path_.reset();
+    selected_visual_composition_.reset();
+    selected_visual_component_.reset();
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
@@ -737,6 +777,28 @@ bool ProjectSession::create_input(const CreateInputPrompt& prompt) {
     return select_resource(StudioResourceKind::input, created_id);
 }
 
+bool ProjectSession::create_visual_preset(
+    const VisualPresetRequest& request) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating a visual preset"}};
+        return false;
+    }
+    if (commands_.dirty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save current changes before creating another resource"}};
+        return false;
+    }
+    auto published = publish_visual_preset(
+        project_root_, *manifest_, request);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::visual_component, request.id);
+}
+
 bool ProjectSession::convert_selected_linked_svg_to_native(
     const AutosaveScheduler::Clock::time_point now) {
     auto* selected = selected_resource();
@@ -844,6 +906,9 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
     std::distance(resources_.begin(), match));
     selected_input_.reset();
     selected_input_document_path_.clear();
+    selected_textured_path_.reset();
+    selected_visual_composition_.reset();
+    selected_visual_component_.reset();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -998,6 +1063,72 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         if (!recovery.errors.empty()) {
             selection_warnings = std::move(recovery.errors);
         }
+    } else if (kind == StudioResourceKind::textured_path) {
+        auto loaded = project::load_textured_path(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_.reset();
+        selected_texture_document_path_.clear();
+        recovery_texture_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
+        selected_textured_path_ = std::move(*loaded.asset);
+    } else if (kind == StudioResourceKind::visual_composition) {
+        auto loaded = project::load_visual_composition(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_.reset();
+        selected_texture_document_path_.clear();
+        recovery_texture_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
+        selected_visual_composition_ = std::move(*loaded.asset);
+    } else if (kind == StudioResourceKind::visual_component) {
+        auto loaded = project::load_visual_component(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_.reset();
+        selected_texture_document_path_.clear();
+        recovery_texture_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
+        selected_visual_component_ = std::move(*loaded.asset);
     } else if (kind == StudioResourceKind::input) {
         auto loaded = project::load_input(
             project_root_, *manifest_, match->document_path);
@@ -2124,6 +2255,21 @@ ProjectSession::selected_animation() const noexcept {
 const std::optional<project::InputDocument>&
 ProjectSession::selected_input() const noexcept {
     return selected_input_;
+}
+
+const std::optional<project::TexturedPath>&
+ProjectSession::selected_textured_path() const noexcept {
+    return selected_textured_path_;
+}
+
+const std::optional<project::VisualComposition>&
+ProjectSession::selected_visual_composition() const noexcept {
+    return selected_visual_composition_;
+}
+
+const std::optional<project::VisualComponent>&
+ProjectSession::selected_visual_component() const noexcept {
+    return selected_visual_component_;
 }
 
 const std::vector<StudioResource>&

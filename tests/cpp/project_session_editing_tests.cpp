@@ -1,9 +1,11 @@
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -160,6 +162,55 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
     CHECK(image.fit == fabric::project::VectorImageFit::free);
     CHECK(image.transform.position == fabric::core::Vec2{0.2F, 0.3F});
     CHECK(image.deform_with_shape);
+}
+
+TEST_CASE("project session creates indexes and reloads a visual preset") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    const auto thread_source = project.path() / "thread.png";
+    std::ofstream{thread_source, std::ios::binary} << "thread-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), manifest,
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "cotton-thread"},
+                      .name = "Cotton Thread"},
+         .source = "assets/textures/cotton-thread.png",
+         .width = 8U,
+         .height = 8U},
+        thread_source).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    const fabric::editor::VisualPresetRequest request{
+        .kind = fabric::editor::VisualPresetKind::zipper,
+        .id = {.value = "coat-zipper"},
+        .name = "Coat zipper",
+        .thread_texture = fabric::project::ResourceReference{
+            {.value = "cotton-thread"}, "texture"},
+        .zipper_tooth_count = 8U};
+    REQUIRE(session.create_visual_preset(request));
+    REQUIRE(session.selected_resource() != nullptr);
+    CHECK(session.selected_resource()->kind ==
+          fabric::editor::StudioResourceKind::visual_component);
+    REQUIRE(session.selected_visual_component().has_value());
+    CHECK(session.selected_visual_component()->document.id.value ==
+          "coat-zipper");
+    CHECK(std::ranges::count_if(
+              session.resources(), [](const auto& resource) {
+                  return resource.kind ==
+                      fabric::editor::StudioResourceKind::textured_path;
+              }) == 2);
+
+    fabric::editor::ProjectSession reopened;
+    REQUIRE(reopened.open(project.path()));
+    REQUIRE(reopened.select_resource(
+        fabric::editor::StudioResourceKind::visual_component,
+        {.value = "coat-zipper"}));
+    REQUIRE(reopened.selected_visual_component().has_value());
+    CHECK(reopened.selected_visual_component()->composition.id.value ==
+          "coat-zipper-composition");
 }
 
 TEST_CASE("material prompt publishes and indexes a material document") {

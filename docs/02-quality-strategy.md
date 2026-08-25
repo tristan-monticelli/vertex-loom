@@ -118,6 +118,9 @@ bouton, couture et fermeture. Les tests inspectent les primitives natives, les
 deux rails texturés, le nombre borné de dents, le curseur et les paramètres
 animables, puis publient les quatre bundles dans un même projet et valident le
 graphe headless complet. Une destination existante est refusée avant écriture.
+Le test de session crée aussi une fermeture depuis le même point d'entrée que
+le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
+resélectionne son composant.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

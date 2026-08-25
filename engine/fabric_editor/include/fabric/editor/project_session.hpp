@@ -8,7 +8,10 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/textured_path.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/project/visual_component.hpp"
+#include "fabric/project/visual_composition.hpp"
 #include "fabric/render/raster_image.hpp"
 
 #include <filesystem>
@@ -24,6 +27,7 @@ struct CreateMaterialPrompt;
 struct CreateEntityPrompt;
 struct CreateAnimationPrompt;
 struct CreateInputPrompt;
+struct VisualPresetRequest;
 
 enum class StudioResourceKind {
     texture,
@@ -32,6 +36,9 @@ enum class StudioResourceKind {
     entity,
     animation,
     input,
+    textured_path,
+    visual_composition,
+    visual_component,
 };
 
 struct StudioResource {
@@ -77,6 +84,8 @@ public:
     [[nodiscard]] bool create_entity(const CreateEntityPrompt& prompt);
     [[nodiscard]] bool create_animation(const CreateAnimationPrompt& prompt);
     [[nodiscard]] bool create_input(const CreateInputPrompt& prompt);
+    [[nodiscard]] bool create_visual_preset(
+        const VisualPresetRequest& request);
     [[nodiscard]] bool convert_selected_linked_svg_to_native(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -191,6 +200,12 @@ public:
     selected_animation() const noexcept;
     [[nodiscard]] const std::optional<project::InputDocument>&
     selected_input() const noexcept;
+    [[nodiscard]] const std::optional<project::TexturedPath>&
+    selected_textured_path() const noexcept;
+    [[nodiscard]] const std::optional<project::VisualComposition>&
+    selected_visual_composition() const noexcept;
+    [[nodiscard]] const std::optional<project::VisualComponent>&
+    selected_visual_component() const noexcept;
     [[nodiscard]] bool set_selected_input_action_id(
         std::size_t action_index, std::string id,
         AutosaveScheduler::Clock::time_point now =
@@ -240,6 +255,9 @@ private:
     std::optional<project::EntityDefinition> selected_entity_;
     std::optional<project::AnimationClip> selected_animation_;
     std::optional<project::InputDocument> selected_input_;
+    std::optional<project::TexturedPath> selected_textured_path_;
+    std::optional<project::VisualComposition> selected_visual_composition_;
+    std::optional<project::VisualComponent> selected_visual_component_;
     std::vector<StudioResource> resources_;
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;

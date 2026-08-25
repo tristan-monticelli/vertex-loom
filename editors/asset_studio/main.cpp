@@ -1,6 +1,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/editor/visual_presets.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
@@ -53,6 +54,7 @@ struct CreationUiState {
     fabric::editor::CreateEntityPrompt entity;
     fabric::editor::CreateAnimationPrompt animation;
     fabric::editor::CreateInputPrompt input;
+    fabric::editor::VisualPresetRequest visual_preset;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     bool request_project{};
     bool request_artwork{};
@@ -60,6 +62,7 @@ struct CreationUiState {
     bool request_entity{};
     bool request_animation{};
     bool request_input{};
+    bool request_visual_preset{};
     bool project_publish_attempted{};
 };
 
@@ -476,6 +479,23 @@ bool select_and_preview_resource(fabric::editor::ProjectSession& session,
     return true;
 }
 
+std::string_view studio_resource_kind_label(
+    const fabric::editor::StudioResourceKind kind) {
+    using Kind = fabric::editor::StudioResourceKind;
+    switch (kind) {
+    case Kind::texture: return "texture";
+    case Kind::vector: return "vector";
+    case Kind::material: return "material";
+    case Kind::entity: return "entity";
+    case Kind::animation: return "animation";
+    case Kind::input: return "input";
+    case Kind::textured_path: return "textured path";
+    case Kind::visual_composition: return "composition";
+    case Kind::visual_component: return "component";
+    }
+    return "resource";
+}
+
 void draw_project_tree(fabric::editor::ProjectSession& session,
                        AssetPreview& preview, std::string& status) {
     if (!session.has_project()) {
@@ -522,6 +542,12 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
     draw_kind("Input bindings", fabric::editor::StudioResourceKind::input);
+    draw_kind("Textured paths",
+              fabric::editor::StudioResourceKind::textured_path);
+    draw_kind("Visual compositions",
+              fabric::editor::StudioResourceKind::visual_composition);
+    draw_kind("Visual components",
+              fabric::editor::StudioResourceKind::visual_component);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -540,9 +566,8 @@ void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
         const bool is_selected = selected != nullptr &&
             selected->kind == resource.kind && selected->id == resource.id;
         const std::string label = resource.name + " (" +
-            (resource.kind == fabric::editor::StudioResourceKind::texture
-                 ? "texture"
-                 : "vector") + ")##existing-" + resource.id.value;
+            std::string(studio_resource_kind_label(resource.kind)) +
+            ")##existing-" + resource.id.value;
         if (ImGui::Selectable(label.c_str(), is_selected)) {
             if (select_and_preview_resource(session, resource, preview, status,
                                              "Added existing resource: ")) {
@@ -1071,6 +1096,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::BeginPopup("Add resource")) {
             if (ImGui::MenuItem("New vector artwork...")) {
                 creation.request_artwork = true;
+            }
+            if (ImGui::MenuItem("New visual preset...")) {
+                creation.request_visual_preset = true;
             }
             if (ImGui::MenuItem("New material / fill...")) {
                 creation.request_material = true;
@@ -2073,6 +2101,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::OpenPopup("Create input bindings");
         creation.request_input = false;
     }
+    if (creation.request_visual_preset && session.has_project()) {
+        creation.visual_preset = {};
+        ImGui::OpenPopup("Create visual preset");
+        creation.request_visual_preset = false;
+    }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
             if (session.open(path_buffer.data())) {
@@ -2341,6 +2374,104 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.artwork.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create visual preset", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        auto& request = creation.visual_preset;
+        ImGui::TextUnformatted("Create a reusable textile visual component");
+        ImGui::TextDisabled(
+            "The preset only assembles generic vectors, paths and layers.");
+        const auto kind_label = std::string(fabric::editor::label(request.kind));
+        ImGui::SetNextItemWidth(280.0F);
+        if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
+            for (const auto kind : {fabric::editor::VisualPresetKind::eye,
+                                    fabric::editor::VisualPresetKind::button,
+                                    fabric::editor::VisualPresetKind::seam,
+                                    fabric::editor::VisualPresetKind::zipper}) {
+                const bool selected = request.kind == kind;
+                const auto option = std::string(fabric::editor::label(kind));
+                if (ImGui::Selectable(option.c_str(), selected)) {
+                    request.kind = kind;
+                }
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetNextItemWidth(520.0F);
+        ImGui::InputText("Name", &request.name);
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Resource id", &request.id.value);
+        const bool uses_thread = request.kind ==
+                fabric::editor::VisualPresetKind::seam ||
+            request.kind == fabric::editor::VisualPresetKind::zipper;
+        if (uses_thread) {
+            const auto selected_texture = std::ranges::find_if(
+                session.resources(), [&](const auto& resource) {
+                    return resource.kind ==
+                               fabric::editor::StudioResourceKind::texture &&
+                        request.thread_texture &&
+                        resource.id == request.thread_texture->id;
+                });
+            const char* texture_label =
+                selected_texture == session.resources().end()
+                ? "Choose a thread texture..."
+                : selected_texture->name.c_str();
+            ImGui::SetNextItemWidth(360.0F);
+            if (ImGui::BeginCombo("Thread texture", texture_label)) {
+                for (const auto& resource : session.resources()) {
+                    if (resource.kind !=
+                        fabric::editor::StudioResourceKind::texture) continue;
+                    const bool selected = request.thread_texture &&
+                        request.thread_texture->id == resource.id;
+                    if (ImGui::Selectable(resource.name.c_str(), selected)) {
+                        request.thread_texture = fabric::project::ResourceReference{
+                            resource.id, "texture"};
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        if (request.kind == fabric::editor::VisualPresetKind::zipper) {
+            int tooth_count = static_cast<int>(request.zipper_tooth_count);
+            ImGui::SetNextItemWidth(180.0F);
+            if (ImGui::InputInt("Teeth", &tooth_count)) {
+                request.zipper_tooth_count = tooth_count < 0
+                    ? 0U : static_cast<std::size_t>(tooth_count);
+            }
+        }
+        const auto built = fabric::editor::build_visual_preset(
+            *session.manifest(), request);
+        if (built.ok()) {
+            ImGui::SeparatorText("Resources created");
+            ImGui::Text("%zu vector artwork(s)", built.bundle->vectors.size());
+            ImGui::Text("%zu textured path(s)",
+                        built.bundle->textured_paths.size());
+            ImGui::TextUnformatted("1 composition");
+            ImGui::TextUnformatted("1 reusable component");
+        } else {
+            for (const auto& error : built.errors) {
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
+                                   error.message.c_str());
+            }
+        }
+        ImGui::BeginDisabled(!built.ok());
+        if (ImGui::Button("Create preset", {140.0F, 0.0F})) {
+            if (session.create_visual_preset(request)) {
+                clear_asset_preview(preview);
+                status = "Visual preset created and selected.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Visual preset creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
