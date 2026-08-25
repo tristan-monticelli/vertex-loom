@@ -145,3 +145,7 @@ C4Component
   sert de preuve headless du flux commun avant les futurs documents d’asset.
 - Les entités sélectionnées utilisent le même flux headless : édition de nœud,
   undo/redo, sauvegarde atomique, autosave miroir et récupération validée.
+- Le viewport d’une entité résout les drawables vectoriels et texturés, compose
+  les transforms parent/enfant et applique le matériau avant d’envoyer les
+  draw packets au renderer OpenGL. Les textures locales sont résolues par le
+  même cache GPU que les artworks natifs.

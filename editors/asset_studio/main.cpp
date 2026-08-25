@@ -3,6 +3,7 @@
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
+#include "fabric/render/svg_vector.hpp"
 #include "fabric/render/vector_geometry.hpp"
 #include "import_workflow.hpp"
 
@@ -22,6 +23,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <numbers>
 #include <optional>
 #include <string>
@@ -103,7 +105,217 @@ struct CanvasUiState {
     ImVec2 native_origin{};
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
+    fabric::core::Rect entity_world_bounds{{-5.0F, -5.0F}, {10.0F, 10.0F}};
 };
+
+struct EntityPreviewResult {
+    std::vector<fabric::render::VectorDrawPacket> packets;
+    fabric::core::Rect bounds{{-5.0F, -5.0F}, {10.0F, 10.0F}};
+    std::vector<std::string> errors;
+};
+
+fabric::core::Vec2 transform_entity_point(
+    const fabric::core::Vec2 point, const fabric::core::Transform& transform) {
+    const auto local = fabric::core::Vec2{
+        (point.x - transform.pivot.x) * transform.scale.x,
+        (point.y - transform.pivot.y) * transform.scale.y};
+    const float angle = transform.rotation_degrees *
+        std::numbers::pi_v<float> / 180.0F;
+    const float cosine = std::cos(angle);
+    const float sine = std::sin(angle);
+    return {local.x * cosine - local.y * sine + transform.pivot.x +
+                transform.position.x,
+            local.x * sine + local.y * cosine + transform.pivot.y +
+                transform.position.y};
+}
+
+fabric::core::Vec2 transform_entity_point(
+    const fabric::core::Vec2 point, const fabric::project::EntityDefinition& entity,
+    const std::size_t node_index) {
+    const auto& node = entity.nodes[node_index];
+    const auto transformed = transform_entity_point(point, node.transform);
+    if (!node.parent) return transformed;
+    const auto parent = std::find_if(
+        entity.nodes.begin(), entity.nodes.end(),
+        [&](const auto& candidate) { return candidate.id == *node.parent; });
+    if (parent == entity.nodes.end()) return transformed;
+    return transform_entity_point(
+        transformed, entity,
+        static_cast<std::size_t>(std::distance(entity.nodes.begin(), parent)));
+}
+
+void transform_entity_packet(fabric::render::VectorDrawPacket& packet,
+                              const fabric::project::EntityDefinition& entity,
+                              const std::size_t node_index) {
+    for (auto& point : packet.outline) {
+        point = transform_entity_point(point, entity, node_index);
+    }
+    for (auto& point : packet.fill_vertices) {
+        point = transform_entity_point(point, entity, node_index);
+    }
+}
+
+void apply_entity_material(fabric::render::VectorDrawPacket& packet,
+                           const fabric::project::MaterialDefinition& material) {
+    if (packet.fill_color) {
+        packet.fill_color->red *= material.color.red;
+        packet.fill_color->green *= material.color.green;
+        packet.fill_color->blue *= material.color.blue;
+        packet.fill_color->alpha *= material.color.alpha * material.opacity;
+    } else if (!material.texture) {
+        auto color = material.color;
+        color.alpha *= material.opacity;
+        packet.fill_color = color;
+    }
+    if (material.texture) {
+        packet.image_fill = fabric::project::VectorImageFill{
+            .texture = *material.texture,
+            .transform = material.uv_transform,
+            .opacity = material.opacity};
+        packet.fill_color.reset();
+        if (!packet.fill_vertices.empty()) {
+            auto min_x = packet.fill_vertices.front().x;
+            auto max_x = min_x;
+            auto min_y = packet.fill_vertices.front().y;
+            auto max_y = min_y;
+            for (const auto point : packet.fill_vertices) {
+                min_x = std::min(min_x, point.x);
+                max_x = std::max(max_x, point.x);
+                min_y = std::min(min_y, point.y);
+                max_y = std::max(max_y, point.y);
+            }
+            const auto width = std::max(max_x - min_x, 1.0e-6F);
+            const auto height = std::max(max_y - min_y, 1.0e-6F);
+            packet.fill_uv.clear();
+            for (const auto point : packet.fill_vertices) {
+                packet.fill_uv.push_back(
+                    {(point.x - min_x) / width, (point.y - min_y) / height});
+            }
+        }
+    }
+}
+
+EntityPreviewResult build_entity_preview(
+    const fabric::editor::ProjectSession& session) {
+    EntityPreviewResult result;
+    if (!session.selected_entity() || !session.manifest()) return result;
+    const auto& entity = *session.selected_entity();
+    for (std::size_t node_index = 0; node_index < entity.nodes.size();
+         ++node_index) {
+        const auto& node = entity.nodes[node_index];
+        std::optional<fabric::project::MaterialDefinition> material;
+        if (node.drawable.material) {
+            const auto loaded = fabric::project::load_material(
+                session.project_root(), *session.manifest(),
+                fabric::project::material_document_path(
+                    *session.manifest(), node.drawable.material->id));
+            if (!loaded.ok()) {
+                for (const auto& error : loaded.errors) {
+                    result.errors.push_back(error.field + ": " + error.message);
+                }
+                continue;
+            }
+            material = *loaded.asset;
+        }
+        if (node.drawable.kind == fabric::project::EntityDrawableKind::vector &&
+            node.drawable.resource) {
+            auto loaded = fabric::project::load_vector_asset(
+                session.project_root(), *session.manifest(),
+                fabric::project::vector_document_path(
+                    *session.manifest(), node.drawable.resource->id));
+            if (!loaded.ok()) {
+                for (const auto& error : loaded.errors) {
+                    result.errors.push_back(error.field + ": " + error.message);
+                }
+                continue;
+            }
+            auto drawable = std::move(*loaded.asset);
+            if (drawable.source_kind == fabric::project::VectorSourceKind::linked_svg) {
+                auto converted = fabric::render::convert_svg_to_native(
+                    session.project_root() / drawable.source,
+                    drawable.document.id, drawable.document.name);
+                if (!converted.ok()) {
+                    for (const auto& error : converted.errors) {
+                        result.errors.push_back(error.field + ": " + error.message);
+                    }
+                    continue;
+                }
+                drawable = std::move(*converted.asset);
+            }
+            auto geometry = fabric::render::build_native_draw_packets(drawable);
+            if (!geometry.ok()) {
+                result.errors.insert(result.errors.end(), geometry.errors.begin(),
+                                     geometry.errors.end());
+                continue;
+            }
+            for (auto& packet : geometry.packets) {
+                if (material) apply_entity_material(packet, *material);
+                transform_entity_packet(packet, entity, node_index);
+                packet.node_id = entity.document.id.value + ":" + node.id + ":" +
+                    packet.node_id;
+                result.packets.push_back(std::move(packet));
+            }
+        } else if (node.drawable.kind == fabric::project::EntityDrawableKind::texture &&
+                   node.drawable.resource) {
+            const auto loaded = fabric::project::load_texture_asset(
+                session.project_root(), *session.manifest(),
+                fabric::project::texture_document_path(
+                    *session.manifest(), node.drawable.resource->id));
+            if (!loaded.ok()) {
+                for (const auto& error : loaded.errors) {
+                    result.errors.push_back(error.field + ": " + error.message);
+                }
+                continue;
+            }
+            const float ppu = static_cast<float>(session.manifest()->pixels_per_unit);
+            const float half_width = std::max(0.5F,
+                static_cast<float>(loaded.asset->width) / ppu * 0.5F);
+            const float half_height = std::max(0.5F,
+                static_cast<float>(loaded.asset->height) / ppu * 0.5F);
+            fabric::render::VectorDrawPacket packet{
+                .node_id = entity.document.id.value + ":" + node.id,
+                .fill_color = material && !material->texture
+                    ? std::optional{fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F}}
+                    : std::nullopt,
+                .image_fill = fabric::project::VectorImageFill{
+                    .texture = *node.drawable.resource},
+                .outline = {{-half_width, -half_height}, {half_width, -half_height},
+                            {half_width, half_height}, {-half_width, half_height}},
+                .fill_vertices = {{-half_width, -half_height},
+                                  {half_width, -half_height},
+                                  {half_width, half_height},
+                                  {-half_width, half_height}},
+                .fill_uv = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F},
+                            {0.0F, 1.0F}},
+                .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
+                .closed_outline = true};
+            if (material) apply_entity_material(packet, *material);
+            transform_entity_packet(packet, entity, node_index);
+            result.packets.push_back(std::move(packet));
+        }
+    }
+    if (!result.packets.empty()) {
+        auto min_x = std::numeric_limits<float>::max();
+        auto min_y = std::numeric_limits<float>::max();
+        auto max_x = std::numeric_limits<float>::lowest();
+        auto max_y = std::numeric_limits<float>::lowest();
+        for (const auto& packet : result.packets) {
+            const auto points = packet.fill_vertices.empty()
+                ? packet.outline : packet.fill_vertices;
+            for (const auto point : points) {
+                min_x = std::min(min_x, point.x);
+                min_y = std::min(min_y, point.y);
+                max_x = std::max(max_x, point.x);
+                max_y = std::max(max_y, point.y);
+            }
+        }
+        const float margin = std::max(1.0F, std::max(max_x - min_x, max_y - min_y) * 0.1F);
+        result.bounds = {{min_x - margin, min_y - margin},
+                         {std::max(2.0F * margin, max_x - min_x + 2.0F * margin),
+                          std::max(2.0F * margin, max_y - min_y + 2.0F * margin)}};
+    }
+    return result;
+}
 
 void copy_path_to_buffer(const std::filesystem::path& path,
                          std::array<char, 1024>& buffer) {
@@ -673,6 +885,55 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     }
 }
 
+void draw_entity_preview_canvas(CanvasUiState& canvas,
+                                const ImVec2 available) {
+    ImGui::InvisibleButton("Entity canvas", available,
+                           ImGuiButtonFlags_MouseButtonLeft |
+                               ImGuiButtonFlags_MouseButtonMiddle);
+    const ImVec2 origin = ImGui::GetItemRectMin();
+    canvas.native_canvas = true;
+    canvas.native_origin = origin;
+    canvas.native_size = available;
+    const auto bounds = canvas.entity_world_bounds;
+    const ImVec2 center{origin.x + available.x * 0.5F,
+                        origin.y + available.y * 0.5F};
+    const float fit = std::min(
+        (available.x - 80.0F) / std::max(bounds.size.x, 1.0F),
+        (available.y - 80.0F) / std::max(bounds.size.y, 1.0F));
+    const float pixels_per_unit = std::max(0.01F, fit * canvas.zoom);
+    if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel != 0.0F) {
+        canvas.zoom = std::clamp(
+            canvas.zoom * (ImGui::GetIO().MouseWheel > 0.0F ? 1.15F : 1.0F / 1.15F),
+            0.1F, 20.0F);
+    }
+    if (ImGui::IsItemHovered() &&
+        ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+        const auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
+        canvas.pan.x += delta.x;
+        canvas.pan.y += delta.y;
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
+    }
+    const auto to_screen = [&](const fabric::core::Vec2 point) {
+        return ImVec2{center.x + canvas.pan.x + point.x * pixels_per_unit,
+                      center.y + canvas.pan.y - point.y * pixels_per_unit};
+    };
+    auto* draw_list = ImGui::GetWindowDrawList();
+    draw_list->AddLine(to_screen({0.0F, bounds.origin.y}),
+                       to_screen({0.0F, bounds.origin.y + bounds.size.y}),
+                       IM_COL32(100, 110, 125, 100));
+    draw_list->AddLine(to_screen({bounds.origin.x, 0.0F}),
+                       to_screen({bounds.origin.x + bounds.size.x, 0.0F}),
+                       IM_COL32(100, 110, 125, 100));
+    const float world_half_width = available.x / (2.0F * pixels_per_unit);
+    const float world_half_height = available.y / (2.0F * pixels_per_unit);
+    canvas.native_world_bounds = {
+        .origin = {-world_half_width - canvas.pan.x / pixels_per_unit,
+                   -world_half_height + canvas.pan.y / pixels_per_unit},
+        .size = {2.0F * world_half_width, 2.0F * world_half_height}};
+    ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
+    ImGui::TextDisabled("Entity preview · %.0f%%", canvas.zoom * 100.0F);
+}
+
 void draw_workspace(fabric::editor::ProjectSession& session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
@@ -681,6 +942,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AssetPreview& preview,
                     AssetPreview& pending_import_preview,
                     CanvasUiState& canvas,
+                    const EntityPreviewResult& entity_preview,
                     ProjectSettingsUiState& project_settings,
                     bool& request_open,
                     bool& request_png,
@@ -767,8 +1029,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     const bool native_selected = session.selected_resource() != nullptr &&
         session.selected_resource()->kind ==
-            fabric::editor::StudioResourceKind::vector &&
+        fabric::editor::StudioResourceKind::vector &&
         session.selected_resource()->native && session.created_vector();
+    const bool entity_selected = session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::entity &&
+        session.selected_entity();
     if (native_selected) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         ImGui::TextUnformatted("Gizmo");
@@ -793,6 +1059,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session, canvas,
             {std::max(1.0F, available.x - 16.0F),
              std::max(1.0F, available.y - 42.0F)});
+    } else if (entity_selected) {
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
+        if (entity_preview.errors.empty()) {
+            ImGui::TextUnformatted("Entity preview");
+        } else {
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                               "Entity preview (%zu unresolved)",
+                               entity_preview.errors.size());
+        }
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
+        draw_entity_preview_canvas(
+            canvas, {std::max(1.0F, available.x - 16.0F),
+                     std::max(1.0F, available.y - 42.0F)});
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);
@@ -2011,8 +2290,19 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             status = "Change redone.";
         }
 
+        EntityPreviewResult entity_preview;
+        const bool entity_selection = session.selected_resource() != nullptr &&
+            session.selected_resource()->kind ==
+                fabric::editor::StudioResourceKind::entity &&
+            session.selected_entity();
+        if (entity_selection) {
+            entity_preview = build_entity_preview(session);
+            canvas.entity_world_bounds = entity_preview.bounds;
+        }
+
         draw_workspace(session, window, path_buffer, creation, imports, preview,
-                       pending_import_preview, canvas, project_settings,
+                       pending_import_preview, canvas, entity_preview,
+                       project_settings,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);
 
@@ -2031,10 +2321,17 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         glClearColor(0.035F, 0.041F, 0.052F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        if (canvas.native_canvas && session.created_vector() &&
-            session.created_vector()->native) {
-            const auto packets = fabric::render::build_native_draw_packets(
-                *session.created_vector());
+        const bool render_native_vector = canvas.native_canvas &&
+            session.created_vector() && session.created_vector()->native;
+        const bool render_entity = canvas.native_canvas && entity_selection &&
+            !entity_preview.packets.empty();
+        if (render_native_vector || render_entity) {
+            const auto native_packets = render_native_vector
+                ? fabric::render::build_native_draw_packets(*session.created_vector())
+                : fabric::render::VectorGeometryResult{};
+            const auto packets = render_native_vector
+                ? std::span<const fabric::render::VectorDrawPacket>(native_packets.packets)
+                : std::span<const fabric::render::VectorDrawPacket>(entity_preview.packets);
             const auto display_size = ImGui::GetIO().DisplaySize;
             const float scale_x = display_size.x > 0.0F
                 ? static_cast<float>(drawable_width) / display_size.x
@@ -2086,7 +2383,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 };
             };
             static_cast<void>(native_renderer.draw(
-                packets.packets, native_viewport, texture_resolver));
+                packets, native_viewport, texture_resolver));
         }
         SDL_GL_SwapWindow(window);
     }
