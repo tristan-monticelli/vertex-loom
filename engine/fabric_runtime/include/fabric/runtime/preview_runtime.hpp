@@ -43,6 +43,7 @@ struct PreviewRuntimeStats {
     std::size_t xpbd_steps{};
     std::size_t deformation_instances{};
     std::size_t deformed_packets{};
+    std::size_t vector_geometry_cache_entries{};
     std::size_t visible_instances{};
     std::size_t draw_calls{};
     std::size_t triangles{};

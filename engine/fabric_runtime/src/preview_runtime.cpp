@@ -3,6 +3,7 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
+#include "fabric/render/vector_geometry.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/animation_ik.hpp"
 #include "fabric/project/manifest.hpp"
@@ -63,6 +64,8 @@ struct PreviewRuntime::Impl {
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
+    std::unordered_map<std::string, project::VectorAsset> vector_assets;
+    render::VectorGeometryCache vector_geometry_cache;
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
     std::unordered_map<std::string, std::string> animation_instances;
     std::unordered_map<std::string, project::AnimationStateMachine> animation_state_machines;
@@ -383,6 +386,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packets.clear();
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
+    impl_->vector_assets.clear();
+    impl_->vector_geometry_cache.clear();
     impl_->animation_clips.clear();
     impl_->animation_instances.clear();
     impl_->animation_state_machines.clear();
@@ -625,25 +630,34 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             const auto& node = resolved_entity.nodes[node_index];
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
                 node.drawable.resource) {
-                auto vector = project::load_vector_asset(
-                    options_.project_root, *manifest_,
-                    project::vector_document_path(*manifest_, node.drawable.resource->id));
-                if (!vector.ok()) {
-                    append_errors(errors_, vector.errors);
-                    return false;
-                }
-                project::VectorAsset drawable = std::move(*vector.asset);
-                if (drawable.source_kind == project::VectorSourceKind::linked_svg) {
-                    auto converted = render::convert_svg_to_native(
-                        options_.project_root / drawable.source,
-                        drawable.document.id, drawable.document.name);
-                    if (!converted.ok()) {
-                        append_errors(errors_, converted.errors);
+                const auto vector_id = node.drawable.resource->id.value;
+                project::VectorAsset drawable;
+                const auto cached_vector = impl_->vector_assets.find(vector_id);
+                if (cached_vector != impl_->vector_assets.end()) {
+                    drawable = cached_vector->second;
+                } else {
+                    auto vector = project::load_vector_asset(
+                        options_.project_root, *manifest_,
+                        project::vector_document_path(*manifest_,
+                                                      node.drawable.resource->id));
+                    if (!vector.ok()) {
+                        append_errors(errors_, vector.errors);
                         return false;
                     }
-                    drawable = std::move(*converted.asset);
+                    drawable = std::move(*vector.asset);
+                    if (drawable.source_kind == project::VectorSourceKind::linked_svg) {
+                        auto converted = render::convert_svg_to_native(
+                            options_.project_root / drawable.source,
+                            drawable.document.id, drawable.document.name);
+                        if (!converted.ok()) {
+                            append_errors(errors_, converted.errors);
+                            return false;
+                        }
+                        drawable = std::move(*converted.asset);
+                    }
+                    impl_->vector_assets.emplace(vector_id, drawable);
                 }
-                auto geometry = render::build_native_draw_packets(drawable);
+                auto geometry = impl_->vector_geometry_cache.get_or_build(drawable);
                 if (!geometry.ok()) {
                     errors_.insert(errors_.end(), geometry.errors.begin(), geometry.errors.end());
                     return false;
@@ -734,6 +748,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         impl_->entity_simulations, [](const auto& item) {
             return item.second.mesh.has_value();
         }));
+    stats_.vector_geometry_cache_entries = impl_->vector_geometry_cache.size();
     std::stable_sort(impl_->packets.begin(), impl_->packets.end(),
                      [](const auto& left, const auto& right) {
                          return left.node_id < right.node_id;

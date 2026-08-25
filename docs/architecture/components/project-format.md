@@ -99,6 +99,9 @@ C4Component
 - Une entité peut persister `animationStateMachine` ; ses états référencent des
   clips, ses transitions sont évaluées par priorité et `exitTime`, et les
   paramètres d'instance utilisent les propriétés `animationParameter.<id>`.
+- `PreviewRuntime` met en cache les `VectorAsset` convertis et les résultats de
+  géométrie par ressource ; chaque instance reçoit ensuite une copie mutable
+  avant matériau et transformation.
 - Le système XPBD unifié expose distance, flexion, aire, pin et collision,
   conserve les lambdas, applique la compliance et quantifie l’état après
   chaque sous-pas.

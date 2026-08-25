@@ -386,6 +386,8 @@ inspectable avec collisions et événements.
 - [x] Partager les nœuds résolus avec les draw packets visuels des instances.
 - [x] Mettre en cache les évaluations animation et nœuds par instance et
   instant de frame.
+- [x] Mettre en cache les assets vectoriels convertis et leur géométrie native
+  partagée entre instances.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri

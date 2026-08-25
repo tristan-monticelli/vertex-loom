@@ -658,6 +658,7 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.stats().vector_geometry_cache_entries == 1U);
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
 
