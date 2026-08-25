@@ -50,7 +50,9 @@ public:
 
     [[nodiscard]] bool initialize();
     void shutdown() noexcept;
-    [[nodiscard]] bool ready() const noexcept { return program_ != 0U; }
+    [[nodiscard]] bool ready() const noexcept {
+        return program_ != 0U || legacy_fixed_function_;
+    }
     [[nodiscard]] const std::string& initialization_error() const noexcept {
         return initialization_error_;
     }
@@ -68,6 +70,7 @@ private:
     };
 
     std::uint32_t program_{};
+    bool legacy_fixed_function_{};
     std::uint32_t vertex_array_{};
     bool use_vertex_array_{};
     std::uint32_t vertex_buffer_{};

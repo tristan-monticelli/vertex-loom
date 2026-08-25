@@ -210,14 +210,18 @@ OpenGLVectorRenderer::~OpenGLVectorRenderer() { shutdown(); }
 bool OpenGLVectorRenderer::initialize() {
     if (ready()) return true;
     initialization_error_.clear();
+    int context_major = 0;
+    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &context_major);
     const auto functions = load_functions();
     if (!functions_ready(functions)) {
+        if (context_major <= 2) {
+            legacy_fixed_function_ = true;
+            return true;
+        }
         initialization_error_ = "required OpenGL entry point is unavailable";
         return false;
     }
 
-    int context_major = 0;
-    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &context_major);
     use_vertex_array_ = context_major >= 3 &&
         functions.gen_vertex_arrays != nullptr &&
         functions.bind_vertex_array != nullptr &&
@@ -339,7 +343,7 @@ void main() {
         functions.delete_buffers(1, &vertex_buffer_);
         functions.delete_buffers(1, &index_buffer_);
         if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
-        functions.delete_program(program_);
+        if (program_ != 0U) functions.delete_program(program_);
         initialization_error_ = "required shader uniform is unavailable";
         program_ = 0U;
         return false;
@@ -357,6 +361,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
         functions.delete_program(program_);
     }
     program_ = 0U;
+    legacy_fixed_function_ = false;
     vertex_array_ = 0U;
     use_vertex_array_ = false;
     vertex_buffer_ = 0U;
@@ -391,6 +396,85 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         viewport.world_bounds.size.x <= 0.0F ||
         viewport.world_bounds.size.y <= 0.0F) {
         stats.errors.push_back("OpenGL vector viewport must be finite and positive");
+        return stats;
+    }
+    if (legacy_fixed_function_) {
+        glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(viewport.world_bounds.origin.x,
+                viewport.world_bounds.origin.x + viewport.world_bounds.size.x,
+                viewport.world_bounds.origin.y,
+                viewport.world_bounds.origin.y + viewport.world_bounds.size.y,
+                -1.0, 1.0);
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        glDisable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        const auto same_color = [](const VectorDrawPacket& left,
+                                   const VectorDrawPacket& right) {
+            if (!left.fill_color || !right.fill_color) return false;
+            return left.fill_color->red == right.fill_color->red &&
+                left.fill_color->green == right.fill_color->green &&
+                left.fill_color->blue == right.fill_color->blue &&
+                left.fill_color->alpha == right.fill_color->alpha;
+        };
+        for (std::size_t packet_index = 0; packet_index < packets.size();) {
+            const auto& packet = packets[packet_index];
+            if (packet.image_fill) {
+                stats.errors.push_back(
+                    "legacy OpenGL renderer does not support image fills");
+                ++packet_index;
+                continue;
+            }
+            if (packet.stroke || !packet.fill_color || packet.fill_vertices.empty() ||
+                packet.fill_indices.empty()) {
+                ++packet_index;
+                continue;
+            }
+            vertex_scratch_.clear();
+            index_scratch_.clear();
+            std::size_t next = packet_index;
+            while (next < packets.size()) {
+                const auto& candidate = packets[next];
+                if (candidate.image_fill || candidate.stroke ||
+                    candidate.fill_vertices.empty() || candidate.fill_indices.empty() ||
+                    !same_color(packet, candidate)) break;
+                const auto base = static_cast<std::uint32_t>(vertex_scratch_.size());
+                vertex_scratch_.reserve(vertex_scratch_.size() +
+                                        candidate.fill_vertices.size());
+                for (const auto point : candidate.fill_vertices)
+                    vertex_scratch_.push_back({point.x, point.y, 0.0F, 0.0F});
+                index_scratch_.reserve(index_scratch_.size() +
+                                       candidate.fill_indices.size());
+                for (const auto index : candidate.fill_indices)
+                    index_scratch_.push_back(base + index);
+                ++next;
+            }
+            const auto& color = *packet.fill_color;
+            glColor4f(color.red, color.green, color.blue, color.alpha);
+            glVertexPointer(2, GL_FLOAT, sizeof(Vertex), vertex_scratch_.data());
+            glDrawElements(GL_TRIANGLES,
+                           static_cast<GLsizei>(index_scratch_.size()),
+                           GL_UNSIGNED_INT, index_scratch_.data());
+            ++stats.draw_calls;
+            stats.packets_drawn += static_cast<std::uint32_t>(next - packet_index);
+            stats.triangles_drawn += static_cast<std::uint32_t>(
+                index_scratch_.size() / 3U);
+            packet_index = next;
+        }
+        glDisable(GL_BLEND);
+        glDisableClientState(GL_VERTEX_ARRAY);
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
         return stats;
     }
     const auto functions = load_functions();
