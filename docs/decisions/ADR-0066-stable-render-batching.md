@@ -17,3 +17,9 @@ Les scènes composées de nombreux sprites ou formes de même matériau réduise
 leurs draw calls sans modifier leur résultat visuel. La cible de 10 000 éléments
 et 60 FPS p95 doit encore être mesurée sur la scène de référence et n’est pas
 considérée comme acquise par cette optimisation seule.
+
+Le backend mémorise également les uniform locations lors de l’initialisation,
+réutilise la capacité des VBO/IBO avec `glBufferSubData` et évite la table
+d’indexation des packets lorsqu’aucun clip n’est présent. Ces optimisations
+réduisent les allocations et recherches répétées par frame sans changer l’ordre
+ou le résultat des draw packets.

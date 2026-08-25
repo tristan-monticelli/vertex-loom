@@ -5,6 +5,7 @@
 #include "fabric/render/vector_geometry.hpp"
 
 #include <cstdint>
+#include <cstddef>
 #include <functional>
 #include <optional>
 #include <span>
@@ -61,6 +62,12 @@ private:
     std::uint32_t vertex_buffer_{};
     std::uint32_t index_buffer_{};
     std::int32_t world_to_clip_uniform_{-1};
+    std::int32_t color_uniform_{-1};
+    std::int32_t image_texture_uniform_{-1};
+    std::int32_t textured_uniform_{-1};
+    std::int32_t opacity_uniform_{-1};
+    std::size_t vertex_buffer_capacity_{};
+    std::size_t index_buffer_capacity_{};
 };
 
 } // namespace fabric::render

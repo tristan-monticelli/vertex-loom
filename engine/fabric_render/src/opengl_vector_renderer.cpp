@@ -34,6 +34,7 @@ using DeleteVertexArrays = PFNGLDELETEVERTEXARRAYSPROC;
 using GenBuffers = PFNGLGENBUFFERSPROC;
 using BindBuffer = PFNGLBINDBUFFERPROC;
 using BufferData = PFNGLBUFFERDATAPROC;
+using BufferSubData = PFNGLBUFFERSUBDATAPROC;
 using DeleteBuffers = PFNGLDELETEBUFFERSPROC;
 using EnableVertexAttribArray = PFNGLENABLEVERTEXATTRIBARRAYPROC;
 using VertexAttribPointer = PFNGLVERTEXATTRIBPOINTERPROC;
@@ -68,6 +69,7 @@ struct Functions {
     GenBuffers gen_buffers{};
     BindBuffer bind_buffer{};
     BufferData buffer_data{};
+    BufferSubData buffer_sub_data{};
     DeleteBuffers delete_buffers{};
     EnableVertexAttribArray enable_vertex_attrib_array{};
     VertexAttribPointer vertex_attrib_pointer{};
@@ -109,6 +111,7 @@ Functions load_functions() {
         load_function<GenBuffers>("glGenBuffers"),
         load_function<BindBuffer>("glBindBuffer"),
         load_function<BufferData>("glBufferData"),
+        load_function<BufferSubData>("glBufferSubData"),
         load_function<DeleteBuffers>("glDeleteBuffers"),
         load_function<EnableVertexAttribArray>("glEnableVertexAttribArray"),
         load_function<VertexAttribPointer>("glVertexAttribPointer"),
@@ -145,6 +148,7 @@ bool functions_ready(const Functions& functions) {
            functions.gen_buffers != nullptr &&
            functions.bind_buffer != nullptr &&
            functions.buffer_data != nullptr &&
+           functions.buffer_sub_data != nullptr &&
            functions.delete_buffers != nullptr &&
            functions.enable_vertex_attrib_array != nullptr &&
            functions.vertex_attrib_pointer != nullptr &&
@@ -282,7 +286,12 @@ void main() {
     program_ = program;
     world_to_clip_uniform_ = functions.get_uniform_location(
         program_, "worldToClip");
-    if (world_to_clip_uniform_ < 0) {
+    color_uniform_ = functions.get_uniform_location(program_, "color");
+    image_texture_uniform_ = functions.get_uniform_location(program_, "imageTexture");
+    textured_uniform_ = functions.get_uniform_location(program_, "textured");
+    opacity_uniform_ = functions.get_uniform_location(program_, "opacity");
+    if (world_to_clip_uniform_ < 0 || color_uniform_ < 0 ||
+        image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
         functions.delete_buffers(1, &vertex_buffer_);
         functions.delete_buffers(1, &index_buffer_);
         functions.delete_vertex_arrays(1, &vertex_array_);
@@ -307,6 +316,12 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     vertex_buffer_ = 0U;
     index_buffer_ = 0U;
     world_to_clip_uniform_ = -1;
+    color_uniform_ = -1;
+    image_texture_uniform_ = -1;
+    textured_uniform_ = -1;
+    opacity_uniform_ = -1;
+    vertex_buffer_capacity_ = 0U;
+    index_buffer_capacity_ = 0U;
 }
 
 OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
@@ -336,12 +351,24 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                                  matrix.data());
     functions.bind_vertex_array(vertex_array_);
 
+    const auto upload_buffer = [&](const GLenum target, const std::size_t size,
+                                   const void* data, std::size_t& capacity) {
+        functions.bind_buffer(target, target == GL_ARRAY_BUFFER
+            ? vertex_buffer_ : index_buffer_);
+        if (size > capacity) {
+            functions.buffer_data(target, static_cast<GLsizeiptr>(size),
+                                  nullptr, GL_STREAM_DRAW);
+            capacity = size;
+        }
+        functions.buffer_sub_data(target, 0, static_cast<GLsizeiptr>(size), data);
+    };
+
     std::unordered_map<std::string, const VectorDrawPacket*> packets_by_id;
-    bool has_clips = false;
-    for (const auto& packet : packets) {
-        packets_by_id.emplace(packet.node_id, &packet);
-        has_clips = has_clips || packet.clip_node_id.has_value();
-    }
+    const bool has_clips = std::ranges::any_of(packets,
+        [](const auto& packet) { return packet.clip_node_id.has_value(); });
+    if (has_clips)
+        for (const auto& packet : packets)
+            packets_by_id.emplace(packet.node_id, &packet);
     bool stencil_ready = false;
     if (has_clips) {
         GLint stencil_bits = 0;
@@ -392,37 +419,26 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             const auto uv = has_uv ? packet.fill_uv[index] : core::Vec2{};
             vertices.push_back({point.x, point.y, uv.x, uv.y});
         }
-        functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
-        functions.buffer_data(GL_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
-                              vertices.data(), GL_STREAM_DRAW);
-        functions.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
-        functions.buffer_data(GL_ELEMENT_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(packet.fill_indices.size() *
-                                                      sizeof(std::uint32_t)),
-                              packet.fill_indices.data(), GL_STREAM_DRAW);
-        const GLint color_uniform = functions.get_uniform_location(program_, "color");
-        const GLint textured_uniform = functions.get_uniform_location(
-            program_, "textured");
-        const GLint opacity_uniform = functions.get_uniform_location(
-            program_, "opacity");
+        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
+                      vertices.data(), vertex_buffer_capacity_);
+        upload_buffer(GL_ELEMENT_ARRAY_BUFFER,
+                      packet.fill_indices.size() * sizeof(std::uint32_t),
+                      packet.fill_indices.data(), index_buffer_capacity_);
         if (resolved_image && !stencil_only) {
-            const GLint sampler_uniform = functions.get_uniform_location(
-                program_, "imageTexture");
-            functions.uniform_4f(color_uniform, 1.0F, 1.0F, 1.0F, 1.0F);
-            functions.uniform_1i(textured_uniform, 1);
-            functions.uniform_1f(opacity_uniform, packet.image_fill->opacity);
-            functions.uniform_1i(sampler_uniform, 0);
+            functions.uniform_4f(color_uniform_, 1.0F, 1.0F, 1.0F, 1.0F);
+            functions.uniform_1i(textured_uniform_, 1);
+            functions.uniform_1f(opacity_uniform_, packet.image_fill->opacity);
+            functions.uniform_1i(image_texture_uniform_, 0);
             functions.active_texture(GL_TEXTURE0);
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
         } else {
             const auto color = stencil_only
                 ? core::Color{1.0F, 1.0F, 1.0F, 1.0F}
                 : *packet.fill_color;
-            functions.uniform_4f(color_uniform, color.red, color.green,
+            functions.uniform_4f(color_uniform_, color.red, color.green,
                                  color.blue, color.alpha);
-            functions.uniform_1i(textured_uniform, 0);
-            functions.uniform_1f(opacity_uniform, 1.0F);
+            functions.uniform_1i(textured_uniform_, 0);
+            functions.uniform_1f(opacity_uniform_, 1.0F);
         }
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.fill_indices.size()),
@@ -442,20 +458,13 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         for (const auto point : packet.outline) {
             vertices.push_back({point.x, point.y, 0.0F, 0.0F});
         }
-        functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
-        functions.buffer_data(GL_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
-                              vertices.data(), GL_STREAM_DRAW);
+        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
+                      vertices.data(), vertex_buffer_capacity_);
         const auto& color = packet.stroke->color;
-        const GLint color_uniform = functions.get_uniform_location(program_, "color");
-        const GLint textured_uniform = functions.get_uniform_location(
-            program_, "textured");
-        const GLint opacity_uniform = functions.get_uniform_location(
-            program_, "opacity");
-        functions.uniform_4f(color_uniform, color.red, color.green,
+        functions.uniform_4f(color_uniform_, color.red, color.green,
                              color.blue, color.alpha);
-        functions.uniform_1i(textured_uniform, 0);
-        functions.uniform_1f(opacity_uniform, 1.0F);
+        functions.uniform_1i(textured_uniform_, 0);
+        functions.uniform_1f(opacity_uniform_, 1.0F);
         functions.draw_arrays(packet.closed_outline ? GL_LINE_LOOP : GL_LINE_STRIP,
                               0, static_cast<GLsizei>(vertices.size()));
         ++stats.draw_calls;
@@ -524,30 +533,23 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             for (const auto index : packet->fill_indices) indices.push_back(base + index);
         }
 
-        functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
-        functions.buffer_data(GL_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
-                              vertices.data(), GL_STREAM_DRAW);
-        functions.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
-        functions.buffer_data(GL_ELEMENT_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(indices.size() * sizeof(std::uint32_t)),
-                              indices.data(), GL_STREAM_DRAW);
-        const GLint color_uniform = functions.get_uniform_location(program_, "color");
-        const GLint textured_uniform = functions.get_uniform_location(program_, "textured");
-        const GLint opacity_uniform = functions.get_uniform_location(program_, "opacity");
+        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
+                      vertices.data(), vertex_buffer_capacity_);
+        upload_buffer(GL_ELEMENT_ARRAY_BUFFER,
+                      indices.size() * sizeof(std::uint32_t), indices.data(),
+                      index_buffer_capacity_);
         if (texture) {
-            const GLint sampler_uniform = functions.get_uniform_location(program_, "imageTexture");
-            functions.uniform_4f(color_uniform, 1.0F, 1.0F, 1.0F, 1.0F);
-            functions.uniform_1i(textured_uniform, 1);
-            functions.uniform_1f(opacity_uniform, first.image_fill->opacity);
-            functions.uniform_1i(sampler_uniform, 0);
+            functions.uniform_4f(color_uniform_, 1.0F, 1.0F, 1.0F, 1.0F);
+            functions.uniform_1i(textured_uniform_, 1);
+            functions.uniform_1f(opacity_uniform_, first.image_fill->opacity);
+            functions.uniform_1i(image_texture_uniform_, 0);
             functions.active_texture(GL_TEXTURE0);
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
         } else {
             const auto& color = *first.fill_color;
-            functions.uniform_4f(color_uniform, color.red, color.green, color.blue, color.alpha);
-            functions.uniform_1i(textured_uniform, 0);
-            functions.uniform_1f(opacity_uniform, 1.0F);
+            functions.uniform_4f(color_uniform_, color.red, color.green, color.blue, color.alpha);
+            functions.uniform_1i(textured_uniform_, 0);
+            functions.uniform_1f(opacity_uniform_, 1.0F);
         }
         functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()),
                                 GL_UNSIGNED_INT, nullptr);
