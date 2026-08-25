@@ -1427,6 +1427,15 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
     return project::evaluate_animation(found->second, time);
 }
 
+std::vector<project::AnimationMarkerHit> PreviewRuntime::animation_markers(
+    const core::ResourceId& animation_id, const float from_time,
+    const float to_time) const {
+    if (!impl_) return {};
+    const auto found = impl_->animation_clips.find(animation_id.value);
+    if (found == impl_->animation_clips.end()) return {};
+    return project::animation_markers_between(found->second, from_time, to_time);
+}
+
 std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_animation(
     const std::string& instance_id, const float time) const {
     if (!impl_) return std::nullopt;

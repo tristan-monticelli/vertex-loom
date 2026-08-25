@@ -118,4 +118,24 @@ TEST_CASE("rotation interpolation follows the shortest angular path") {
     CHECK(std::get<float>(reverse.properties.back().value) == 0.0F);
 }
 
+TEST_CASE("animation marker hits are ordered across loop boundaries") {
+    auto source = clip();
+    source.markers = {{"foot", 0.25F}, {"turn", 0.75F}};
+    const auto one_pass = fabric::project::animation_markers_between(source, 0.2F, 0.8F);
+    REQUIRE(one_pass.size() == 2U);
+    CHECK(one_pass[0] == fabric::project::AnimationMarkerHit{"foot", 0.25F, 0.25F, 0});
+    CHECK(one_pass[1] == fabric::project::AnimationMarkerHit{"turn", 0.75F, 0.75F, 0});
+
+    const auto looped = fabric::project::animation_markers_between(source, 0.6F, 1.4F);
+    REQUIRE(looped.size() == 2U);
+    CHECK(looped[0] == fabric::project::AnimationMarkerHit{"turn", 0.75F, 0.75F, 0});
+    CHECK(looped[1] == fabric::project::AnimationMarkerHit{"foot", 1.25F, 0.25F, 1});
+
+    source.loop = false;
+    const auto clamped = fabric::project::animation_markers_between(source, -1.0F, 2.0F);
+    REQUIRE(clamped.size() == 2U);
+    CHECK(clamped.front().id == "foot");
+    CHECK(clamped.back().id == "turn");
+}
+
 } // namespace

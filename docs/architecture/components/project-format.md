@@ -75,7 +75,10 @@ C4Component
   Chaque piste porte aussi une composition `replace` ou `additive` ; le champ
   est facultatif à la lecture pour conserver la compatibilité des clips v1
   existants et vaut `replace` par défaut. L’évaluation headless expose cette
-  composition avec la valeur interpolée.
+  composition avec la valeur interpolée. Le helper `animation_markers_between`
+  et l’API runtime correspondante renvoient les markers franchis dans
+  l’intervalle semi-ouvert `(from, to]` (`from < marker <= to`), avec
+  instant absolu, instant local et index de boucle.
 - `PreviewRuntime` énumère les documents `*.animation.json` sous
   `assets/animations` avant l’initialisation SDL. Chaque document est chargé
   avec un chemin relatif au projet, validé puis indexé par `ResourceId` ; un

@@ -65,6 +65,8 @@ fabric::project::AnimationClip animation() {
                          .id = {.value = "runtime-animation"},
                          .name = "Runtime Animation"},
             .duration = 1.0F,
+            .loop = true,
+            .markers = {{"start", 0.0F}, {"end", 1.0F}},
             .tracks = {{{.node_id = "root",
                          .component_id = "transform",
                          .property_id = "position"},
@@ -604,6 +606,12 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
     const auto position = std::get<fabric::core::Vec2>(
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
+    const auto marker_hits = runtime.animation_markers(
+        {.value = "runtime-animation"}, 0.25F, 1.25F);
+    REQUIRE(marker_hits.size() == 2U);
+    CHECK(marker_hits.front().id == "end");
+    CHECK(marker_hits.back().id == "start");
+    CHECK(marker_hits.back().loop_index == 1);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

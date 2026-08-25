@@ -28,6 +28,10 @@ des tracks. Les propriétés matériau `color` et `opacity` suivent la même rè
 de composition lors du rendu des draw packets. Les tracks
 `transform/rotationDegrees` suivent toujours le chemin angulaire le plus
 court, y compris lorsqu’elles franchissent 0°/360°.
+Le runtime expose aussi les markers franchis entre deux instants, dans l’ordre
+temporel, avec leur instant local et leur index de boucle ; l’intervalle est
+semi-ouvert à gauche et fermé à droite (`from, to]`), afin d’éviter les doubles
+émissions au même instant de frame.
 
 Asset Studio propose un mode `Auto-key at scrub time`. Lorsqu’il est actif,
 toute modification de la valeur de clé dans l’inspecteur appelle `Set key` au

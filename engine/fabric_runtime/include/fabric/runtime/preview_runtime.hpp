@@ -103,6 +103,8 @@ public:
     [[nodiscard]] std::size_t animation_count() const noexcept;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(
         const core::ResourceId& animation_id, float time) const;
+    [[nodiscard]] std::vector<project::AnimationMarkerHit> animation_markers(
+        const core::ResourceId& animation_id, float from_time, float to_time) const;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_instance_animation(
         const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::MeshDeformationResult>

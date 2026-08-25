@@ -5,6 +5,7 @@
 #include "fabric/project/manifest.hpp"
 
 #include <filesystem>
+#include <cstdint>
 #include <optional>
 #include <variant>
 #include <vector>
@@ -47,6 +48,14 @@ struct AnimationMarker {
     std::string id;
     float time{};
     friend bool operator==(const AnimationMarker&, const AnimationMarker&) = default;
+};
+
+struct AnimationMarkerHit {
+    std::string id;
+    float time{};
+    float local_time{};
+    std::int64_t loop_index{};
+    friend bool operator==(const AnimationMarkerHit&, const AnimationMarkerHit&) = default;
 };
 
 struct AnimationClip {
@@ -95,5 +104,7 @@ struct EvaluationResult {
                                                 const ProjectManifest&,
                                                 const AnimationClip&);
 [[nodiscard]] EvaluationResult evaluate_animation(const AnimationClip&, float time);
+[[nodiscard]] std::vector<AnimationMarkerHit> animation_markers_between(
+    const AnimationClip&, float from_time, float to_time);
 
 } // namespace fabric::project

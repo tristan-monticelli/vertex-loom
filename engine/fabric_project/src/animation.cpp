@@ -100,4 +100,43 @@ EvaluationResult evaluate_animation(const AnimationClip& clip, const float time)
     }
     return result;
 }
+
+std::vector<AnimationMarkerHit> animation_markers_between(
+    const AnimationClip& clip, const float from_time, const float to_time) {
+    std::vector<AnimationMarkerHit> hits;
+    if (!(to_time > from_time) || clip.markers.empty()) return hits;
+
+    if (!clip.loop || clip.duration <= 0.0F) {
+        const auto begin = std::max(0.0F, from_time);
+        const auto end = std::min(clip.duration, to_time);
+        if (!(end > begin)) return hits;
+        for (const auto& marker : clip.markers) {
+            if (marker.time > begin && marker.time <= end)
+                hits.push_back({marker.id, marker.time, marker.time, 0});
+        }
+        std::stable_sort(hits.begin(), hits.end(),
+                         [](const auto& left, const auto& right) {
+                             return left.time < right.time;
+                         });
+        return hits;
+    }
+
+    const auto first_loop = static_cast<std::int64_t>(
+        std::floor(from_time / clip.duration));
+    const auto last_loop = static_cast<std::int64_t>(
+        std::floor(to_time / clip.duration));
+    for (std::int64_t loop_index = first_loop; loop_index <= last_loop; ++loop_index) {
+        const auto loop_start = static_cast<float>(loop_index) * clip.duration;
+        for (const auto& marker : clip.markers) {
+            const auto absolute_time = loop_start + marker.time;
+            if (absolute_time > from_time && absolute_time <= to_time)
+                hits.push_back({marker.id, absolute_time, marker.time, loop_index});
+        }
+    }
+    std::stable_sort(hits.begin(), hits.end(),
+                     [](const auto& left, const auto& right) {
+                         return left.time < right.time;
+                     });
+    return hits;
+}
 }
