@@ -286,6 +286,9 @@ qui les consomme.
 Un calque peut être choisi comme calque actif ; les instances sélectionnées
 peuvent y être déplacées en une commande atomique, avec refus des calques
 verrouillés.
+Le placement interactif permet maintenant de choisir un identifiant, une
+ressource `entity` ou `prefab`, puis de créer l’instance au clic dans le
+canvas avec snapping et historique.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

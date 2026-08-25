@@ -191,6 +191,10 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      CollisionPointGizmoState& point_gizmo,
                      int selected_trigger_index,
                      const std::string& active_layer_id,
+                     bool& placement_mode,
+                     std::string& placement_id,
+                     std::string& placement_resource_id,
+                     int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
                      std::string& status) {
     if (!session.map()) return;
@@ -407,6 +411,27 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
+        if (placement_mode && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            fabric::project::MapInstance instance;
+            instance.id = placement_id;
+            instance.layer_id = active_layer_id;
+            instance.transform.position = screen_to_world(io.MousePos);
+            if (placement_kind == 0)
+                instance.entity = fabric::project::ResourceReference{
+                    {.value = placement_resource_id}, "entity"};
+            else
+                instance.prefab = fabric::project::ResourceReference{
+                    {.value = placement_resource_id}, "prefab"};
+            const auto placed = session.place_instance(std::move(instance), snapping);
+            status = placed ? "Instance placed" :
+                             "Placement rejected (id, resource, layer or lock)";
+            if (placed) {
+                placement_mode = false;
+                placement_id.clear();
+                placement_resource_id.clear();
+            }
+            return;
+        }
         if (!gizmo.active && !point_gizmo.active &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_collision_index >= 0) {
             const auto collision_index = static_cast<std::size_t>(selected_collision_index);
@@ -616,6 +641,10 @@ int run(const std::filesystem::path& project_root,
     fabric::project::TriggerDefinition trigger_editor;
     std::vector<std::string> selected_instances;
     std::string active_layer_id;
+    bool placement_mode = false;
+    std::string placement_id;
+    std::string placement_resource_id;
+    int placement_kind = 0;
     std::string selected_prefab;
     std::string override_id;
     std::string override_value;
@@ -746,9 +775,23 @@ int run(const std::filesystem::path& project_root,
                     : "Layer move rejected (locked or invalid)";
             }
             ImGui::EndDisabled();
+            ImGui::SeparatorText("Placement");
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("New instance id", &placement_id);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("Resource id", &placement_resource_id);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::Combo("Resource kind", &placement_kind, "entity\0prefab\0");
+            ImGui::BeginDisabled(placement_id.empty() || placement_resource_id.empty() ||
+                                 active_layer_id.empty());
+            if (ImGui::Button(placement_mode ? "Cancel placement" : "Place in canvas"))
+                placement_mode = !placement_mode;
+            ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
-                            selected_trigger_index, active_layer_id, canvas_snapping, status);
+                            selected_trigger_index, active_layer_id, placement_mode,
+                            placement_id, placement_resource_id, placement_kind,
+                            canvas_snapping, status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
