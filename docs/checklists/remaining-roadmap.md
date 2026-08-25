@@ -293,6 +293,9 @@ canvas avec snapping et historique.
 curseur, en conservant le snapping et l’historique déterministe.
 Un glisser dans le canvas sélectionne maintenant les instances visibles dans
 un rectangle ; Shift ajoute ou retire la zone de la sélection existante.
+Une sélection multiple peut être déplacée en glissant n’importe quelle
+instance du groupe ; le delta commun est soumis au snapping et enregistré en
+une seule commande.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

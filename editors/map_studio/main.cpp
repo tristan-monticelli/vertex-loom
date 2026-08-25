@@ -129,6 +129,8 @@ struct CanvasGizmoState {
     ImVec2 start_mouse{};
     fabric::core::Transform start_transform{};
     fabric::core::Transform preview_transform{};
+    std::vector<std::string> group_ids;
+    fabric::core::Vec2 preview_delta{};
 };
 
 struct CollisionPointGizmoState {
@@ -264,8 +266,16 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                                   -(point.y - canvas_center.y - pan.y) / zoom};
     };
     auto transform_for = [&](const fabric::project::MapInstance& instance) {
-        return gizmo.active && gizmo.instance_id == instance.id
-            ? gizmo.preview_transform : instance.transform;
+        if (!gizmo.active) return instance.transform;
+        if (gizmo.mode == CanvasGizmoMode::translate &&
+            std::find(gizmo.group_ids.begin(), gizmo.group_ids.end(), instance.id) !=
+                gizmo.group_ids.end()) {
+            auto result = instance.transform;
+            result.position.x += gizmo.preview_delta.x;
+            result.position.y += gizmo.preview_delta.y;
+            return result;
+        }
+        return gizmo.instance_id == instance.id ? gizmo.preview_transform : instance.transform;
     };
     auto collision_point_for = [&](const std::size_t collision_index,
                                    const std::size_t point_index,
@@ -401,6 +411,28 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             draw->AddCircle(rotate_handle, 6.0F, IM_COL32(240, 180, 80, 240), 16, 2.0F);
             draw->AddCircle(center, 11.0F, IM_COL32(90, 190, 255, 240), 24, 2.0F);
         }
+    } else if (selected_instances.size() > 1U) {
+        ImVec2 minimum{std::numeric_limits<float>::max(), std::numeric_limits<float>::max()};
+        ImVec2 maximum{std::numeric_limits<float>::lowest(), std::numeric_limits<float>::lowest()};
+        bool found = false;
+        for (const auto& instance : map.instances) {
+            if (std::find(selected_instances.begin(), selected_instances.end(), instance.id) ==
+                    selected_instances.end() || !layer_visible(map, instance.layer_id))
+                continue;
+            const auto point = world_to_screen(transform_for(instance).position);
+            minimum.x = std::min(minimum.x, point.x);
+            minimum.y = std::min(minimum.y, point.y);
+            maximum.x = std::max(maximum.x, point.x);
+            maximum.y = std::max(maximum.y, point.y);
+            found = true;
+        }
+        if (found) {
+            minimum.x -= 12.0F;
+            minimum.y -= 12.0F;
+            maximum.x += 12.0F;
+            maximum.y += 12.0F;
+            draw->AddRect(minimum, maximum, IM_COL32(90, 190, 255, 230), 2.0F, 0, 2.0F);
+        }
     }
     draw->AddRect(canvas_pos,
                   {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
@@ -509,13 +541,13 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 point_gizmo.collision_index = -1;
             }
         }
-        if (!gizmo.active && !point_gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-            selected_instances.size() == 1U) {
+        if (!gizmo.active && !point_gizmo.active &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !selected_instances.empty()) {
             const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
                                                [&](const auto& instance) {
                                                    return instance.id == selected_instances.front();
                                                });
-            if (selected != map.instances.end()) {
+            if (selected_instances.size() == 1U && selected != map.instances.end()) {
                 const auto transform = transform_for(*selected);
                 const auto center = world_to_screen(transform.position);
                 const auto scale_handle = ImVec2{center.x + 36.0F, center.y};
@@ -540,6 +572,27 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                         : (rotate_distance <= 10.0F ? CanvasGizmoMode::rotate
                                                    : CanvasGizmoMode::translate);
                 }
+            } else if (selected_instances.size() > 1U) {
+                const auto hit = std::find_if(map.instances.begin(), map.instances.end(),
+                                              [&](const auto& instance) {
+                                                  if (std::find(selected_instances.begin(),
+                                                                selected_instances.end(),
+                                                                instance.id) == selected_instances.end())
+                                                      return false;
+                                                  const auto point = world_to_screen(
+                                                      instance.transform.position);
+                                                  const auto dx = io.MousePos.x - point.x;
+                                                  const auto dy = io.MousePos.y - point.y;
+                                                  return std::sqrt(dx * dx + dy * dy) <= 12.0F;
+                                              });
+                if (hit != map.instances.end()) {
+                    gizmo.active = true;
+                    gizmo.mode = CanvasGizmoMode::translate;
+                    gizmo.instance_id = hit->id;
+                    gizmo.start_mouse = io.MousePos;
+                    gizmo.preview_delta = {};
+                    gizmo.group_ids = selected_instances;
+                }
             }
         }
         if (gizmo.active) {
@@ -547,9 +600,11 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 if (gizmo.mode == CanvasGizmoMode::translate) {
                     const auto start = screen_to_world(gizmo.start_mouse);
                     const auto current = screen_to_world(io.MousePos);
-                    gizmo.preview_transform.position = {
-                        gizmo.start_transform.position.x + current.x - start.x,
-                        gizmo.start_transform.position.y + current.y - start.y};
+                    gizmo.preview_delta = {current.x - start.x, current.y - start.y};
+                    if (gizmo.group_ids.size() == 1U)
+                        gizmo.preview_transform.position = {
+                            gizmo.start_transform.position.x + gizmo.preview_delta.x,
+                            gizmo.start_transform.position.y + gizmo.preview_delta.y};
                 } else if (gizmo.mode == CanvasGizmoMode::rotate) {
                     const auto center = world_to_screen(gizmo.start_transform.position);
                     const auto start_angle = std::atan2(gizmo.start_mouse.y - center.y,
@@ -568,14 +623,23 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                         gizmo.start_transform.scale.y * factor};
                 }
             } else {
-                const auto committed = session.set_instance_transform(
-                    {.value = gizmo.instance_id}, gizmo.preview_transform,
-                    gizmo.mode == CanvasGizmoMode::translate
-                        ? snapping : fabric::editor::MapSnapSettings{.enabled = false});
+                bool committed = false;
+                if (gizmo.group_ids.size() > 1U) {
+                    std::vector<fabric::core::ResourceId> ids;
+                    for (const auto& id : gizmo.group_ids) ids.push_back({.value = id});
+                    committed = session.translate_instances(ids, gizmo.preview_delta, snapping);
+                } else {
+                    committed = session.set_instance_transform(
+                        {.value = gizmo.instance_id}, gizmo.preview_transform,
+                        gizmo.mode == CanvasGizmoMode::translate
+                            ? snapping : fabric::editor::MapSnapSettings{.enabled = false});
+                }
                 status = committed ? "Canvas transform committed"
                                    : "Canvas transform rejected (layer locked or invalid)";
                 gizmo.active = false;
                 gizmo.instance_id.clear();
+                gizmo.group_ids.clear();
+                gizmo.preview_delta = {};
             }
         }
         if (!gizmo.active && !point_gizmo.active && !placement_mode &&
