@@ -233,6 +233,11 @@ VectorGeometryResult build_native_draw_packets(
             .outline = flatten_shape(node.shape, curve_tolerance),
             .parent_id = node.parent_id,
             .clip_node_id = node.clip_node_id,
+            .closed_outline = node.shape.kind != project::VectorShapeKind::line &&
+                (node.shape.kind != project::VectorShapeKind::path ||
+                 (!node.shape.path.empty() &&
+                  node.shape.path.back().kind ==
+                      project::VectorPathCommandKind::close)),
         };
         std::string transform_error;
         if (!transform_outline(nodes, node, packet.outline, transform_error)) {

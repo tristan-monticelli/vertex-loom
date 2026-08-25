@@ -65,4 +65,5 @@ C4Component
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.
   Le backend OpenGL 3 compile ses shaders et possède ses buffers via les
   fonctions chargées par SDL ; il refuse explicitement les fills image tant
-  qu’aucun résolveur de textures n’est fourni.
+  qu’aucun résolveur de textures n’est fourni, mais dessine les contours
+  ouverts et fermés avec le même packet.

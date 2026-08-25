@@ -178,7 +178,8 @@ void native_geometry_produces_deterministic_packets() {
     require(first.packets == second.packets,
             "native geometry packets were not deterministic");
     require(first.packets.size() == 1U &&
-                first.packets.front().fill_indices.size() == 3U,
+                first.packets.front().fill_indices.size() == 3U &&
+                first.packets.front().closed_outline,
             "triangle did not produce one deterministic fill triangle");
 }
 
@@ -258,6 +259,20 @@ void opengl_vector_renderer_reports_uninitialized_use() {
             "uninitialized OpenGL renderer did not report its state");
 }
 
+void native_geometry_marks_open_strokes() {
+    auto asset = native_geometry_fixture();
+    auto& node = asset.native->nodes.front();
+    node.shape.kind = fabric::project::VectorShapeKind::line;
+    node.shape.points = {{0.0F, 0.0F}, {4.0F, 2.0F}};
+    node.fill = {.kind = fabric::project::VectorFillKind::none};
+    node.stroke = fabric::project::VectorStroke{};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U &&
+                !result.packets.front().closed_outline &&
+                result.packets.front().stroke.has_value(),
+            "line stroke packet was not marked as open");
+}
+
 } // namespace
 
 int main() {
@@ -270,5 +285,6 @@ int main() {
     native_geometry_preserves_image_fill_payload();
     native_geometry_applies_node_and_parent_transforms();
     opengl_vector_renderer_reports_uninitialized_use();
+    native_geometry_marks_open_strokes();
     return 0;
 }

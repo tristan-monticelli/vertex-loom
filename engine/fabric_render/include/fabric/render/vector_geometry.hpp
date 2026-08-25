@@ -21,6 +21,7 @@ struct VectorDrawPacket {
     std::vector<std::uint32_t> fill_indices;
     std::optional<std::string> parent_id;
     std::optional<std::string> clip_node_id;
+    bool closed_outline{};
 
     friend bool operator==(const VectorDrawPacket&, const VectorDrawPacket&) = default;
 };

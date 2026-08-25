@@ -36,6 +36,7 @@ using DeleteBuffers = PFNGLDELETEBUFFERSPROC;
 using EnableVertexAttribArray = PFNGLENABLEVERTEXATTRIBARRAYPROC;
 using VertexAttribPointer = PFNGLVERTEXATTRIBPOINTERPROC;
 using DrawElements = void (GLAPIENTRY *)(GLenum, GLsizei, GLenum, const void*);
+using DrawArrays = void (GLAPIENTRY *)(GLenum, GLint, GLsizei);
 using GetUniformLocation = PFNGLGETUNIFORMLOCATIONPROC;
 using UniformMatrix4fv = PFNGLUNIFORMMATRIX4FVPROC;
 using Uniform4f = PFNGLUNIFORM4FPROC;
@@ -64,6 +65,7 @@ struct Functions {
     EnableVertexAttribArray enable_vertex_attrib_array{};
     VertexAttribPointer vertex_attrib_pointer{};
     DrawElements draw_elements{};
+    DrawArrays draw_arrays{};
     GetUniformLocation get_uniform_location{};
     UniformMatrix4fv uniform_matrix_4fv{};
     Uniform4f uniform_4f{};
@@ -99,6 +101,7 @@ Functions load_functions() {
         load_function<EnableVertexAttribArray>("glEnableVertexAttribArray"),
         load_function<VertexAttribPointer>("glVertexAttribPointer"),
         load_function<DrawElements>("glDrawElements"),
+        load_function<DrawArrays>("glDrawArrays"),
         load_function<GetUniformLocation>("glGetUniformLocation"),
         load_function<UniformMatrix4fv>("glUniformMatrix4fv"),
         load_function<Uniform4f>("glUniform4f"),
@@ -129,6 +132,7 @@ bool functions_ready(const Functions& functions) {
            functions.enable_vertex_attrib_array != nullptr &&
            functions.vertex_attrib_pointer != nullptr &&
            functions.draw_elements != nullptr &&
+           functions.draw_arrays != nullptr &&
            functions.get_uniform_location != nullptr &&
            functions.uniform_matrix_4fv != nullptr &&
            functions.uniform_4f != nullptr;
@@ -284,35 +288,55 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         if (packet.image_fill.has_value()) {
             stats.errors.push_back(
                 "OpenGL vector renderer requires a texture resolver for image fills");
-            continue;
         }
-        if (!packet.fill_color.has_value() || packet.fill_indices.empty()) {
-            continue;
+        bool packet_drawn = false;
+        if (packet.fill_color.has_value() && !packet.fill_indices.empty()) {
+            std::vector<Vertex> vertices;
+            vertices.reserve(packet.fill_vertices.size());
+            for (const auto point : packet.fill_vertices) {
+                vertices.push_back({point.x, point.y});
+            }
+            functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
+            functions.buffer_data(GL_ARRAY_BUFFER,
+                                  static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
+                                  vertices.data(), GL_STREAM_DRAW);
+            functions.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
+            functions.buffer_data(GL_ELEMENT_ARRAY_BUFFER,
+                                  static_cast<GLsizeiptr>(packet.fill_indices.size() *
+                                                          sizeof(std::uint32_t)),
+                                  packet.fill_indices.data(), GL_STREAM_DRAW);
+            const auto& color = *packet.fill_color;
+            const GLint color_uniform = functions.get_uniform_location(program_, "color");
+            functions.uniform_4f(color_uniform, color.red, color.green, color.blue,
+                                 color.alpha);
+            functions.draw_elements(GL_TRIANGLES,
+                                    static_cast<GLsizei>(packet.fill_indices.size()),
+                                    GL_UNSIGNED_INT, nullptr);
+            stats.triangles_drawn += static_cast<std::uint32_t>(
+                packet.fill_indices.size() / 3U);
+            packet_drawn = true;
         }
-        std::vector<Vertex> vertices;
-        vertices.reserve(packet.fill_vertices.size());
-        for (const auto point : packet.fill_vertices) {
-            vertices.push_back({point.x, point.y});
+        if (packet.stroke.has_value() && packet.outline.size() >= 2U) {
+            std::vector<Vertex> vertices;
+            vertices.reserve(packet.outline.size());
+            for (const auto point : packet.outline) {
+                vertices.push_back({point.x, point.y});
+            }
+            functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
+            functions.buffer_data(GL_ARRAY_BUFFER,
+                                  static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
+                                  vertices.data(), GL_STREAM_DRAW);
+            const auto& color = packet.stroke->color;
+            const GLint color_uniform = functions.get_uniform_location(program_, "color");
+            functions.uniform_4f(color_uniform, color.red, color.green, color.blue,
+                                 color.alpha);
+            const GLenum mode = packet.closed_outline ? GL_LINE_LOOP
+                                                       : GL_LINE_STRIP;
+            functions.draw_arrays(mode, 0,
+                                  static_cast<GLsizei>(vertices.size()));
+            packet_drawn = true;
         }
-        functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
-        functions.buffer_data(GL_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(vertices.size() * sizeof(Vertex)),
-                              vertices.data(), GL_STREAM_DRAW);
-        functions.bind_buffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer_);
-        functions.buffer_data(GL_ELEMENT_ARRAY_BUFFER,
-                              static_cast<GLsizeiptr>(packet.fill_indices.size() *
-                                                      sizeof(std::uint32_t)),
-                              packet.fill_indices.data(), GL_STREAM_DRAW);
-        const auto& color = *packet.fill_color;
-        const GLint color_uniform = functions.get_uniform_location(program_, "color");
-        functions.uniform_4f(color_uniform, color.red, color.green, color.blue,
-                             color.alpha);
-        functions.draw_elements(GL_TRIANGLES,
-                                static_cast<GLsizei>(packet.fill_indices.size()),
-                                GL_UNSIGNED_INT, nullptr);
-        ++stats.packets_drawn;
-        stats.triangles_drawn += static_cast<std::uint32_t>(
-            packet.fill_indices.size() / 3U);
+        if (packet_drawn) ++stats.packets_drawn;
     }
     functions.bind_vertex_array(0U);
     functions.use_program(0U);
