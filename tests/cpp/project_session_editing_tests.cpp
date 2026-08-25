@@ -302,6 +302,10 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
         position_binding,
         1U, start));
     CHECK(session.selected_animation()->tracks.front().keys.size() == 1U);
+    REQUIRE(session.insert_selected_animation_marker("apex", 1.0F, start));
+    CHECK_FALSE(session.insert_selected_animation_marker("apex", 1.25F, start));
+    REQUIRE(session.remove_selected_animation_marker("apex", start));
+    CHECK(session.selected_animation()->markers.size() == 1U);
     REQUIRE(session.update_autosave(start + std::chrono::seconds{2}) ==
             fabric::editor::AutosaveStatus::saved);
     fabric::editor::ProjectSession recovered;

@@ -128,6 +128,30 @@ bool AnimationTimeline::remove_key(const project::PropertyBinding& binding,
     return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
+bool AnimationTimeline::insert_marker(std::string id, const float time) {
+    auto next = clip_;
+    if (std::ranges::any_of(next.markers,
+                            [&](const auto& marker) { return marker.id == id; }))
+        return false;
+    next.markers.push_back({std::move(id), time});
+    std::stable_sort(next.markers.begin(), next.markers.end(),
+                     [](const auto& left, const auto& right) {
+                         return left.time < right.time;
+                     });
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
+bool AnimationTimeline::remove_marker(const std::string_view id) {
+    auto next = clip_;
+    const auto marker = std::ranges::find_if(
+        next.markers, [&](const auto& candidate) { return candidate.id == id; });
+    if (marker == next.markers.end()) return false;
+    next.markers.erase(marker);
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
 bool AnimationTimeline::set_duration(float duration) {
     auto next = clip_;
     next.duration = duration;

@@ -112,8 +112,10 @@ struct AnimationUiState {
     std::string node_id{"root"};
     std::string component_id{"transform"};
     std::string property_id{"position"};
+    std::string marker_id{"marker"};
     float scrub_time{};
     float key_time{};
+    float marker_time{};
     float key_value[2]{};
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
@@ -1497,6 +1499,35 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 clip, animation_ui.scrub_time);
             ImGui::TextDisabled("Evaluated properties: %zu",
                                 evaluated.properties.size());
+            ImGui::SeparatorText("Markers");
+            ImGui::InputText("Marker id", &animation_ui.marker_id);
+            animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
+                                                   std::max(0.0F, clip.duration));
+            ImGui::SliderFloat("Marker time", &animation_ui.marker_time, 0.0F,
+                               std::max(0.01F, clip.duration), "%.2f s");
+            ImGui::BeginDisabled(animation_ui.marker_id.empty());
+            if (ImGui::Button("Add marker")) {
+                if (session.insert_selected_animation_marker(
+                        animation_ui.marker_id, animation_ui.marker_time)) {
+                    status = "Animation marker added.";
+                } else {
+                    status = "Animation marker rejected; inspect diagnostics.";
+                }
+            }
+            ImGui::EndDisabled();
+            bool marker_removed = false;
+            for (const auto& marker : clip.markers) {
+                ImGui::BulletText("%s · %.2f s", marker.id.c_str(), marker.time);
+                ImGui::SameLine();
+                const auto marker_button = "Remove##animation-marker-" + marker.id;
+                if (ImGui::SmallButton(marker_button.c_str())) {
+                    marker_removed = session.remove_selected_animation_marker(marker.id);
+                    status = marker_removed
+                        ? "Animation marker removed."
+                        : "Animation marker could not be removed; inspect diagnostics.";
+                    break;
+                }
+            }
             ImGui::SeparatorText("Insert key");
             ImGui::InputText("Node id", &animation_ui.node_id);
             ImGui::InputText("Component", &animation_ui.component_id);

@@ -1347,6 +1347,37 @@ bool ProjectSession::move_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::insert_selected_animation_marker(
+    std::string id, const float time,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.insert_marker(std::move(id), time)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "markers",
+                    "the marker id or time is invalid or already exists"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::remove_selected_animation_marker(
+    const std::string_view id, const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.remove_marker(id)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "markers",
+                    "the marker does not exist"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.undo()) {
         return false;

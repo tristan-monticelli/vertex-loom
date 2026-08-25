@@ -257,6 +257,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   conservant au moins une clé par track.
 - [x] Déplacer les clés avec fusion des gestes continus et évaluer le clip via
   un scrubber temporel.
+- [x] Ajouter et supprimer les markers d’un clip avec validation de l’id et du
+  temps dans la durée.
 - [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
   viewport OpenGL, avec composition des transforms et matériaux.
 - [ ] Refuser cycles, références invalides et valeurs non finies.

@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fabric::editor {
@@ -122,6 +123,14 @@ public:
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool move_selected_animation_key(
         project::PropertyBinding binding, std::size_t key_index, float time,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool insert_selected_animation_marker(
+        std::string id, float time,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool remove_selected_animation_marker(
+        std::string_view id,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(

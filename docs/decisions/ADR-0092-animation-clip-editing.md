@@ -12,7 +12,8 @@ tracks sont créées à la première clé et doivent conserver le type de valeur
 track. Une clé existante peut être supprimée depuis la liste de tracks, sauf si
 elle est la dernière clé de la track, ou déplacée dans la durée du clip. Les
 déplacements continus fusionnent leurs commandes ; le scrubber évalue le clip
-sans modifier le document.
+sans modifier le document. Les markers peuvent aussi être ajoutés ou supprimés
+depuis l’inspecteur.
 
 `ProjectSession` orchestre `AnimationTimeline` avec le même `CommandStack`,
 dirty state, autosave miroir, récupération validée et publication atomique que

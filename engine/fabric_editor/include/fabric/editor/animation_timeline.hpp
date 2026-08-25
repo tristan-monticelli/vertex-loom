@@ -24,6 +24,8 @@ public:
                                 std::size_t key_index, float time);
     [[nodiscard]] bool remove_key(const project::PropertyBinding& binding,
                                   std::size_t key_index);
+    [[nodiscard]] bool insert_marker(std::string id, float time);
+    [[nodiscard]] bool remove_marker(std::string_view id);
     [[nodiscard]] bool set_duration(float duration);
     [[nodiscard]] bool set_loop(bool loop);
 

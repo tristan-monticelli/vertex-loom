@@ -157,4 +157,5 @@ C4Component
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,
   récupération et sauvegarde atomique que les autres documents éditables ; les
   clés existantes peuvent être déplacées ou supprimées sauf la dernière clé
-  d’une track, et un scrubber évalue les propriétés à l’instant courant.
+  d’une track, un scrubber évalue les propriétés à l’instant courant et les
+  markers peuvent être ajoutés ou supprimés.
