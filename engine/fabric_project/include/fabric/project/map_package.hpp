@@ -45,6 +45,15 @@ struct MapPackageManifestResult {
     }
 };
 
+struct MapPackagePublishResult {
+    std::optional<MapPackageManifest> manifest;
+    std::filesystem::path destination;
+    std::vector<Error> errors;
+    [[nodiscard]] bool ok() const noexcept {
+        return manifest.has_value() && errors.empty();
+    }
+};
+
 [[nodiscard]] ValidationReport validate_map_package_manifest(
     const MapPackageManifest&);
 [[nodiscard]] std::string serialize_map_package_manifest(
@@ -53,6 +62,10 @@ struct MapPackageManifestResult {
     std::string_view);
 [[nodiscard]] MapPackageManifestResult plan_map_package(
     const std::filesystem::path& project_root, const core::ResourceId& map_id,
+    std::string_view minimum_runtime_version = core::version());
+[[nodiscard]] MapPackagePublishResult publish_map_package(
+    const std::filesystem::path& project_root, const core::ResourceId& map_id,
+    const std::filesystem::path& destination,
     std::string_view minimum_runtime_version = core::version());
 [[nodiscard]] bool runtime_can_load_map_package(
     const MapPackageManifest&,

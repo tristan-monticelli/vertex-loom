@@ -86,8 +86,8 @@ void replace_in_file(const std::filesystem::path& path,
     output << contents;
 }
 
-bool has_error(const fabric::project::MapPackageManifestResult& result,
-               const fabric::project::ErrorCode code) {
+template <typename Result>
+bool has_error(const Result& result, const fabric::project::ErrorCode code) {
     return std::ranges::any_of(result.errors, [&](const auto& error) {
         return error.code == code;
     });
@@ -284,4 +284,28 @@ TEST_CASE("map package planning rejects identifiers shared by two types") {
         project.root(), {.value = "platform-preview"});
     CHECK_FALSE(planned.ok());
     CHECK(has_error(planned, fabric::project::ErrorCode::duplicate_resource));
+}
+
+TEST_CASE("map package publication copies the planned closure without overwrite") {
+    TemporaryProject project{"studio-rotating-platform"};
+    const auto destination = project.root().parent_path() /
+        (project.root().filename().string() + "-published");
+    std::error_code cleanup_error;
+    std::filesystem::remove_all(destination, cleanup_error);
+    const auto published = fabric::project::publish_map_package(
+        project.root(), {.value = "platform-preview"}, destination);
+    REQUIRE(published.ok());
+    CHECK(std::filesystem::is_regular_file(
+        destination / "map-package.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "maps/platform-preview.map.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "assets/textures/platform-thread.png"));
+
+    const auto rejected = fabric::project::publish_map_package(
+        project.root(), {.value = "platform-preview"}, destination);
+    CHECK_FALSE(rejected.ok());
+    CHECK(has_error(rejected,
+                    fabric::project::ErrorCode::asset_already_exists));
+    std::filesystem::remove_all(destination, cleanup_error);
 }

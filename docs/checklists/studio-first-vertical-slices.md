@@ -224,8 +224,16 @@ plateforme tournante pilotée par la présence du personnage.
   confondus. Des copies temporaires de la fixture plateforme vérifient document
   manquant, source absolue, symlink externe, cycle composant/composition et
   collision entité/mécanique avant toute écriture de paquet.
-- [ ] Ajouter Preview, Validate et Publish dans Map Studio en réutilisant les
+- [x] Ajouter Preview, Validate et Publish dans Map Studio en réutilisant les
   services headless.
+
+  Preuve : Map Studio expose `Preview`, `Validate` et `Publish` dans la barre
+  de la map. Preview redémarre l'aperçu graphique partagé ; Validate appelle
+  `plan_map_package` et affiche ses diagnostics ; Publish utilise le dialogue
+  de dossier natif et `publish_map_package`, dans un sous-dossier nommé par la
+  map, sans écrasement. Une session dirty est sauvegardée avant les deux
+  opérations de paquet. Le service headless copie manifeste, documents et
+  payloads et son round-trip est vérifié par `fabric_map_package_tests`.
 - [ ] Charger le paquet directement depuis Preview Runtime et le chemin futur
   du catalogue du jeu.
 - [ ] Vérifier qu'un paquet produit sur une plateforme se charge sur les deux

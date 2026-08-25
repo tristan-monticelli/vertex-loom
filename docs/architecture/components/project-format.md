@@ -8,7 +8,7 @@ C4Component
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
-        Component(packages, "Map package planner", "C++20", "Calcule la fermeture typée déterministe et refuse chemins externes, absences, collisions d'identifiants et cycles avant export")
+        Component(packages, "Map package planner/publisher", "C++20", "Calcule la fermeture typée déterministe, valide et publie un dossier portable sans écraser une destination")
         Component(storage, "Atomic document storage", "C++20 / filesystem", "Remplace les documents éditables validés et publie les imports sans remplacement")
         Component(autosave, "Autosave storage", "C++20 / filesystem", "Écrit un miroir validé sous .vertex-loom/autosave et sélectionne les récupérations récentes")
         Component(validator, "Project validator", "C++20", "Valide versions, chemins, documents puis le graphe complet des ressources")

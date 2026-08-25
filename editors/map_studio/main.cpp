@@ -1,6 +1,7 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
+#include "fabric/project/map_package.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
@@ -11,6 +12,8 @@
 #include <imgui_impl_opengl3.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_stdlib.h>
+#include <nfd.h>
+#include <nfd_sdl2.h>
 
 #include <filesystem>
 #include <algorithm>
@@ -36,6 +39,34 @@ void draw_errors(const fabric::editor::MapSession& session) {
         ImGui::TextWrapped("%s: %s", error.field.c_str(), error.message.c_str());
         ImGui::PopStyleColor();
     }
+}
+
+void draw_package_errors(
+    const std::vector<fabric::project::Error>& errors) {
+    for (const auto& error : errors) {
+        ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
+        ImGui::TextWrapped("Package %s: %s", error.field.c_str(),
+                           error.message.c_str());
+        ImGui::PopStyleColor();
+    }
+}
+
+std::optional<std::filesystem::path> choose_folder(SDL_Window* window,
+                                                    std::string& status) {
+    nfdu8char_t* selected_path = nullptr;
+    nfdpickfolderu8args_t arguments{};
+    NFD_GetNativeWindowFromSDLWindow(window, &arguments.parentWindow);
+    const auto result = NFD_PickFolderU8_With(&selected_path, &arguments);
+    if (result == NFD_CANCEL) return std::nullopt;
+    if (result == NFD_ERROR) {
+        status = "Native folder dialog failed: " +
+            std::string(NFD_GetError() == nullptr ? "unknown error"
+                                                   : NFD_GetError());
+        return std::nullopt;
+    }
+    const std::filesystem::path path{selected_path};
+    NFD_FreePathU8(selected_path);
+    return path;
 }
 
 std::optional<fabric::project::MapPropertyValue> parse_override_value(
@@ -1388,6 +1419,13 @@ int run(const std::filesystem::path& project_root,
         std::cerr << SDL_GetError() << '\n';
         return 1;
     }
+    if (NFD_Init() != NFD_OKAY) {
+        std::cerr << "native file dialog initialization failed: "
+                  << (NFD_GetError() == nullptr ? "unknown error"
+                                                 : NFD_GetError()) << '\n';
+        SDL_Quit();
+        return 1;
+    }
 #if defined(__APPLE__)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -1404,6 +1442,7 @@ int run(const std::filesystem::path& project_root,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
     if (window == nullptr) {
         std::cerr << SDL_GetError() << '\n';
+        NFD_Quit();
         SDL_Quit();
         return 1;
     }
@@ -1411,6 +1450,7 @@ int run(const std::filesystem::path& project_root,
     if (context == nullptr) {
         std::cerr << SDL_GetError() << '\n';
         SDL_DestroyWindow(window);
+        NFD_Quit();
         SDL_Quit();
         return 1;
     }
@@ -1436,6 +1476,14 @@ int run(const std::filesystem::path& project_root,
                   << map_renderer.initialization_error() << '\n';
     }
     std::string status;
+    std::vector<fabric::project::Error> package_errors;
+    const auto prepare_package = [&] {
+        if (session.dirty() && !session.save()) {
+            status = "Save failed; package action cancelled";
+            return false;
+        }
+        return true;
+    };
     if (!project_root.empty()) {
         if (!session.open(project_root, map_id)) status = "Map could not be opened";
         else status = "Map opened";
@@ -1543,6 +1591,38 @@ int run(const std::filesystem::path& project_root,
                                                : ImVec4{0.45F, 0.9F, 0.55F, 1.0F},
                                session.dirty() ? "dirty" : "saved");
             if (ImGui::Button("Save")) status = session.save() ? "Map saved" : "Save failed";
+            ImGui::SameLine();
+            if (ImGui::Button("Preview")) {
+                preview_time = 0.0F;
+                preview_playing = true;
+                status = "Map preview restarted";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Validate")) {
+                if (prepare_package()) {
+                    const auto validation = fabric::project::plan_map_package(
+                        session.project_root(), map.document.id);
+                    package_errors = validation.errors;
+                    status = validation.ok() ? "Map package validated"
+                                             : "Map validation failed";
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Publish")) {
+                if (prepare_package()) {
+                    const auto parent = choose_folder(window, status);
+                    if (parent) {
+                        const auto destination = *parent /
+                            (map.document.id.value + ".map-package");
+                        const auto published = fabric::project::publish_map_package(
+                            session.project_root(), map.document.id, destination);
+                        package_errors = published.errors;
+                        status = published.ok()
+                            ? "Map package published: " + destination.string()
+                            : "Map package publication failed";
+                    }
+                }
+            }
             ImGui::SameLine();
             ImGui::BeginDisabled(!session.can_undo());
             if (ImGui::Button("Undo")) static_cast<void>(session.undo());
@@ -2104,6 +2184,7 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::Columns(1);
             if (!status.empty()) ImGui::TextDisabled("%s", status.c_str());
+            draw_package_errors(package_errors);
             draw_errors(session);
         }
         ImGui::End();
@@ -2126,6 +2207,7 @@ int run(const std::filesystem::path& project_root,
     ImGui::DestroyContext();
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
+    NFD_Quit();
     SDL_Quit();
     return 0;
 }

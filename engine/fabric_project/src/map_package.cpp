@@ -20,6 +20,8 @@
 #include <array>
 #include <charconv>
 #include <compare>
+#include <fstream>
+#include <iterator>
 #include <limits>
 #include <map>
 #include <set>
@@ -578,6 +580,77 @@ MapPackageManifestResult plan_map_package(
         return output;
     }
     output.manifest = std::move(package);
+    return output;
+}
+
+MapPackagePublishResult publish_map_package(
+    const std::filesystem::path& project_root, const core::ResourceId& map_id,
+    const std::filesystem::path& destination,
+    const std::string_view minimum_runtime_version) {
+    MapPackagePublishResult output{.destination = destination};
+    const auto planned = plan_map_package(project_root, map_id,
+                                          minimum_runtime_version);
+    if (!planned.ok()) {
+        output.errors = planned.errors;
+        return output;
+    }
+    std::error_code filesystem_error;
+    if (std::filesystem::exists(destination, filesystem_error)) {
+        error(output.errors, ErrorCode::asset_already_exists, "destination",
+              "package destination already exists");
+        return output;
+    }
+    if (filesystem_error || destination.empty()) {
+        error(output.errors, ErrorCode::invalid_path, "destination",
+              "package destination is invalid");
+        return output;
+    }
+    std::filesystem::create_directories(destination, filesystem_error);
+    if (filesystem_error) {
+        error(output.errors, ErrorCode::io_error, "destination",
+              "cannot create package destination");
+        return output;
+    }
+    const auto rollback = [&] {
+        std::error_code ignored;
+        std::filesystem::remove_all(destination, ignored);
+    };
+    const auto copy_file = [&](const std::filesystem::path& relative) {
+        const auto source = project_root / relative;
+        const auto target = destination / relative;
+        std::filesystem::create_directories(target.parent_path(),
+                                             filesystem_error);
+        if (filesystem_error ||
+            !std::filesystem::copy_file(source, target,
+                                        std::filesystem::copy_options::none,
+                                        filesystem_error)) {
+            error(output.errors, ErrorCode::io_error, relative.generic_string(),
+                  "cannot copy package file");
+            return false;
+        }
+        return true;
+    };
+    bool copied = true;
+    for (const auto& resource : planned.manifest->resources) {
+        copied = copy_file(resource.document_path) && copied;
+        for (const auto& payload : resource.payload_paths)
+            copied = copy_file(payload) && copied;
+    }
+    if (copied) {
+        std::ofstream manifest_file(
+            destination / map_package_manifest_filename,
+            std::ios::binary | std::ios::trunc);
+        manifest_file << serialize_map_package_manifest(*planned.manifest);
+        if (!manifest_file) {
+            error(output.errors, ErrorCode::io_error, "map-package.json",
+                  "cannot write package manifest");
+        }
+    }
+    if (!output.errors.empty()) {
+        rollback();
+        return output;
+    }
+    output.manifest = planned.manifest;
     return output;
 }
 

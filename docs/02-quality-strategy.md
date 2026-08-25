@@ -100,6 +100,12 @@ Des copies temporaires de ces projets couvrent aussi document ou payload
 absent, chemin absolu, lien symbolique sortant, cycle composant/composition et
 même identifiant utilisé par deux types. Ces erreurs doivent être retournées
 avant la création d'un dossier de paquet.
+La publication headless vérifie la copie du manifeste et des payloads,
+l'absence d'écrasement d'une destination existante et le rollback d'une
+destination nouvellement créée en cas d'échec.
+Les actions Map Studio valident la version courante de la session : une map
+dirty est sauvegardée avant `Validate` ou `Publish`, et l'action est annulée si
+la sauvegarde échoue.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
