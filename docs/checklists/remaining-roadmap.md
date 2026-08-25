@@ -381,6 +381,8 @@ inspectable avec collisions et événements.
   vectoriels d’une instance liée.
 - [x] Appliquer les pistes `transform` aux poses de déformation avant le calcul
   des sommets animés.
+- [x] Réévaluer l’ordre pistes → contraintes → IK → poses de déformation à
+  chaque instant headless ou frame runtime.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri

@@ -87,8 +87,8 @@ C4Component
 - `AnimationConstraint` porte une dépendance source/cible et un ordre explicite
   pour `copy_transform`, `limits` ou `look_at`. Les cycles et rangs dupliqués
   sont refusés avant résolution ; les bornes optionnelles de `limits` doivent
-  être finies et ordonnées. Preview Runtime résout ces contraintes avant les
-  draw packets et les poses de déformation.
+  être finies et ordonnées. Preview Runtime résout à chaque évaluation les
+  pistes, puis ces contraintes et les chaînes IK avant les poses de déformation.
 - Les entités peuvent persister des chaînes FABRIK 2D (`ikChains`) ciblant des
   nœuds par identifiant ; le runtime les résout dans l'ordre déclaré avant de
   produire les poses et draw packets. Le solveur conserve la racine, borne ses itérations, vérifie les

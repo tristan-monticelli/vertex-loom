@@ -45,6 +45,9 @@ struct PreviewRuntime::Impl {
     struct EntitySimulation {
         std::optional<project::DeformationMesh> mesh;
         std::optional<project::XpbdSystem> xpbd;
+        std::vector<project::EntityNode> nodes;
+        std::vector<project::AnimationConstraint> constraints;
+        std::vector<project::FabrikChainDefinition> ik_chains;
         std::vector<project::DeformationPose> poses;
         core::Transform instance_transform;
     };
@@ -173,6 +176,28 @@ bool resolve_ik_chains(std::vector<project::EntityNode>& nodes,
         }
     }
     return true;
+}
+
+void apply_animation_to_nodes(std::vector<project::EntityNode>& nodes,
+                              const project::EvaluationResult& animation) {
+    for (const auto& property : animation.properties) {
+        if (property.binding.component_id != "transform") continue;
+        const auto node = std::find_if(nodes.begin(), nodes.end(),
+            [&](const auto& candidate) {
+                return candidate.id == property.binding.node_id;
+            });
+        if (node == nodes.end()) continue;
+        if (property.binding.property_id == "position") {
+            if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                node->transform.position = *value;
+        } else if (property.binding.property_id == "rotationDegrees") {
+            if (const auto* value = std::get_if<float>(&property.value))
+                node->transform.rotation_degrees = *value;
+        } else if (property.binding.property_id == "scale") {
+            if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                node->transform.scale = *value;
+        }
+    }
 }
 
 struct ResolvedAnimation {
@@ -571,6 +596,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             Impl::EntitySimulation simulation{
                 .mesh = resolved_entity.deformation_mesh,
                 .xpbd = resolved_entity.xpbd,
+                .nodes = resolved_entity.nodes,
+                .constraints = resolved_entity.constraints,
+                .ik_chains = resolved_entity.ik_chains,
                 .instance_transform = instance.transform};
             simulation.poses.reserve(resolved_entity.nodes.size());
             for (const auto& node : resolved_entity.nodes)
@@ -1091,28 +1119,16 @@ PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id,
             result.positions.push_back(particle.position);
         return result;
     }
-    auto poses = found->second.poses;
+    auto nodes = found->second.nodes;
     const auto animation = evaluate_instance_animation(instance_id, time);
-    if (animation && animation->ok()) {
-        for (const auto& property : animation->properties) {
-            const auto pose = std::find_if(poses.begin(), poses.end(),
-                [&](const auto& candidate) {
-                    return candidate.node_id == property.binding.node_id;
-                });
-            if (pose == poses.end() || property.binding.component_id != "transform")
-                continue;
-            if (property.binding.property_id == "position") {
-                if (const auto* value = std::get_if<core::Vec2>(&property.value))
-                    pose->transform.position = *value;
-            } else if (property.binding.property_id == "rotationDegrees") {
-                if (const auto* value = std::get_if<float>(&property.value))
-                    pose->transform.rotation_degrees = *value;
-            } else if (property.binding.property_id == "scale") {
-                if (const auto* value = std::get_if<core::Vec2>(&property.value))
-                    pose->transform.scale = *value;
-            }
-        }
-    }
+    if (animation && animation->ok()) apply_animation_to_nodes(nodes, *animation);
+    if (!resolve_constraints(nodes, found->second.constraints) ||
+        !resolve_ik_chains(nodes, found->second.ik_chains))
+        return std::nullopt;
+    std::vector<project::DeformationPose> poses;
+    poses.reserve(nodes.size());
+    for (const auto& node : nodes)
+        poses.push_back({.node_id = node.id, .transform = node.transform});
     return project::deform_mesh(*found->second.mesh, poses);
 }
 

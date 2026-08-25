@@ -530,6 +530,35 @@ TEST_CASE("preview runtime applies animation transforms to deformation poses") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime evaluates animation before entity constraints") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-animation-constraints-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto animated_map = map_with_constrained_entity();
+    animated_map.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-animation"}, "animation"}});
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), animated_map).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), constrained_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto deformation = runtime.evaluate_instance_deformation("constrained", 0.5F);
+    REQUIRE(deformation.has_value());
+    REQUIRE(deformation->ok());
+    REQUIRE(deformation->positions.size() == 1U);
+    CHECK(deformation->positions.front() == fabric::core::Vec2{1.0F, 2.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime resolves persisted FABRIK chains before deformation") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-ik-" + std::to_string(
