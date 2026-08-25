@@ -40,6 +40,10 @@ using DrawArrays = void (GLAPIENTRY *)(GLenum, GLint, GLsizei);
 using GetUniformLocation = PFNGLGETUNIFORMLOCATIONPROC;
 using UniformMatrix4fv = PFNGLUNIFORMMATRIX4FVPROC;
 using Uniform4f = PFNGLUNIFORM4FPROC;
+using Uniform1i = PFNGLUNIFORM1IPROC;
+using Uniform1f = PFNGLUNIFORM1FPROC;
+using ActiveTexture = PFNGLACTIVETEXTUREPROC;
+using BindTexture = void (GLAPIENTRY *)(GLenum, GLuint);
 
 struct Functions {
     CreateShader create_shader{};
@@ -69,6 +73,10 @@ struct Functions {
     GetUniformLocation get_uniform_location{};
     UniformMatrix4fv uniform_matrix_4fv{};
     Uniform4f uniform_4f{};
+    Uniform1i uniform_1i{};
+    Uniform1f uniform_1f{};
+    ActiveTexture active_texture{};
+    BindTexture bind_texture{};
 };
 
 template <typename Function>
@@ -105,6 +113,10 @@ Functions load_functions() {
         load_function<GetUniformLocation>("glGetUniformLocation"),
         load_function<UniformMatrix4fv>("glUniformMatrix4fv"),
         load_function<Uniform4f>("glUniform4f"),
+        load_function<Uniform1i>("glUniform1i"),
+        load_function<Uniform1f>("glUniform1f"),
+        load_function<ActiveTexture>("glActiveTexture"),
+        load_function<BindTexture>("glBindTexture"),
     };
 }
 
@@ -135,7 +147,11 @@ bool functions_ready(const Functions& functions) {
            functions.draw_arrays != nullptr &&
            functions.get_uniform_location != nullptr &&
            functions.uniform_matrix_4fv != nullptr &&
-           functions.uniform_4f != nullptr;
+           functions.uniform_4f != nullptr &&
+           functions.uniform_1i != nullptr &&
+           functions.uniform_1f != nullptr &&
+           functions.active_texture != nullptr &&
+           functions.bind_texture != nullptr;
 }
 
 std::string shader_log(const Functions& functions, const GLuint shader) {
@@ -176,6 +192,8 @@ std::array<float, 16> world_to_clip(const OpenGLVectorViewport& viewport) {
 struct Vertex {
     float x;
     float y;
+    float u;
+    float v;
 };
 
 } // namespace
@@ -189,13 +207,26 @@ bool OpenGLVectorRenderer::initialize() {
 
     constexpr const char* vertex_source = R"GLSL(#version 130
 in vec2 position;
+in vec2 uv;
+out vec2 fragmentUv;
 uniform mat4 worldToClip;
-void main() { gl_Position = worldToClip * vec4(position, 0.0, 1.0); }
+void main() {
+    fragmentUv = uv;
+    gl_Position = worldToClip * vec4(position, 0.0, 1.0);
+}
 )GLSL";
     constexpr const char* fragment_source = R"GLSL(#version 130
 uniform vec4 color;
+uniform sampler2D imageTexture;
+uniform int textured;
+uniform float opacity;
+in vec2 fragmentUv;
 out vec4 fragmentColor;
-void main() { fragmentColor = color; }
+void main() {
+    fragmentColor = textured == 1
+        ? texture(imageTexture, fragmentUv) * opacity
+        : color;
+}
 )GLSL";
     std::string error;
     const GLuint vertex_shader = compile_shader(
@@ -228,6 +259,12 @@ void main() { fragmentColor = color; }
     functions.enable_vertex_attrib_array(position);
     functions.vertex_attrib_pointer(position, 2, GL_FLOAT, GL_FALSE,
                                      sizeof(Vertex), nullptr);
+    const GLint uv = 1;
+    functions.enable_vertex_attrib_array(uv);
+    functions.vertex_attrib_pointer(uv, 2, GL_FLOAT, GL_FALSE,
+                                     sizeof(Vertex),
+                                     reinterpret_cast<const void*>(
+                                         2U * sizeof(float)));
     functions.bind_vertex_array(0U);
     program_ = program;
     world_to_clip_uniform_ = functions.get_uniform_location(
@@ -261,7 +298,8 @@ void OpenGLVectorRenderer::shutdown() noexcept {
 
 OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     const std::span<const VectorDrawPacket> packets,
-    const OpenGLVectorViewport& viewport) {
+    const OpenGLVectorViewport& viewport,
+    const OpenGLTextureResolver& texture_resolver) {
     OpenGLVectorRenderStats stats;
     stats.packets_submitted = static_cast<std::uint32_t>(packets.size());
     if (!ready()) {
@@ -286,15 +324,39 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     functions.bind_vertex_array(vertex_array_);
     for (const auto& packet : packets) {
         if (packet.image_fill.has_value()) {
-            stats.errors.push_back(
-                "OpenGL vector renderer requires a texture resolver for image fills");
+            if (!texture_resolver) {
+                stats.errors.push_back(
+                    "OpenGL vector renderer requires a texture resolver for image fills");
+            }
         }
         bool packet_drawn = false;
-        if (packet.fill_color.has_value() && !packet.fill_indices.empty()) {
+        std::optional<OpenGLTextureHandle> texture;
+        if (packet.image_fill.has_value() && texture_resolver) {
+            texture = texture_resolver(packet.image_fill->texture.id);
+            if (!texture.has_value() || texture->handle == 0U) {
+                stats.errors.push_back(
+                    "OpenGL vector texture reference could not be resolved: " +
+                    packet.image_fill->texture.id.value);
+            }
+        }
+        const bool can_draw_image = packet.image_fill.has_value() &&
+            texture.has_value() && texture->handle != 0U &&
+            packet.fill_uv.size() == packet.fill_vertices.size();
+        if (packet.image_fill.has_value() && texture.has_value() &&
+            packet.fill_uv.size() != packet.fill_vertices.size()) {
+            stats.errors.push_back("OpenGL image fill UV count does not match silhouette");
+        }
+        const bool can_draw_fill = !packet.fill_indices.empty() &&
+            (packet.fill_color.has_value() || can_draw_image);
+        if (can_draw_fill) {
             std::vector<Vertex> vertices;
             vertices.reserve(packet.fill_vertices.size());
-            for (const auto point : packet.fill_vertices) {
-                vertices.push_back({point.x, point.y});
+            for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index) {
+                const auto point = packet.fill_vertices[index];
+                const auto uv = packet.fill_uv.size() == packet.fill_vertices.size()
+                    ? packet.fill_uv[index]
+                    : core::Vec2{};
+                vertices.push_back({point.x, point.y, uv.x, uv.y});
             }
             functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
             functions.buffer_data(GL_ARRAY_BUFFER,
@@ -305,10 +367,28 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                                   static_cast<GLsizeiptr>(packet.fill_indices.size() *
                                                           sizeof(std::uint32_t)),
                                   packet.fill_indices.data(), GL_STREAM_DRAW);
-            const auto& color = *packet.fill_color;
             const GLint color_uniform = functions.get_uniform_location(program_, "color");
-            functions.uniform_4f(color_uniform, color.red, color.green, color.blue,
-                                 color.alpha);
+            const GLint textured_uniform = functions.get_uniform_location(
+                program_, "textured");
+            const GLint opacity_uniform = functions.get_uniform_location(
+                program_, "opacity");
+            if (can_draw_image) {
+                const GLint sampler_uniform = functions.get_uniform_location(
+                    program_, "imageTexture");
+                functions.uniform_4f(color_uniform, 1.0F, 1.0F, 1.0F, 1.0F);
+                functions.uniform_1i(textured_uniform, 1);
+                functions.uniform_1f(opacity_uniform,
+                                     packet.image_fill->opacity);
+                functions.uniform_1i(sampler_uniform, 0);
+                functions.active_texture(GL_TEXTURE0);
+                functions.bind_texture(GL_TEXTURE_2D, texture->handle);
+            } else {
+                const auto& color = *packet.fill_color;
+                functions.uniform_4f(color_uniform, color.red, color.green,
+                                     color.blue, color.alpha);
+                functions.uniform_1i(textured_uniform, 0);
+                functions.uniform_1f(opacity_uniform, 1.0F);
+            }
             functions.draw_elements(GL_TRIANGLES,
                                     static_cast<GLsizei>(packet.fill_indices.size()),
                                     GL_UNSIGNED_INT, nullptr);
@@ -320,7 +400,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             std::vector<Vertex> vertices;
             vertices.reserve(packet.outline.size());
             for (const auto point : packet.outline) {
-                vertices.push_back({point.x, point.y});
+                vertices.push_back({point.x, point.y, 0.0F, 0.0F});
             }
             functions.bind_buffer(GL_ARRAY_BUFFER, vertex_buffer_);
             functions.buffer_data(GL_ARRAY_BUFFER,
@@ -328,8 +408,14 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                                   vertices.data(), GL_STREAM_DRAW);
             const auto& color = packet.stroke->color;
             const GLint color_uniform = functions.get_uniform_location(program_, "color");
+            const GLint textured_uniform = functions.get_uniform_location(
+                program_, "textured");
+            const GLint opacity_uniform = functions.get_uniform_location(
+                program_, "opacity");
             functions.uniform_4f(color_uniform, color.red, color.green, color.blue,
                                  color.alpha);
+            functions.uniform_1i(textured_uniform, 0);
+            functions.uniform_1f(opacity_uniform, 1.0F);
             const GLenum mode = packet.closed_outline ? GL_LINE_LOOP
                                                        : GL_LINE_STRIP;
             functions.draw_arrays(mode, 0,

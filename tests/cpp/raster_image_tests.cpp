@@ -221,7 +221,8 @@ void native_geometry_preserves_image_fill_payload() {
             "image fill geometry packet build failed");
     const auto& packet = result.packets.front();
     require(!packet.fill_color.has_value() && packet.image_fill == fill.image &&
-                packet.fill_indices.size() == 3U,
+                packet.fill_indices.size() == 3U &&
+                packet.fill_uv.size() == packet.fill_vertices.size(),
             "image fill payload or silhouette was lost in draw packet");
 }
 

@@ -18,6 +18,7 @@ struct VectorDrawPacket {
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
     std::vector<core::Vec2> fill_vertices;
+    std::vector<core::Vec2> fill_uv;
     std::vector<std::uint32_t> fill_indices;
     std::optional<std::string> parent_id;
     std::optional<std::string> clip_node_id;

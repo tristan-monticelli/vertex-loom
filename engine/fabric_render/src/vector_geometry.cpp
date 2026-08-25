@@ -225,12 +225,13 @@ VectorGeometryResult build_native_draw_packets(
     }
     const auto& nodes = asset.native->nodes;
     for (const auto& node : asset.native->nodes) {
+        const auto local_outline = flatten_shape(node.shape, curve_tolerance);
         VectorDrawPacket packet{
             .node_id = node.id,
             .fill_color = node.fill.color,
             .image_fill = node.fill.image,
             .stroke = node.stroke,
-            .outline = flatten_shape(node.shape, curve_tolerance),
+            .outline = local_outline,
             .parent_id = node.parent_id,
             .clip_node_id = node.clip_node_id,
             .closed_outline = node.shape.kind != project::VectorShapeKind::line &&
@@ -248,6 +249,19 @@ VectorGeometryResult build_native_draw_packets(
             node.fill.kind == project::VectorFillKind::image) {
             packet.fill_indices = triangulate(packet.outline);
             packet.fill_vertices = packet.outline;
+            if (node.fill.kind == project::VectorFillKind::image) {
+                const auto& bounds = node.shape.bounds;
+                const float width = bounds.size.x;
+                const float height = bounds.size.y;
+                packet.fill_uv.reserve(local_outline.size());
+                for (const auto point : local_outline) {
+                    core::Vec2 uv{
+                        (point.x - bounds.origin.x) / width,
+                        (point.y - bounds.origin.y) / height};
+                    uv = apply_transform(uv, node.fill.image->transform);
+                    packet.fill_uv.push_back(uv);
+                }
+            }
             if (packet.outline.size() >= 3U && packet.fill_indices.empty()) {
                 result.errors.push_back("native shape could not be triangulated: " +
                                        node.id);

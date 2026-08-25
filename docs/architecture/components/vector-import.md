@@ -59,7 +59,7 @@ C4Component
   cache headless est indexé par le JSON canonique du document et la tolérance
   de courbe, ce qui invalide automatiquement une version modifiée ; l’import
   opaque reste fonctionnel. Chaque draw packet porte soit une couleur solide,
-  soit la référence texture et le transform UV du fill image, ainsi que la
+  soit la référence texture et les UV transformées du fill image, ainsi que la
   même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
   Les sommets sont exprimés dans l’espace monde après application du transform
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.

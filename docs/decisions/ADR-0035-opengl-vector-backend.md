@@ -14,8 +14,9 @@ OpenGL dans les documents ou les tests de validation.
 
 `fabric_render` expose `OpenGLVectorRenderer`. Il charge les fonctions
 OpenGL via `SDL_GL_GetProcAddress`, compile un programme OpenGL 3, configure
-un VAO avec VBO/IBO et dessine les triangles de fills couleur ainsi que les
-contours ouverts ou fermés. Le viewport
+un VAO avec VBO/IBO et dessine les triangles de fills couleur ou image ainsi
+que les contours ouverts ou fermés. Les packets image fournissent les UV
+normalisées et la résolution texture est injectée par callback. Le viewport
 convertit les unités monde en coordonnées clip ; les statistiques retournent
 packets soumis, packets dessinés, triangles et diagnostics.
 

@@ -1,9 +1,12 @@
 #pragma once
 
 #include "fabric/core/types.hpp"
+#include "fabric/core/resource_id.hpp"
 #include "fabric/render/vector_geometry.hpp"
 
 #include <cstdint>
+#include <functional>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -27,6 +30,15 @@ struct OpenGLVectorRenderStats {
     [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
 };
 
+struct OpenGLTextureHandle {
+    std::uint32_t handle{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+};
+
+using OpenGLTextureResolver = std::function<std::optional<OpenGLTextureHandle>(
+    const core::ResourceId&)>;
+
 class OpenGLVectorRenderer {
 public:
     OpenGLVectorRenderer() = default;
@@ -39,7 +51,8 @@ public:
     [[nodiscard]] bool ready() const noexcept { return program_ != 0U; }
     [[nodiscard]] OpenGLVectorRenderStats draw(
         std::span<const VectorDrawPacket> packets,
-        const OpenGLVectorViewport& viewport);
+        const OpenGLVectorViewport& viewport,
+        const OpenGLTextureResolver& texture_resolver = {});
 
 private:
     std::uint32_t program_{};
