@@ -1,0 +1,121 @@
+#include "fabric/editor/map_session.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <memory>
+#include <utility>
+
+namespace fabric::editor {
+namespace {
+
+class MapSnapshotCommand final : public Command {
+public:
+    MapSnapshotCommand(project::MapDocument& target, project::MapDocument before,
+                       project::MapDocument after)
+        : target_(target), before_(std::move(before)), after_(std::move(after)) {}
+
+    bool execute() override { target_ = after_; return true; }
+    bool undo() override { target_ = before_; return true; }
+
+private:
+    project::MapDocument& target_;
+    project::MapDocument before_;
+    project::MapDocument after_;
+};
+
+bool commit(CommandStack& commands, project::MapDocument& target,
+            project::MapDocument before, project::MapDocument after) {
+    if (!project::validate_map(project::ProjectManifest{}, after).ok()) return false;
+    return commands.execute(std::make_unique<MapSnapshotCommand>(
+        target, std::move(before), std::move(after)));
+}
+
+std::optional<std::size_t> find_instance(const project::MapDocument& map,
+                                         const core::ResourceId& id) {
+    for (std::size_t index = 0; index < map.instances.size(); ++index)
+        if (map.instances[index].id == id.value) return index;
+    return std::nullopt;
+}
+
+void set_chunk(project::MapInstance& instance) {
+    instance.chunk_x = static_cast<std::int32_t>(
+        std::floor(instance.transform.position.x / project::map_chunk_size));
+    instance.chunk_y = static_cast<std::int32_t>(
+        std::floor(instance.transform.position.y / project::map_chunk_size));
+}
+
+} // namespace
+
+bool MapSession::create(const std::filesystem::path& project_root,
+                        const project::MapDocument& map) {
+    project_root_ = project_root;
+    auto loaded = project::load_manifest(project_root);
+    if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
+    if (!project::validate_map(*loaded.manifest, map).ok()) return false;
+    manifest_ = std::move(*loaded.manifest);
+    map_ = map;
+    commands_.clear();
+    errors_.clear();
+    return save();
+}
+
+bool MapSession::open(const std::filesystem::path& project_root,
+                      const core::ResourceId& map_id) {
+    project_root_ = project_root;
+    auto loaded = project::load_manifest(project_root);
+    if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
+    auto loaded_map = project::load_map(
+        project_root, *loaded.manifest,
+        project::map_document_path(*loaded.manifest, map_id));
+    if (!loaded_map.ok()) { errors_ = std::move(loaded_map.errors); return false; }
+    manifest_ = std::move(*loaded.manifest);
+    map_ = std::move(*loaded_map.asset);
+    commands_.clear();
+    errors_.clear();
+    return true;
+}
+
+bool MapSession::save() {
+    if (!map_ || !manifest_) return false;
+    const auto result = project::publish_map(project_root_, *manifest_, *map_);
+    if (!result.ok()) { errors_ = result.errors; return false; }
+    commands_.mark_clean();
+    errors_.clear();
+    return true;
+}
+
+bool MapSession::place_instance(project::MapInstance instance) {
+    if (!map_ || find_instance(*map_, {.value = instance.id})) return false;
+    set_chunk(instance);
+    auto next = *map_;
+    next.instances.push_back(std::move(instance));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::remove_instance(const core::ResourceId& instance_id) {
+    if (!map_) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.instances.erase(next.instances.begin() + static_cast<std::ptrdiff_t>(*found));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
+                                         core::Transform transform) {
+    if (!map_) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.instances[*found].transform = transform;
+    set_chunk(next.instances[*found]);
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::undo() { return commands_.undo(); }
+bool MapSession::redo() { return commands_.redo(); }
+
+} // namespace fabric::editor

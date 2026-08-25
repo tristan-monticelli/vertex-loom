@@ -159,6 +159,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/autosave_scheduler.cpp
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
+    engine/fabric_editor/src/map_session.cpp
     engine/fabric_editor/src/project_session.cpp
     engine/fabric_editor/src/session_transition.cpp
 )
@@ -324,6 +325,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_physics_tests PRIVATE
         fabric_physics fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_physics_tests COMMAND fabric_physics_tests)
+
+    add_executable(fabric_map_session_tests tests/cpp/map_session_tests.cpp)
+    target_link_libraries(fabric_map_session_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_map_session_tests COMMAND fabric_map_session_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp
