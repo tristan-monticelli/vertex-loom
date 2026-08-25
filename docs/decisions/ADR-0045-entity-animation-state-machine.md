@@ -16,7 +16,9 @@ Les paramètres propres à une instance de map sont fournis par les propriétés
 Le Preview Runtime résout l’état et le temps local du clip avant d’évaluer les
 pistes ; cette résolution est inspectable headless par `state_id`, `clip_id` et
 `local_time`. Les animations directes par propriété `animation` restent
-supportées.
+supportées. Pour ces animations directes, les markers franchis pendant les
+pas fixes sont publiés comme événements runtime avec l’instance, le clip et
+les temps local/absolu du marker.
 
 ## Conséquences
 

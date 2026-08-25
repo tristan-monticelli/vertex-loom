@@ -66,6 +66,7 @@ struct PreviewRuntimeStats {
     std::size_t replay_events{};
     std::size_t replay_checkpoints{};
     std::size_t gameplay_events{};
+    std::size_t animation_marker_events{};
     float character_x{};
     float character_y{};
 };
@@ -76,6 +77,14 @@ struct AnimationStateEvaluation {
     float local_time{};
     friend bool operator==(const AnimationStateEvaluation&,
                            const AnimationStateEvaluation&) = default;
+};
+
+struct AnimationMarkerEvent {
+    std::string instance_id;
+    core::ResourceId clip_id;
+    project::AnimationMarkerHit marker;
+    friend bool operator==(const AnimationMarkerEvent&,
+                           const AnimationMarkerEvent&) = default;
 };
 
 class PreviewRuntime {
@@ -104,6 +113,8 @@ public:
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
     [[nodiscard]] const std::vector<GameplayEvent>& gameplay_events() const noexcept;
+    [[nodiscard]] const std::vector<AnimationMarkerEvent>&
+    animation_marker_events() const noexcept;
     [[nodiscard]] std::vector<std::string> packet_order() const;
     // Returns the packets submitted by the most recent frame. Empty before run().
     [[nodiscard]] const std::vector<render::VectorDrawPacket>&

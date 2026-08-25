@@ -677,6 +677,34 @@ TEST_CASE("preview runtime resolves an animation assigned to a map instance") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime emits crossed markers for animated instances") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-marker-events-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    auto source_animation = animation();
+    source_animation.markers = {{"frame", 0.01F}};
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_animated_entity()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), source_animation).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.animation_marker_events().size() == 1U);
+    const auto& event = runtime.animation_marker_events().front();
+    CHECK(event.instance_id == "marker");
+    CHECK(event.clip_id.value == "runtime-animation");
+    CHECK(event.marker.id == "frame");
+    CHECK(runtime.stats().animation_marker_events == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime applies animated material tracks to submitted packets") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-material-animation-" + std::to_string(

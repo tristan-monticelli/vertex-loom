@@ -95,6 +95,7 @@ struct PreviewRuntime::Impl {
     std::vector<bool> packet_bounds_dynamic;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     std::vector<GameplayEvent> gameplay_events;
+    std::vector<AnimationMarkerEvent> animation_marker_events;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -463,6 +464,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_bounds_dynamic.clear();
     impl_->entity_simulations.clear();
     impl_->gameplay_events.clear();
+    impl_->animation_marker_events.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -1161,6 +1163,20 @@ bool PreviewRuntime::run() {
         }
         const auto animation_time = static_cast<float>(stats_.physics_steps) *
             static_cast<float>(fixed_time_step);
+        const auto previous_animation_time = animation_time -
+            static_cast<float>(fixed_time_step);
+        for (const auto& [instance_id, clip_id] : impl_->animation_instances) {
+            const auto clip = impl_->animation_clips.find(clip_id);
+            if (clip == impl_->animation_clips.end()) continue;
+            const auto markers = project::animation_markers_between(
+                clip->second, previous_animation_time, animation_time);
+            for (const auto& marker : markers)
+                impl_->animation_marker_events.push_back({
+                    .instance_id = instance_id,
+                    .clip_id = {.value = clip_id},
+                    .marker = marker});
+        }
+        stats_.animation_marker_events = impl_->animation_marker_events.size();
         std::unordered_map<std::string, std::vector<project::EntityNode>> evaluated_nodes;
         const auto animate_packet = [&](render::VectorDrawPacket packet) {
             const auto separator = packet.node_id.find(':');
@@ -1406,6 +1422,12 @@ std::size_t PreviewRuntime::animation_count() const noexcept {
 const std::vector<GameplayEvent>& PreviewRuntime::gameplay_events() const noexcept {
     static const std::vector<GameplayEvent> empty;
     return impl_ ? impl_->gameplay_events : empty;
+}
+
+const std::vector<AnimationMarkerEvent>&
+PreviewRuntime::animation_marker_events() const noexcept {
+    static const std::vector<AnimationMarkerEvent> empty;
+    return impl_ ? impl_->animation_marker_events : empty;
 }
 
 std::vector<std::string> PreviewRuntime::packet_order() const {
