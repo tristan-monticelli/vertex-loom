@@ -345,6 +345,16 @@ void session_creates_and_reopens_input_bindings() {
             "input document was not persisted");
     require(session.resources().size() == 1,
             "created input was not added to the resource index");
+    require(session.set_selected_input_binding(
+                0, 0, {fabric::project::InputDevice::keyboard, 81}),
+            "input binding edit failed");
+    require(session.selected_input()->actions[0].bindings[0].code == 81,
+            "input binding edit was not applied");
+    require(session.undo(), "input binding undo failed");
+    require(session.selected_input()->actions[0].bindings[0].code == 74,
+            "input binding undo did not restore the value");
+    require(session.redo(), "input binding redo failed");
+    require(session.save(), "edited input binding was not saved");
     fabric::editor::ProjectSession reopened;
     require(reopened.open(valid.path()), "project with input could not reopen");
     require(reopened.select_resource(fabric::editor::StudioResourceKind::input,
@@ -352,6 +362,8 @@ void session_creates_and_reopens_input_bindings() {
             "input resource could not be selected after reopen");
     require(reopened.selected_input()->actions.size() == 3,
             "reopened input lost actions");
+    require(reopened.selected_input()->actions[0].bindings[0].code == 81,
+            "reopened input lost its edited binding");
 }
 
 } // namespace

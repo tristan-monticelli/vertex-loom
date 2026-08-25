@@ -264,6 +264,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     selected_vector_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
+    selected_input_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -316,6 +317,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     selected_vector_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
+    selected_input_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -835,8 +837,9 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         dirty_document_ = DirtyDocument::none;
     }
     const auto index = static_cast<std::size_t>(
-        std::distance(resources_.begin(), match));
+    std::distance(resources_.begin(), match));
     selected_input_.reset();
+    selected_input_document_path_.clear();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -984,6 +987,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_entity_.reset();
         selected_animation_.reset();
         selected_input_ = std::move(loaded.input);
+        selected_input_document_path_ = match->document_path;
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
         selected_entity_document_path_.clear();
@@ -1343,6 +1347,108 @@ bool ProjectSession::prepare_animation_edit(
     return true;
 }
 
+bool ProjectSession::prepare_input_edit(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_input_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select input bindings before editing them"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::input) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing input bindings"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    return true;
+}
+
+bool ProjectSession::set_selected_input_action_id(
+    const std::size_t action_index, std::string id,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now) || action_index >= selected_input_->actions.size()) {
+        if (selected_input_ && action_index >= selected_input_->actions.size())
+            errors_ = {{project::ErrorCode::invalid_asset, "actions", "action index is invalid"}};
+        return false;
+    }
+    auto candidate = *selected_input_;
+    candidate.actions[action_index].id = id;
+    if (!project::validate_input(*manifest_, candidate).ok()) {
+        errors_ = project::validate_input(*manifest_, candidate).errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<SetValueCommand<std::string>>(
+            selected_input_->actions[action_index].id, std::move(id)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "actions", "could not change action id"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_input_binding(
+    const std::size_t action_index, const std::size_t binding_index,
+    const project::InputBinding binding,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now) || action_index >= selected_input_->actions.size() ||
+        binding_index >= selected_input_->actions[action_index].bindings.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "bindings", "binding index is invalid"}};
+        return false;
+    }
+    auto candidate = *selected_input_;
+    candidate.actions[action_index].bindings[binding_index] = binding;
+    const auto validation = project::validate_input(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<SetValueCommand<project::InputBinding>>(
+            selected_input_->actions[action_index].bindings[binding_index], binding))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "bindings", "could not change binding"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::add_selected_input_binding(
+    const std::size_t action_index, const project::InputBinding binding,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now) || action_index >= selected_input_->actions.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "actions", "action index is invalid"}};
+        return false;
+    }
+    auto actions = selected_input_->actions;
+    actions[action_index].bindings.push_back(binding);
+    auto candidate = *selected_input_;
+    candidate.actions = actions;
+    const auto validation = project::validate_input(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::InputActionDefinition>>>(
+            selected_input_->actions, std::move(actions)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "bindings", "could not add binding"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_animation_duration(
     const float duration, const AutosaveScheduler::Clock::time_point now) {
     if (!prepare_animation_edit(now)) return false;
@@ -1521,6 +1627,20 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::input) {
+        if (!selected_input_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_input(
+            project_root_, *manifest_, *selected_input_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else {
         auto report = project::save_manifest_atomic(project_root_, *manifest_);
         if (!report.ok()) {
@@ -1551,15 +1671,19 @@ AutosaveStatus ProjectSession::update_autosave(
             selected_entity_ && !selected_entity_document_path_.empty();
         const bool animation_document = dirty_document_ == DirtyDocument::animation &&
             selected_animation_ && !selected_animation_document_path_.empty();
+        const bool input_document = dirty_document_ == DirtyDocument::input &&
+            selected_input_ && !selected_input_document_path_.empty();
         auto report = project::save_autosave_atomic(
             project_root_,
             vector_document ? selected_vector_document_path_
             : entity_document ? selected_entity_document_path_
             : animation_document ? selected_animation_document_path_
+            : input_document ? selected_input_document_path_
                             : std::filesystem::path{"project.json"},
             vector_document ? project::serialize_vector_asset(*created_vector_)
             : entity_document ? project::serialize_entity(*selected_entity_)
             : animation_document ? project::serialize_animation(*selected_animation_)
+            : input_document ? project::serialize_input(*selected_input_)
                             : project::serialize_manifest(*manifest_),
             vector_document
                 ? project::DocumentValidator{[this](const std::string_view contents) {
@@ -1576,6 +1700,12 @@ AutosaveStatus ProjectSession::update_autosave(
                 : animation_document
                 ? project::DocumentValidator{[this](const std::string_view contents) {
                       auto parsed = project::parse_animation(*manifest_, contents);
+                      return project::ValidationReport{
+                          .errors = std::move(parsed.errors)};
+                  }}
+                : input_document
+                ? project::DocumentValidator{[](const std::string_view contents) {
+                      auto parsed = project::parse_input(contents);
                       return project::ValidationReport{
                           .errors = std::move(parsed.errors)};
                   }}
@@ -1597,15 +1727,19 @@ AutosaveStatus ProjectSession::update_autosave(
         selected_entity_ && !selected_entity_document_path_.empty();
     const bool animation_document = dirty_document_ == DirtyDocument::animation &&
         selected_animation_ && !selected_animation_document_path_.empty();
+    const bool input_document = dirty_document_ == DirtyDocument::input &&
+        selected_input_ && !selected_input_document_path_.empty();
     auto report = project::save_autosave_atomic(
         project_root_,
         vector_document ? selected_vector_document_path_
         : entity_document ? selected_entity_document_path_
         : animation_document ? selected_animation_document_path_
+        : input_document ? selected_input_document_path_
                         : std::filesystem::path{"project.json"},
         vector_document ? project::serialize_vector_asset(*created_vector_)
         : entity_document ? project::serialize_entity(*selected_entity_)
         : animation_document ? project::serialize_animation(*selected_animation_)
+        : input_document ? project::serialize_input(*selected_input_)
                         : project::serialize_manifest(*manifest_),
         vector_document
             ? project::DocumentValidator{[this](const std::string_view contents) {
@@ -1622,6 +1756,12 @@ AutosaveStatus ProjectSession::update_autosave(
             : animation_document
             ? project::DocumentValidator{[this](const std::string_view contents) {
                   auto parsed = project::parse_animation(*manifest_, contents);
+                  return project::ValidationReport{
+                      .errors = std::move(parsed.errors)};
+              }}
+            : input_document
+            ? project::DocumentValidator{[](const std::string_view contents) {
+                  auto parsed = project::parse_input(contents);
                   return project::ValidationReport{
                       .errors = std::move(parsed.errors)};
               }}

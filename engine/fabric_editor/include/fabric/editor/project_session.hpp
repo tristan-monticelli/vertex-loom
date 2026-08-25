@@ -175,6 +175,19 @@ public:
     selected_animation() const noexcept;
     [[nodiscard]] const std::optional<project::InputDocument>&
     selected_input() const noexcept;
+    [[nodiscard]] bool set_selected_input_action_id(
+        std::size_t action_index, std::string id,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_input_binding(
+        std::size_t action_index, std::size_t binding_index,
+        project::InputBinding binding,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool add_selected_input_binding(
+        std::size_t action_index, project::InputBinding binding,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
     [[nodiscard]] StudioResource* selected_resource() noexcept;
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
@@ -186,6 +199,7 @@ private:
         vector,
         entity,
         animation,
+        input,
     };
 
     std::filesystem::path project_root_;
@@ -206,12 +220,15 @@ private:
     std::filesystem::path selected_vector_document_path_;
     std::filesystem::path selected_entity_document_path_;
     std::filesystem::path selected_animation_document_path_;
+    std::filesystem::path selected_input_document_path_;
     DirtyDocument dirty_document_{DirtyDocument::none};
     CommandStack commands_;
     AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
 
     [[nodiscard]] bool prepare_animation_edit(
+        AutosaveScheduler::Clock::time_point now);
+    [[nodiscard]] bool prepare_input_edit(
         AutosaveScheduler::Clock::time_point now);
 
 };

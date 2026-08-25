@@ -1486,6 +1486,51 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::input &&
+            session.selected_input()) {
+            const auto& input = *session.selected_input();
+            ImGui::SeparatorText("Input bindings");
+            for (std::size_t action_index = 0;
+                 action_index < input.actions.size(); ++action_index) {
+                const auto& action = input.actions[action_index];
+                ImGui::PushID(static_cast<int>(action_index));
+                std::string action_id = action.id;
+                if (ImGui::InputText("Action id", &action_id) &&
+                    action_id != action.id &&
+                    !session.set_selected_input_action_id(action_index, action_id)) {
+                    status = "Input action rejected; inspect diagnostics.";
+                }
+                for (std::size_t binding_index = 0;
+                     binding_index < action.bindings.size(); ++binding_index) {
+                    const auto& binding = action.bindings[binding_index];
+                    ImGui::PushID(static_cast<int>(binding_index));
+                    int device = static_cast<int>(binding.device);
+                    int code = binding.code;
+                    const char* devices[] = {"keyboard", "gamepad"};
+                    bool changed = false;
+                    ImGui::SetNextItemWidth(130.0F);
+                    if (ImGui::Combo("Device", &device, devices, 2)) changed = true;
+                    ImGui::SameLine();
+                    ImGui::SetNextItemWidth(130.0F);
+                    if (ImGui::InputInt("Code", &code)) changed = true;
+                    if (changed && !session.set_selected_input_binding(
+                            action_index, binding_index,
+                            {static_cast<fabric::project::InputDevice>(device), code})) {
+                        status = "Input binding rejected; inspect diagnostics.";
+                    }
+                    ImGui::PopID();
+                }
+                if (ImGui::Button("Add binding") &&
+                    !session.add_selected_input_binding(
+                        action_index, {fabric::project::InputDevice::keyboard, 0})) {
+                    status = "Input binding could not be added; inspect diagnostics.";
+                }
+                ImGui::PopID();
+            }
+            if (input.actions.empty())
+                ImGui::TextDisabled("No actions defined.");
+        }
+        if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::animation &&
             session.selected_animation()) {
             auto& clip = *session.selected_animation();
