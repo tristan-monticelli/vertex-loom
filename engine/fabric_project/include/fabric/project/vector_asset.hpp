@@ -31,6 +31,14 @@ enum class VectorShapeKind {
     rectangle,
     ellipse,
     line,
+    path,
+};
+
+enum class VectorPathCommandKind {
+    move,
+    line,
+    cubic,
+    close,
 };
 
 enum class VectorFillKind {
@@ -48,6 +56,7 @@ enum class VectorImageFit {
 
 [[nodiscard]] std::string_view to_string(VectorOrigin origin) noexcept;
 [[nodiscard]] std::string_view to_string(VectorShapeKind kind) noexcept;
+[[nodiscard]] std::string_view to_string(VectorPathCommandKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(VectorFillKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(VectorImageFit fit) noexcept;
 
@@ -75,6 +84,16 @@ struct VectorShape {
     VectorShapeKind kind{VectorShapeKind::rectangle};
     core::Rect bounds;
     std::vector<core::Vec2> points;
+
+    struct PathCommand {
+        VectorPathCommandKind kind{VectorPathCommandKind::move};
+        core::Vec2 point;
+        core::Vec2 control1;
+        core::Vec2 control2;
+
+        friend bool operator==(const PathCommand&, const PathCommand&) = default;
+    };
+    std::vector<PathCommand> path;
 
     friend bool operator==(const VectorShape&, const VectorShape&) = default;
 };

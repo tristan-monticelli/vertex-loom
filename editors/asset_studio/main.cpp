@@ -348,6 +348,43 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                    node.shape.points.size() == 2U) {
             points = {to_screen(transform_point(node.shape.points[0])),
                       to_screen(transform_point(node.shape.points[1]))};
+        } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
+            fabric::core::Vec2 current{};
+            fabric::core::Vec2 first{};
+            bool has_current = false;
+            for (const auto& command : node.shape.path) {
+                if (command.kind == fabric::project::VectorPathCommandKind::move) {
+                    current = command.point;
+                    first = current;
+                    has_current = true;
+                    points.push_back(to_screen(transform_point(current)));
+                } else if (command.kind == fabric::project::VectorPathCommandKind::line &&
+                           has_current) {
+                    current = command.point;
+                    points.push_back(to_screen(transform_point(current)));
+                } else if (command.kind == fabric::project::VectorPathCommandKind::cubic &&
+                           has_current) {
+                    const auto start = current;
+                    for (int segment = 1; segment <= 12; ++segment) {
+                        const float t = static_cast<float>(segment) / 12.0F;
+                        const float inverse = 1.0F - t;
+                        current = {
+                            inverse * inverse * inverse * start.x +
+                                3.0F * inverse * inverse * t * command.control1.x +
+                                3.0F * inverse * t * t * command.control2.x +
+                                t * t * t * command.point.x,
+                            inverse * inverse * inverse * start.y +
+                                3.0F * inverse * inverse * t * command.control1.y +
+                                3.0F * inverse * t * t * command.control2.y +
+                                t * t * t * command.point.y};
+                        points.push_back(to_screen(transform_point(current)));
+                    }
+                } else if (command.kind == fabric::project::VectorPathCommandKind::close &&
+                           has_current) {
+                    current = first;
+                    points.push_back(to_screen(transform_point(current)));
+                }
+            }
         } else {
             points = {
                 to_screen(transform_point(bounds.origin)),
@@ -375,11 +412,18 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                                            color_to_u32(fill));
         }
         const bool selected = node_index == canvas.selected_node;
+        const bool closed_path =
+            node.shape.kind == fabric::project::VectorShapeKind::path &&
+            !node.shape.path.empty() &&
+            node.shape.path.back().kind ==
+                fabric::project::VectorPathCommandKind::close;
         draw_list->AddPolyline(
             points.data(), static_cast<int>(points.size()),
             selected ? IM_COL32(236, 180, 75, 255)
                      : IM_COL32(225, 230, 235, 255),
-            node.shape.kind == fabric::project::VectorShapeKind::line
+            node.shape.kind == fabric::project::VectorShapeKind::line ||
+                    (node.shape.kind == fabric::project::VectorShapeKind::path &&
+                     !closed_path)
                 ? ImDrawFlags_None
                 : ImDrawFlags_Closed,
             selected ? 2.5F : 1.5F);

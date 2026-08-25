@@ -539,6 +539,36 @@ void line_shape_round_trips_and_rejects_invalid_endpoints() {
     require(!validation.ok(), "coincident line endpoints were accepted");
 }
 
+void path_shape_round_trips_and_rejects_invalid_sequences() {
+    auto expected = native_rectangle_asset();
+    auto& shape = expected.native->nodes.front().shape;
+    shape.kind = fabric::project::VectorShapeKind::path;
+    shape.bounds = {.origin = {-4.0F, -3.0F}, .size = {8.0F, 6.0F}};
+    shape.path = {
+        {.kind = fabric::project::VectorPathCommandKind::move,
+         .point = {-4.0F, -3.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::cubic,
+         .point = {4.0F, -3.0F},
+         .control1 = {-1.0F, -6.0F},
+         .control2 = {1.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {4.0F, 3.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::close},
+    };
+
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(), fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "path vector did not round-trip");
+    require(*parsed.asset == expected, "path commands changed during round-trip");
+
+    auto invalid = expected;
+    std::swap(invalid.native->nodes.front().shape.path[0],
+              invalid.native->nodes.front().shape.path[1]);
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "path without an initial move was accepted");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
@@ -611,6 +641,7 @@ int main() {
     vector_source_kinds_reject_ambiguous_payloads();
     image_fill_round_trips_with_adjustable_shape_mapping();
     line_shape_round_trips_and_rejects_invalid_endpoints();
+    path_shape_round_trips_and_rejects_invalid_sequences();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

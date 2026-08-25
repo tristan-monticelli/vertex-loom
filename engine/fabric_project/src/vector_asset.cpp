@@ -194,9 +194,33 @@ bool read_shape_kind(const Json& object, VectorShapeKind& destination,
         destination = VectorShapeKind::line;
         return true;
     }
+    if (value == "path") {
+        destination = VectorShapeKind::path;
+        return true;
+    }
     add_error(errors, ErrorCode::invalid_asset, field,
-              "must be rectangle, ellipse or line");
+              "must be rectangle, ellipse, line or path");
     return false;
+}
+
+bool read_path_command_kind(const Json& object,
+                            VectorPathCommandKind& destination,
+                            std::vector<Error>& errors,
+                            const std::string& field) {
+    std::string value;
+    if (!read_string(object, "kind", value, errors)) {
+        return false;
+    }
+    if (value == "move") destination = VectorPathCommandKind::move;
+    else if (value == "line") destination = VectorPathCommandKind::line;
+    else if (value == "cubic") destination = VectorPathCommandKind::cubic;
+    else if (value == "close") destination = VectorPathCommandKind::close;
+    else {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "must be move, line, cubic or close");
+        return false;
+    }
+    return true;
 }
 
 bool read_fill_kind(const Json& object, VectorFillKind& destination,
@@ -369,6 +393,49 @@ std::optional<NativeVectorDefinition> read_native(
                     }
                 }
             }
+            if (node.shape.kind == VectorShapeKind::path) {
+                const auto path = shape->find("path");
+                if (path == shape->end() || !path->is_array()) {
+                    add_error(errors, ErrorCode::invalid_asset,
+                              prefix + ".shape.path",
+                              "path shapes require a command array");
+                } else {
+                    for (std::size_t command_index = 0;
+                         command_index < path->size(); ++command_index) {
+                        const auto& command_json = (*path)[command_index];
+                        const std::string command_field =
+                            prefix + ".shape.path[" +
+                            std::to_string(command_index) + "]";
+                        VectorShape::PathCommand command;
+                        if (!command_json.is_object() ||
+                            !read_path_command_kind(command_json, command.kind,
+                                                    errors, command_field + ".kind")) {
+                            continue;
+                        }
+                        if (command.kind != VectorPathCommandKind::close) {
+                            const auto point = command_json.find("point");
+                            if (point == command_json.end() ||
+                                !read_point(*point, command.point, errors,
+                                            command_field + ".point")) {
+                                continue;
+                            }
+                        }
+                        if (command.kind == VectorPathCommandKind::cubic) {
+                            const auto control1 = command_json.find("control1");
+                            const auto control2 = command_json.find("control2");
+                            if (control1 == command_json.end() ||
+                                control2 == command_json.end() ||
+                                !read_point(*control1, command.control1, errors,
+                                             command_field + ".control1") ||
+                                !read_point(*control2, command.control2, errors,
+                                             command_field + ".control2")) {
+                                continue;
+                            }
+                        }
+                        node.shape.path.push_back(command);
+                    }
+                }
+            }
         }
         const auto fill = node_json.find("fill");
         if (fill == node_json.end() || !fill->is_object()) {
@@ -434,8 +501,19 @@ std::string_view to_string(const VectorShapeKind kind) noexcept {
     case VectorShapeKind::rectangle: return "rectangle";
     case VectorShapeKind::ellipse: return "ellipse";
     case VectorShapeKind::line: return "line";
+    case VectorShapeKind::path: return "path";
     }
     return "rectangle";
+}
+
+std::string_view to_string(const VectorPathCommandKind kind) noexcept {
+    switch (kind) {
+    case VectorPathCommandKind::move: return "move";
+    case VectorPathCommandKind::line: return "line";
+    case VectorPathCommandKind::cubic: return "cubic";
+    case VectorPathCommandKind::close: return "close";
+    }
+    return "move";
 }
 
 std::string_view to_string(const VectorFillKind kind) noexcept {
@@ -574,10 +652,52 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                                   "line endpoints must be finite and distinct");
                     }
                 }
+            } else if (node.shape.kind == VectorShapeKind::path) {
+                const auto& commands = node.shape.path;
+                bool valid_sequence = commands.size() >= 2U &&
+                    commands.front().kind == VectorPathCommandKind::move;
+                std::size_t segments = 0;
+                bool closed = false;
+                for (std::size_t command_index = 0;
+                     command_index < commands.size(); ++command_index) {
+                    const auto& command = commands[command_index];
+                    if (command.kind != VectorPathCommandKind::close &&
+                        (!finite(command.point.x) || !finite(command.point.y))) {
+                        valid_sequence = false;
+                    }
+                    if (command.kind == VectorPathCommandKind::cubic &&
+                        (!finite(command.control1.x) ||
+                         !finite(command.control1.y) ||
+                         !finite(command.control2.x) ||
+                         !finite(command.control2.y))) {
+                        valid_sequence = false;
+                    }
+                    if (command.kind != VectorPathCommandKind::close) {
+                        ++segments;
+                    } else if (closed || command_index + 1U != commands.size()) {
+                        valid_sequence = false;
+                    } else {
+                        closed = true;
+                    }
+                }
+                if (segments < 2U) {
+                    valid_sequence = false;
+                }
+                if (!valid_sequence) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".shape.path",
+                              "must start with move, contain a segment and end close if present");
+                }
             } else if (!node.shape.points.empty()) {
                 add_error(report.errors, ErrorCode::invalid_asset,
                           prefix + ".shape.points",
                           "only line shapes may declare points");
+            }
+            if (node.shape.kind != VectorShapeKind::path &&
+                !node.shape.path.empty()) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".shape.path",
+                          "only path shapes may declare commands");
             }
             if (node.fill.kind == VectorFillKind::solid) {
                 if (!node.fill.color.has_value()) {
@@ -712,6 +832,24 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                 shape["points"] = Json::array();
                 for (const auto& point : node.shape.points) {
                     shape["points"].push_back(serialize_vec2(point));
+                }
+            }
+            if (node.shape.kind == VectorShapeKind::path) {
+                shape["path"] = Json::array();
+                for (const auto& command : node.shape.path) {
+                    Json command_json = {
+                        {"kind", std::string(to_string(command.kind))},
+                    };
+                    if (command.kind != VectorPathCommandKind::close) {
+                        command_json["point"] = serialize_vec2(command.point);
+                    }
+                    if (command.kind == VectorPathCommandKind::cubic) {
+                        command_json["control1"] =
+                            serialize_vec2(command.control1);
+                        command_json["control2"] =
+                            serialize_vec2(command.control2);
+                    }
+                    shape["path"].push_back(std::move(command_json));
                 }
             }
             nodes.push_back({
