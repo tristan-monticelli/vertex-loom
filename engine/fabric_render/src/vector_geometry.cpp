@@ -158,12 +158,14 @@ VectorGeometryResult build_native_draw_packets(
         VectorDrawPacket packet{
             .node_id = node.id,
             .fill_color = node.fill.color,
+            .image_fill = node.fill.image,
             .stroke = node.stroke,
             .outline = flatten_shape(node.shape, curve_tolerance),
             .parent_id = node.parent_id,
             .clip_node_id = node.clip_node_id,
         };
-        if (node.fill.kind == project::VectorFillKind::solid) {
+        if (node.fill.kind == project::VectorFillKind::solid ||
+            node.fill.kind == project::VectorFillKind::image) {
             packet.fill_indices = triangulate(packet.outline);
             packet.fill_vertices = packet.outline;
             if (packet.outline.size() >= 3U && packet.fill_indices.empty()) {

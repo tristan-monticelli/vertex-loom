@@ -141,6 +141,10 @@ lorsqu’elles contiennent encore des variantes non livrées.
 Gate : un artwork combinant contour vectoriel et image remplissante est créé,
 sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
+Le payload headless de fill image et la triangulation de sa silhouette sont
+désormais disponibles ; le rendu OpenGL effectif et la validation visuelle du
+gate restent ouverts.
+
 ## Étape D — Personnalisateur intégré
 
 Tranche livrée : navigateur persistant, sélection d'un artwork natif,

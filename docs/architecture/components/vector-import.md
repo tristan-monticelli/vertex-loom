@@ -56,4 +56,6 @@ C4Component
   native. Les chemins auto-intersectants sont rejetés par le validateur. Le
   cache headless est indexé par le JSON canonique du document et la tolérance
   de courbe, ce qui invalide automatiquement une version modifiée ; l’import
-  opaque reste fonctionnel.
+  opaque reste fonctionnel. Chaque draw packet porte soit une couleur solide,
+  soit la référence texture et le transform UV du fill image, ainsi que la
+  même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.

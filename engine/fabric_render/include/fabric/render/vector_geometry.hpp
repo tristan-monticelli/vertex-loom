@@ -14,6 +14,7 @@ namespace fabric::render {
 struct VectorDrawPacket {
     std::string node_id;
     std::optional<core::Color> fill_color;
+    std::optional<project::VectorImageFill> image_fill;
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
     std::vector<core::Vec2> fill_vertices;

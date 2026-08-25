@@ -199,6 +199,30 @@ void native_geometry_cache_invalidates_on_document_or_tolerance_change() {
             "vector geometry cache did not separate curve tolerances");
 }
 
+void native_geometry_preserves_image_fill_payload() {
+    auto asset = native_geometry_fixture();
+    auto& fill = asset.native->nodes.front().fill;
+    fill.kind = fabric::project::VectorFillKind::image;
+    fill.color.reset();
+    fill.image = fabric::project::VectorImageFill{
+        .texture = {{.value = "fabric-photo"}, "texture"},
+        .fit = fabric::project::VectorImageFit::contain,
+        .transform = {.position = {0.1F, -0.2F},
+                      .rotation_degrees = 15.0F,
+                      .scale = {1.2F, 0.8F},
+                      .pivot = {0.5F, 0.5F}},
+        .opacity = 0.75F,
+        .deform_with_shape = true,
+    };
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U,
+            "image fill geometry packet build failed");
+    const auto& packet = result.packets.front();
+    require(!packet.fill_color.has_value() && packet.image_fill == fill.image &&
+                packet.fill_indices.size() == 3U,
+            "image fill payload or silhouette was lost in draw packet");
+}
+
 } // namespace
 
 int main() {
@@ -208,5 +232,6 @@ int main() {
     invalid_svg_inputs_are_rejected_before_publication();
     native_geometry_produces_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
+    native_geometry_preserves_image_fill_payload();
     return 0;
 }
