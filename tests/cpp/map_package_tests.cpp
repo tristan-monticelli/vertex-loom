@@ -3,7 +3,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <fstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -37,6 +40,57 @@ fabric::project::MapPackageManifest package_manifest() {
 std::filesystem::path fixture(const std::string_view name) {
     return std::filesystem::path{__FILE__}.parent_path().parent_path() /
         "fixtures" / name;
+}
+
+class TemporaryProject {
+public:
+    explicit TemporaryProject(const std::string_view source) {
+        static std::uint64_t sequence{};
+        root_ = std::filesystem::temp_directory_path() /
+            ("fabric-map-package-" +
+             std::to_string(std::chrono::steady_clock::now()
+                                .time_since_epoch().count()) +
+             "-" + std::to_string(sequence++));
+        outside_ = root_.string() + "-outside";
+        std::filesystem::copy(fixture(source), root_,
+                              std::filesystem::copy_options::recursive);
+    }
+    ~TemporaryProject() {
+        std::error_code ignored;
+        std::filesystem::remove_all(root_, ignored);
+        std::filesystem::remove_all(outside_, ignored);
+    }
+    const std::filesystem::path& root() const { return root_; }
+    const std::filesystem::path& outside() const { return outside_; }
+
+private:
+    std::filesystem::path root_;
+    std::filesystem::path outside_;
+};
+
+std::string read_file(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    return {std::istreambuf_iterator<char>{input},
+            std::istreambuf_iterator<char>{}};
+}
+
+void replace_in_file(const std::filesystem::path& path,
+                     const std::string_view from,
+                     const std::string_view to) {
+    auto contents = read_file(path);
+    const auto position = contents.find(from);
+    if (position == std::string::npos)
+        throw std::runtime_error("test replacement source is missing");
+    contents.replace(position, from.size(), to);
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output << contents;
+}
+
+bool has_error(const fabric::project::MapPackageManifestResult& result,
+               const fabric::project::ErrorCode code) {
+    return std::ranges::any_of(result.errors, [&](const auto& error) {
+        return error.code == code;
+    });
 }
 
 } // namespace
@@ -150,4 +204,84 @@ TEST_CASE("map package planning includes native vector dependencies") {
               planned.manifest->resources, [](const auto& resource) {
                   return resource.resource.expected_type == "vector";
               }) == 2);
+}
+
+TEST_CASE("map package planning rejects missing and absolute resources") {
+    TemporaryProject missing{"studio-rotating-platform"};
+    std::filesystem::remove(
+        missing.root() /
+        "assets/components/platform-strip.component.json");
+    auto planned = fabric::project::plan_map_package(
+        missing.root(), {.value = "platform-preview"});
+    CHECK_FALSE(planned.ok());
+    CHECK(has_error(planned, fabric::project::ErrorCode::missing_file));
+
+    TemporaryProject absolute{"studio-rotating-platform"};
+    replace_in_file(
+        absolute.root() /
+            "assets/textures/platform-thread.texture.json",
+        "assets/textures/platform-thread.png", "/outside/thread.png");
+    planned = fabric::project::plan_map_package(
+        absolute.root(), {.value = "platform-preview"});
+    CHECK_FALSE(planned.ok());
+    CHECK(has_error(planned, fabric::project::ErrorCode::invalid_path));
+}
+
+TEST_CASE("map package planning rejects an external payload symlink") {
+    TemporaryProject project{"studio-rotating-platform"};
+    std::filesystem::create_directories(project.outside());
+    const auto external = project.outside() / "thread.png";
+    {
+        std::ofstream output(external, std::ios::binary);
+        output << "external";
+    }
+    const auto payload = project.root() /
+        "assets/textures/platform-thread.png";
+    std::filesystem::remove(payload);
+    std::error_code link_error;
+    std::filesystem::create_symlink(external, payload, link_error);
+    if (link_error) SKIP("symbolic links are unavailable");
+    const auto planned = fabric::project::plan_map_package(
+        project.root(), {.value = "platform-preview"});
+    CHECK_FALSE(planned.ok());
+    CHECK(has_error(planned, fabric::project::ErrorCode::invalid_path));
+}
+
+TEST_CASE("map package planning rejects dependency cycles") {
+    TemporaryProject project{"studio-rotating-platform"};
+    const auto composition = project.root() /
+        "assets/compositions/platform-strip-composition.composition.json";
+    replace_in_file(
+        composition, "\"kind\": \"texturedPath\"",
+        "\"componentInstance\": {\n        \"overrides\": []\n      },\n      \"kind\": \"component\"");
+    replace_in_file(composition, "\"expectedType\": \"texturedPath\"",
+                    "\"expectedType\": \"visualComponent\"");
+    replace_in_file(composition, "\"id\": \"platform-strip-rail\"",
+                    "\"id\": \"platform-strip\"");
+    const auto planned = fabric::project::plan_map_package(
+        project.root(), {.value = "platform-preview"});
+    CHECK_FALSE(planned.ok());
+    CHECK(has_error(planned, fabric::project::ErrorCode::resource_cycle));
+}
+
+TEST_CASE("map package planning rejects identifiers shared by two types") {
+    TemporaryProject project{"studio-rotating-platform"};
+    const auto mechanics = project.root() / "assets/mechanics";
+    auto graph = read_file(mechanics / "rotating-platform.mechanic.json");
+    const auto id = graph.find("\"id\": \"rotating-platform\"");
+    REQUIRE(id != std::string::npos);
+    graph.replace(id, std::string_view{"\"id\": \"rotating-platform\""}.size(),
+                  "\"id\": \"platform-visual\"");
+    {
+        std::ofstream output(mechanics / "platform-visual.mechanic.json",
+                             std::ios::binary);
+        output << graph;
+    }
+    replace_in_file(project.root() / "maps/platform-preview.map.json",
+                    "\"id\": \"rotating-platform\"",
+                    "\"id\": \"platform-visual\"");
+    const auto planned = fabric::project::plan_map_package(
+        project.root(), {.value = "platform-preview"});
+    CHECK_FALSE(planned.ok());
+    CHECK(has_error(planned, fabric::project::ErrorCode::duplicate_resource));
 }

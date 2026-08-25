@@ -363,12 +363,15 @@ TextureAssetResult load_texture_asset(
         project_root / result.asset->source, filesystem_error);
     const bool source_is_file = !filesystem_error &&
         std::filesystem::is_regular_file(canonical_source, filesystem_error);
-    if (filesystem_error ||
-        !detail::is_within(canonical_root, canonical_source) ||
-        !source_is_file) {
+    if (!filesystem_error && source_is_file &&
+        !detail::is_within(canonical_root, canonical_source)) {
+        result.asset.reset();
+        add_error(result.errors, ErrorCode::invalid_path, "source",
+                  "texture source must resolve inside the project");
+    } else if (filesystem_error || !source_is_file) {
         result.asset.reset();
         add_error(result.errors, ErrorCode::missing_file, "source",
-                  "texture source is missing or outside the project");
+                  "texture source is missing");
     }
     return result;
 }

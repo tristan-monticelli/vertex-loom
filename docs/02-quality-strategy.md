@@ -96,6 +96,10 @@ tête textile, qui traversent prefab, entité, composition, composant, chemin
 texturé, mécanique, vectoriel et texture. L'ordre du parcours ne doit pas
 influencer le manifeste sérialisé et les prefabs inline ne doivent pas
 dupliquer le fichier map.
+Des copies temporaires de ces projets couvrent aussi document ou payload
+absent, chemin absolu, lien symbolique sortant, cycle composant/composition et
+même identifiant utilisé par deux types. Ces erreurs doivent être retournées
+avant la création d'un dossier de paquet.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime

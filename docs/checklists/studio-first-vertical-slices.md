@@ -214,8 +214,16 @@ plateforme tournante pilotée par la présence du personnage.
   aucun payload. Les fixtures Studio `studio-rotating-platform` et
   `studio-textile-head` vérifient la fermeture complète, l'ordre stable, la
   déduplication et la sérialisation répétable.
-- [ ] Refuser chemins absolus, fichiers externes, références manquantes, cycles
+- [x] Refuser chemins absolus, fichiers externes, références manquantes, cycles
   invalides et collision d'identifiants avant export.
+
+  Preuve : les loaders canonisent documents, PNG et SVG ; une source liée hors
+  projet produit désormais `invalid_path`, tandis qu'une absence produit
+  `missing_file`. Le planificateur maintient les arêtes de la fermeture,
+  détecte les cycles sans récursion et impose un identifiant unique tous types
+  confondus. Des copies temporaires de la fixture plateforme vérifient document
+  manquant, source absolue, symlink externe, cycle composant/composition et
+  collision entité/mécanique avant toute écriture de paquet.
 - [ ] Ajouter Preview, Validate et Publish dans Map Studio en réutilisant les
   services headless.
 - [ ] Charger le paquet directement depuis Preview Runtime et le chemin futur

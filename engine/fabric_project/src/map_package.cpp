@@ -21,6 +21,7 @@
 #include <charconv>
 #include <compare>
 #include <limits>
+#include <map>
 #include <set>
 #include <utility>
 
@@ -474,10 +475,19 @@ MapPackageManifestResult plan_map_package(
     using Key = std::pair<std::string, std::string>;
     std::set<Key> pending{{"map", map_id.value}};
     std::set<Key> processed;
+    std::map<Key, std::vector<Key>> adjacency;
+    std::map<std::string, std::string> types_by_identifier;
     while (!pending.empty()) {
         const auto key = *pending.begin();
         pending.erase(pending.begin());
         if (!processed.insert(key).second) continue;
+        const auto [identity, inserted] =
+            types_by_identifier.emplace(key.second, key.first);
+        if (!inserted && identity->second != key.first) {
+            error(output.errors, ErrorCode::duplicate_resource, key.second,
+                  "resource identifier is used by both " + identity->second +
+                      " and " + key.first);
+        }
         const ResourceReference reference{{.value = key.second}, key.first};
         if (reference.expected_type == "prefab") {
             const auto prefab = std::find_if(
@@ -498,8 +508,11 @@ MapPackageManifestResult plan_map_package(
             references.insert(references.end(), mechanic_references.begin(),
                               mechanic_references.end());
             enqueue_property_references(prefab->overrides, references);
-            for (const auto& dependency : references)
+            for (const auto& dependency : references) {
+                adjacency[key].emplace_back(dependency.expected_type,
+                                            dependency.id.value);
                 pending.emplace(dependency.expected_type, dependency.id.value);
+            }
             continue;
         }
         auto resolved = resolve_package_resource(
@@ -515,9 +528,41 @@ MapPackageManifestResult plan_map_package(
                 enqueue_property_references(prefab.overrides,
                                             resolved->references);
         }
-        for (const auto& dependency : resolved->references)
+        for (const auto& dependency : resolved->references) {
+            adjacency[key].emplace_back(dependency.expected_type,
+                                        dependency.id.value);
             pending.emplace(dependency.expected_type, dependency.id.value);
+        }
         package.resources.push_back(std::move(resolved->package_resource));
+    }
+    if (!output.errors.empty()) return output;
+    for (auto& [source, targets] : adjacency) {
+        (void)source;
+        std::ranges::sort(targets);
+        targets.erase(std::unique(targets.begin(), targets.end()), targets.end());
+    }
+    std::map<Key, unsigned char> state;
+    for (const auto& start : processed) {
+        if (state[start] != 0) continue;
+        state[start] = 1;
+        std::vector<std::pair<Key, std::size_t>> stack{{start, 0}};
+        while (!stack.empty()) {
+            auto& [current, edge_index] = stack.back();
+            const auto edges = adjacency.find(current);
+            if (edges == adjacency.end() || edge_index == edges->second.size()) {
+                state[current] = 2;
+                stack.pop_back();
+                continue;
+            }
+            const auto target = edges->second[edge_index++];
+            if (state[target] == 0) {
+                state[target] = 1;
+                stack.emplace_back(target, 0);
+            } else if (state[target] == 1) {
+                error(output.errors, ErrorCode::resource_cycle, target.second,
+                      "resource dependency cycle detected in map package");
+            }
+        }
     }
     if (!output.errors.empty()) return output;
     std::ranges::sort(package.resources, [](const auto& left, const auto& right) {

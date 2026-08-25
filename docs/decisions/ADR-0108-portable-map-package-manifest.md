@@ -48,5 +48,9 @@ interplateformes sans bénéfice pour cette première version.
   comme une partie du fichier map et trie le résultat par type puis identifiant.
   Une texture ajoute son PNG et un SVG lié ajoute sa source aux payloads ; la
   géométrie vectorielle native n'ajoute aucun fichier dérivé.
+- Avant tout export, le planificateur canonise indirectement chaque fichier via
+  les loaders partagés, refuse une référence absente ou un prefab local absent,
+  impose un identifiant unique tous types confondus et rejette tout cycle dans
+  la fermeture. Une ressource invalide mais non référencée ne bloque pas la map.
 - Preview Runtime et le futur catalogue partageront le même contrôle de
   compatibilité avant chargement.
