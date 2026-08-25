@@ -37,9 +37,10 @@ un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
 disponible et retourne `77` lorsqu'aucun contexte n'est disponible.
 Le workflow manuel `workflow_dispatch` exécute aussi
-`fabric_runtime_benchmark --instances 10000 --frames 600` sur macOS, Windows et
-Linux sous Xvfb. Ses résultats servent à fermer le gate de performance ; ils
-ne sont pas exécutés sur chaque PR.
+`fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60` sur
+macOS, Windows et Linux sous Xvfb, puis archive un rapport JSON par plateforme.
+Ses résultats servent à fermer le gate de performance ; ils ne sont pas
+exécutés sur chaque PR.
 Le chargeur PNG couvre un fichier RGBA valide, une extension
 incorrecte et un contenu corrompu sans initialiser de fenêtre. L'import de
 texture couvre le round-trip du document, les chemins traversants, la copie
