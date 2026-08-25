@@ -51,6 +51,9 @@ public:
     [[nodiscard]] bool initialize();
     void shutdown() noexcept;
     [[nodiscard]] bool ready() const noexcept { return program_ != 0U; }
+    [[nodiscard]] const std::string& initialization_error() const noexcept {
+        return initialization_error_;
+    }
     [[nodiscard]] OpenGLVectorRenderStats draw(
         std::span<const VectorDrawPacket> packets,
         const OpenGLVectorViewport& viewport,
@@ -74,6 +77,7 @@ private:
     std::int32_t image_texture_uniform_{-1};
     std::int32_t textured_uniform_{-1};
     std::int32_t opacity_uniform_{-1};
+    std::string initialization_error_;
     std::size_t vertex_buffer_capacity_{};
     std::size_t index_buffer_capacity_{};
     std::vector<Vertex> vertex_scratch_;

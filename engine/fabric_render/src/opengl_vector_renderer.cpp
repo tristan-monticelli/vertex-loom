@@ -168,6 +168,14 @@ std::string shader_log(const Functions& functions, const GLuint shader) {
     return log;
 }
 
+std::string program_log(const Functions& functions, const GLuint program) {
+    GLint length = 0;
+    functions.get_program_iv(program, GL_INFO_LOG_LENGTH, &length);
+    std::string log(static_cast<std::size_t>(std::max(length, 1)), '\0');
+    functions.get_program_info_log(program, length, nullptr, log.data());
+    return log;
+}
+
 GLuint compile_shader(const Functions& functions, const GLenum type,
                       const char* source, std::string& error) {
     const GLuint shader = functions.create_shader(type);
@@ -201,8 +209,12 @@ OpenGLVectorRenderer::~OpenGLVectorRenderer() { shutdown(); }
 
 bool OpenGLVectorRenderer::initialize() {
     if (ready()) return true;
+    initialization_error_.clear();
     const auto functions = load_functions();
-    if (!functions_ready(functions)) return false;
+    if (!functions_ready(functions)) {
+        initialization_error_ = "required OpenGL entry point is unavailable";
+        return false;
+    }
 
     int context_major = 0;
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &context_major);
@@ -273,11 +285,15 @@ void main() {
     std::string error;
     const GLuint vertex_shader = compile_shader(
         functions, GL_VERTEX_SHADER, vertex_source.c_str(), error);
-    if (vertex_shader == 0U) return false;
+    if (vertex_shader == 0U) {
+        initialization_error_ = "vertex shader: " + error;
+        return false;
+    }
     const GLuint fragment_shader = compile_shader(
         functions, GL_FRAGMENT_SHADER, fragment_source.c_str(), error);
     if (fragment_shader == 0U) {
         functions.delete_shader(vertex_shader);
+        initialization_error_ = "fragment shader: " + error;
         return false;
     }
     const GLuint program = functions.create_program();
@@ -291,6 +307,7 @@ void main() {
     GLint linked = GL_FALSE;
     functions.get_program_iv(program, GL_LINK_STATUS, &linked);
     if (linked == GL_FALSE) {
+        initialization_error_ = "program link: " + program_log(functions, program);
         functions.delete_program(program);
         return false;
     }
@@ -323,6 +340,7 @@ void main() {
         functions.delete_buffers(1, &index_buffer_);
         if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
         functions.delete_program(program_);
+        initialization_error_ = "required shader uniform is unavailable";
         program_ = 0U;
         return false;
     }
@@ -348,6 +366,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     image_texture_uniform_ = -1;
     textured_uniform_ = -1;
     opacity_uniform_ = -1;
+    initialization_error_.clear();
     vertex_buffer_capacity_ = 0U;
     index_buffer_capacity_ = 0U;
     vertex_scratch_.clear();

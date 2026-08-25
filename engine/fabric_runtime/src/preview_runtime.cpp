@@ -960,8 +960,12 @@ bool PreviewRuntime::run() {
         return false;
     }
     impl_->context = SDL_GL_CreateContext(impl_->window);
-    if (impl_->context == nullptr || !impl_->renderer.initialize()) {
+    if (impl_->context == nullptr) {
         errors_.push_back(SDL_GetError());
+        return false;
+    }
+    if (!impl_->renderer.initialize()) {
+        errors_.push_back(impl_->renderer.initialization_error());
         return false;
     }
     if (options_.mode == RuntimeMode::benchmark) SDL_GL_SetSwapInterval(0);
