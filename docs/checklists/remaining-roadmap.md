@@ -215,6 +215,7 @@ transform du fill restent ouverts.
   d’itérations déterministe.
 - [x] Ajouter XPBD distance, flexion, aire, pin et collision avec compliance,
   lambdas et quantification après sous-pas.
+- [x] Ajouter déformation par maillage triangulé et poids par nœud.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
   la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
 - [x] Supporter création explicite de clé, déplacement et suppression de clés
