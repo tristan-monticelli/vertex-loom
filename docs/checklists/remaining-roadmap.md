@@ -281,6 +281,8 @@ références de triggers vérifiables dans l’éditeur.
   une seule commande à son relâchement.
   La translation dispose maintenant d’un snapping activable avec taille de
   grille et origine configurables ; rotation et échelle restent continues.
+  Les commandes `Frame selection` et `Frame all` centrent désormais le canvas
+  et ajustent automatiquement le zoom sur les instances visibles.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

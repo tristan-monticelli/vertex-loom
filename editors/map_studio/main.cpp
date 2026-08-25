@@ -13,6 +13,7 @@
 #include <cmath>
 #include <iostream>
 #include <optional>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -192,6 +193,39 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     ImGui::SetNextItemWidth(150.0F);
     ImGui::DragFloat2("Origin", &snapping.origin.x, 0.1F);
     const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
+    auto frame_instances = [&](const bool selected_only) {
+        float min_x = std::numeric_limits<float>::max();
+        float min_y = std::numeric_limits<float>::max();
+        float max_x = std::numeric_limits<float>::lowest();
+        float max_y = std::numeric_limits<float>::lowest();
+        bool found = false;
+        for (const auto& instance : map.instances) {
+            if (!layer_visible(map, instance.layer_id)) continue;
+            if (selected_only && std::find(selected_instances.begin(), selected_instances.end(),
+                                           instance.id) == selected_instances.end()) continue;
+            min_x = std::min(min_x, instance.transform.position.x);
+            min_y = std::min(min_y, instance.transform.position.y);
+            max_x = std::max(max_x, instance.transform.position.x);
+            max_y = std::max(max_y, instance.transform.position.y);
+            found = true;
+        }
+        if (!found) return false;
+        const auto width = std::max(max_x - min_x, 1.0F);
+        const auto height = std::max(max_y - min_y, 1.0F);
+        zoom = std::clamp(std::min((canvas_size.x - 48.0F) / width,
+                                   (canvas_size.y - 48.0F) / height), 0.1F, 32.0F);
+        const auto center_x = (min_x + max_x) * 0.5F;
+        const auto center_y = (min_y + max_y) * 0.5F;
+        pan = {-center_x * zoom, center_y * zoom};
+        return true;
+    };
+    ImGui::BeginDisabled(selected_instances.empty());
+    if (ImGui::Button("Frame selection"))
+        status = frame_instances(true) ? "Selection framed" : "No visible selected instance";
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Frame all"))
+        status = frame_instances(false) ? "Map framed" : "No visible instance to frame";
     const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton("##map-canvas", canvas_size);
     const bool hovered = ImGui::IsItemHovered();
