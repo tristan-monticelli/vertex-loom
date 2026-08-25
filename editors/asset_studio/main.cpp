@@ -46,9 +46,11 @@ constexpr ImGuiWindowFlags fixed_panel_flags =
 struct CreationUiState {
     fabric::editor::CreateProjectPrompt project;
     fabric::editor::CreateVectorArtworkPrompt artwork;
+    fabric::editor::CreateMaterialPrompt material;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     bool request_project{};
     bool request_artwork{};
+    bool request_material{};
     bool project_publish_attempted{};
 };
 
@@ -210,6 +212,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     };
     draw_kind("Textures", fabric::editor::StudioResourceKind::texture);
     draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector);
+    draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -709,6 +712,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::MenuItem("New vector artwork...")) {
                 creation.request_artwork = true;
             }
+            if (ImGui::MenuItem("New material / fill...")) {
+                creation.request_material = true;
+            }
             if (ImGui::MenuItem("Add existing resource...")) {
                 ImGui::OpenPopup("Add existing resource");
             }
@@ -1109,6 +1115,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::OpenPopup("Create vector artwork");
         creation.request_artwork = false;
     }
+    if (creation.request_material && session.has_project()) {
+        creation.material.reset();
+        ImGui::OpenPopup("Create material / fill");
+        creation.request_material = false;
+    }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
             if (session.open(path_buffer.data())) {
@@ -1377,6 +1388,87 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.artwork.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create material / fill", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Create a reusable MaterialDefinition v1");
+        ImGui::TextDisabled(
+            "The validated material is published atomically in the open project.");
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", &creation.material.name);
+        float color[] = {creation.material.color.red,
+                         creation.material.color.green,
+                         creation.material.color.blue,
+                         creation.material.color.alpha};
+        if (ImGui::ColorEdit4("Color", color)) {
+            creation.material.color = {color[0], color[1], color[2], color[3]};
+        }
+        float opacity = static_cast<float>(creation.material.opacity);
+        if (ImGui::SliderFloat("Opacity", &opacity, 0.0F, 1.0F, "%.2f")) {
+            creation.material.opacity = opacity;
+        }
+        const auto blend_label = std::string(
+            fabric::project::to_string(creation.material.blend));
+        if (ImGui::BeginCombo("Blend", blend_label.c_str())) {
+            for (const auto blend : {
+                     fabric::project::MaterialBlendMode::normal,
+                     fabric::project::MaterialBlendMode::additive,
+                     fabric::project::MaterialBlendMode::multiply,
+                     fabric::project::MaterialBlendMode::screen}) {
+                const bool selected = creation.material.blend == blend;
+                const auto option = std::string(fabric::project::to_string(blend));
+                if (ImGui::Selectable(option.c_str(), selected)) {
+                    creation.material.blend = blend;
+                }
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Texture id (optional)", &creation.material.texture_id);
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Vector pattern id (optional)",
+                         &creation.material.vector_pattern_id);
+        float uv_position[] = {creation.material.uv_transform.position.x,
+                               creation.material.uv_transform.position.y};
+        if (ImGui::InputFloat2("UV offset", uv_position)) {
+            creation.material.uv_transform.position =
+                {uv_position[0], uv_position[1]};
+        }
+        float uv_scale[] = {creation.material.uv_transform.scale.x,
+                            creation.material.uv_transform.scale.y};
+        if (ImGui::InputFloat2("UV scale", uv_scale)) {
+            creation.material.uv_transform.scale = {uv_scale[0], uv_scale[1]};
+        }
+        ImGui::InputFloat("UV rotation",
+                          &creation.material.uv_transform.rotation_degrees,
+                          1.0F, 10.0F, "%.2f deg");
+        const auto validation = creation.material.validate(
+            session.project_root(), *session.manifest());
+        draw_prompt_error(validation, "name");
+        draw_prompt_error(validation, "id");
+        draw_prompt_error(validation, "opacity");
+        draw_prompt_error(validation, "texture");
+        draw_prompt_error(validation, "vectorPattern");
+        draw_prompt_summary(validation);
+        ImGui::BeginDisabled(!validation.ok());
+        if (ImGui::Button("Create material", {140.0F, 0.0F})) {
+            if (session.create_material(creation.material)) {
+                clear_asset_preview(preview);
+                status = "Material created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Material creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            creation.material.reset();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

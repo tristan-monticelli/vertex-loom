@@ -189,6 +189,28 @@ TEST_CASE("vector artwork prompt validates dimensions and resource conflicts") {
           project.path() / "assets/vectors/occupied-2.vector.json");
 }
 
+TEST_CASE("material prompt validates channels and exposes atomic destination") {
+    TemporaryDirectory project;
+    std::filesystem::create_directories(project.path() / "assets/materials");
+    std::ofstream{project.path() / "assets/materials/paper.material.json"}
+        << "{}";
+    fabric::editor::CreateMaterialPrompt prompt;
+    prompt.name = "Paper";
+    prompt.color.red = 2.0F;
+    prompt.opacity = -0.5;
+
+    const auto validation = prompt.validate(project.path(), manifest());
+    CHECK_FALSE(validation.ok());
+    CHECK(validation.error_for("color.red").has_value());
+    CHECK(validation.error_for("opacity").has_value());
+    CHECK(validation.destination ==
+          project.path() / "assets/materials/paper-2.material.json");
+
+    prompt.reset();
+    CHECK(prompt.name.empty());
+    CHECK(prompt.opacity == 1.0);
+}
+
 TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     fabric::editor::CreateProjectPrompt project_prompt;
     fabric::editor::CreateVectorArtworkPrompt artwork_prompt;

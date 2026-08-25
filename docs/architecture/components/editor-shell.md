@@ -60,6 +60,10 @@ C4Component
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
   L'index est reconstruit à l'ouverture et après publication ; sélectionner
   recharge le document validé et son aperçu depuis le projet.
+- Le hub de création sépare maintenant `New material / fill` des imports et
+  artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
+  atomiquement dans `assets/materials` puis réindexé comme ressource
+  sélectionnable.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,

@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/core/types.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/material.hpp"
 #include "fabric/project/vector_asset.hpp"
 
 #include <filesystem>
@@ -109,6 +110,24 @@ struct CreateVectorArtworkPrompt {
     core::Transform image_transform;
     double image_opacity{1.0};
     bool deform_image_with_shape{true};
+
+    void reset() noexcept;
+    [[nodiscard]] PromptValidation validate(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+};
+
+struct CreateMaterialPrompt {
+    std::string name;
+    core::Color color{1.0F, 1.0F, 1.0F, 1.0F};
+    double opacity{1.0};
+    project::MaterialBlendMode blend{project::MaterialBlendMode::normal};
+    std::string texture_id;
+    std::string vector_pattern_id;
+    core::Transform uv_transform;
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(

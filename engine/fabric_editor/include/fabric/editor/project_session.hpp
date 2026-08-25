@@ -3,6 +3,7 @@
 #include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/render/raster_image.hpp"
@@ -15,10 +16,12 @@
 namespace fabric::editor {
 
 struct CreateVectorArtworkPrompt;
+struct CreateMaterialPrompt;
 
 enum class StudioResourceKind {
     texture,
     vector,
+    material,
 };
 
 struct StudioResource {
@@ -60,6 +63,7 @@ public:
                                   const std::string& name);
     [[nodiscard]] bool create_vector_artwork(
         const CreateVectorArtworkPrompt& prompt);
+    [[nodiscard]] bool create_material(const CreateMaterialPrompt& prompt);
     [[nodiscard]] bool convert_selected_linked_svg_to_native(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -105,6 +109,8 @@ public:
     [[nodiscard]] const std::optional<ImportedVector>& imported_vector() const noexcept;
     [[nodiscard]] const std::optional<project::VectorAsset>&
     created_vector() const noexcept;
+    [[nodiscard]] const std::optional<project::MaterialDefinition>&
+    selected_material() const noexcept;
     [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
     [[nodiscard]] StudioResource* selected_resource() noexcept;
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
@@ -121,6 +127,7 @@ private:
     std::optional<ImportedTexture> imported_texture_;
     std::optional<ImportedVector> imported_vector_;
     std::optional<project::VectorAsset> created_vector_;
+    std::optional<project::MaterialDefinition> selected_material_;
     std::vector<StudioResource> resources_;
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;

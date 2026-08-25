@@ -62,7 +62,7 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
-            } else {
+            } else if (kind == StudioResourceKind::vector) {
                 auto loaded = project::load_vector_asset(
                     project_root, manifest, relative);
                 if (!loaded.ok()) {
@@ -73,6 +73,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                     kind, loaded.asset->document.id, loaded.asset->document.name,
                     relative,
                     loaded.asset->source_kind == project::VectorSourceKind::native});
+            } else {
+                auto loaded = project::load_material(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
             }
         }
         if (error) {
@@ -87,7 +96,9 @@ std::optional<std::vector<StudioResource>> index_project_resources(
     if (!inspect(StudioResourceKind::texture, assets / "textures",
                  ".texture.json") ||
         !inspect(StudioResourceKind::vector, assets / "vectors",
-                 ".vector.json")) {
+                 ".vector.json") ||
+        !inspect(StudioResourceKind::material, assets / "materials",
+                 ".material.json")) {
         return std::nullopt;
     }
     std::ranges::sort(indexed, [](const StudioResource& left,
@@ -182,6 +193,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
+    selected_material_.reset();
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
@@ -226,6 +238,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
+    selected_material_.reset();
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
@@ -418,11 +431,68 @@ bool ProjectSession::create_vector_artwork(
     }
     created_vector_ = std::move(*published.asset);
     imported_vector_.reset();
+    selected_material_.reset();
     const auto created_id = created_vector_->document.id;
     if (!refresh_resources()) {
         return false;
     }
     return select_resource(StudioResourceKind::vector, created_id);
+}
+
+bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating a material"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before creating another resource"}};
+        return false;
+    }
+    const auto prompt_validation = prompt.validate(project_root_, *manifest_);
+    if (!prompt_validation.ok()) {
+        errors_.clear();
+        for (const auto& error : prompt_validation.errors) {
+            errors_.push_back({project::ErrorCode::invalid_asset,
+                               error.field, error.message});
+        }
+        return false;
+    }
+    project::MaterialDefinition material{
+        .document = {
+            .schema_version = project::current_material_schema_version,
+            .type = "material",
+            .id = prompt.resource_id(project_root_, *manifest_),
+            .name = prompt.name,
+        },
+        .color = prompt.color,
+        .opacity = static_cast<float>(prompt.opacity),
+        .blend = prompt.blend,
+        .uv_transform = prompt.uv_transform,
+    };
+    if (!prompt.texture_id.empty()) {
+        material.texture = project::ResourceReference{
+            {.value = prompt.texture_id}, "texture"};
+    }
+    if (!prompt.vector_pattern_id.empty()) {
+        material.vector_pattern = project::ResourceReference{
+            {.value = prompt.vector_pattern_id}, "vector"};
+    }
+    const auto published = project::publish_material(
+        project_root_, *manifest_, material);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    selected_material_ = std::move(*published.asset);
+    imported_texture_.reset();
+    imported_vector_.reset();
+    created_vector_.reset();
+    selected_vector_document_path_.clear();
+    const auto created_id = selected_material_->document.id;
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::material, created_id);
 }
 
 bool ProjectSession::convert_selected_linked_svg_to_native(
@@ -546,10 +616,11 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_texture_ = ImportedTexture{
             .asset = std::move(*loaded.asset), .image = std::move(*image.image)};
         imported_vector_.reset();
+        selected_material_.reset();
         created_vector_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
-    } else {
+    } else if (kind == StudioResourceKind::vector) {
         auto loaded = project::load_vector_asset(
             project_root_, *manifest_, match->document_path);
         if (!loaded.ok()) {
@@ -557,6 +628,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             return false;
         }
         imported_texture_.reset();
+        selected_material_.reset();
         if (loaded.asset->source_kind == project::VectorSourceKind::linked_svg) {
             auto image = render::load_svg_preview(project_root_ / loaded.asset->source);
             if (!image.ok()) {
@@ -595,6 +667,19 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                 selection_warnings = std::move(recovery.errors);
             }
         }
+    } else {
+        auto loaded = project::load_material(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_ = std::move(*loaded.asset);
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
     }
     selected_resource_index_ = index;
     errors_ = std::move(selection_warnings);
@@ -921,6 +1006,11 @@ const std::optional<ImportedVector>& ProjectSession::imported_vector() const noe
 const std::optional<project::VectorAsset>&
 ProjectSession::created_vector() const noexcept {
     return created_vector_;
+}
+
+const std::optional<project::MaterialDefinition>&
+ProjectSession::selected_material() const noexcept {
+    return selected_material_;
 }
 
 const std::vector<StudioResource>&

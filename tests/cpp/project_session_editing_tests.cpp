@@ -162,6 +162,33 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
     CHECK(image.deform_with_shape);
 }
 
+TEST_CASE("material prompt publishes and indexes a material document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateMaterialPrompt prompt;
+    prompt.name = "Paper fill";
+    prompt.color = {0.8F, 0.7F, 0.5F, 1.0F};
+    prompt.opacity = 0.75;
+    prompt.blend = fabric::project::MaterialBlendMode::multiply;
+    REQUIRE(session.create_material(prompt));
+    REQUIRE(session.selected_resource() != nullptr);
+    CHECK(session.selected_resource()->kind ==
+          fabric::editor::StudioResourceKind::material);
+    REQUIRE(session.selected_material().has_value());
+    CHECK(session.selected_material()->document.name == "Paper fill");
+    CHECK(session.selected_material()->opacity == 0.75F);
+    CHECK(session.selected_material()->blend ==
+          fabric::project::MaterialBlendMode::multiply);
+    const auto loaded = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), session.selected_material()->document.id));
+    REQUIRE(loaded.ok());
+    CHECK(loaded.asset->color == fabric::core::Color{0.8F, 0.7F, 0.5F, 1.0F});
+}
+
 TEST_CASE("undoing to clean neutralizes a previous autosave") {
     using namespace std::chrono_literals;
     const TemporaryDirectory project;

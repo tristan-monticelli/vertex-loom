@@ -68,6 +68,21 @@ bool identifier_conflicts(const std::filesystem::path& project_root,
     return false;
 }
 
+bool resource_document_exists(const std::filesystem::path& project_root,
+                              const project::ProjectManifest& manifest,
+                              const std::string_view id,
+                              const std::string_view suffix) {
+    if (id.empty()) return false;
+    std::error_code error;
+    const auto root = project_root / manifest.directories.assets;
+    for (const auto& directory : {root / "textures", root / "vectors"}) {
+        const auto candidate = directory / (std::string{id} + std::string{suffix});
+        if (std::filesystem::is_regular_file(candidate, error)) return true;
+        error.clear();
+    }
+    return false;
+}
+
 core::ResourceId available_resource_id(
     const std::filesystem::path& project_root,
     const project::ProjectManifest& manifest,
@@ -376,6 +391,65 @@ std::string_view label(const InitialFill fill) noexcept {
 
 void CreateVectorArtworkPrompt::reset() noexcept {
     *this = CreateVectorArtworkPrompt{};
+}
+
+void CreateMaterialPrompt::reset() noexcept {
+    *this = CreateMaterialPrompt{};
+}
+
+PromptValidation CreateMaterialPrompt::validate(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    PromptValidation validation;
+    validate_name(validation, name);
+    const auto id = resource_id(project_root, manifest);
+    if (!core::ResourceId::is_valid(id.value)) {
+        add_error(validation, "id", "Generated resource id is invalid.");
+    }
+    for (const auto [field, value] : {
+             std::pair{"red", color.red}, std::pair{"green", color.green},
+             std::pair{"blue", color.blue}, std::pair{"alpha", color.alpha}}) {
+        if (!std::isfinite(value) || value < 0.0F || value > 1.0F) {
+            add_error(validation, "color." + std::string(field),
+                      "Color channels must be finite in [0,1].");
+        }
+    }
+    if (!std::isfinite(opacity) || opacity < 0.0 || opacity > 1.0) {
+        add_error(validation, "opacity", "Opacity must be finite in [0,1].");
+    }
+    if (!texture_id.empty() && !core::ResourceId::is_valid(texture_id)) {
+        add_error(validation, "texture", "Texture id must be a valid resource id.");
+    } else if (!texture_id.empty() &&
+               !resource_document_exists(project_root, manifest, texture_id,
+                                          ".texture.json")) {
+        add_error(validation, "texture", "Texture id is not registered in the project.");
+    }
+    if (!vector_pattern_id.empty() &&
+        !core::ResourceId::is_valid(vector_pattern_id)) {
+        add_error(validation, "vectorPattern",
+                  "Vector pattern id must be a valid resource id.");
+    } else if (!vector_pattern_id.empty() &&
+               !resource_document_exists(project_root, manifest,
+                                         vector_pattern_id, ".vector.json")) {
+        add_error(validation, "vectorPattern",
+                  "Vector pattern id is not registered in the project.");
+    }
+    const auto destination = project::material_document_path(manifest, id);
+    validation.destination = project_root / destination;
+    validation.summary = {
+        "Create MaterialDefinition v1: " + name,
+        "Id: " + id.value,
+        "Destination: " + validation.destination.generic_string(),
+        "Blend: " + std::string(project::to_string(blend)),
+    };
+    return validation;
+}
+
+core::ResourceId CreateMaterialPrompt::resource_id(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    return available_resource_id(project_root, manifest,
+                                 generated_resource_id(name, "material"));
 }
 
 PromptValidation CreateVectorArtworkPrompt::validate(
