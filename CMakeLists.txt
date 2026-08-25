@@ -249,6 +249,13 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_render_tests PRIVATE fabric_render)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
 
+    add_executable(fabric_render_gl_smoke tests/cpp/opengl_vector_smoke.cpp)
+    target_compile_definitions(fabric_render_gl_smoke PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(fabric_render_gl_smoke PRIVATE
+        fabric_render
+        SDL2::SDL2-static
+    )
+
     add_test(
         NAME project_validator_accepts_valid_project
         COMMAND fabric_project_validate ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/valid-project

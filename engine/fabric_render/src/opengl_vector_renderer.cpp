@@ -21,6 +21,7 @@ using GetShaderInfoLog = PFNGLGETSHADERINFOLOGPROC;
 using DeleteShader = PFNGLDELETESHADERPROC;
 using CreateProgram = PFNGLCREATEPROGRAMPROC;
 using AttachShader = PFNGLATTACHSHADERPROC;
+using BindAttribLocation = PFNGLBINDATTRIBLOCATIONPROC;
 using LinkProgram = PFNGLLINKPROGRAMPROC;
 using GetProgramiv = PFNGLGETPROGRAMIVPROC;
 using GetProgramInfoLog = PFNGLGETPROGRAMINFOLOGPROC;
@@ -54,6 +55,7 @@ struct Functions {
     DeleteShader delete_shader{};
     CreateProgram create_program{};
     AttachShader attach_shader{};
+    BindAttribLocation bind_attrib_location{};
     LinkProgram link_program{};
     GetProgramiv get_program_iv{};
     GetProgramInfoLog get_program_info_log{};
@@ -94,6 +96,7 @@ Functions load_functions() {
         load_function<DeleteShader>("glDeleteShader"),
         load_function<CreateProgram>("glCreateProgram"),
         load_function<AttachShader>("glAttachShader"),
+        load_function<BindAttribLocation>("glBindAttribLocation"),
         load_function<LinkProgram>("glLinkProgram"),
         load_function<GetProgramiv>("glGetProgramiv"),
         load_function<GetProgramInfoLog>("glGetProgramInfoLog"),
@@ -129,6 +132,7 @@ bool functions_ready(const Functions& functions) {
            functions.delete_shader != nullptr &&
            functions.create_program != nullptr &&
            functions.attach_shader != nullptr &&
+           functions.bind_attrib_location != nullptr &&
            functions.link_program != nullptr &&
            functions.get_program_iv != nullptr &&
            functions.get_program_info_log != nullptr &&
@@ -205,7 +209,13 @@ bool OpenGLVectorRenderer::initialize() {
     const auto functions = load_functions();
     if (!functions_ready(functions)) return false;
 
-    constexpr const char* vertex_source = R"GLSL(#version 130
+    constexpr const char* shader_version =
+#if defined(__APPLE__)
+        "#version 150\n";
+#else
+        "#version 130\n";
+#endif
+    const std::string vertex_source = shader_version + std::string{R"GLSL(
 in vec2 position;
 in vec2 uv;
 out vec2 fragmentUv;
@@ -214,8 +224,8 @@ void main() {
     fragmentUv = uv;
     gl_Position = worldToClip * vec4(position, 0.0, 1.0);
 }
-)GLSL";
-    constexpr const char* fragment_source = R"GLSL(#version 130
+)GLSL"};
+    const std::string fragment_source = shader_version + std::string{R"GLSL(
 uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
@@ -227,13 +237,13 @@ void main() {
         ? texture(imageTexture, fragmentUv) * opacity
         : color;
 }
-)GLSL";
+)GLSL"};
     std::string error;
     const GLuint vertex_shader = compile_shader(
-        functions, GL_VERTEX_SHADER, vertex_source, error);
+        functions, GL_VERTEX_SHADER, vertex_source.c_str(), error);
     if (vertex_shader == 0U) return false;
     const GLuint fragment_shader = compile_shader(
-        functions, GL_FRAGMENT_SHADER, fragment_source, error);
+        functions, GL_FRAGMENT_SHADER, fragment_source.c_str(), error);
     if (fragment_shader == 0U) {
         functions.delete_shader(vertex_shader);
         return false;
@@ -241,6 +251,8 @@ void main() {
     const GLuint program = functions.create_program();
     functions.attach_shader(program, vertex_shader);
     functions.attach_shader(program, fragment_shader);
+    functions.bind_attrib_location(program, 0, "position");
+    functions.bind_attrib_location(program, 1, "uv");
     functions.link_program(program);
     functions.delete_shader(vertex_shader);
     functions.delete_shader(fragment_shader);

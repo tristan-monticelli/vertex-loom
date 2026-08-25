@@ -25,9 +25,10 @@ local n’est pas passé au backend. Asset Studio fournit désormais ce resolver
 il charge le `TextureAsset` et le PNG local à la demande, puis conserve le
 handle GPU pendant la session. Aucun atlas implicite n’est créé.
 Les tests headless couvrent l’état non initialisé. Asset Studio appelle le
-backend après le rendu ImGui dans le viewport natif courant ; le smoke-test
-avec contexte OpenGL automatisé et le résolveur de textures restent des étapes
-dédiées.
+backend après le rendu ImGui dans le viewport natif courant. `npm run test:gl`
+exécute un smoke-test dédié avec contexte SDL caché, rendu d’un quad et
+vérification d’un pixel ; il est tolérant à l’absence de contexte en retournant
+le code de saut `77`.
 
 ## Consequences
 
