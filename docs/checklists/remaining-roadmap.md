@@ -227,7 +227,7 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
 - [ ] Ajouter contraintes copy-transform, limites, look-at et ordre explicite.
 - [ ] Ajouter maillage triangulé, poids, FABRIK 2D et solveur XPBD unifié.
 - [ ] Quantifier l’état simulé après chaque sous-pas pour le replay portable.
-- [ ] Ajouter `fabric_asset_preview` headless basé sur les draw packets réels.
+- [x] Ajouter `fabric_asset_preview` headless basé sur les draw packets réels.
 
 Gate : une entité vectorielle personnalisée, animée et déformée conserve le
 même résultat visible après sauvegarde, rechargement et replay.

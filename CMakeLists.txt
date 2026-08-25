@@ -59,6 +59,7 @@ target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)
 
+
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
@@ -117,6 +118,12 @@ target_compile_features(fabric_render PUBLIC cxx_std_20)
 target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
     SDL2::SDL2-static
     SDL2_image::SDL2_image-static
+)
+
+add_executable(fabric_asset_preview tools/asset_preview/main.cpp)
+target_link_libraries(fabric_asset_preview PRIVATE
+    fabric_render
+    nlohmann_json::nlohmann_json
 )
 
 add_library(fabric_editor STATIC
@@ -261,6 +268,12 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(
         NAME project_validator_accepts_valid_project
         COMMAND fabric_project_validate ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/valid-project
+    )
+    add_test(
+        NAME asset_preview_emits_native_packets
+        COMMAND fabric_asset_preview
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/native-preview-project
+            triangle
     )
     add_test(
         NAME project_validator_rejects_invalid_project

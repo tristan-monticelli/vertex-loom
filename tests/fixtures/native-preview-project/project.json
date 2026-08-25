@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 2,
+  "id": "native-preview",
+  "name": "Native Preview",
+  "pixelsPerUnit": 100.0,
+  "directories": {
+    "assets": "assets",
+    "entities": "entities",
+    "maps": "maps",
+    "scenes": "scenes",
+    "schemas": "schemas"
+  }
+}

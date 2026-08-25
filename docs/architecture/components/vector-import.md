@@ -16,9 +16,10 @@ C4Component
         Component(gpu_preview, "OpenGL preview texture", "OpenGL", "Téléverse temporairement l'aperçu rasterisé")
     }
     Container_Boundary(editor, "fabric_editor") {
-    Component(importer, "Vector importer", "C++20", "Orchestre validation, copie et publication du document VectorAsset")
-    Component(conversion_command, "SVG conversion command", "C++20 / CommandStack", "Publie la conversion native avec undo/redo et conserve le SVG lié lors de l’annulation")
+        Component(importer, "Vector importer", "C++20", "Orchestre validation, copie et publication du document VectorAsset")
+        Component(conversion_command, "SVG conversion command", "C++20 / CommandStack", "Publie la conversion native avec undo/redo et conserve le SVG lié lors de l’annulation")
     }
+    Container(preview_cli, "fabric_asset_preview", "C++20 CLI", "Résout un VectorAsset natif et émet ses draw packets JSON sans fenêtre")
     Container(project, "fabric_project", "C++20 / JSON", "Valide et publie le contrat VectorAsset")
     ContainerDb(files, "Local Files", "SVG", "Source vectorielle choisie par l'utilisateur")
     Rel(import_ui, importer, "Demande l'import")
@@ -26,6 +27,8 @@ C4Component
     Rel(importer, converter, "Convertit sur action explicite")
     Rel(import_ui, conversion_command, "Confirme la conversion")
     Rel(conversion_command, project, "Publie le document natif")
+    Rel(preview_cli, project, "Charge le VectorAsset")
+    Rel(preview_cli, geometry, "Construit les packets")
     Rel(importer, project, "Publie source et document")
     Rel(loader, files, "Lit")
     Rel(loader, image, "Produit")
@@ -56,6 +59,8 @@ C4Component
 - Asset Studio expose la conversion dans l’inspecteur du SVG lié. La commande
   est réversible, sauvegarde le `VectorAsset v2 native` au même emplacement
   JSON et ne modifie jamais le fichier SVG source.
+- `fabric_asset_preview <project> <vector-id>` valide le document natif et
+  émet les sommets, indices, contours, fills et UV des draw packets en JSON.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un
   carré de 2048 pixels de côté sans dépasser 4194304 pixels.
 - L'import refuse tout identifiant ou SVG invalide et ne remplace jamais un
