@@ -79,6 +79,17 @@ TEST_CASE("map session snaps placement on a configurable grid") {
         {.enabled = false, .grid_size = 4.0F}));
     CHECK(session.map()->instances.front().transform.position == fabric::core::Vec2{-3.1F, -6.1F});
     CHECK(session.map()->instances.front().transform.rotation_degrees == 17.0F);
+    REQUIRE(session.set_instance_property(
+        {.value = "hero"}, {"health", std::int64_t{3}}));
+    REQUIRE(session.map()->instances.front().properties.size() == 1);
+    CHECK(std::get<std::int64_t>(session.map()->instances.front().properties.front().value) == 3);
+    REQUIRE(session.set_instance_property(
+        {.value = "hero"}, {"health", std::int64_t{4}}));
+    CHECK(session.map()->instances.front().properties.size() == 1);
+    CHECK(std::get<std::int64_t>(session.map()->instances.front().properties.front().value) == 4);
+    REQUIRE(session.undo());
+    CHECK(std::get<std::int64_t>(session.map()->instances.front().properties.front().value) == 3);
+    CHECK_FALSE(session.set_instance_property({.value = "hero"}, {"", false}));
     CHECK(fabric::editor::MapSession::snap_position({5.0F, 5.0F}, {.grid_size = 0.0F}) ==
           fabric::core::Vec2{5.0F, 5.0F});
     std::error_code ignored;

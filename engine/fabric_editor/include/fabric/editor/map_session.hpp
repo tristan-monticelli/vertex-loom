@@ -28,6 +28,8 @@ public:
     [[nodiscard]] bool set_instance_transform(const core::ResourceId& instance_id,
                                                core::Transform transform,
                                                MapSnapSettings snapping = {});
+    [[nodiscard]] bool set_instance_property(const core::ResourceId& instance_id,
+                                              project::MapProperty property);
     [[nodiscard]] static core::Vec2 snap_position(core::Vec2 position,
                                                   MapSnapSettings snapping = {}) noexcept;
     [[nodiscard]] bool declare_event(project::MapEventDefinition event);

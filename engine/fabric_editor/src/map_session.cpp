@@ -144,6 +144,21 @@ bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::set_instance_property(const core::ResourceId& instance_id,
+                                       project::MapProperty property) {
+    if (!map_ || property.id.empty()) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found) return false;
+    auto next = *map_;
+    auto& properties = next.instances[*found].properties;
+    const auto existing = std::find_if(properties.begin(), properties.end(),
+        [&](const auto& candidate) { return candidate.id == property.id; });
+    if (existing != properties.end()) existing->value = std::move(property.value);
+    else properties.push_back(std::move(property));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::declare_event(project::MapEventDefinition event) {
     if (!map_ || !core::ResourceId::is_valid(event.id.value) ||
         find_event(*map_, event.id)) return false;
