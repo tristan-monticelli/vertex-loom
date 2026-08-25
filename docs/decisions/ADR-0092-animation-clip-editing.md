@@ -26,6 +26,11 @@ défaut. Le runtime applique les tracks additives comme des offsets sur les
 transformations de base (position, rotation et échelle), dans l’ordre stable
 des tracks.
 
+Asset Studio propose un mode `Auto-key at scrub time`. Lorsqu’il est actif,
+toute modification de la valeur de clé dans l’inspecteur appelle `Set key` au
+temps de scrubbing courant ; le mode reste désactivable et le geste conserve
+les mêmes garanties d’undo/redo et de validation.
+
 `ProjectSession` orchestre `AnimationTimeline` avec le même `CommandStack`,
 dirty state, autosave miroir, récupération validée et publication atomique que
 les documents vectoriels et d’entité.

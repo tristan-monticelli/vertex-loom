@@ -169,4 +169,6 @@ C4Component
   récupération et sauvegarde atomique que les autres documents éditables ; les
   clés existantes peuvent être déplacées ou supprimées sauf la dernière clé
   d’une track, un scrubber évalue les propriétés à l’instant courant et les
-  markers peuvent être ajoutés ou supprimés.
+  markers peuvent être ajoutés ou supprimés. Le mode `Auto-key at scrub time`
+  transforme toute modification de valeur dans l’inspecteur en `Set key` au
+  temps de scrubbing courant.

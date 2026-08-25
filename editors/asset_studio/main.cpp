@@ -123,6 +123,7 @@ struct AnimationUiState {
     float key_scalar{};
     float key_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
     bool key_boolean{};
+    bool auto_key{};
     std::string key_resource_id;
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
@@ -1575,6 +1576,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                   std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Scrub", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
+            ImGui::Checkbox("Auto-key at scrub time", &animation_ui.auto_key);
             const auto evaluated = fabric::project::evaluate_animation(
                 clip, animation_ui.scrub_time);
             ImGui::TextDisabled("Evaluated properties: %zu",
@@ -1618,16 +1620,22 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::Combo("Key type", &animation_ui.key_kind,
                          "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
+            bool auto_key_changed = false;
             if (animation_ui.key_kind == 0) {
-                ImGui::InputFloat2("Vec2 value", animation_ui.key_value);
+                auto_key_changed = ImGui::InputFloat2("Vec2 value",
+                                                      animation_ui.key_value);
             } else if (animation_ui.key_kind == 1) {
-                ImGui::InputFloat("Scalar value", &animation_ui.key_scalar);
+                auto_key_changed = ImGui::InputFloat("Scalar value",
+                                                     &animation_ui.key_scalar);
             } else if (animation_ui.key_kind == 2) {
-                ImGui::ColorEdit4("Color value", animation_ui.key_color);
+                auto_key_changed = ImGui::ColorEdit4("Color value",
+                                                     animation_ui.key_color);
             } else if (animation_ui.key_kind == 3) {
-                ImGui::Checkbox("Boolean value", &animation_ui.key_boolean);
+                auto_key_changed = ImGui::Checkbox("Boolean value",
+                                                    &animation_ui.key_boolean);
             } else {
-                ImGui::InputText("Resource id", &animation_ui.key_resource_id);
+                auto_key_changed = ImGui::InputText("Resource id",
+                                                    &animation_ui.key_resource_id);
             }
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
@@ -1661,9 +1669,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::BeginDisabled(animation_ui.node_id.empty() ||
                                  animation_ui.component_id.empty() ||
                                  animation_ui.property_id.empty() ||
-                                 (animation_ui.key_kind == 4 &&
+                                  (animation_ui.key_kind == 4 &&
                                   animation_ui.key_resource_id.empty()));
-            if (ImGui::Button("Set key")) {
+            const auto set_key = [&]() {
                 fabric::project::AnimationValue value;
                 if (animation_ui.key_kind == 0) {
                     value = fabric::core::Vec2{animation_ui.key_value[0],
@@ -1685,15 +1693,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         {.node_id = animation_ui.node_id,
                          .component_id = animation_ui.component_id,
                          .property_id = animation_ui.property_id},
-                        animation_ui.key_time,
+                        animation_ui.auto_key
+                            ? animation_ui.scrub_time
+                            : animation_ui.key_time,
                         std::move(value),
                         animation_ui.interpolation,
                         fabric::editor::AutosaveScheduler::Clock::now(),
                         animation_ui.composition)) {
-                    status = "Animation key inserted.";
+                    status = "Animation key set.";
                 } else {
                     status = "Animation key rejected; inspect diagnostics.";
                 }
+            };
+            if (ImGui::Button("Set key") ||
+                (animation_ui.auto_key && auto_key_changed)) {
+                set_key();
             }
             ImGui::EndDisabled();
             ImGui::SeparatorText("Tracks");
