@@ -173,6 +173,10 @@ target_link_libraries(fabric_asset_preview PRIVATE
     nlohmann_json::nlohmann_json
 )
 
+add_executable(fabric_render_benchmark tools/render_benchmark/main.cpp)
+target_link_libraries(fabric_render_benchmark PRIVATE
+    fabric_render SDL2::SDL2-static)
+
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/animation_timeline.cpp
     engine/fabric_editor/src/autosave_scheduler.cpp

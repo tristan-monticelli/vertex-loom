@@ -14,6 +14,7 @@ C4Container
         Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, prompts typés, historique réversible, autosave et orchestration d’authoring")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie, compositing vectoriels et batching stable des draw packets")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
+        Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
     Rel(creator, asset, "Crée et prévisualise")
@@ -31,6 +32,7 @@ C4Container
     Rel(runtime, projectlib, "Charge")
     Rel(runtime, renderlib, "Rend les draw packets")
     Rel(projectcli, projectlib, "Utilise")
+    Rel(renderbench, renderlib, "Mesure")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
     Rel(editorlib, renderlib, "Valide les sources raster et vectorielles")

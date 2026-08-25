@@ -277,6 +277,7 @@ inspectable avec collisions et événements.
 - [x] Ajouter smoke test, benchmark et replay par checkpoints.
 - [x] Réduire les draw calls des packets contigus compatibles par batching stable
 - [x] Utiliser l’index des chunks pour limiter les instances candidates au culling
+- [x] Ajouter un benchmark OpenGL synthétique à 10 000 packets avec p95 et draw calls
 - [ ] Mesurer puis tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
   de référence.
 

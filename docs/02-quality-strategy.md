@@ -17,8 +17,9 @@
 ## Decision rule
 
 Les tests unitaires et de contrat s'exécutent à chaque modification du cœur.
-Les intégrations précèdent chaque étape fonctionnelle. Les benchmarks sont
-requis avant une release ou une modification du renderer. Les tests Node de
+Les intégrations précèdent chaque étape fonctionnelle. Le benchmark
+`./build/fabric_render_benchmark --packets 10000 --frames 600` est requis avant
+une release ou une modification du renderer. Les tests Node de
 gouvernance restent exécutés par `npm test`. Le contrat projet couvre le
 round-trip JSON, les versions non prises en charge, les chemins traversants et
 le comportement du validateur headless sur des fixtures valides et invalides.
