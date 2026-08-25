@@ -77,8 +77,9 @@ C4Component
   sont refusés avant résolution.
 - Le solveur FABRIK 2D conserve la racine, borne ses itérations, vérifie les
   longueurs de segments et traite explicitement les cibles hors de portée.
-- Le système XPBD unifié expose distance et pin, conserve les lambdas,
-  applique la compliance et quantifie l’état après chaque sous-pas.
+- Le système XPBD unifié expose distance, flexion, aire, pin et collision,
+  conserve les lambdas, applique la compliance et quantifie l’état après
+  chaque sous-pas.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.

@@ -213,8 +213,8 @@ transform du fill restent ouverts.
   refuser les cycles avant résolution.
 - [x] Ajouter IK 2D par FABRIK avec racine fixe, tolérance et nombre maximal
   d’itérations déterministe.
-- [x] Ajouter le socle XPBD distance/pin avec compliance, lambdas et
-  quantification après sous-pas.
+- [x] Ajouter XPBD distance, flexion, aire, pin et collision avec compliance,
+  lambdas et quantification après sous-pas.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
   la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
 - [x] Supporter création explicite de clé, déplacement et suppression de clés

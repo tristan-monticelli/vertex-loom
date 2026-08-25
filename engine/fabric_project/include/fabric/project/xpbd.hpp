@@ -28,10 +28,39 @@ struct XpbdPinConstraint {
     core::Vec2 lambda;
 };
 
+struct XpbdBendingConstraint {
+    std::size_t first{};
+    std::size_t middle{};
+    std::size_t third{};
+    float rest_length{};
+    float compliance{};
+    float lambda{};
+};
+
+struct XpbdAreaConstraint {
+    std::size_t first{};
+    std::size_t second{};
+    std::size_t third{};
+    float rest_area{};
+    float compliance{};
+    float lambda{};
+};
+
+struct XpbdCollisionConstraint {
+    std::size_t particle{};
+    core::Vec2 normal{0.0F, 1.0F};
+    float offset{};
+    float compliance{};
+    float lambda{};
+};
+
 struct XpbdSystem {
     std::vector<XpbdParticle> particles;
     std::vector<XpbdDistanceConstraint> distance_constraints;
     std::vector<XpbdPinConstraint> pin_constraints;
+    std::vector<XpbdBendingConstraint> bending_constraints;
+    std::vector<XpbdAreaConstraint> area_constraints;
+    std::vector<XpbdCollisionConstraint> collision_constraints;
 };
 
 struct XpbdResult {
