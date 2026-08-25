@@ -6,7 +6,7 @@ C4Component
     Container_Boundary(render, "fabric_render") {
         Component(loader, "SVG preview loader", "C++20 / SDL2_image / NanoSVG", "Valide la taille du fichier et rasterise un aperçu RGBA8 borné")
         Component(image, "RasterImage", "C++20", "Aperçu possédé par le moteur sans type SDL ou OpenGL public")
-        Component(geometry, "Native vector renderer", "C++20 / OpenGL", "Valide les contours, aplatit, triangule, met en cache et produit des draw packets déterministes")
+        Component(geometry, "Native vector renderer", "C++20 / OpenGL", "Valide les contours, applique les transforms, aplatit, triangule, met en cache et produit des draw packets déterministes")
     }
     Container_Boundary(asset, "Asset Studio") {
         Component(import_ui, "SVG import dialog", "Dear ImGui", "Saisit la source, l'identifiant et le nom puis présente les diagnostics")
@@ -59,3 +59,5 @@ C4Component
   opaque reste fonctionnel. Chaque draw packet porte soit une couleur solide,
   soit la référence texture et le transform UV du fill image, ainsi que la
   même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
+  Les sommets sont exprimés dans l’espace monde après application du transform
+  du nœud et de ses parents dans l’ordre stable de la hiérarchie.

@@ -143,7 +143,8 @@ sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
 Le payload headless de fill image et la triangulation de sa silhouette sont
 désormais disponibles ; le rendu OpenGL effectif et la validation visuelle du
-gate restent ouverts.
+gate restent ouverts. Les draw packets appliquent désormais les transforms
+locales et parentes avant d’exposer leurs sommets monde.
 
 ## Étape D — Personnalisateur intégré
 

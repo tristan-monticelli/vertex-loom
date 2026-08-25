@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numeric>
+#include <unordered_set>
 
 namespace fabric::render {
 namespace {
@@ -140,6 +141,74 @@ std::vector<core::Vec2> flatten_shape(const project::VectorShape& shape,
     return points;
 }
 
+core::Vec2 apply_transform(const core::Vec2 point,
+                           const core::Transform& transform) {
+    const float x = (point.x - transform.pivot.x) * transform.scale.x;
+    const float y = (point.y - transform.pivot.y) * transform.scale.y;
+    constexpr float pi = 3.14159265358979323846F;
+    const float angle = transform.rotation_degrees * pi / 180.0F;
+    const float cosine = std::cos(angle);
+    const float sine = std::sin(angle);
+    return {transform.position.x + transform.pivot.x + x * cosine - y * sine,
+            transform.position.y + transform.pivot.y + x * sine + y * cosine};
+}
+
+const project::VectorNode* find_node(
+    const std::vector<project::VectorNode>& nodes, const std::string& id) {
+    const auto iterator = std::ranges::find_if(
+        nodes, [&id](const project::VectorNode& candidate) {
+            return candidate.id == id;
+        });
+    return iterator == nodes.end() ? nullptr : &*iterator;
+}
+
+bool resolve_world_point(const std::vector<project::VectorNode>& nodes,
+                         const project::VectorNode& node,
+                         const core::Vec2 local,
+                         std::unordered_set<std::string>& active,
+                         core::Vec2& world,
+                         std::string& error) {
+    if (!active.insert(node.id).second) {
+        error = "native transform hierarchy contains a cycle at node: " +
+                node.id;
+        return false;
+    }
+    const auto transformed = apply_transform(local, node.transform);
+    if (!node.parent_id.has_value()) {
+        world = transformed;
+        active.erase(node.id);
+        return true;
+    }
+    const auto* parent = find_node(nodes, *node.parent_id);
+    if (parent == nullptr) {
+        error = "native transform parent is missing: " + *node.parent_id;
+        active.erase(node.id);
+        return false;
+    }
+    const bool resolved = resolve_world_point(nodes, *parent, transformed,
+                                              active, world, error);
+    active.erase(node.id);
+    return resolved;
+}
+
+bool transform_outline(const std::vector<project::VectorNode>& nodes,
+                       const project::VectorNode& node,
+                       std::vector<core::Vec2>& outline,
+                       std::string& error) {
+    std::vector<core::Vec2> transformed;
+    transformed.reserve(outline.size());
+    for (const auto point : outline) {
+        std::unordered_set<std::string> active;
+        core::Vec2 world{};
+        if (!resolve_world_point(nodes, node, point, active, world, error)) {
+            return false;
+        }
+        transformed.push_back(world);
+    }
+    outline = std::move(transformed);
+    return true;
+}
+
 } // namespace
 
 VectorGeometryResult build_native_draw_packets(
@@ -154,6 +223,7 @@ VectorGeometryResult build_native_draw_packets(
         result.errors.push_back("curve tolerance must be finite and positive");
         return result;
     }
+    const auto& nodes = asset.native->nodes;
     for (const auto& node : asset.native->nodes) {
         VectorDrawPacket packet{
             .node_id = node.id,
@@ -164,6 +234,11 @@ VectorGeometryResult build_native_draw_packets(
             .parent_id = node.parent_id,
             .clip_node_id = node.clip_node_id,
         };
+        std::string transform_error;
+        if (!transform_outline(nodes, node, packet.outline, transform_error)) {
+            result.errors.push_back(std::move(transform_error));
+            continue;
+        }
         if (node.fill.kind == project::VectorFillKind::solid ||
             node.fill.kind == project::VectorFillKind::image) {
             packet.fill_indices = triangulate(packet.outline);

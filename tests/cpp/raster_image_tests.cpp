@@ -223,6 +223,28 @@ void native_geometry_preserves_image_fill_payload() {
             "image fill payload or silhouette was lost in draw packet");
 }
 
+void native_geometry_applies_node_and_parent_transforms() {
+    auto asset = native_geometry_fixture();
+    auto& child = asset.native->nodes.front();
+    child.parent_id = "parent-1";
+    child.transform.position = {2.0F, 3.0F};
+    child.transform.scale = {2.0F, 2.0F};
+    asset.native->nodes.push_back({
+        .id = "parent-1",
+        .name = "Parent",
+        .transform = {.position = {10.0F, -1.0F}},
+        .shape = {.id = "parent-shape", .kind = fabric::project::VectorShapeKind::line,
+                  .bounds = {.origin = {0.0F, 0.0F}, .size = {1.0F, 1.0F}},
+                  .points = {{0.0F, 0.0F}, {1.0F, 0.0F}}},
+    });
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 2U,
+            "hierarchical transform packet build failed");
+    const auto& child_packet = result.packets.front();
+    require(child_packet.outline.front() == fabric::core::Vec2{12.0F, 2.0F},
+            "parent and child transforms were not composed in draw packet");
+}
+
 } // namespace
 
 int main() {
@@ -233,5 +255,6 @@ int main() {
     native_geometry_produces_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
+    native_geometry_applies_node_and_parent_transforms();
     return 0;
 }
