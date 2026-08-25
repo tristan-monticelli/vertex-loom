@@ -67,12 +67,26 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, std::string> animation_instances;
     std::unordered_map<std::string, project::AnimationStateMachine> animation_state_machines;
     std::unordered_map<std::string, std::vector<project::AnimationParameter>> animation_parameters;
+    mutable bool evaluation_cache_valid{};
+    mutable float evaluation_cache_time{};
+    mutable std::unordered_map<std::string,
+        std::optional<project::EvaluationResult>> animation_evaluation_cache;
+    mutable std::unordered_map<std::string,
+        std::optional<std::vector<project::EntityNode>>> node_evaluation_cache;
     std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
     bool sdl_initialized{};
+
+    void begin_evaluation_cache(const float time) const {
+        if (evaluation_cache_valid && evaluation_cache_time == time) return;
+        evaluation_cache_valid = true;
+        evaluation_cache_time = time;
+        animation_evaluation_cache.clear();
+        node_evaluation_cache.clear();
+    }
 };
 
 namespace {
@@ -373,6 +387,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->animation_instances.clear();
     impl_->animation_state_machines.clear();
     impl_->animation_parameters.clear();
+    impl_->evaluation_cache_valid = false;
+    impl_->animation_evaluation_cache.clear();
+    impl_->node_evaluation_cache.clear();
     impl_->packet_base_transforms.clear();
     impl_->entity_simulations.clear();
     impl_->packet_indices_by_instance.clear();
@@ -1103,6 +1120,10 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
 std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_animation(
     const std::string& instance_id, const float time) const {
     if (!impl_) return std::nullopt;
+    impl_->begin_evaluation_cache(time);
+    const auto cached = impl_->animation_evaluation_cache.find(instance_id);
+    if (cached != impl_->animation_evaluation_cache.end()) return cached->second;
+    std::optional<project::EvaluationResult> result;
     const auto machine = impl_->animation_state_machines.find(instance_id);
     if (machine != impl_->animation_state_machines.end()) {
         const auto parameters = impl_->animation_parameters.find(instance_id);
@@ -1111,12 +1132,15 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_anima
             ? empty_parameters : parameters->second;
         const auto resolved = resolve_state_machine_animation(
             machine->second, impl_->animation_clips, values, time);
-        if (!resolved) return std::nullopt;
-        return evaluate_animation({.value = resolved->clip_id}, resolved->local_time);
+        if (resolved)
+            result = evaluate_animation({.value = resolved->clip_id}, resolved->local_time);
+    } else {
+        const auto animation = impl_->animation_instances.find(instance_id);
+        if (animation != impl_->animation_instances.end())
+            result = evaluate_animation({.value = animation->second}, time);
     }
-    const auto animation = impl_->animation_instances.find(instance_id);
-    if (animation == impl_->animation_instances.end()) return std::nullopt;
-    return evaluate_animation({.value = animation->second}, time);
+    impl_->animation_evaluation_cache.emplace(instance_id, result);
+    return result;
 }
 
 std::optional<project::MeshDeformationResult>
@@ -1128,14 +1152,23 @@ std::optional<std::vector<project::EntityNode>>
 PreviewRuntime::evaluate_instance_nodes(const std::string& instance_id,
                                         const float time) const {
     if (!impl_) return std::nullopt;
+    impl_->begin_evaluation_cache(time);
+    const auto cached = impl_->node_evaluation_cache.find(instance_id);
+    if (cached != impl_->node_evaluation_cache.end()) return cached->second;
     const auto found = impl_->entity_simulations.find(instance_id);
-    if (found == impl_->entity_simulations.end()) return std::nullopt;
+    if (found == impl_->entity_simulations.end()) {
+        impl_->node_evaluation_cache.emplace(instance_id, std::nullopt);
+        return std::nullopt;
+    }
     auto nodes = found->second.nodes;
     const auto animation = evaluate_instance_animation(instance_id, time);
     if (animation && animation->ok()) apply_animation_to_nodes(nodes, *animation);
     if (!resolve_constraints(nodes, found->second.constraints) ||
-        !resolve_ik_chains(nodes, found->second.ik_chains))
+        !resolve_ik_chains(nodes, found->second.ik_chains)) {
+        impl_->node_evaluation_cache.emplace(instance_id, std::nullopt);
         return std::nullopt;
+    }
+    impl_->node_evaluation_cache.emplace(instance_id, nodes);
     return nodes;
 }
 
