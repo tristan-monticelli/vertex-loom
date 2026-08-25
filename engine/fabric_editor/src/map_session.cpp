@@ -37,6 +37,20 @@ std::optional<std::size_t> find_instance(const project::MapDocument& map,
     return std::nullopt;
 }
 
+std::optional<std::size_t> find_event(const project::MapDocument& map,
+                                      const core::ResourceId& id) {
+    for (std::size_t index = 0; index < map.events.size(); ++index)
+        if (map.events[index].id == id) return index;
+    return std::nullopt;
+}
+
+std::optional<std::size_t> find_trigger(const project::MapDocument& map,
+                                        const core::ResourceId& id) {
+    for (std::size_t index = 0; index < map.triggers.size(); ++index)
+        if (map.triggers[index].id == id.value) return index;
+    return std::nullopt;
+}
+
 void set_chunk(project::MapInstance& instance) {
     instance.chunk_x = static_cast<std::int32_t>(
         std::floor(instance.transform.position.x / project::map_chunk_size));
@@ -111,6 +125,47 @@ bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
     auto next = *map_;
     next.instances[*found].transform = transform;
     set_chunk(next.instances[*found]);
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::declare_event(project::MapEventDefinition event) {
+    if (!map_ || !core::ResourceId::is_valid(event.id.value) ||
+        find_event(*map_, event.id)) return false;
+    auto next = *map_;
+    next.events.push_back(std::move(event));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::remove_event(const core::ResourceId& event_id) {
+    if (!map_) return false;
+    const auto found = find_event(*map_, event_id);
+    if (!found) return false;
+    for (const auto& trigger : map_->triggers)
+        if (trigger.event_id == event_id) return false;
+    auto next = *map_;
+    next.events.erase(next.events.begin() + static_cast<std::ptrdiff_t>(*found));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::add_trigger(project::TriggerDefinition trigger) {
+    if (!map_ || !core::ResourceId::is_valid(trigger.id) ||
+        find_trigger(*map_, {.value = trigger.id}) ||
+        !find_event(*map_, trigger.event_id)) return false;
+    auto next = *map_;
+    next.triggers.push_back(std::move(trigger));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::remove_trigger(const core::ResourceId& trigger_id) {
+    if (!map_) return false;
+    const auto found = find_trigger(*map_, trigger_id);
+    if (!found) return false;
+    auto next = *map_;
+    next.triggers.erase(next.triggers.begin() + static_cast<std::ptrdiff_t>(*found));
     auto before = *map_;
     return commit(commands_, *map_, std::move(before), std::move(next));
 }

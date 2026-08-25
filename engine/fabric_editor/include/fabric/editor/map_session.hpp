@@ -20,6 +20,10 @@ public:
     [[nodiscard]] bool remove_instance(const core::ResourceId& instance_id);
     [[nodiscard]] bool set_instance_transform(const core::ResourceId& instance_id,
                                                core::Transform transform);
+    [[nodiscard]] bool declare_event(project::MapEventDefinition event);
+    [[nodiscard]] bool remove_event(const core::ResourceId& event_id);
+    [[nodiscard]] bool add_trigger(project::TriggerDefinition trigger);
+    [[nodiscard]] bool remove_trigger(const core::ResourceId& trigger_id);
     [[nodiscard]] bool undo();
     [[nodiscard]] bool redo();
 

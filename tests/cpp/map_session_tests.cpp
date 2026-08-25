@@ -17,7 +17,13 @@ fabric::project::MapDocument map() {
     return {.document = {.schema_version = 1, .type = "map",
                          .id = {.value = "session"}, .name = "Session"},
             .layers = {{"instances", "Instances",
-                        fabric::project::MapLayerKind::instances, true, false, 0.0F}}};
+                        fabric::project::MapLayerKind::instances, true, false, 0.0F},
+                       {"collision", "Collision",
+                        fabric::project::MapLayerKind::collision, true, false, 0.0F},
+                       {"triggers", "Triggers",
+                        fabric::project::MapLayerKind::triggers, true, false, 0.0F}},
+            .collisions = {{fabric::project::CollisionShapeKind::circle, "collision", true,
+                            {}, 1.0F, 0.0F, {}}}};
 }
 
 fabric::project::MapInstance instance(std::string id, float x) {
@@ -42,6 +48,11 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.undo());
     REQUIRE(session.map()->instances.front().chunk_x == 1);
     REQUIRE(session.redo());
+    REQUIRE(session.declare_event({{.value = "on-enter"}, {}}));
+    REQUIRE(session.add_trigger({"enter", "triggers", 0, {.value = "on-enter"}, {}}));
+    REQUIRE_FALSE(session.remove_event({.value = "on-enter"}));
+    REQUIRE(session.remove_trigger({.value = "enter"}));
+    REQUIRE(session.remove_event({.value = "on-enter"}));
     REQUIRE(session.save());
 
     fabric::editor::MapSession reopened;
