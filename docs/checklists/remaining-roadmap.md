@@ -410,8 +410,8 @@ trois plateformes.
 
 ## Étape I — Runtime jouable
 
-- [ ] Ajouter actions clavier/manette, scènes, transitions et points d’entrée.
-- [ ] Ajouter contrôleur de personnage, caméra, zones et événements en
+- [x] Ajouter actions clavier/manette, scènes, transitions et points d’entrée.
+- [x] Ajouter contrôleur de personnage, caméra, zones et événements en
   réutilisant les propriétés et animations génériques.
 - [x] Ajouter audio PCM WAV, progression versionnée atomique et replay gameplay.
 
@@ -428,6 +428,8 @@ déclencher une transition de scène via un hand-off propre ; les autres
 options CLI validées.
 Les bindings d’actions peuvent être fournis par `--bind` sans modifier le
 programme.
+Asset Studio peut créer et modifier ces bindings dans des `InputDocument v1`
+persistants, avec undo/redo et autosave atomique.
 Les bindings peuvent maintenant être publiés dans `assets/input/<id>.input.json`
 et chargés automatiquement par `PreviewRuntime` via `default` ou `--input <id>`.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
