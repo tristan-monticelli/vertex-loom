@@ -1,4 +1,5 @@
 #include "fabric/editor/map_session.hpp"
+#include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
@@ -136,6 +137,10 @@ struct MechanicEditorState {
     std::string from_port;
     std::string to_node;
     std::string to_port;
+    fabric::editor::RotatingPlatformPresetRequest platform;
+    int platform_activation{};
+    int platform_direction{};
+    std::string platform_visual_entity;
 };
 
 void draw_mechanic_value_editor(
@@ -242,6 +247,93 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         }
     }
     ImGui::EndDisabled();
+
+    ImGui::SeparatorText("Rotating platform preset");
+    ImGui::SetNextItemWidth(150.0F);
+    ImGui::InputText("Platform id", &state.platform.id.value);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(170.0F);
+    ImGui::InputText("Platform name", &state.platform.name);
+    ImGui::Combo("Activation", &state.platform_activation,
+                 "Presence sensor\0Map event\0");
+    if (state.platform_activation == 1)
+        ImGui::InputText("Activation event", &state.platform.event_id.value);
+    if (state.platform_activation == 1 && !map_session.map()->events.empty()) {
+        ImGui::TextDisabled("Map events:");
+        for (const auto& event : map_session.map()->events) {
+            ImGui::SameLine();
+            if (ImGui::SmallButton(event.id.value.c_str()))
+                state.platform.event_id = event.id;
+        }
+    }
+    ImGui::InputText("Visual entity (optional)", &state.platform_visual_entity);
+    if (map_session.manifest()) {
+        const auto directory = map_session.project_root() /
+            map_session.manifest()->directories.entities;
+        std::error_code error;
+        if (std::filesystem::exists(directory, error)) {
+            ImGui::TextDisabled("Asset Studio entities:");
+            for (std::filesystem::directory_iterator iterator{directory, error}, end;
+                 !error && iterator != end; iterator.increment(error)) {
+                if (!iterator->is_regular_file(error)) continue;
+                auto filename = iterator->path().filename().string();
+                constexpr std::string_view suffix = ".entity.json";
+                if (!filename.ends_with(suffix)) continue;
+                filename.resize(filename.size() - suffix.size());
+                ImGui::SameLine();
+                if (ImGui::SmallButton(filename.c_str()))
+                    state.platform_visual_entity = filename;
+            }
+        }
+    }
+    ImGui::DragFloat2("Platform position", &state.platform.position.x, 0.1F);
+    ImGui::DragFloat2("Platform size", &state.platform.size.x, 0.1F, 0.01F, 256.0F);
+    ImGui::DragFloat("Speed (deg/s)",
+                     &state.platform.speed_degrees_per_second, 1.0F, 0.0F, 3600.0F);
+    ImGui::Combo("Direction", &state.platform_direction,
+                 "Counter-clockwise (+1)\0Clockwise (-1)\0");
+    ImGui::DragFloat("Acceleration (deg/s2)",
+                     &state.platform.acceleration_degrees_per_second_squared,
+                     1.0F, 0.0F, 7200.0F);
+    ImGui::DragFloat("Maximum torque", &state.platform.maximum_torque,
+                     1.0F, 0.0F, 100000.0F);
+    ImGui::Checkbox("Angular limits", &state.platform.limit_enabled);
+    if (state.platform.limit_enabled) {
+        ImGui::DragFloat("Minimum angle", &state.platform.minimum_angle_degrees,
+                         1.0F, -178.0F, 178.0F);
+        ImGui::DragFloat("Maximum angle", &state.platform.maximum_angle_degrees,
+                         1.0F, -178.0F, 178.0F);
+    }
+    if (state.platform_activation == 0) {
+        ImGui::DragFloat2("Sensor center", &state.platform.sensor_center.x, 0.1F);
+        ImGui::DragFloat2("Sensor size", &state.platform.sensor_size.x,
+                          0.1F, 0.01F, 256.0F);
+    }
+    if (ImGui::Button("Create rotating platform")) {
+        state.platform.activation = state.platform_activation == 0
+            ? fabric::editor::RotatingPlatformActivation::sensor
+            : fabric::editor::RotatingPlatformActivation::event;
+        state.platform.direction = state.platform_direction == 0 ? 1 : -1;
+        state.platform.visual_entity = state.platform_visual_entity.empty()
+            ? std::nullopt
+            : std::optional<fabric::project::ResourceReference>{
+                  {{.value = state.platform_visual_entity}, "entity"}};
+        const auto built = fabric::editor::build_rotating_platform_preset(
+            *map_session.manifest(), *map_session.map(), state.platform);
+        if (!built.ok()) {
+            status = built.errors.empty() ? "Platform preset rejected"
+                                          : built.errors.front().message;
+        } else if (session.create(map_session.project_root(), *map_session.map(),
+                                  *built.graph)) {
+            state.open_id = state.platform.id.value;
+            state.selected_node = "platform";
+            status = "Rotating platform created from Studio preset";
+        } else {
+            status = session.errors().empty()
+                ? "Platform could not replace the current dirty graph"
+                : session.errors().front().message;
+        }
+    }
 
     if (!session.has_graph()) {
         for (const auto& error : session.errors())
@@ -370,6 +462,21 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                                          : "Simulation reset failed";
     ImGui::EndDisabled();
     ImGui::Text("Fixed steps: %zu", simulation.step_count());
+    for (const auto& signal : simulation.signal_states()) {
+        bool active = signal.active;
+        const auto label = signal.kind == fabric::physics::MechanicSignalKind::sensor
+            ? "Sensor: " + signal.node_id
+            : "Event: " + signal.event_id.value;
+        if (ImGui::Checkbox(label.c_str(), &active)) {
+            const auto applied = signal.kind ==
+                    fabric::physics::MechanicSignalKind::sensor
+                ? session.set_preview_sensor_active(
+                      {.value = signal.node_id}, active)
+                : session.set_preview_event_active(signal.event_id, active);
+            status = applied ? "Preview activation signal changed"
+                             : "Preview activation signal rejected";
+        }
+    }
     for (const auto& body : simulation.body_states())
         ImGui::BulletText("%s  pos %.2f, %.2f  rot %.2f deg",
                           body.node_id.c_str(), body.position.x, body.position.y,

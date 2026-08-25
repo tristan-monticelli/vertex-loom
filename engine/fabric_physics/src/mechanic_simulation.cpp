@@ -35,7 +35,9 @@ struct MechanicSimulation::Impl {
     b2BodyId ground{b2_nullBodyId};
     std::unordered_map<std::string, b2BodyId> bodies;
     std::unordered_map<std::string, b2JointId> joints;
+    std::unordered_map<std::string, float> motor_speeds;
     std::vector<MechanicBodyState> states;
+    std::vector<MechanicSignalState> signals;
     bool playing{};
     bool has_plan{};
     float accumulator{};
@@ -47,7 +49,9 @@ struct MechanicSimulation::Impl {
         ground = b2_nullBodyId;
         bodies.clear();
         joints.clear();
+        motor_speeds.clear();
         states.clear();
+        signals.clear();
         accumulator = 0.0F;
         steps = 0;
     }
@@ -76,6 +80,37 @@ struct MechanicSimulation::Impl {
                 .position = {position.x, position.y},
                 .rotation_degrees = degrees(
                     b2Rot_GetAngle(b2Body_GetRotation(found->second))) });
+        }
+    }
+
+    bool source_active(const std::optional<std::string>& source) const noexcept {
+        if (!source) return true;
+        const auto found = std::ranges::find(
+            signals, *source, &MechanicSignalState::node_id);
+        return found != signals.end() && found->active;
+    }
+
+    void update_motors(const float time_step) {
+        for (const auto& motor : plan.motors) {
+            const auto joint = joints.find(motor.joint_node_id);
+            if (joint == joints.end()) continue;
+            const auto enabled = source_active(motor.enabled_source_node_id);
+            const auto target = enabled
+                ? radians(motor.speed_degrees_per_second *
+                          static_cast<float>(motor.direction))
+                : 0.0F;
+            auto& current = motor_speeds[motor.node_id];
+            const auto acceleration = radians(
+                motor.acceleration_degrees_per_second_squared);
+            if (acceleration <= 0.0F) {
+                current = target;
+            } else {
+                const auto maximum_delta = acceleration * time_step;
+                current += std::clamp(target - current,
+                                      -maximum_delta, maximum_delta);
+            }
+            b2RevoluteJoint_EnableMotor(joint->second, true);
+            b2RevoluteJoint_SetMotorSpeed(joint->second, current);
         }
     }
 
@@ -140,12 +175,20 @@ struct MechanicSimulation::Impl {
         for (const auto& motor : plan.motors) {
             const auto found = joints.find(motor.joint_node_id);
             if (found == joints.end()) { destroy(); return false; }
-            b2RevoluteJoint_EnableMotor(found->second,
-                                        !motor.enabled_source_node_id.has_value());
-            b2RevoluteJoint_SetMotorSpeed(
-                found->second, radians(motor.speed_degrees_per_second));
+            b2RevoluteJoint_EnableMotor(found->second, true);
+            b2RevoluteJoint_SetMotorSpeed(found->second, 0.0F);
             b2RevoluteJoint_SetMaxMotorTorque(found->second, motor.maximum_torque);
+            motor_speeds.emplace(motor.node_id, 0.0F);
         }
+
+        for (const auto& sensor : plan.sensors)
+            signals.push_back({.node_id = sensor.node_id,
+                               .kind = MechanicSignalKind::sensor});
+        for (const auto& event : plan.events)
+            if (event.mode == MechanicEventMode::listen)
+                signals.push_back({.node_id = event.node_id,
+                                   .kind = MechanicSignalKind::event,
+                                   .event_id = event.event_id});
 
         for (const auto& constraint : plan.constraints) {
             const auto body_id = body(std::optional<std::string>{constraint.body_node_id});
@@ -194,6 +237,7 @@ bool MechanicSimulation::update(const float frame_seconds) {
         frame_seconds < 0.0F) return false;
     impl_->accumulator += std::min(frame_seconds, 0.25F);
     while (impl_->accumulator >= fixed_step) {
+        impl_->update_motors(fixed_step);
         b2World_Step(impl_->world, fixed_step, sub_steps);
         impl_->accumulator -= fixed_step;
         ++impl_->steps;
@@ -204,6 +248,7 @@ bool MechanicSimulation::update(const float frame_seconds) {
 
 bool MechanicSimulation::step_once() {
     if (!valid() || impl_->playing) return false;
+    impl_->update_motors(fixed_step);
     b2World_Step(impl_->world, fixed_step, sub_steps);
     ++impl_->steps;
     impl_->refresh_states();
@@ -212,6 +257,27 @@ bool MechanicSimulation::step_once() {
 
 void MechanicSimulation::play() noexcept { if (valid()) impl_->playing = true; }
 void MechanicSimulation::pause() noexcept { impl_->playing = false; }
+bool MechanicSimulation::set_sensor_active(
+    const core::ResourceId& node_id, const bool active) noexcept {
+    const auto found = std::ranges::find(
+        impl_->signals, node_id.value, &MechanicSignalState::node_id);
+    if (found == impl_->signals.end() ||
+        found->kind != MechanicSignalKind::sensor) return false;
+    found->active = active;
+    return true;
+}
+bool MechanicSimulation::set_event_active(
+    const core::ResourceId& event_id, const bool active) noexcept {
+    bool changed = false;
+    for (auto& signal : impl_->signals) {
+        if (signal.kind == MechanicSignalKind::event &&
+            signal.event_id == event_id) {
+            signal.active = active;
+            changed = true;
+        }
+    }
+    return changed;
+}
 bool MechanicSimulation::valid() const noexcept {
     return impl_ && b2World_IsValid(impl_->world);
 }
@@ -219,6 +285,9 @@ bool MechanicSimulation::playing() const noexcept { return impl_->playing; }
 std::size_t MechanicSimulation::step_count() const noexcept { return impl_->steps; }
 const std::vector<MechanicBodyState>& MechanicSimulation::body_states() const noexcept {
     return impl_->states;
+}
+const std::vector<MechanicSignalState>& MechanicSimulation::signal_states() const noexcept {
+    return impl_->signals;
 }
 
 } // namespace fabric::physics

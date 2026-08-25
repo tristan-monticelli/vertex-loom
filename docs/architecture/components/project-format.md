@@ -90,7 +90,10 @@ C4Component
   `constraint` et `event`. Chacun possède un schéma fermé de ports et de
   propriétés ; les types de handle `body`, `pivot` et `joint` ne sont valides
   que sur les ports et ne peuvent pas être sérialisés comme valeurs de
-  paramètres.
+  paramètres. Un moteur peut dériver sa vitesse cible de `speed`, `direction`
+  et `acceleration`. Un événement v1 sans mode conserve le comportement
+  `emit`; le mode optionnel `listen` expose son signal `active` aux autres
+  nœuds. Ces ajouts optionnels préservent la lecture des premiers documents v1.
 - `VectorAsset v2` est la version écrite. Un document v1 est accepté en lecture,
   conserve sa source `assets/vectors/<id>.svg` et devient
   `sourceKind = linkedSvg` sans modifier le fichier source.

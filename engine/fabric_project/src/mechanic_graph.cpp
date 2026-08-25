@@ -210,8 +210,9 @@ void validate_builtin_node(const MechanicNodeDefinition& node,
     for (const auto& expected : schema.ports) {
         const auto* port = find_port(&node, std::string{expected.id});
         if (port == nullptr) {
-            error(errors, ErrorCode::missing_resource, field + ".ports",
-                  "required port is missing: " + std::string{expected.id});
+            if (expected.required)
+                error(errors, ErrorCode::missing_resource, field + ".ports",
+                      "required port is missing: " + std::string{expected.id});
             continue;
         }
         if (port->direction != expected.direction || port->type != expected.type)
@@ -275,11 +276,24 @@ void validate_builtin_node(const MechanicNodeDefinition& node,
         if (minimum && maximum && *minimum > *maximum)
             error(errors, ErrorCode::invalid_asset, field + ".properties",
                   "minimum angle must not exceed maximum angle");
+        constexpr float maximum_revolute_angle = 178.0F;
+        if ((minimum && *minimum < -maximum_revolute_angle) ||
+            (maximum && *maximum > maximum_revolute_angle))
+            error(errors, ErrorCode::invalid_asset, field + ".properties",
+                  "revolute angles must stay in [-178,178] degrees");
     } else if (*kind == MechanicNodeKind::motor) {
         const auto* torque = property_value<float>(node, "max-torque");
         if (torque && *torque < 0.0F)
             error(errors, ErrorCode::invalid_asset,
                   field + ".properties.max-torque", "must be non-negative");
+        const auto* acceleration = property_value<float>(node, "acceleration");
+        if (acceleration && *acceleration < 0.0F)
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.acceleration", "must be non-negative");
+        const auto* direction = property_value<std::int64_t>(node, "direction");
+        if (direction && *direction != -1 && *direction != 1)
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.direction", "must be -1 or 1");
     } else if (*kind == MechanicNodeKind::sensor) {
         const auto* size = property_value<core::Vec2>(node, "size");
         if (size && (size->x <= 0.0F || size->y <= 0.0F))
@@ -290,6 +304,13 @@ void validate_builtin_node(const MechanicNodeDefinition& node,
         if (event_id && !core::ResourceId::is_valid(*event_id))
             error(errors, ErrorCode::invalid_resource_id,
                   field + ".properties.event-id", "must be a valid event id");
+        const auto* mode = property_value<std::string>(node, "mode");
+        if (mode && *mode != "emit" && *mode != "listen")
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.mode", "must be emit or listen");
+        if (mode && *mode == "listen" && find_port(&node, "active") == nullptr)
+            error(errors, ErrorCode::missing_resource, field + ".ports.active",
+                  "listen events require the active output port");
     }
 }
 
@@ -406,7 +427,9 @@ const MechanicNodeSchema& mechanic_node_schema(const MechanicNodeKind kind) {
          {{"joint", Direction::input, Type::joint_handle},
           {"enabled", Direction::input, Type::boolean},
           {"active", Direction::output, Type::boolean}},
-         {{"speed", Type::scalar}, {"max-torque", Type::scalar}}},
+         {{"speed", Type::scalar}, {"max-torque", Type::scalar},
+          {"direction", Type::integer, false},
+          {"acceleration", Type::scalar, false}}},
         {MechanicNodeKind::sensor, "sensor",
          {{"body", Direction::input, Type::body_handle},
           {"active", Direction::output, Type::boolean}},
@@ -418,8 +441,9 @@ const MechanicNodeSchema& mechanic_node_schema(const MechanicNodeKind kind) {
           {"active", Direction::output, Type::boolean}},
          {{"min-angle", Type::scalar}, {"max-angle", Type::scalar}}},
         {MechanicNodeKind::event, "event",
-         {{"trigger", Direction::input, Type::boolean}},
-         {{"event-id", Type::text}}},
+         {{"trigger", Direction::input, Type::boolean},
+          {"active", Direction::output, Type::boolean, false}},
+         {{"event-id", Type::text}, {"mode", Type::text, false}}},
     }};
     return schemas[static_cast<std::size_t>(kind)];
 }

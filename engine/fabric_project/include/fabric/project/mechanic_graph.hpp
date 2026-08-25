@@ -90,6 +90,7 @@ struct MechanicNodePortSchema {
     std::string_view id;
     MechanicPortDirection direction;
     MechanicValueType type;
+    bool required{true};
 };
 
 struct MechanicNodePropertySchema {

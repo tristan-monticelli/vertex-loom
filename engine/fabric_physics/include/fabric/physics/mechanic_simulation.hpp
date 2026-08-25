@@ -17,6 +17,15 @@ struct MechanicBodyState {
                            const MechanicBodyState&) = default;
 };
 
+enum class MechanicSignalKind { sensor, event };
+
+struct MechanicSignalState {
+    std::string node_id;
+    MechanicSignalKind kind{MechanicSignalKind::sensor};
+    core::ResourceId event_id;
+    bool active{};
+};
+
 class MechanicSimulation {
 public:
     MechanicSimulation();
@@ -32,11 +41,14 @@ public:
     [[nodiscard]] bool step_once();
     void play() noexcept;
     void pause() noexcept;
+    [[nodiscard]] bool set_sensor_active(const core::ResourceId&, bool) noexcept;
+    [[nodiscard]] bool set_event_active(const core::ResourceId&, bool) noexcept;
 
     [[nodiscard]] bool valid() const noexcept;
     [[nodiscard]] bool playing() const noexcept;
     [[nodiscard]] std::size_t step_count() const noexcept;
     [[nodiscard]] const std::vector<MechanicBodyState>& body_states() const noexcept;
+    [[nodiscard]] const std::vector<MechanicSignalState>& signal_states() const noexcept;
 
 private:
     struct Impl;

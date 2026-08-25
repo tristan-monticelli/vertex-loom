@@ -237,6 +237,14 @@ C4Component
   invalide la preview précédente. Le monde Box2D reconstruit expose les états
   de corps par identifiant de nœud ; lecture, pause, pas à `1/60 s` et reset
   restent des commandes de preview non persistantes.
+- Le prompt `Rotating platform` de Map Studio produit un `MechanicGraph`
+  générique avec corps, pivot, joint, moteur et source d'activation capteur ou
+  événement. Taille, vitesse, direction, accélération, couple, zone
+  capteur et limites optionnelles deviennent des paramètres liés du document.
+  La preview permet d'injecter explicitement les signaux capteur/événement pour
+  vérifier les deux modes avant qu'un personnage ne soit ajouté à la map.
+  Une entité visuelle Asset Studio optionnelle est liée au corps de plateforme
+  sans devenir sa collision.
 - L’inspecteur d’animation expose une première timeline générique : durée,
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,

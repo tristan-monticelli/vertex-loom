@@ -4,6 +4,7 @@
 #include "fabric/project/mechanic_graph.hpp"
 
 #include <optional>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -19,6 +20,7 @@ struct MechanicBodyDescription {
     float rotation_degrees{};
     float density{};
     float friction{};
+    std::optional<project::ResourceReference> visual_entity;
     friend bool operator==(const MechanicBodyDescription&,
                            const MechanicBodyDescription&) = default;
 };
@@ -48,10 +50,14 @@ struct MechanicMotorDescription {
     std::string joint_node_id;
     std::optional<std::string> enabled_source_node_id;
     float speed_degrees_per_second{};
+    std::int64_t direction{1};
+    float acceleration_degrees_per_second_squared{};
     float maximum_torque{};
     friend bool operator==(const MechanicMotorDescription&,
                            const MechanicMotorDescription&) = default;
 };
+
+enum class MechanicEventMode { emit, listen };
 
 struct MechanicSensorDescription {
     std::string node_id;
@@ -75,7 +81,8 @@ struct MechanicConstraintDescription {
 struct MechanicEventDescription {
     std::string node_id;
     core::ResourceId event_id;
-    std::string trigger_source_node_id;
+    MechanicEventMode mode{MechanicEventMode::emit};
+    std::optional<std::string> trigger_source_node_id;
     friend bool operator==(const MechanicEventDescription&,
                            const MechanicEventDescription&) = default;
 };

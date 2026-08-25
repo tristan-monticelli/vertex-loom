@@ -198,6 +198,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/map_session.cpp
+    engine/fabric_editor/src/mechanic_presets.cpp
     engine/fabric_editor/src/mechanic_session.cpp
     engine/fabric_editor/src/project_session.cpp
     engine/fabric_editor/src/session_transition.cpp
@@ -492,6 +493,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_mechanic_session_tests
              COMMAND fabric_mechanic_session_tests)
+
+    add_executable(fabric_mechanic_presets_tests
+        tests/cpp/mechanic_presets_tests.cpp)
+    target_compile_definitions(fabric_mechanic_presets_tests PRIVATE
+        FABRIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(fabric_mechanic_presets_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_mechanic_presets_tests
+             COMMAND fabric_mechanic_presets_tests)
 
     add_executable(fabric_preview_runtime_tests tests/cpp/preview_runtime_tests.cpp)
     target_link_libraries(fabric_preview_runtime_tests PRIVATE

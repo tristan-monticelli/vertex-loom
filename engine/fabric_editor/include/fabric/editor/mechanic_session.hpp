@@ -40,6 +40,14 @@ public:
     void pause() noexcept { simulation_.pause(); }
     [[nodiscard]] bool step_once() { return simulation_.step_once(); }
     [[nodiscard]] bool reset_preview();
+    [[nodiscard]] bool set_preview_sensor_active(
+        const core::ResourceId& node_id, bool active) noexcept {
+        return simulation_.set_sensor_active(node_id, active);
+    }
+    [[nodiscard]] bool set_preview_event_active(
+        const core::ResourceId& event_id, bool active) noexcept {
+        return simulation_.set_event_active(event_id, active);
+    }
     [[nodiscard]] bool update_preview(float frame_seconds) {
         return simulation_.update(frame_seconds);
     }

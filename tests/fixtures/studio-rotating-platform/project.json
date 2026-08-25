@@ -1,0 +1,13 @@
+{
+  "directories": {
+    "assets": "assets",
+    "entities": "entities",
+    "maps": "maps",
+    "scenes": "scenes",
+    "schemas": "schemas"
+  },
+  "id": "studio-rotating-platform",
+  "name": "Studio Rotating Platform",
+  "pixelsPerUnit": 100.0,
+  "schemaVersion": 2
+}

@@ -155,6 +155,8 @@ TEST_CASE("all mechanic nodes compile deterministically into fabric_physics") {
     CHECK(first.plan->events.front().event_id.value == "platform-start");
     CHECK(first.plan->motors.front().enabled_source_node_id == "presence");
     CHECK(first.plan->motors.front().speed_degrees_per_second == 90.0F);
+    CHECK(first.plan->motors.front().direction == 1);
+    CHECK(first.plan->motors.front().acceleration_degrees_per_second_squared == 0.0F);
 }
 
 TEST_CASE("mechanic compilation rejects missing wiring and map events") {

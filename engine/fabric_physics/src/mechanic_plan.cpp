@@ -103,7 +103,9 @@ MechanicPlanResult compile_mechanic_graph(
                 .size = value<core::Vec2>(node, "size"),
                 .rotation_degrees = value<float>(node, "rotation"),
                 .density = value<float>(node, "density"),
-                .friction = value<float>(node, "friction")});
+                .friction = value<float>(node, "friction"),
+                .visual_entity = value<project::ResourceReference>(
+                    node, "entity")});
             break;
         case project::MechanicNodeKind::pivot: {
             MechanicPivotDescription description{
@@ -144,6 +146,9 @@ MechanicPlanResult compile_mechanic_graph(
                 .enabled_source_node_id = incoming_source(
                     resolved, node.id, "enabled"),
                 .speed_degrees_per_second = value<float>(node, "speed"),
+                .direction = value<std::int64_t>(node, "direction", 1),
+                .acceleration_degrees_per_second_squared =
+                    value<float>(node, "acceleration"),
                 .maximum_torque = value<float>(node, "max-torque")};
             if (require_source(result, resolved, node, "joint",
                                description.joint_node_id))
@@ -169,12 +174,21 @@ MechanicPlanResult compile_mechanic_graph(
             break;
         }
         case project::MechanicNodeKind::event: {
+            const auto mode = value<std::string>(node, "mode", "emit");
             MechanicEventDescription description{
                 .node_id = node.id,
-                .event_id = {.value = value<std::string>(node, "event-id")}};
-            if (!require_source(result, resolved, node, "trigger",
-                                description.trigger_source_node_id))
+                .event_id = {.value = value<std::string>(node, "event-id")},
+                .mode = mode == "listen" ? MechanicEventMode::listen
+                                         : MechanicEventMode::emit,
+                .trigger_source_node_id = incoming_source(
+                    resolved, node.id, "trigger")};
+            if (description.mode == MechanicEventMode::emit &&
+                !description.trigger_source_node_id) {
+                error(result, project::ErrorCode::missing_resource,
+                      "nodes." + node.id + ".ports.trigger",
+                      "emit event requires a trigger input");
                 break;
+            }
             if (!event_declared(map, description.event_id)) {
                 error(result, project::ErrorCode::missing_resource,
                       "nodes." + node.id + ".properties.event-id",

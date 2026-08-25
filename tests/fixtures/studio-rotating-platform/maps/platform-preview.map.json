@@ -1,0 +1,27 @@
+{
+  "chunkSize": 64.0,
+  "collisions": [],
+  "events": [
+    {
+      "id": "platform-activate",
+      "payload": []
+    }
+  ],
+  "id": "platform-preview",
+  "instances": [],
+  "layers": [
+    {
+      "depth": 0.0,
+      "id": "gameplay",
+      "kind": "gameplay",
+      "locked": false,
+      "name": "Gameplay",
+      "visible": true
+    }
+  ],
+  "name": "Platform Preview",
+  "prefabs": [],
+  "schemaVersion": 1,
+  "triggers": [],
+  "type": "map"
+}

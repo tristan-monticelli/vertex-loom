@@ -1,0 +1,10 @@
+{
+  "height": 2,
+  "id": "platform-thread",
+  "name": "Platform Thread",
+  "pixelFormat": "rgba8",
+  "schemaVersion": 1,
+  "source": "assets/textures/platform-thread.png",
+  "type": "texture",
+  "width": 2
+}

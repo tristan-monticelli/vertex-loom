@@ -85,6 +85,11 @@ Les mutations de nœuds, propriétés et connexions passent par son propre
 Box2D. Lecture, pause, pas fixe et reset n'écrivent jamais d'état de simulation
 dans le document.
 
+La factory de plateforme tournante vit dans `fabric_editor` et assemble un
+graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview
+évalue les signaux capteur ou événement, applique direction et accélération au
+moteur, puis laisse Box2D imposer les limites du joint.
+
 Une tranche fonctionnelle suit la même direction de données dans les outils et
 le runtime : contrat partagé, commande d'authoring, preview du studio,
 sauvegarde dans le projet, composition dans Map Studio, puis chargement du

@@ -37,6 +37,7 @@ project::MechanicValue default_value(const project::MechanicValueType type,
     case Type::text:
         if (id == "body-type") return std::string{"dynamic"};
         if (id == "event-id") return std::string{"event"};
+        if (id == "mode") return std::string{"emit"};
         return std::string{"value"};
     case Type::vec2: return core::Vec2{1.0F, 1.0F};
     case Type::resource:
@@ -58,11 +59,16 @@ project::MechanicNodeDefinition make_node(const project::MechanicNodeKind kind,
             .id = std::string{port.id}, .name = std::string{port.id},
             .direction = port.direction, .type = port.type});
     for (const auto& property : schema.properties) {
-        if (property.required)
+        if (property.required ||
+            property.type != project::MechanicValueType::resource)
             node.properties.push_back({
                 .id = std::string{property.id},
                 .value = default_value(property.type, property.id)});
     }
+    if (kind == project::MechanicNodeKind::motor)
+        std::ranges::find(node.properties, "direction",
+                          &project::MechanicNodeProperty::id)->value =
+            std::int64_t{1};
     return node;
 }
 
@@ -228,8 +234,19 @@ bool MechanicSession::set_node_property(const core::ResourceId& node_id,
     if (node == next.nodes.end()) return false;
     const auto property = std::ranges::find(node->properties, property_id,
                                             &project::MechanicNodeProperty::id);
-    if (property == node->properties.end()) return false;
-    property->value = std::move(value);
+    if (property == node->properties.end()) {
+        const auto kind = project::mechanic_node_kind(node->type);
+        if (!kind) return false;
+        const auto& schema = project::mechanic_node_schema(*kind);
+        const auto optional = std::ranges::find(
+            schema.properties, property_id,
+            &project::MechanicNodePropertySchema::id);
+        if (optional == schema.properties.end() || optional->required ||
+            !project::mechanic_value_matches(optional->type, value)) return false;
+        node->properties.push_back({std::move(property_id), std::move(value)});
+    } else {
+        property->value = std::move(value);
+    }
     return commit(std::move(next));
 }
 

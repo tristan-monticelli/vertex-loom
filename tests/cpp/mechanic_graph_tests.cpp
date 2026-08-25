@@ -147,6 +147,20 @@ TEST_CASE("all seven built-in mechanic node schemas are authorable") {
     }
     CHECK(fabric::project::validate_mechanic_graph(manifest(), source).ok());
 
+    auto legacy_event = complete_node(
+        fabric::project::MechanicNodeKind::event, "legacy-event");
+    std::erase_if(legacy_event.ports, [](const auto& port) {
+        return port.id == "active";
+    });
+    source.parameters.clear();
+    source.nodes = {legacy_event};
+    source.connections.clear();
+    CHECK(fabric::project::validate_mechanic_graph(manifest(), source).ok());
+
+    source.nodes.clear();
+    for (const auto kind : kinds)
+        source.nodes.push_back(complete_node(
+            kind, std::string{fabric::project::to_string(kind)}));
     source.nodes.front().ports.pop_back();
     source.nodes.back().properties.front().value = std::string{"Bad event id"};
     const auto invalid = fabric::project::validate_mechanic_graph(
@@ -165,9 +179,22 @@ TEST_CASE("all seven built-in mechanic node schemas are authorable") {
     source.nodes.push_back(complete_node(
         fabric::project::MechanicNodeKind::motor, "motor"));
     source.nodes.back().properties[1].value = -1.0F;
+    source.nodes.back().properties.push_back({"direction", std::int64_t{0}});
+    source.nodes.back().properties.push_back({"acceleration", -1.0F});
     source.nodes.push_back(complete_node(
         fabric::project::MechanicNodeKind::sensor, "sensor"));
     source.nodes.back().properties[1].value = fabric::core::Vec2{};
+    CHECK_FALSE(fabric::project::validate_mechanic_graph(
+                    manifest(), source).ok());
+
+    source = graph();
+    auto invalid_event = complete_node(
+        fabric::project::MechanicNodeKind::event, "event");
+    invalid_event.properties.push_back({"mode", std::string{"listen"}});
+    std::erase_if(invalid_event.ports, [](const auto& port) {
+        return port.id == "active";
+    });
+    source.nodes.push_back(std::move(invalid_event));
     CHECK_FALSE(fabric::project::validate_mechanic_graph(
                     manifest(), source).ok());
 }

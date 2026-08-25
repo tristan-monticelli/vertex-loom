@@ -149,8 +149,20 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
   sont disponibles dans l'inspecteur. Les tests headless couvrent authoring,
   connexions, rejet de preview incomplète, undo/redo, sauvegarde/reload,
   récupération et contrôles à pas fixe.
-- [ ] Livrer une plateforme tournante paramétrique avec activation par capteur
+- [x] Livrer une plateforme tournante paramétrique avec activation par capteur
   ou événement et limites angulaires optionnelles.
+
+  Preuve : le prompt `Rotating platform` de Map Studio assemble un graphe
+  générique corps/pivot/joint/moteur avec source `sensor` ou événement
+  `listen`. Taille, vitesse, direction, accélération, couple, zone capteur et
+  limites sont des paramètres liés et validés ; la preview injecte les deux
+  types de signal, accélère le moteur puis laisse Box2D borner le joint. La
+  fixture versionnée `studio-rotating-platform` est régénérée octet par octet
+  avec `ProjectSession`, `MapSession` et `MechanicSession` : Asset Studio crée
+  sa bande textile texturée et son entité, puis Map Studio crée et sauvegarde
+  la mécanique qui la référence sans confondre visuel et collision. Les tests
+  couvrent mode inactif, capteur, événement, direction, accélération, limites,
+  référence visuelle, reload et validation du projet complet.
 - [ ] Faire transporter le personnage et exposer début, fin et état de la
   mécanique dans les overlays de debug.
 - [ ] Sauvegarder la mécanique dans un prefab et modifier ses paramètres par

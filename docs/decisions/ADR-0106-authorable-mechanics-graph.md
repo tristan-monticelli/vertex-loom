@@ -34,6 +34,23 @@ La première mécanique de référence est une plateforme tournante avec pivot,
 vitesse, direction, accélération, limites optionnelles, capteur de présence,
 activation événementielle, collision et transport du personnage.
 
+Le nœud événement distingue deux modes rétrocompatibles : `emit` consomme un
+signal booléen et publie l'événement map ; `listen` produit un signal booléen
+piloté par cet événement. Le port de sortie et la propriété de mode restent
+optionnels dans le schéma v1 afin que les graphes v1 déjà publiés conservent
+leur sens `emit`. Le moteur accepte aussi les propriétés optionnelles
+`direction` (`-1` ou `1`) et `acceleration`; leur absence conserve la vitesse
+signée instantanée de la première version.
+
+Map Studio fournit une factory `RotatingPlatform` qui assemble uniquement les
+sept nœuds génériques. Elle expose taille, vitesse, direction,
+accélération, couple, zone capteur et limites comme paramètres liés ; le mode
+d'activation choisit un capteur ou un écouteur d'événement, sans type Box2D ou
+code gameplay propre au preset.
+Le corps peut référencer une entité visuelle créée dans Asset Studio ; cette
+référence reste distincte de sa forme de collision et sera composée par la map
+sans convertir l'image ou le composant visuel en géométrie physique.
+
 ## Alternatives
 
 Un prefab codé par mécanique serait rapide mais non composable. Un langage de

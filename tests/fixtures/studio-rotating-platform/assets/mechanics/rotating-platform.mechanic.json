@@ -1,0 +1,416 @@
+{
+  "connections": [
+    {
+      "fromNode": "platform",
+      "fromPort": "body",
+      "toNode": "anchor",
+      "toPort": "body"
+    },
+    {
+      "fromNode": "platform",
+      "fromPort": "body",
+      "toNode": "hinge",
+      "toPort": "body-a"
+    },
+    {
+      "fromNode": "anchor",
+      "fromPort": "pivot",
+      "toNode": "hinge",
+      "toPort": "pivot"
+    },
+    {
+      "fromNode": "hinge",
+      "fromPort": "joint",
+      "toNode": "drive",
+      "toPort": "joint"
+    },
+    {
+      "fromNode": "platform",
+      "fromPort": "body",
+      "toNode": "presence",
+      "toPort": "body"
+    },
+    {
+      "fromNode": "presence",
+      "fromPort": "active",
+      "toNode": "drive",
+      "toPort": "enabled"
+    }
+  ],
+  "id": "rotating-platform",
+  "name": "Rotating Platform",
+  "nodes": [
+    {
+      "id": "platform",
+      "nodeType": "body",
+      "ports": [
+        {
+          "direction": "output",
+          "id": "body",
+          "name": "body",
+          "valueType": "body"
+        }
+      ],
+      "properties": [
+        {
+          "id": "body-type",
+          "value": {
+            "kind": "text",
+            "value": "dynamic"
+          }
+        },
+        {
+          "id": "position",
+          "value": {
+            "kind": "vec2",
+            "value": {
+              "x": 0.0,
+              "y": 2.0
+            }
+          }
+        },
+        {
+          "id": "size",
+          "value": {
+            "kind": "vec2",
+            "value": {
+              "x": 6.0,
+              "y": 0.6000000238418579
+            }
+          }
+        },
+        {
+          "id": "rotation",
+          "value": {
+            "kind": "scalar",
+            "value": 0.0
+          }
+        },
+        {
+          "id": "density",
+          "value": {
+            "kind": "scalar",
+            "value": 1.0
+          }
+        },
+        {
+          "id": "friction",
+          "value": {
+            "kind": "scalar",
+            "value": 0.8999999761581421
+          }
+        },
+        {
+          "id": "entity",
+          "value": {
+            "kind": "resource",
+            "value": {
+              "expectedType": "entity",
+              "id": "platform-visual"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "anchor",
+      "nodeType": "pivot",
+      "ports": [
+        {
+          "direction": "input",
+          "id": "body",
+          "name": "body",
+          "valueType": "body"
+        },
+        {
+          "direction": "output",
+          "id": "pivot",
+          "name": "pivot",
+          "valueType": "pivot"
+        }
+      ],
+      "properties": [
+        {
+          "id": "position",
+          "value": {
+            "kind": "vec2",
+            "value": {
+              "x": 0.0,
+              "y": 2.0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "hinge",
+      "nodeType": "joint",
+      "ports": [
+        {
+          "direction": "input",
+          "id": "body-a",
+          "name": "body-a",
+          "valueType": "body"
+        },
+        {
+          "direction": "input",
+          "id": "body-b",
+          "name": "body-b",
+          "valueType": "body"
+        },
+        {
+          "direction": "input",
+          "id": "pivot",
+          "name": "pivot",
+          "valueType": "pivot"
+        },
+        {
+          "direction": "output",
+          "id": "joint",
+          "name": "joint",
+          "valueType": "joint"
+        }
+      ],
+      "properties": [
+        {
+          "id": "limit-enabled",
+          "value": {
+            "kind": "bool",
+            "value": true
+          }
+        },
+        {
+          "id": "min-angle",
+          "value": {
+            "kind": "scalar",
+            "value": -35.0
+          }
+        },
+        {
+          "id": "max-angle",
+          "value": {
+            "kind": "scalar",
+            "value": 35.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "drive",
+      "nodeType": "motor",
+      "ports": [
+        {
+          "direction": "input",
+          "id": "joint",
+          "name": "joint",
+          "valueType": "joint"
+        },
+        {
+          "direction": "input",
+          "id": "enabled",
+          "name": "enabled",
+          "valueType": "bool"
+        },
+        {
+          "direction": "output",
+          "id": "active",
+          "name": "active",
+          "valueType": "bool"
+        }
+      ],
+      "properties": [
+        {
+          "id": "speed",
+          "value": {
+            "kind": "scalar",
+            "value": 90.0
+          }
+        },
+        {
+          "id": "max-torque",
+          "value": {
+            "kind": "scalar",
+            "value": 250.0
+          }
+        },
+        {
+          "id": "direction",
+          "value": {
+            "kind": "integer",
+            "value": -1
+          }
+        },
+        {
+          "id": "acceleration",
+          "value": {
+            "kind": "scalar",
+            "value": 180.0
+          }
+        }
+      ]
+    },
+    {
+      "id": "presence",
+      "nodeType": "sensor",
+      "ports": [
+        {
+          "direction": "input",
+          "id": "body",
+          "name": "body",
+          "valueType": "body"
+        },
+        {
+          "direction": "output",
+          "id": "active",
+          "name": "active",
+          "valueType": "bool"
+        }
+      ],
+      "properties": [
+        {
+          "id": "center",
+          "value": {
+            "kind": "vec2",
+            "value": {
+              "x": 0.0,
+              "y": 3.0
+            }
+          }
+        },
+        {
+          "id": "size",
+          "value": {
+            "kind": "vec2",
+            "value": {
+              "x": 7.0,
+              "y": 2.0
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "defaultValue": {
+        "kind": "vec2",
+        "value": {
+          "x": 6.0,
+          "y": 0.6000000238418579
+        }
+      },
+      "id": "size",
+      "name": "Size",
+      "targetNode": "platform",
+      "targetProperty": "size",
+      "valueType": "vec2"
+    },
+    {
+      "defaultValue": {
+        "kind": "scalar",
+        "value": 90.0
+      },
+      "id": "speed",
+      "name": "Speed",
+      "targetNode": "drive",
+      "targetProperty": "speed",
+      "valueType": "scalar"
+    },
+    {
+      "defaultValue": {
+        "kind": "integer",
+        "value": -1
+      },
+      "id": "direction",
+      "name": "Direction",
+      "targetNode": "drive",
+      "targetProperty": "direction",
+      "valueType": "integer"
+    },
+    {
+      "defaultValue": {
+        "kind": "scalar",
+        "value": 180.0
+      },
+      "id": "acceleration",
+      "name": "Acceleration",
+      "targetNode": "drive",
+      "targetProperty": "acceleration",
+      "valueType": "scalar"
+    },
+    {
+      "defaultValue": {
+        "kind": "scalar",
+        "value": 250.0
+      },
+      "id": "max-torque",
+      "name": "Maximum torque",
+      "targetNode": "drive",
+      "targetProperty": "max-torque",
+      "valueType": "scalar"
+    },
+    {
+      "defaultValue": {
+        "kind": "bool",
+        "value": true
+      },
+      "id": "limit-enabled",
+      "name": "Limit enabled",
+      "targetNode": "hinge",
+      "targetProperty": "limit-enabled",
+      "valueType": "bool"
+    },
+    {
+      "defaultValue": {
+        "kind": "scalar",
+        "value": -35.0
+      },
+      "id": "min-angle",
+      "name": "Minimum angle",
+      "targetNode": "hinge",
+      "targetProperty": "min-angle",
+      "valueType": "scalar"
+    },
+    {
+      "defaultValue": {
+        "kind": "scalar",
+        "value": 35.0
+      },
+      "id": "max-angle",
+      "name": "Maximum angle",
+      "targetNode": "hinge",
+      "targetProperty": "max-angle",
+      "valueType": "scalar"
+    },
+    {
+      "defaultValue": {
+        "kind": "vec2",
+        "value": {
+          "x": 0.0,
+          "y": 3.0
+        }
+      },
+      "id": "sensor-center",
+      "name": "Sensor center",
+      "targetNode": "presence",
+      "targetProperty": "center",
+      "valueType": "vec2"
+    },
+    {
+      "defaultValue": {
+        "kind": "vec2",
+        "value": {
+          "x": 7.0,
+          "y": 2.0
+        }
+      },
+      "id": "sensor-size",
+      "name": "Sensor size",
+      "targetNode": "presence",
+      "targetProperty": "size",
+      "valueType": "vec2"
+    }
+  ],
+  "schemaVersion": 1,
+  "type": "mechanic"
+}
