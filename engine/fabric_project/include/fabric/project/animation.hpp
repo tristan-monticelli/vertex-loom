@@ -19,6 +19,9 @@ using AnimationValue = std::variant<float, core::Vec2, core::Color, bool,
 enum class AnimationInterpolation { step, linear, cubic };
 [[nodiscard]] std::string_view to_string(AnimationInterpolation) noexcept;
 
+enum class AnimationComposition { replace, additive };
+[[nodiscard]] std::string_view to_string(AnimationComposition) noexcept;
+
 struct PropertyBinding {
     std::string node_id;
     std::string component_id;
@@ -36,6 +39,7 @@ struct AnimationTrack {
     PropertyBinding binding;
     AnimationInterpolation interpolation{AnimationInterpolation::linear};
     std::vector<AnimationKey> keys;
+    AnimationComposition composition{AnimationComposition::replace};
     friend bool operator==(const AnimationTrack&, const AnimationTrack&) = default;
 };
 
@@ -66,6 +70,7 @@ struct AnimationResult {
 struct EvaluatedProperty {
     PropertyBinding binding;
     AnimationValue value;
+    AnimationComposition composition{AnimationComposition::replace};
     friend bool operator==(const EvaluatedProperty&, const EvaluatedProperty&) = default;
 };
 

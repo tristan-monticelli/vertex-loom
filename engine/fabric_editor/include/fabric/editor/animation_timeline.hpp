@@ -19,10 +19,14 @@ public:
 
     [[nodiscard]] bool insert_key(const project::PropertyBinding& binding,
                                   float time, project::AnimationValue value,
-                                  project::AnimationInterpolation interpolation);
+                                  project::AnimationInterpolation interpolation,
+                                  project::AnimationComposition composition =
+                                      project::AnimationComposition::replace);
     [[nodiscard]] bool set_key(const project::PropertyBinding& binding,
                                float time, project::AnimationValue value,
-                               project::AnimationInterpolation interpolation);
+                               project::AnimationInterpolation interpolation,
+                               project::AnimationComposition composition =
+                                   project::AnimationComposition::replace);
     [[nodiscard]] bool move_key(const project::PropertyBinding& binding,
                                 std::size_t key_index, float time);
     [[nodiscard]] bool remove_key(const project::PropertyBinding& binding,

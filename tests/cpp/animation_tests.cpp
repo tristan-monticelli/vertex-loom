@@ -83,4 +83,21 @@ TEST_CASE("animation validation rejects incompatible interpolated values") {
     REQUIRE_FALSE(fabric::project::validate_animation(manifest(), invalid).ok());
 }
 
+TEST_CASE("animation composition round-trips and is exposed during evaluation") {
+    auto source = clip();
+    source.tracks.front().composition =
+        fabric::project::AnimationComposition::additive;
+    const auto serialized = fabric::project::serialize_animation(source);
+    const auto parsed = fabric::project::parse_animation(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    REQUIRE(parsed.asset->tracks.front().composition ==
+            fabric::project::AnimationComposition::additive);
+
+    const auto evaluated = fabric::project::evaluate_animation(*parsed.asset, 0.5F);
+    REQUIRE(evaluated.ok());
+    REQUIRE(evaluated.properties.front().composition ==
+            fabric::project::AnimationComposition::additive);
+    CHECK(std::get<float>(evaluated.properties.front().value) == 0.5F);
+}
+
 } // namespace

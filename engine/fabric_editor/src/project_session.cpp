@@ -1566,11 +1566,12 @@ bool ProjectSession::insert_selected_animation_key(
     project::PropertyBinding binding, const float time,
     project::AnimationValue value,
     const project::AnimationInterpolation interpolation,
-    const AutosaveScheduler::Clock::time_point now) {
+    const AutosaveScheduler::Clock::time_point now,
+    const project::AnimationComposition composition) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.insert_key(std::move(binding), time, std::move(value),
-                             interpolation)) {
+                             interpolation, composition)) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;
@@ -1585,11 +1586,12 @@ bool ProjectSession::set_selected_animation_key(
     project::PropertyBinding binding, const float time,
     project::AnimationValue value,
     const project::AnimationInterpolation interpolation,
-    const AutosaveScheduler::Clock::time_point now) {
+    const AutosaveScheduler::Clock::time_point now,
+    const project::AnimationComposition composition) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.set_key(std::move(binding), time, std::move(value),
-                          interpolation)) {
+                          interpolation, composition)) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;

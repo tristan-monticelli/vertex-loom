@@ -120,12 +120,16 @@ public:
         project::PropertyBinding binding, float time,
         project::AnimationValue value, project::AnimationInterpolation interpolation,
         AutosaveScheduler::Clock::time_point now =
-            AutosaveScheduler::Clock::now());
+            AutosaveScheduler::Clock::now(),
+        project::AnimationComposition composition =
+            project::AnimationComposition::replace);
     [[nodiscard]] bool set_selected_animation_key(
         project::PropertyBinding binding, float time,
         project::AnimationValue value, project::AnimationInterpolation interpolation,
         AutosaveScheduler::Clock::time_point now =
-            AutosaveScheduler::Clock::now());
+            AutosaveScheduler::Clock::now(),
+        project::AnimationComposition composition =
+            project::AnimationComposition::replace);
     [[nodiscard]] bool remove_selected_animation_key(
         project::PropertyBinding binding, std::size_t key_index,
         AutosaveScheduler::Clock::time_point now =

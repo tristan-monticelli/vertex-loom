@@ -220,15 +220,32 @@ void apply_animation_to_nodes(std::vector<project::EntityNode>& nodes,
                 return candidate.id == property.binding.node_id;
             });
         if (node == nodes.end()) continue;
+        const bool additive = property.composition ==
+            project::AnimationComposition::additive;
         if (property.binding.property_id == "position") {
-            if (const auto* value = std::get_if<core::Vec2>(&property.value))
-                node->transform.position = *value;
+            if (const auto* value = std::get_if<core::Vec2>(&property.value)) {
+                if (additive) {
+                    node->transform.position.x += value->x;
+                    node->transform.position.y += value->y;
+                } else {
+                    node->transform.position = *value;
+                }
+            }
         } else if (property.binding.property_id == "rotationDegrees") {
-            if (const auto* value = std::get_if<float>(&property.value))
-                node->transform.rotation_degrees = *value;
+            if (const auto* value = std::get_if<float>(&property.value)) {
+                node->transform.rotation_degrees = additive
+                    ? node->transform.rotation_degrees + *value
+                    : *value;
+            }
         } else if (property.binding.property_id == "scale") {
-            if (const auto* value = std::get_if<core::Vec2>(&property.value))
-                node->transform.scale = *value;
+            if (const auto* value = std::get_if<core::Vec2>(&property.value)) {
+                if (additive) {
+                    node->transform.scale.x += value->x;
+                    node->transform.scale.y += value->y;
+                } else {
+                    node->transform.scale = *value;
+                }
+            }
         }
     }
 }

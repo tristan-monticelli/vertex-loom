@@ -82,13 +82,16 @@ std::vector<project::PropertyBinding> AnimationTimeline::animatable_bindings(
 
 bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
                                    float time, project::AnimationValue value,
-                                   project::AnimationInterpolation interpolation) {
+                                   project::AnimationInterpolation interpolation,
+                                   project::AnimationComposition composition) {
     auto next = clip_;
     auto* track = find_track(next, binding);
     if (!track) {
-        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}}});
+        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}},
+                               composition});
     } else {
-        if (track->interpolation != interpolation)
+        if (track->interpolation != interpolation ||
+            track->composition != composition)
             return false;
         if (!track->keys.empty() && !same_value_type(track->keys.front().value, value))
             return false;
@@ -104,13 +107,16 @@ bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
 
 bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
                                 const float time, project::AnimationValue value,
-                                const project::AnimationInterpolation interpolation) {
+                                const project::AnimationInterpolation interpolation,
+                                const project::AnimationComposition composition) {
     auto next = clip_;
     auto* track = find_track(next, binding);
     if (!track) {
-        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}}});
+        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}},
+                               composition});
     } else {
         if (track->interpolation != interpolation ||
+            track->composition != composition ||
             (!track->keys.empty() &&
              !same_value_type(track->keys.front().value, value))) {
             return false;

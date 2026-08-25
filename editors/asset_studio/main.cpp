@@ -126,6 +126,8 @@ struct AnimationUiState {
     std::string key_resource_id;
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
+    fabric::project::AnimationComposition composition{
+        fabric::project::AnimationComposition::replace};
 };
 
 struct EntityPreviewResult {
@@ -1642,6 +1644,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::EndCombo();
             }
+            const auto composition_label = std::string(
+                fabric::project::to_string(animation_ui.composition));
+            if (ImGui::BeginCombo("Composition", composition_label.c_str())) {
+                for (const auto option : {
+                         fabric::project::AnimationComposition::replace,
+                         fabric::project::AnimationComposition::additive}) {
+                    const bool selected_option = option == animation_ui.composition;
+                    const auto label = std::string(fabric::project::to_string(option));
+                    if (ImGui::Selectable(label.c_str(), selected_option)) {
+                        animation_ui.composition = option;
+                    }
+                }
+                ImGui::EndCombo();
+            }
             ImGui::BeginDisabled(animation_ui.node_id.empty() ||
                                  animation_ui.component_id.empty() ||
                                  animation_ui.property_id.empty() ||
@@ -1671,7 +1687,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                          .property_id = animation_ui.property_id},
                         animation_ui.key_time,
                         std::move(value),
-                        animation_ui.interpolation)) {
+                        animation_ui.interpolation,
+                        fabric::editor::AutosaveScheduler::Clock::now(),
+                        animation_ui.composition)) {
                     status = "Animation key inserted.";
                 } else {
                     status = "Animation key rejected; inspect diagnostics.";

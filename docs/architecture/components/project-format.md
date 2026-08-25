@@ -72,6 +72,10 @@ C4Component
   des markers et des pistes liées par `nodeId + componentId + propertyId`.
   Les valeurs v1 sont scalaire, `Vec2`, couleur, booléen ou référence de
   ressource ; les interpolations disponibles sont step, linear et cubic.
+  Chaque piste porte aussi une composition `replace` ou `additive` ; le champ
+  est facultatif à la lecture pour conserver la compatibilité des clips v1
+  existants et vaut `replace` par défaut. L’évaluation headless expose cette
+  composition avec la valeur interpolée.
 - `PreviewRuntime` énumère les documents `*.animation.json` sous
   `assets/animations` avant l’initialisation SDL. Chaque document est chargé
   avec un chemin relatif au projet, validé puis indexé par `ResourceId` ; un
@@ -79,7 +83,8 @@ C4Component
   d’un clip est disponible par identifiant et instant. Une instance de map peut
   le sélectionner via la propriété `animation`, directement ou par override de
   prefab ; le runtime applique alors les pistes de transformation et de
-  matériau supportées. Les pistes `transform` sont aussi appliquées aux poses
+  matériau supportées ; les pistes additives de position, rotation et échelle
+  sont appliquées comme offsets sur la pose de base. Les pistes `transform` sont aussi appliquées aux poses
   de déformation avant l’évaluation du maillage, avec une API headless pouvant
   évaluer à un instant donné.
 - `PropertyDescriptorRegistry` décrit les propriétés exposées par les

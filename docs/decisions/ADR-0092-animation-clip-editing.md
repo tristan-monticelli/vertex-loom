@@ -20,6 +20,12 @@ crée la clé si elle n’existe pas et remplace sa valeur si elle existe déjà
 Cette opération passe par le `CommandStack`, donc un remplacement de clé est
 annulable en une seule commande.
 
+Chaque track porte aussi une composition `replace` ou `additive`, persistée
+dans le JSON. Les documents v1 qui n’ont pas ce champ restent `replace` par
+défaut. Le runtime applique les tracks additives comme des offsets sur les
+transformations de base (position, rotation et échelle), dans l’ordre stable
+des tracks.
+
 `ProjectSession` orchestre `AnimationTimeline` avec le même `CommandStack`,
 dirty state, autosave miroir, récupération validée et publication atomique que
 les documents vectoriels et d’entité.
@@ -30,6 +36,8 @@ les documents vectoriels et d’entité.
   la main.
 - Le même geste peut être rejoué pendant une édition continue sans créer de
   clés concurrentes au même instant.
+- Les offsets d’animation sont explicites et ne sont jamais déduits de la
+  valeur de la clé.
 - Les bindings restent génériques et ne dépendent pas encore d’un type précis
   d’entité ou de matériau.
 - Le scrubbing visuel, l’édition de tangentes et les pistes booléennes/couleur/

@@ -81,4 +81,29 @@ TEST_CASE("animation timeline rejects invalid key edits") {
     REQUIRE(source.tracks.front().keys.size() == 1);
 }
 
+TEST_CASE("animation timeline preserves composition and rejects mismatches") {
+    auto source = clip();
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(source, commands);
+    const fabric::project::PropertyBinding binding{"root", "transform", "position"};
+
+    REQUIRE(timeline.set_key(
+        binding, 0.0F, fabric::core::Vec2{1.0F, 2.0F},
+        fabric::project::AnimationInterpolation::linear,
+        fabric::project::AnimationComposition::additive));
+    CHECK(source.tracks.front().composition ==
+          fabric::project::AnimationComposition::additive);
+    REQUIRE_FALSE(timeline.set_key(
+        binding, 0.5F, fabric::core::Vec2{2.0F, 3.0F},
+        fabric::project::AnimationInterpolation::linear,
+        fabric::project::AnimationComposition::replace));
+    REQUIRE(timeline.set_key(
+        binding, 0.0F, fabric::core::Vec2{4.0F, 5.0F},
+        fabric::project::AnimationInterpolation::linear,
+        fabric::project::AnimationComposition::additive));
+    CHECK(source.tracks.front().keys.size() == 1U);
+    CHECK(std::get<fabric::core::Vec2>(source.tracks.front().keys.front().value) ==
+          fabric::core::Vec2{4.0F, 5.0F});
+}
+
 } // namespace
