@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <filesystem>
+#include <limits>
 #include <string>
 
 #include <catch2/catch_test_macros.hpp>
@@ -25,7 +26,8 @@ fabric::project::MapDocument map() {
         .layers = {{"instances", "Instances", MapLayerKind::instances, true, false, 0.0F},
                    {"collision", "Collision", MapLayerKind::collision, true, false, 0.0F},
                    {"triggers", "Triggers", MapLayerKind::triggers, true, false, 1.0F}},
-        .prefabs = {{"hero", {{.value = "hero-entity"}, "entity"}, {}}},
+        .prefabs = {{.id = "hero",
+                     .entity = {{.value = "hero-entity"}, "entity"}}},
         .instances = {{"hero-1", std::nullopt,
                        ResourceReference{{.value = "hero"}, "prefab"}, "instances",
                        {.position = {65.0F, -1.0F}}, 1, -1, {}}},
@@ -72,6 +74,34 @@ TEST_CASE("map validation rejects malformed instance animation bindings") {
         "animation", fabric::project::ResourceReference{
             {.value = "walk"}, "texture"}});
     REQUIRE_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+}
+
+TEST_CASE("map prefabs round trip optional mechanic parameter overrides") {
+    auto source = map();
+    source.prefabs.front().mechanic = fabric::project::ResourceReference{
+        {.value = "rotating-platform"}, "mechanic"};
+    source.prefabs.front().mechanic_overrides = {
+        {"speed", 120.0F},
+        {"direction", std::int64_t{-1}},
+        {"sensor-size", fabric::core::Vec2{8.0F, 3.0F}}};
+    const auto parsed = fabric::project::parse_map(
+        manifest(), fabric::project::serialize_map(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.asset == source);
+
+    auto invalid = source;
+    invalid.prefabs.front().mechanic.reset();
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+    invalid = source;
+    invalid.prefabs.front().mechanic_overrides.push_back({"speed", 30.0F});
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+    invalid = source;
+    invalid.prefabs.front().mechanic_overrides.front().value =
+        std::numeric_limits<float>::infinity();
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+    invalid = source;
+    invalid.instances.front().transform.scale = {2.0F, 1.0F};
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
 }
 
 } // namespace

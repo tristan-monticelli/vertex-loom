@@ -599,6 +599,45 @@ ValidationReport validate_mechanic_graph(const ProjectManifest&,
     return report;
 }
 
+ValidationReport validate_mechanic_parameter_overrides(
+    const MechanicGraph& graph,
+    const std::vector<MechanicParameterOverride>& overrides) {
+    ValidationReport report;
+    std::unordered_set<std::string> ids;
+    for (std::size_t index = 0; index < overrides.size(); ++index) {
+        const auto& override = overrides[index];
+        const auto field = "mechanicOverrides[" + std::to_string(index) + "]";
+        if (!core::ResourceId::is_valid(override.parameter_id))
+            error(report.errors, ErrorCode::invalid_resource_id,
+                  field + ".parameter", "must be a valid parameter id");
+        if (!ids.insert(override.parameter_id).second)
+            error(report.errors, ErrorCode::duplicate_resource,
+                  field + ".parameter", "parameter override is duplicated");
+        validate_value(override.value, field + ".value", report.errors);
+        const auto parameter = std::ranges::find(
+            graph.parameters, override.parameter_id,
+            &MechanicParameterDefinition::id);
+        if (parameter == graph.parameters.end()) {
+            error(report.errors, ErrorCode::missing_resource,
+                  field + ".parameter", "mechanic parameter does not exist");
+        } else if (!mechanic_value_matches(parameter->type, override.value)) {
+            error(report.errors, ErrorCode::resource_type_mismatch,
+                  field + ".value", "override does not match parameter type");
+        }
+    }
+    return report;
+}
+
+std::vector<ResourceReference> mechanic_parameter_override_resource_references(
+    const std::vector<MechanicParameterOverride>& overrides) {
+    std::vector<ResourceReference> references;
+    for (const auto& override : overrides)
+        if (const auto* reference =
+                std::get_if<ResourceReference>(&override.value))
+            references.push_back(*reference);
+    return references;
+}
+
 std::vector<ResourceReference> mechanic_graph_resource_references(
     const MechanicGraph& graph) {
     std::vector<ResourceReference> references;

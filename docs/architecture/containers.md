@@ -7,7 +7,7 @@ C4Container
     System_Boundary(fabric, "Vertex Loom") {
     Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge directement une scène et son entryMap ou une map, évalue les AnimationClip v1 et leurs markers franchis, publie les événements de markers des instances animées, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, expose les packets de la dernière frame pour inspection headless, résout les transitions atomiques et les transitions associées aux événements gameplay, remet proprement la boucle au runtime après une transition, traduit les actions SDL configurables vers le CharacterController, interpole Camera2D avec suivi de personnage et limites monde, interpole les positions XPBD, émet les entrées et sorties de zones, culling par chunks avec bounds statiques précalculés, chemin direct des packets statiques visibles et culling géométrique dynamique, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, vues raster non destructives, compositions par calques, composants paramétriques, chemins texturés, matériaux, entités, animations et InputDocument v1")
-        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps et édite les graphes mécaniques par commandes ; inspecte leur simulation, pilote un personnage de test et affiche états et transitions avant publication portable")
+        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps, leurs prefabs et graphes mécaniques ; édite les paramètres de mécanique par overrides typés et inspecte leur simulation avant publication portable")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
@@ -95,6 +95,13 @@ formes sensor détectent physiquement ses entrées et sorties ; la friction des
 contacts transporte le personnage. `fabric_physics` publie l'état courant de
 chaque activation et un journal borné `begin/end`, consommés par les overlays
 de Map Studio sans persistance de handles ou d'état simulé.
+
+Un prefab inline de `MapDocument` peut référencer séparément une entité et un
+`MechanicGraph`. Ses overrides ciblent les paramètres déclarés par le graphe ;
+le validateur de projet vérifie identifiants et types, puis Map Studio compile
+une copie paramétrée pour la preview sans modifier la ressource mécanique. Le
+transform uniforme de l'instance déplace corps, pivots et capteurs dans le même
+repère monde que son entité visuelle.
 
 Une tranche fonctionnelle suit la même direction de données dans les outils et
 le runtime : contrat partagé, commande d'authoring, preview du studio,

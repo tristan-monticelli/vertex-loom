@@ -19,6 +19,13 @@ public:
     [[nodiscard]] bool open(const std::filesystem::path& project_root,
                             const project::MapDocument& map,
                             const core::ResourceId& graph_id);
+    [[nodiscard]] bool open_prefab(const std::filesystem::path& project_root,
+                                   const project::MapDocument& map,
+                                   const core::ResourceId& prefab_id);
+    [[nodiscard]] bool open_prefab_instance(
+        const std::filesystem::path& project_root,
+        const project::MapDocument& map,
+        const core::ResourceId& instance_id);
     [[nodiscard]] bool save();
     [[nodiscard]] AutosaveStatus update_autosave(
         AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());
@@ -31,6 +38,9 @@ public:
     [[nodiscard]] bool set_node_property(const core::ResourceId& node_id,
                                          std::string property_id,
                                          project::MechanicValue value);
+    [[nodiscard]] bool set_parameter_default(
+        const core::ResourceId& parameter_id,
+        project::MechanicValue value);
     [[nodiscard]] bool connect(project::MechanicConnection connection);
     [[nodiscard]] bool disconnect(std::size_t connection_index);
     [[nodiscard]] bool undo();
@@ -61,6 +71,10 @@ public:
     }
 
     [[nodiscard]] bool has_graph() const noexcept { return graph_.has_value(); }
+    [[nodiscard]] bool previewing_prefab(
+        const core::ResourceId& prefab_id) const noexcept {
+        return preview_prefab_id_ && *preview_prefab_id_ == prefab_id;
+    }
     [[nodiscard]] bool dirty() const noexcept { return commands_.dirty(); }
     [[nodiscard]] bool can_undo() const noexcept { return commands_.can_undo(); }
     [[nodiscard]] bool can_redo() const noexcept { return commands_.can_redo(); }
@@ -87,6 +101,9 @@ private:
     std::optional<project::ProjectManifest> manifest_;
     std::optional<project::MapDocument> map_;
     std::optional<project::MechanicGraph> graph_;
+    std::vector<project::MechanicParameterOverride> parameter_overrides_;
+    std::optional<core::Transform> instance_transform_;
+    std::optional<core::ResourceId> preview_prefab_id_;
     std::optional<project::MechanicGraph> recovery_graph_;
     CommandStack commands_;
     AutosaveScheduler autosave_;

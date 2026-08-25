@@ -13,7 +13,7 @@ C4Component
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
-        Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph par commandes, sauvegarde atomique, autosave et récupération, puis pilote sa preview Box2D, son personnage de test et ses overlays de cycle de vie")
+        Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph ou prévisualise sa configuration de prefab, puis pilote Box2D, le personnage de test et les overlays de cycle de vie")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
         Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
@@ -250,6 +250,12 @@ C4Component
   vitesse horizontale et observer son transport par contact. Les overlays
   listent l'état actif de chaque moteur et le journal borné de ses transitions
   `begin/end`, ordonné par numéro de pas fixe.
+- Map Studio crée les prefabs inline par commande et lie séparément leur
+  entité et leur `MechanicGraph`. Le formulaire d'overrides est dérivé des
+  paramètres du graphe chargé : identifiant, type et valeur sont validés avant
+  mutation. `MechanicSession` prévisualise une copie effective du graphe avec
+  ces valeurs et le transform de l'instance sélectionnée, sans rendre le
+  document mécanique dirty.
 - L’inspecteur d’animation expose une première timeline générique : durée,
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,

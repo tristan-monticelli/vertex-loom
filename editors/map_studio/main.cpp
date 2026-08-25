@@ -19,6 +19,7 @@
 #include <iostream>
 #include <optional>
 #include <limits>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -81,6 +82,62 @@ std::optional<fabric::project::MapPropertyValue> parse_override_value(
     }
 }
 
+std::optional<fabric::project::MechanicValue> parse_mechanic_override_value(
+    const fabric::project::MechanicParameterDefinition& parameter,
+    const std::string_view text) {
+    try {
+        using Type = fabric::project::MechanicValueType;
+        switch (parameter.type) {
+        case Type::boolean:
+            if (text == "true") return true;
+            if (text == "false") return false;
+            return std::nullopt;
+        case Type::integer: {
+            std::size_t consumed = 0;
+            const auto value = std::stoll(std::string{text}, &consumed);
+            if (consumed != text.size()) return std::nullopt;
+            return static_cast<std::int64_t>(value);
+        }
+        case Type::scalar: {
+            std::size_t consumed = 0;
+            const auto value = std::stof(std::string{text}, &consumed);
+            if (consumed != text.size() || !std::isfinite(value))
+                return std::nullopt;
+            return value;
+        }
+        case Type::text: return std::string{text};
+        case Type::vec2: {
+            const auto separator = text.find(',');
+            if (separator == std::string_view::npos) return std::nullopt;
+            std::size_t consumed_x = 0;
+            std::size_t consumed_y = 0;
+            const auto x = std::stof(std::string{text.substr(0, separator)},
+                                     &consumed_x);
+            const auto y = std::stof(std::string{text.substr(separator + 1)},
+                                     &consumed_y);
+            if (consumed_x != separator ||
+                consumed_y != text.size() - separator - 1U ||
+                !std::isfinite(x) || !std::isfinite(y)) return std::nullopt;
+            return fabric::core::Vec2{x, y};
+        }
+        case Type::resource: {
+            if (text.empty()) return std::nullopt;
+            const auto* fallback = std::get_if<fabric::project::ResourceReference>(
+                &parameter.default_value);
+            return fabric::project::ResourceReference{
+                {.value = std::string{text}},
+                fallback == nullptr ? "resource" : fallback->expected_type};
+        }
+        case Type::body_handle:
+        case Type::pivot_handle:
+        case Type::joint_handle: return std::nullopt;
+        }
+    } catch (const std::exception&) {
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
 std::string property_value_text(const fabric::project::MapPropertyValue& value) {
     return std::visit([](const auto& item) -> std::string {
         using Value = std::decay_t<decltype(item)>;
@@ -92,6 +149,26 @@ std::string property_value_text(const fabric::project::MapPropertyValue& value) 
             return std::to_string(item.x) + "," + std::to_string(item.y);
         else return item.id.value;
     }, value);
+}
+
+void draw_resource_picker(const char* label,
+                          const std::filesystem::path& directory,
+                          const std::string_view suffix,
+                          std::string& selected_id) {
+    std::error_code error;
+    if (!std::filesystem::exists(directory, error) || error) return;
+    ImGui::TextDisabled("%s", label);
+    ImGui::PushID(label);
+    for (std::filesystem::directory_iterator iterator{directory, error}, end;
+         !error && iterator != end; iterator.increment(error)) {
+        if (!iterator->is_regular_file(error)) continue;
+        auto filename = iterator->path().filename().string();
+        if (!filename.ends_with(suffix)) continue;
+        filename.resize(filename.size() - suffix.size());
+        ImGui::SameLine();
+        if (ImGui::SmallButton(filename.c_str())) selected_id = filename;
+    }
+    ImGui::PopID();
 }
 
 std::string collision_shape_text(const fabric::project::CollisionShape& shape) {
@@ -1382,14 +1459,22 @@ int run(const std::filesystem::path& project_root,
     fabric::project::TriggerDefinition trigger_editor;
     std::vector<std::string> selected_instances;
     std::string active_layer_id;
+    std::string new_layer_id;
+    std::string new_layer_name;
+    int new_layer_kind = 2;
     bool placement_mode = false;
     std::string placement_id;
     std::string placement_resource_id;
     int placement_kind = 0;
     std::string selected_prefab;
+    std::string new_prefab_id;
+    std::string new_prefab_entity;
+    std::string new_prefab_mechanic;
     std::string override_id;
     std::string override_value;
     int override_kind = 2;
+    std::string mechanic_override_parameter;
+    std::string mechanic_override_value;
     std::string instance_property_id;
     std::string instance_property_value;
     int instance_property_kind = 2;
@@ -1469,6 +1554,29 @@ int run(const std::filesystem::path& project_root,
             ImGui::Separator();
             ImGui::Columns(2, "map-studio-columns", true);
             ImGui::Text("Layers (%zu)", map.layers.size());
+            ImGui::SetNextItemWidth(120.0F);
+            ImGui::InputText("Layer id", &new_layer_id);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(140.0F);
+            ImGui::InputText("Layer name", &new_layer_name);
+            ImGui::SetNextItemWidth(150.0F);
+            ImGui::Combo("Layer kind", &new_layer_kind,
+                         "visual\0tiles\0instances\0collision\0triggers\0gameplay\0");
+            ImGui::SameLine();
+            ImGui::BeginDisabled(new_layer_id.empty() || new_layer_name.empty());
+            if (ImGui::Button("Add layer")) {
+                const auto added = session.add_layer({
+                    new_layer_id, new_layer_name,
+                    static_cast<fabric::project::MapLayerKind>(new_layer_kind),
+                    true, false, 0.0F});
+                status = added ? "Layer added" : "Layer creation rejected";
+                if (added) {
+                    active_layer_id = new_layer_id;
+                    new_layer_id.clear();
+                    new_layer_name.clear();
+                }
+            }
+            ImGui::EndDisabled();
             bool layer_changed = false;
             for (std::size_t layer_index = 0; layer_index < map.layers.size(); ++layer_index) {
                 const auto layer = map.layers[layer_index];
@@ -1832,13 +1940,138 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::EndDisabled();
             }
-            ImGui::SeparatorText("Prefab overrides");
+            ImGui::SeparatorText("Prefabs");
+            ImGui::SetNextItemWidth(160.0F);
+            ImGui::InputText("New prefab id", &new_prefab_id);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("Prefab entity", &new_prefab_entity);
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("Prefab mechanic (optional)",
+                             &new_prefab_mechanic);
+            if (session.manifest()) {
+                draw_resource_picker(
+                    "Asset Studio entities:", session.project_root() /
+                        session.manifest()->directories.entities,
+                    ".entity.json", new_prefab_entity);
+                draw_resource_picker(
+                    "Mechanic graphs:", session.project_root() /
+                        session.manifest()->directories.assets / "mechanics",
+                    ".mechanic.json", new_prefab_mechanic);
+            }
+            ImGui::BeginDisabled(new_prefab_id.empty() ||
+                                 new_prefab_entity.empty());
+            if (ImGui::Button("Create prefab")) {
+                fabric::project::PrefabDefinition prefab{
+                    .id = new_prefab_id,
+                    .entity = {{.value = new_prefab_entity}, "entity"}};
+                if (!new_prefab_mechanic.empty())
+                    prefab.mechanic = fabric::project::ResourceReference{
+                        {.value = new_prefab_mechanic}, "mechanic"};
+                const auto created = session.add_prefab(std::move(prefab));
+                status = created ? "Prefab created"
+                                 : "Prefab creation rejected";
+                if (created) {
+                    selected_prefab = new_prefab_id;
+                    new_prefab_id.clear();
+                }
+            }
+            ImGui::EndDisabled();
             for (const auto& prefab : map.prefabs) {
                 const auto selected = selected_prefab == prefab.id;
                 if (ImGui::Selectable(prefab.id.c_str(), selected)) selected_prefab = prefab.id;
             }
             if (!selected_prefab.empty()) {
                 ImGui::Text("Selected prefab: %s", selected_prefab.c_str());
+                const auto prefab = std::ranges::find(
+                    map.prefabs, selected_prefab,
+                    &fabric::project::PrefabDefinition::id);
+                if (prefab != map.prefabs.end() && prefab->mechanic) {
+                    ImGui::Text("Mechanic: %s",
+                                prefab->mechanic->id.value.c_str());
+                    const auto preview_instance = std::ranges::find_if(
+                        map.instances, [&](const auto& instance) {
+                            return instance.prefab &&
+                                   instance.prefab->id.value == selected_prefab;
+                        });
+                    if (ImGui::Button(preview_instance == map.instances.end()
+                            ? "Preview prefab mechanic"
+                            : "Preview mechanic instance")) {
+                        const auto opened = preview_instance == map.instances.end()
+                            ? mechanic_session.open_prefab(
+                                  session.project_root(), map,
+                                  {.value = selected_prefab})
+                            : mechanic_session.open_prefab_instance(
+                                  session.project_root(), map,
+                                  {.value = preview_instance->id});
+                        status = opened ? "Prefab mechanic preview opened"
+                                        : "Prefab mechanic preview rejected";
+                        if (opened)
+                            mechanic_editor.open_id =
+                                prefab->mechanic->id.value;
+                    }
+                    const auto graph = session.prefab_mechanic_graph(
+                        {.value = selected_prefab});
+                    if (graph) {
+                        ImGui::TextDisabled("Mechanic parameters:");
+                        for (const auto& parameter : graph->parameters) {
+                            const auto selected = mechanic_override_parameter ==
+                                                  parameter.id;
+                            const auto label = parameter.name + " [" +
+                                std::string{fabric::project::to_string(
+                                    parameter.type)} + "]##" + parameter.id;
+                            if (ImGui::Selectable(label.c_str(), selected)) {
+                                mechanic_override_parameter = parameter.id;
+                                const auto stored = std::ranges::find(
+                                    prefab->mechanic_overrides, parameter.id,
+                                    &fabric::project::MechanicParameterOverride::parameter_id);
+                                mechanic_override_value = property_value_text(
+                                    stored == prefab->mechanic_overrides.end()
+                                        ? parameter.default_value : stored->value);
+                            }
+                        }
+                        const auto parameter = std::ranges::find(
+                            graph->parameters, mechanic_override_parameter,
+                            &fabric::project::MechanicParameterDefinition::id);
+                        if (parameter != graph->parameters.end()) {
+                            ImGui::SetNextItemWidth(180.0F);
+                            ImGui::InputText("Mechanic value",
+                                             &mechanic_override_value);
+                            if (ImGui::Button("Apply mechanic override")) {
+                                const auto value = parse_mechanic_override_value(
+                                    *parameter, mechanic_override_value);
+                                const auto applied = value &&
+                                    session.set_prefab_mechanic_override(
+                                        {.value = selected_prefab},
+                                        {parameter->id, *value});
+                                status = applied
+                                    ? "Mechanic override applied"
+                                    : "Mechanic override rejected by parameter type";
+                                if (applied && mechanic_session.previewing_prefab(
+                                                   {.value = selected_prefab})) {
+                                    const auto refreshed_map = *session.map();
+                                    const auto refreshed_instance = std::ranges::find_if(
+                                        refreshed_map.instances,
+                                        [&](const auto& instance) {
+                                            return instance.prefab &&
+                                                instance.prefab->id.value ==
+                                                    selected_prefab;
+                                        });
+                                    if (refreshed_instance ==
+                                        refreshed_map.instances.end())
+                                        static_cast<void>(mechanic_session.open_prefab(
+                                            session.project_root(), refreshed_map,
+                                            {.value = selected_prefab}));
+                                    else
+                                        static_cast<void>(
+                                            mechanic_session.open_prefab_instance(
+                                                session.project_root(), refreshed_map,
+                                                {.value = refreshed_instance->id}));
+                                }
+                            }
+                        }
+                    }
+                }
+                ImGui::SeparatorText("Visual/property overrides");
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::InputText("Property id", &override_id);
                 ImGui::SetNextItemWidth(180.0F);

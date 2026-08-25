@@ -7,6 +7,7 @@
 #include "fabric/physics/mechanic_plan.hpp"
 #include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/render/map_preview.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -38,6 +39,9 @@ fabric::project::MapDocument map() {
                      .name = "Platform Preview"},
         .layers = {{"gameplay", "Gameplay",
                     fabric::project::MapLayerKind::gameplay,
+                    true, false, 0.0F},
+                   {"instances", "Instances",
+                    fabric::project::MapLayerKind::instances,
                     true, false, 0.0F}},
         .events = {{{.value = "platform-activate"}, {}}}};
 }
@@ -84,30 +88,39 @@ void create_studio_platform_fixture(const std::filesystem::path& root) {
     const bool project_opened = updating
         ? project.open(root) : project.create(root, manifest());
     REQUIRE(project_opened);
-    auto thread_source = temporary_root("fabric-platform-thread");
-    thread_source += ".png";
-    write_thread_png(thread_source);
-    REQUIRE(project.import_png(thread_source, {.value = "platform-thread"},
-                               "Platform Thread"));
-    std::error_code ignored;
-    std::filesystem::remove(thread_source, ignored);
-    REQUIRE(project.create_visual_preset({
-        .kind = fabric::editor::VisualPresetKind::seam,
-        .id = {.value = "platform-strip"},
-        .name = "Platform Strip",
-        .thread_texture = fabric::project::ResourceReference{
-            {.value = "platform-thread"}, "texture"}}));
-    fabric::editor::CreateEntityPrompt entity;
-    entity.name = "Platform Visual";
-    entity.node_name = "Textile strip";
-    entity.drawable = fabric::project::EntityDrawableKind::visual_component;
-    entity.resource_id = "platform-strip";
-    REQUIRE(project.create_entity(entity));
+    if (!updating) {
+        auto thread_source = temporary_root("fabric-platform-thread");
+        thread_source += ".png";
+        write_thread_png(thread_source);
+        REQUIRE(project.import_png(thread_source, {.value = "platform-thread"},
+                                   "Platform Thread"));
+        std::error_code ignored;
+        std::filesystem::remove(thread_source, ignored);
+        REQUIRE(project.create_visual_preset({
+            .kind = fabric::editor::VisualPresetKind::seam,
+            .id = {.value = "platform-strip"},
+            .name = "Platform Strip",
+            .thread_texture = fabric::project::ResourceReference{
+                {.value = "platform-thread"}, "texture"}}));
+        fabric::editor::CreateEntityPrompt entity;
+        entity.name = "Platform Visual";
+        entity.node_name = "Textile strip";
+        entity.drawable = fabric::project::EntityDrawableKind::visual_component;
+        entity.resource_id = "platform-strip";
+        REQUIRE(project.create_entity(entity));
+    }
     fabric::editor::MapSession map_session;
     const bool map_opened = updating
         ? map_session.open(root, {.value = "platform-preview"})
         : map_session.create(root, map());
     REQUIRE(map_opened);
+    if (std::ranges::none_of(map_session.map()->layers, [](const auto& layer) {
+            return layer.id == "instances";
+        }))
+        REQUIRE(map_session.add_layer({
+            "instances", "Instances",
+            fabric::project::MapLayerKind::instances,
+            true, false, 0.0F}));
     const auto preset = fabric::editor::build_rotating_platform_preset(
         manifest(), *map_session.map(), {
             .id = {.value = "rotating-platform"},
@@ -115,9 +128,9 @@ void create_studio_platform_fixture(const std::filesystem::path& root) {
             .activation = fabric::editor::RotatingPlatformActivation::sensor,
             .visual_entity = fabric::project::ResourceReference{
                 {.value = "platform-visual"}, "entity"},
-            .position = {0.0F, 2.0F},
+            .position = {0.0F, 0.0F},
             .size = {6.0F, 0.6F},
-            .sensor_center = {0.0F, 3.0F},
+            .sensor_center = {0.0F, 1.0F},
             .sensor_size = {7.0F, 2.0F},
             .speed_degrees_per_second = 90.0F,
             .direction = -1,
@@ -132,6 +145,16 @@ void create_studio_platform_fixture(const std::filesystem::path& root) {
         REQUIRE(mechanic.open(root, *map_session.map(),
                               {.value = "rotating-platform"}));
         REQUIRE(mechanic.set_node_property(
+            {.value = "platform"}, "position", fabric::core::Vec2{}));
+        REQUIRE(mechanic.set_node_property(
+            {.value = "anchor"}, "position", fabric::core::Vec2{}));
+        REQUIRE(mechanic.set_node_property(
+            {.value = "presence"}, "center",
+            fabric::core::Vec2{0.0F, 1.0F}));
+        REQUIRE(mechanic.set_parameter_default(
+            {.value = "sensor-center"},
+            fabric::core::Vec2{0.0F, 1.0F}));
+        REQUIRE(mechanic.set_node_property(
             {.value = "platform"}, "entity",
             fabric::project::ResourceReference{
                 {.value = "platform-visual"}, "entity"}));
@@ -139,6 +162,33 @@ void create_studio_platform_fixture(const std::filesystem::path& root) {
         REQUIRE(mechanic.create(root, *map_session.map(), *preset.graph));
     }
     REQUIRE(mechanic.save());
+    const auto prefab = std::ranges::find(
+        map_session.map()->prefabs, "rotating-platform-prefab",
+        &fabric::project::PrefabDefinition::id);
+    if (prefab == map_session.map()->prefabs.end()) {
+        REQUIRE(map_session.add_prefab({
+            .id = "rotating-platform-prefab",
+            .entity = {{.value = "platform-visual"}, "entity"},
+            .mechanic = fabric::project::ResourceReference{
+                {.value = "rotating-platform"}, "mechanic"}}));
+    }
+    REQUIRE(map_session.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"}, {"speed", 60.0F}));
+    REQUIRE(map_session.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"},
+        {"sensor-size", fabric::core::Vec2{8.0F, 2.5F}}));
+    if (std::ranges::none_of(map_session.map()->instances,
+            [](const auto& instance) {
+                return instance.id == "rotating-platform-instance";
+            }))
+        REQUIRE(map_session.place_instance({
+            .id = "rotating-platform-instance",
+            .prefab = fabric::project::ResourceReference{
+                {.value = "rotating-platform-prefab"}, "prefab"},
+            .layer_id = "instances",
+            .transform = {.position = {0.0F, 2.0F}}},
+            {.enabled = false}));
+    REQUIRE(map_session.save());
 }
 
 float platform_angle(const fabric::physics::MechanicSimulation& simulation) {
@@ -171,6 +221,35 @@ TEST_CASE("rotating platform preset exposes typed parameters and two activations
     CHECK(sensor_plan.plan->motors.front().direction == 1);
     CHECK(sensor_plan.plan->motors.front().acceleration_degrees_per_second_squared ==
           180.0F);
+    const auto overridden_plan = fabric::physics::compile_mechanic_graph(
+        *sensor.graph, map(),
+        {{"speed", 45.0F}, {"direction", std::int64_t{-1}},
+         {"sensor-size", fabric::core::Vec2{9.0F, 4.0F}}});
+    REQUIRE(overridden_plan.ok());
+    CHECK(overridden_plan.plan->motors.front().speed_degrees_per_second ==
+          45.0F);
+    CHECK(overridden_plan.plan->motors.front().direction == -1);
+    CHECK(overridden_plan.plan->sensors.front().size ==
+          fabric::core::Vec2{9.0F, 4.0F});
+    CHECK_FALSE(fabric::physics::compile_mechanic_graph(
+        *sensor.graph, map(), {{"speed", std::int64_t{45}}}).ok());
+    const auto transformed_plan = fabric::physics::compile_mechanic_graph(
+        *sensor.graph, map(), {},
+        fabric::core::Transform{.position = {3.0F, 4.0F},
+                                .rotation_degrees = 90.0F,
+                                .scale = {2.0F, 2.0F}});
+    REQUIRE(transformed_plan.ok());
+    CHECK(transformed_plan.plan->bodies.front().position ==
+          fabric::core::Vec2{3.0F, 4.0F});
+    CHECK(transformed_plan.plan->bodies.front().size ==
+          fabric::core::Vec2{8.0F, 1.0F});
+    CHECK(std::abs(transformed_plan.plan->sensors.front().center.x - 1.0F) <
+          0.001F);
+    CHECK(std::abs(transformed_plan.plan->sensors.front().center.y - 4.0F) <
+          0.001F);
+    CHECK_FALSE(fabric::physics::compile_mechanic_graph(
+        *sensor.graph, map(), {},
+        fabric::core::Transform{.scale = {2.0F, 1.0F}}).ok());
     auto unlimited_request = sensor_request;
     unlimited_request.id = {.value = "unlimited-platform"};
     unlimited_request.limit_enabled = false;
@@ -311,9 +390,23 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
         "assets/mechanics/rotating-platform.mechanic.json");
     REQUIRE(loaded_map.ok());
     REQUIRE(loaded_graph.ok());
+    REQUIRE(loaded_map.asset->prefabs.size() == 1U);
+    REQUIRE(loaded_map.asset->instances.size() == 1U);
     const auto compiled = fabric::physics::compile_mechanic_graph(
-        *loaded_graph.asset, *loaded_map.asset);
+        *loaded_graph.asset, *loaded_map.asset,
+        loaded_map.asset->prefabs.front().mechanic_overrides,
+        loaded_map.asset->instances.front().transform);
     REQUIRE(compiled.ok());
+    REQUIRE(loaded_map.asset->prefabs.front().mechanic.has_value());
+    CHECK(loaded_map.asset->prefabs.front().mechanic->id.value ==
+          "rotating-platform");
+    CHECK(compiled.plan->motors.front().speed_degrees_per_second == 60.0F);
+    CHECK(compiled.plan->sensors.front().size ==
+          fabric::core::Vec2{8.0F, 2.5F});
+    CHECK(compiled.plan->bodies.front().position ==
+          fabric::core::Vec2{0.0F, 2.0F});
+    CHECK(compiled.plan->sensors.front().center ==
+          fabric::core::Vec2{0.0F, 3.0F});
     REQUIRE(compiled.plan->bodies.front().visual_entity.has_value());
     CHECK(compiled.plan->bodies.front().visual_entity->id.value ==
           "platform-visual");
@@ -330,8 +423,30 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     REQUIRE(fixture_character.has_value());
     CHECK(std::abs(fixture_character->position.x + 1.0F) > 0.15F);
     CHECK(fixture_simulation.activation_states().front().active);
+    REQUIRE_FALSE(fixture_simulation.debug_events().empty());
     CHECK(fixture_simulation.debug_events().front().transition ==
           fabric::physics::MechanicActivationTransition::begin);
+    fabric::editor::MechanicSession prefab_preview;
+    REQUIRE(prefab_preview.open_prefab_instance(
+        fixture, *loaded_map.asset,
+        {.value = "rotating-platform-instance"}));
+    REQUIRE(prefab_preview.place_preview_character({
+        .position = {-1.0F, 2.81F}, .size = {0.6F, 1.0F}}));
+    REQUIRE(prefab_preview.step_once());
+    CHECK(prefab_preview.simulation().activation_states().front().active);
+    fabric::editor::MapSession prefab_editor;
+    REQUIRE(prefab_editor.open(
+        regenerated, {.value = "platform-preview"}));
+    CHECK_FALSE(prefab_editor.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"},
+        {"speed", std::int64_t{60}}));
+    CHECK_FALSE(prefab_editor.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"}, {"unknown", 1.0F}));
+    REQUIRE(prefab_editor.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"}, {"speed", 75.0F}));
+    REQUIRE(prefab_editor.undo());
+    CHECK(std::get<float>(prefab_editor.map()->prefabs.front()
+                              .mechanic_overrides.front().value) == 60.0F);
     const auto visual = fabric::project::load_entity(
         fixture, *loaded_manifest.manifest,
         "entities/platform-visual.entity.json");
@@ -345,6 +460,17 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     REQUIRE(rendered.ok());
     REQUIRE(rendered.packets.size() == 1U);
     CHECK(rendered.packets.front().image_fill.has_value());
+    const auto map_preview = fabric::render::resolve_map_preview(
+        fixture, *loaded_manifest.manifest, *loaded_map.asset);
+    REQUIRE(map_preview.ok());
+    REQUIRE(map_preview.packets.size() == 1U);
+    CHECK(map_preview.packets.front().image_fill.has_value());
+    auto invalid_map = *loaded_map.asset;
+    invalid_map.prefabs.front().mechanic_overrides.push_back(
+        {"unknown", 1.0F});
+    REQUIRE(fabric::project::publish_map(
+        regenerated, *loaded_manifest.manifest, invalid_map).ok());
+    CHECK_FALSE(fabric::project::validate_project(regenerated).ok());
     std::error_code ignored;
     std::filesystem::remove_all(regenerated, ignored);
 }

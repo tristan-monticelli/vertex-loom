@@ -33,9 +33,9 @@ fabric::project::MapDocument map_with_prefab() {
     auto result = map();
     result.layers.push_back({"gameplay", "Gameplay",
                              fabric::project::MapLayerKind::gameplay, true, false, 2.0F});
-    result.prefabs.push_back({"hero-prefab",
-                              fabric::project::ResourceReference{{.value = "entity"}, "entity"},
-                              {}});
+    result.prefabs.push_back({
+        .id = "hero-prefab",
+        .entity = {{.value = "entity"}, "entity"}});
     return result;
 }
 

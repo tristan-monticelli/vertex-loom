@@ -173,8 +173,19 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
   personnage ; l'inspecteur affiche l'état courant et un journal borné
   `begin/end` ordonné par pas fixe. Les tests headless couvrent entrée physique,
   transport, sortie, injection manuelle et la fixture Studio versionnée.
-- [ ] Sauvegarder la mécanique dans un prefab et modifier ses paramètres par
+- [x] Sauvegarder la mécanique dans un prefab et modifier ses paramètres par
   overrides typés.
+
+  Preuve : `PrefabDefinition` référence séparément l'entité textile et le
+  `MechanicGraph`, puis conserve des `mechanicOverrides` ciblant les paramètres
+  stables du graphe. Map Studio crée calques et prefabs, propose les ressources
+  du projet, dérive l'éditeur des paramètres déclarés et prévisualise la copie
+  effective sans modifier le graphe source. Le validateur global refuse noms,
+  types et références invalides. La fixture `studio-rotating-platform`
+  instancie réellement ce prefab dans sa map avec vitesse et zone capteur
+  remplacées ; son transform place ensemble entité, corps, pivot et capteur.
+  Round-trip, undo, reload, rendu de map, compilation transformée et simulation
+  headless sont vérifiés ; les échelles physiques non uniformes sont refusées.
 
 Gate : une map sans code spécifique instancie, simule et recharge une
 plateforme tournante pilotée par la présence du personnage.

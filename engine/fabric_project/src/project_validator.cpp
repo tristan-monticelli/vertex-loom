@@ -129,13 +129,39 @@ void register_map_prefabs(const std::filesystem::path& project_root,
             iterator->path().lexically_relative(project_root));
         if (!loaded_map.ok()) continue;
         for (const auto& prefab : loaded_map.asset->prefabs) {
+            std::vector<ResourceReference> references{prefab.entity};
+            if (prefab.mechanic) {
+                references.push_back(*prefab.mechanic);
+                const auto loaded_mechanic = load_mechanic_graph(
+                    project_root, manifest,
+                    mechanic_graph_document_path(
+                        manifest, prefab.mechanic->id));
+                if (loaded_mechanic.ok()) {
+                    auto validation = validate_mechanic_parameter_overrides(
+                        *loaded_mechanic.asset, prefab.mechanic_overrides);
+                    errors.insert(
+                        errors.end(),
+                        std::make_move_iterator(validation.errors.begin()),
+                        std::make_move_iterator(validation.errors.end()));
+                } else {
+                    errors.insert(
+                        errors.end(),
+                        std::make_move_iterator(loaded_mechanic.errors.begin()),
+                        std::make_move_iterator(loaded_mechanic.errors.end()));
+                }
+            }
+            auto override_references =
+                mechanic_parameter_override_resource_references(
+                    prefab.mechanic_overrides);
+            references.insert(references.end(), override_references.begin(),
+                              override_references.end());
             auto registration = registry.register_resource({
                 .document = {.schema_version = current_map_schema_version,
                              .type = "prefab",
                              .id = {.value = prefab.id},
                              .name = prefab.id},
                 .document_path = iterator->path().lexically_relative(project_root),
-                .references = {prefab.entity}});
+                .references = std::move(references)});
             errors.insert(errors.end(),
                           std::make_move_iterator(registration.errors.begin()),
                           std::make_move_iterator(registration.errors.end()));

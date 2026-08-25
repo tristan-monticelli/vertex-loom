@@ -107,6 +107,8 @@ struct MechanicPlanResult {
 };
 
 [[nodiscard]] MechanicPlanResult compile_mechanic_graph(
-    const project::MechanicGraph&, const project::MapDocument&);
+    const project::MechanicGraph&, const project::MapDocument&,
+    const std::vector<project::MechanicParameterOverride>& overrides = {},
+    const std::optional<core::Transform>& instance_transform = std::nullopt);
 
 } // namespace fabric::physics

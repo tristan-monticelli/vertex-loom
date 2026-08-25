@@ -289,9 +289,9 @@ fabric::project::MapDocument map_with_animated_entity() {
 fabric::project::MapDocument map_with_animated_prefab() {
     auto result = map();
     result.prefabs.push_back({
-        "animated", fabric::project::ResourceReference{
-            {.value = "runtime-entity"}, "entity"},
-        {{"animation", fabric::project::ResourceReference{
+        .id = "animated",
+        .entity = {{.value = "runtime-entity"}, "entity"},
+        .overrides = {{"animation", fabric::project::ResourceReference{
             {.value = "runtime-animation"}, "animation"}}}});
     result.instances.push_back({
         "marker", std::nullopt,

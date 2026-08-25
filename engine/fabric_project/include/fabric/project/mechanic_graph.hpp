@@ -41,6 +41,13 @@ enum class MechanicNodeKind {
 using MechanicValue = std::variant<bool, std::int64_t, float, std::string,
                                    core::Vec2, ResourceReference>;
 
+struct MechanicParameterOverride {
+    std::string parameter_id;
+    MechanicValue value{0.0F};
+    friend bool operator==(const MechanicParameterOverride&,
+                           const MechanicParameterOverride&) = default;
+};
+
 struct MechanicParameterDefinition {
     std::string id;
     std::string name;
@@ -137,6 +144,11 @@ struct MechanicGraphResult {
     const ProjectManifest&, const core::ResourceId&);
 [[nodiscard]] ValidationReport validate_mechanic_graph(
     const ProjectManifest&, const MechanicGraph&);
+[[nodiscard]] ValidationReport validate_mechanic_parameter_overrides(
+    const MechanicGraph&, const std::vector<MechanicParameterOverride>&);
+[[nodiscard]] std::vector<ResourceReference>
+    mechanic_parameter_override_resource_references(
+        const std::vector<MechanicParameterOverride>&);
 [[nodiscard]] std::vector<ResourceReference>
 mechanic_graph_resource_references(const MechanicGraph&);
 [[nodiscard]] std::string serialize_mechanic_graph(const MechanicGraph&);

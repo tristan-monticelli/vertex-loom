@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cmath>
 #include <memory>
+#include <ranges>
 #include <set>
 #include <utility>
 
@@ -367,6 +368,16 @@ bool MapSession::translate_instances(
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::add_layer(project::LayerDefinition layer) {
+    if (!map_ || !core::ResourceId::is_valid(layer.id) || layer.name.empty() ||
+        !std::isfinite(layer.depth) ||
+        find_layer(*map_, {.value = layer.id})) return false;
+    auto next = *map_;
+    next.layers.push_back(std::move(layer));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_layer_visibility(const core::ResourceId& layer_id,
                                       const bool visible) {
     if (!map_) return false;
@@ -400,6 +411,37 @@ bool MapSession::set_layer_depth(const core::ResourceId& layer_id,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+std::optional<project::MechanicGraph> MapSession::prefab_mechanic_graph(
+    const core::ResourceId& prefab_id) const {
+    if (!map_ || !manifest_) return std::nullopt;
+    const auto found = find_prefab(*map_, prefab_id);
+    if (!found || !map_->prefabs[*found].mechanic) return std::nullopt;
+    const auto& reference = *map_->prefabs[*found].mechanic;
+    auto loaded = project::load_mechanic_graph(
+        project_root_, *manifest_,
+        project::mechanic_graph_document_path(*manifest_, reference.id));
+    if (!loaded.ok()) return std::nullopt;
+    return std::move(*loaded.asset);
+}
+
+bool MapSession::add_prefab(project::PrefabDefinition prefab) {
+    if (!map_ || !manifest_ || !core::ResourceId::is_valid(prefab.id) ||
+        find_prefab(*map_, {.value = prefab.id})) return false;
+    if (prefab.mechanic) {
+        const auto loaded = project::load_mechanic_graph(
+            project_root_, *manifest_,
+            project::mechanic_graph_document_path(
+                *manifest_, prefab.mechanic->id));
+        if (!loaded.ok() ||
+            !project::validate_mechanic_parameter_overrides(
+                *loaded.asset, prefab.mechanic_overrides).ok()) return false;
+    }
+    auto next = *map_;
+    next.prefabs.push_back(std::move(prefab));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_prefab_override(const core::ResourceId& prefab_id,
                                      project::MapProperty property) {
     if (!map_ || property.id.empty()) return false;
@@ -411,6 +453,29 @@ bool MapSession::set_prefab_override(const core::ResourceId& prefab_id,
         [&](const auto& candidate) { return candidate.id == property.id; });
     if (existing != overrides.end()) existing->value = std::move(property.value);
     else overrides.push_back(std::move(property));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_prefab_mechanic_override(
+    const core::ResourceId& prefab_id,
+    project::MechanicParameterOverride parameter_override) {
+    if (!map_ || parameter_override.parameter_id.empty()) return false;
+    const auto found = find_prefab(*map_, prefab_id);
+    if (!found || !map_->prefabs[*found].mechanic) return false;
+    auto next = *map_;
+    auto& overrides = next.prefabs[*found].mechanic_overrides;
+    const auto existing = std::ranges::find(
+        overrides, parameter_override.parameter_id,
+        &project::MechanicParameterOverride::parameter_id);
+    if (existing == overrides.end())
+        overrides.push_back(std::move(parameter_override));
+    else
+        existing->value = std::move(parameter_override.value);
+    const auto graph = prefab_mechanic_graph(prefab_id);
+    if (!graph ||
+        !project::validate_mechanic_parameter_overrides(*graph, overrides).ok())
+        return false;
     auto before = *map_;
     return commit(commands_, *map_, std::move(before), std::move(next));
 }

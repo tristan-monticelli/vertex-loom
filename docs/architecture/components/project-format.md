@@ -191,6 +191,13 @@ C4Component
   par le validateur à partir de son `MapDocument`. Son identifiant, son
   `EntityDefinition` et ses overrides sont donc vérifiés par le graphe global,
   y compris lorsqu’une instance référence le prefab.
+- Un prefab peut aussi référencer un `MechanicGraph` et conserver des
+  `mechanicOverrides` ciblant ses paramètres stables. Le validateur charge le
+  graphe, vérifie chaque identifiant et son `MechanicValueType`, puis ajoute les
+  références portées par les valeurs au graphe global. L'absence des champs
+  mécaniques conserve le sens des prefabs MapDocument v1 existants. Lors de
+  l'instanciation, le transform uniforme positif de `MapInstance` est appliqué
+  au plan physique après les overrides ; une échelle non uniforme est refusée.
 - `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
   extrait les instances visibles d’un viewport sans accès disque.
 - `SceneDocument v1` est stocké sous `scenes/<id>.scene.json`. Il référence les

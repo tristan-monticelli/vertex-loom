@@ -101,6 +101,9 @@ bool MechanicSession::create(const std::filesystem::path& project_root,
     manifest_ = std::move(*manifest.manifest);
     map_ = map;
     graph_ = graph;
+    parameter_overrides_.clear();
+    instance_transform_.reset();
+    preview_prefab_id_.reset();
     document_path_ = path;
     recovery_graph_.reset();
     commands_.clear();
@@ -124,6 +127,9 @@ bool MechanicSession::open(const std::filesystem::path& project_root,
     manifest_ = std::move(*manifest.manifest);
     map_ = map;
     graph_ = std::move(*loaded.asset);
+    parameter_overrides_.clear();
+    instance_transform_.reset();
+    preview_prefab_id_.reset();
     document_path_ = project::mechanic_graph_document_path(*manifest_, graph_id);
     recovery_graph_.reset();
     commands_.clear();
@@ -142,6 +148,31 @@ bool MechanicSession::open(const std::filesystem::path& project_root,
     }
     rebuild_preview();
     return true;
+}
+
+bool MechanicSession::open_prefab(
+    const std::filesystem::path& project_root,
+    const project::MapDocument& map, const core::ResourceId& prefab_id) {
+    const auto prefab = std::ranges::find(
+        map.prefabs, prefab_id.value, &project::PrefabDefinition::id);
+    if (prefab == map.prefabs.end() || !prefab->mechanic) return false;
+    if (!open(project_root, map, prefab->mechanic->id)) return false;
+    parameter_overrides_ = prefab->mechanic_overrides;
+    preview_prefab_id_ = prefab_id;
+    rebuild_preview();
+    return preview_errors_.empty();
+}
+
+bool MechanicSession::open_prefab_instance(
+    const std::filesystem::path& project_root,
+    const project::MapDocument& map, const core::ResourceId& instance_id) {
+    const auto instance = std::ranges::find(
+        map.instances, instance_id.value, &project::MapInstance::id);
+    if (instance == map.instances.end() || !instance->prefab) return false;
+    if (!open_prefab(project_root, map, instance->prefab->id)) return false;
+    instance_transform_ = instance->transform;
+    rebuild_preview();
+    return preview_errors_.empty();
 }
 
 bool MechanicSession::save() {
@@ -250,6 +281,19 @@ bool MechanicSession::set_node_property(const core::ResourceId& node_id,
     return commit(std::move(next));
 }
 
+bool MechanicSession::set_parameter_default(
+    const core::ResourceId& parameter_id, project::MechanicValue value) {
+    if (!graph_) return false;
+    auto next = *graph_;
+    const auto parameter = std::ranges::find(
+        next.parameters, parameter_id.value,
+        &project::MechanicParameterDefinition::id);
+    if (parameter == next.parameters.end() ||
+        !project::mechanic_value_matches(parameter->type, value)) return false;
+    parameter->default_value = std::move(value);
+    return commit(std::move(next));
+}
+
 bool MechanicSession::connect(project::MechanicConnection connection) {
     if (!graph_) return false;
     auto next = *graph_;
@@ -286,7 +330,8 @@ void MechanicSession::rebuild_preview() {
     simulation_ = physics::MechanicSimulation{};
     preview_errors_.clear();
     if (!graph_ || !map_) return;
-    auto compiled = physics::compile_mechanic_graph(*graph_, *map_);
+    auto compiled = physics::compile_mechanic_graph(
+        *graph_, *map_, parameter_overrides_, instance_transform_);
     if (!compiled.ok()) {
         preview_errors_ = std::move(compiled.errors);
         return;

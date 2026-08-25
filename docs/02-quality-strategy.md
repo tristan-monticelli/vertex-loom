@@ -119,7 +119,11 @@ par Map Studio et l'entité textile créée par Asset Studio. Son test headless
 matérialise le capteur Box2D, place un personnage dynamique, vérifie son
 transport par friction, les états actif/inactif et les transitions
 `begin/end`. Le build de Map Studio vérifie en plus les overlays de corps,
-capteur et personnage consommant exactement ces états de preview.
+capteur et personnage consommant exactement ces états de preview. La même
+fixture enregistre la mécanique dans un prefab, remplace vitesse et taille de
+capteur par identifiant de paramètre, puis vérifie round-trip, compilation
+effective, preview du prefab, undo, rejet des noms/types invalides et échec du
+validateur de projet face à un override sémantiquement inconnu.
 Les commandes d'édition de composition et composant couvrent modification et
 duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
 test session vérifie undo/redo, autosave, récupération, sauvegarde et reload

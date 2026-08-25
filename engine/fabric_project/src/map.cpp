@@ -152,6 +152,47 @@ bool properties_read(const Json& object, const char* key, std::vector<MapPropert
     }
     return true;
 }
+Json mechanic_overrides(
+    const std::vector<MechanicParameterOverride>& overrides) {
+    Json result = Json::array();
+    for (const auto& override : overrides) {
+        auto value = property_value(override.value);
+        if (value["kind"] == "real") value["kind"] = "scalar";
+        result.push_back({{"parameter", override.parameter_id},
+                          {"value", std::move(value)}});
+    }
+    return result;
+}
+bool mechanic_overrides_read(
+    const Json& object, std::vector<MechanicParameterOverride>& out,
+    std::vector<Error>& errors) {
+    const auto item = object.find("mechanicOverrides");
+    if (item == object.end()) return true;
+    if (!item->is_array()) {
+        error(errors, ErrorCode::invalid_asset, "mechanicOverrides",
+              "expected an array");
+        return false;
+    }
+    for (const auto& value : *item) {
+        MechanicParameterOverride override;
+        if (!text(value, "parameter", override.parameter_id, errors)) continue;
+        const auto stored = value.find("value");
+        if (stored == value.end() || !stored->is_object()) continue;
+        auto normalized = *stored;
+        if (normalized.value("kind", "") == "scalar")
+            normalized["kind"] = "real";
+        if (!property_value_read(normalized, override.value, errors)) continue;
+        out.push_back(std::move(override));
+    }
+    return true;
+}
+bool finite_mechanic_value(const MechanicValue& value) {
+    if (const auto* scalar = std::get_if<float>(&value))
+        return std::isfinite(*scalar);
+    if (const auto* vector = std::get_if<core::Vec2>(&value))
+        return std::isfinite(vector->x) && std::isfinite(vector->y);
+    return true;
+}
 bool layer_exists(const MapDocument& map, const std::string& id, MapLayerKind kind) {
     for (const auto& layer : map.layers)
         if (layer.id == id && layer.kind == kind) return true;
@@ -199,6 +240,34 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
             error(report.errors, ErrorCode::duplicate_resource, "prefabs.id", "prefab ids must be valid and unique");
         if (!core::ResourceId::is_valid(prefab.entity.id.value) || prefab.entity.expected_type != "entity")
             error(report.errors, ErrorCode::resource_type_mismatch, "prefabs.entity", "prefab must reference an entity");
+        if (prefab.mechanic &&
+            (prefab.mechanic->expected_type != "mechanic" ||
+             !core::ResourceId::is_valid(prefab.mechanic->id.value)))
+            error(report.errors, ErrorCode::resource_type_mismatch,
+                  "prefabs.mechanic", "prefab mechanic reference is invalid");
+        if (!prefab.mechanic && !prefab.mechanic_overrides.empty())
+            error(report.errors, ErrorCode::missing_resource,
+                  "prefabs.mechanicOverrides",
+                  "mechanic overrides require a mechanic reference");
+        std::set<std::string> mechanic_override_ids;
+        for (const auto& override : prefab.mechanic_overrides) {
+            if (!core::ResourceId::is_valid(override.parameter_id) ||
+                !mechanic_override_ids.insert(override.parameter_id).second)
+                error(report.errors, ErrorCode::duplicate_resource,
+                      "prefabs.mechanicOverrides.parameter",
+                      "parameter ids must be valid and unique");
+            if (!finite_mechanic_value(override.value))
+                error(report.errors, ErrorCode::invalid_asset,
+                      "prefabs.mechanicOverrides.value", "must be finite");
+            if (const auto* reference =
+                    std::get_if<ResourceReference>(&override.value);
+                reference != nullptr &&
+                (!core::ResourceId::is_valid(reference->id.value) ||
+                 reference->expected_type.empty()))
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      "prefabs.mechanicOverrides.value",
+                      "resource override is invalid");
+        }
         bool has_animation = false;
         for (const auto& property : prefab.overrides) {
             if (property.id != "animation") continue;
@@ -230,9 +299,25 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
         if (instance.prefab && (instance.prefab->expected_type != "prefab" || !core::ResourceId::is_valid(instance.prefab->id.value)))
             error(report.errors, ErrorCode::resource_type_mismatch, "instances.prefab", "invalid prefab reference");
         const auto& position = instance.transform.position;
+        const auto& pivot = instance.transform.pivot;
         if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(instance.transform.rotation_degrees) ||
-            !std::isfinite(instance.transform.scale.x) || !std::isfinite(instance.transform.scale.y))
+            !std::isfinite(instance.transform.scale.x) || !std::isfinite(instance.transform.scale.y) ||
+            !std::isfinite(pivot.x) || !std::isfinite(pivot.y))
             error(report.errors, ErrorCode::invalid_asset, "instances.transform", "must be finite");
+        if (instance.prefab) {
+            const auto prefab = std::find_if(
+                map.prefabs.begin(), map.prefabs.end(), [&](const auto& item) {
+                    return item.id == instance.prefab->id.value;
+                });
+            if (prefab != map.prefabs.end() && prefab->mechanic &&
+                (instance.transform.scale.x <= 0.0F ||
+                 instance.transform.scale.y <= 0.0F ||
+                 std::abs(instance.transform.scale.x -
+                          instance.transform.scale.y) > 0.0001F))
+                error(report.errors, ErrorCode::invalid_asset,
+                      "instances.transform.scale",
+                      "mechanic prefab instances require positive uniform scale");
+        }
         bool has_animation = false;
         for (const auto& property : instance.properties) {
             if (property.id != "animation") continue;
@@ -284,7 +369,15 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
 
 std::vector<ResourceReference> map_resource_references(const MapDocument& map) {
     std::vector<ResourceReference> references;
-    for (const auto& prefab : map.prefabs) references.push_back(prefab.entity);
+    for (const auto& prefab : map.prefabs) {
+        references.push_back(prefab.entity);
+        if (prefab.mechanic) references.push_back(*prefab.mechanic);
+        auto override_references =
+            mechanic_parameter_override_resource_references(
+                prefab.mechanic_overrides);
+        references.insert(references.end(), override_references.begin(),
+                          override_references.end());
+    }
     for (const auto& instance : map.instances) {
         if (instance.entity) references.push_back(*instance.entity);
         if (instance.prefab) references.push_back(*instance.prefab);
@@ -301,7 +394,16 @@ std::string serialize_map(const MapDocument& map) {
                  {"instances", Json::array()}, {"collisions", Json::array()}, {"triggers", Json::array()},
                  {"events", Json::array()}};
     for (const auto& layer : map.layers) json["layers"].push_back({{"id", layer.id}, {"name", layer.name}, {"kind", std::string(to_string(layer.kind))}, {"visible", layer.visible}, {"locked", layer.locked}, {"depth", layer.depth}});
-    for (const auto& prefab : map.prefabs) json["prefabs"].push_back({{"id", prefab.id}, {"entity", ref(prefab.entity)}, {"overrides", properties(prefab.overrides)}});
+    for (const auto& prefab : map.prefabs) {
+        Json value{{"id", prefab.id}, {"entity", ref(prefab.entity)},
+                   {"overrides", properties(prefab.overrides)}};
+        if (prefab.mechanic) {
+            value["mechanic"] = ref(*prefab.mechanic);
+            value["mechanicOverrides"] =
+                mechanic_overrides(prefab.mechanic_overrides);
+        }
+        json["prefabs"].push_back(std::move(value));
+    }
     for (const auto& instance : map.instances) {
         Json value = {{"id", instance.id}, {"layer", instance.layer_id}, {"transform", transform(instance.transform)}, {"chunkX", instance.chunk_x}, {"chunkY", instance.chunk_y}, {"properties", properties(instance.properties)}};
         if (instance.entity) value["entity"] = ref(*instance.entity);
@@ -329,7 +431,7 @@ MapResult parse_map(const ProjectManifest& manifest, std::string_view serialized
     const auto layers = json.find("layers");
     if (layers == json.end() || !layers->is_array()) error(result.errors, ErrorCode::invalid_asset, "layers", "expected an array"); else for (const auto& value : *layers) { LayerDefinition layer; std::string kind; text(value, "id", layer.id, result.errors); text(value, "name", layer.name, result.errors); text(value, "kind", kind, result.errors); if (kind == "visual") layer.kind = MapLayerKind::visual; else if (kind == "tiles") layer.kind = MapLayerKind::tiles; else if (kind == "instances") layer.kind = MapLayerKind::instances; else if (kind == "collision") layer.kind = MapLayerKind::collision; else if (kind == "triggers") layer.kind = MapLayerKind::triggers; else if (kind == "gameplay") layer.kind = MapLayerKind::gameplay; else error(result.errors, ErrorCode::invalid_asset, "kind", "unsupported layer kind"); const auto visible = value.find("visible"); if (visible == value.end() || !visible->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "visible", "expected boolean"); else layer.visible = visible->get<bool>(); const auto locked = value.find("locked"); if (locked == value.end() || !locked->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "locked", "expected boolean"); else layer.locked = locked->get<bool>(); number(value, "depth", layer.depth, result.errors); map.layers.push_back(std::move(layer)); }
     const auto prefabs = json.find("prefabs");
-    if (prefabs == json.end() || !prefabs->is_array()) error(result.errors, ErrorCode::invalid_asset, "prefabs", "expected an array"); else for (const auto& value : *prefabs) { PrefabDefinition prefab; text(value, "id", prefab.id, result.errors); std::optional<ResourceReference> entity; ref_read(value, "entity", entity, result.errors); if (entity) prefab.entity = *entity; properties_read(value, "overrides", prefab.overrides, result.errors); map.prefabs.push_back(std::move(prefab)); }
+    if (prefabs == json.end() || !prefabs->is_array()) error(result.errors, ErrorCode::invalid_asset, "prefabs", "expected an array"); else for (const auto& value : *prefabs) { PrefabDefinition prefab; text(value, "id", prefab.id, result.errors); std::optional<ResourceReference> entity; ref_read(value, "entity", entity, result.errors); if (entity) prefab.entity = *entity; properties_read(value, "overrides", prefab.overrides, result.errors); ref_read(value, "mechanic", prefab.mechanic, result.errors); mechanic_overrides_read(value, prefab.mechanic_overrides, result.errors); map.prefabs.push_back(std::move(prefab)); }
     const auto instances = json.find("instances");
     if (instances == json.end() || !instances->is_array()) error(result.errors, ErrorCode::invalid_asset, "instances", "expected an array"); else for (const auto& value : *instances) { MapInstance instance; text(value, "id", instance.id, result.errors); text(value, "layer", instance.layer_id, result.errors); transform_read(value, "transform", instance.transform, result.errors); std::int64_t chunk{}; integer(value, "chunkX", chunk, result.errors); instance.chunk_x = static_cast<std::int32_t>(chunk); integer(value, "chunkY", chunk, result.errors); instance.chunk_y = static_cast<std::int32_t>(chunk); ref_read(value, "entity", instance.entity, result.errors); ref_read(value, "prefab", instance.prefab, result.errors); properties_read(value, "properties", instance.properties, result.errors); map.instances.push_back(std::move(instance)); }
     const auto collisions = json.find("collisions");

@@ -3,6 +3,7 @@
 #include "fabric/core/types.hpp"
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/mechanic_graph.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -42,6 +43,8 @@ struct PrefabDefinition {
     std::string id;
     ResourceReference entity;
     std::vector<MapProperty> overrides;
+    std::optional<ResourceReference> mechanic;
+    std::vector<MechanicParameterOverride> mechanic_overrides;
     friend bool operator==(const PrefabDefinition&, const PrefabDefinition&) = default;
 };
 

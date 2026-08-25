@@ -1,6 +1,7 @@
 #include "fabric/physics/mechanic_plan.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <ranges>
 #include <string_view>
 
@@ -68,13 +69,46 @@ bool event_declared(const project::MapDocument& map,
     });
 }
 
+core::Vec2 transform_point(core::Vec2 point,
+                           const core::Transform& transform) {
+    point.x = (point.x - transform.pivot.x) * transform.scale.x;
+    point.y = (point.y - transform.pivot.y) * transform.scale.y;
+    constexpr float degrees_to_radians = 0.01745329251994329577F;
+    const auto angle = transform.rotation_degrees * degrees_to_radians;
+    const auto cosine = std::cos(angle);
+    const auto sine = std::sin(angle);
+    return {point.x * cosine - point.y * sine + transform.position.x,
+            point.x * sine + point.y * cosine + transform.position.y};
+}
+
 } // namespace
 
 MechanicPlanResult compile_mechanic_graph(
-    const project::MechanicGraph& graph, const project::MapDocument& map) {
+    const project::MechanicGraph& graph, const project::MapDocument& map,
+    const std::vector<project::MechanicParameterOverride>& overrides,
+    const std::optional<core::Transform>& instance_transform) {
     MechanicPlanResult result;
     const auto validation = project::validate_mechanic_graph({}, graph);
     result.errors = validation.errors;
+    const auto override_validation =
+        project::validate_mechanic_parameter_overrides(graph, overrides);
+    result.errors.insert(result.errors.end(), override_validation.errors.begin(),
+                         override_validation.errors.end());
+    if (instance_transform) {
+        const auto& transform = *instance_transform;
+        if (!std::isfinite(transform.position.x) ||
+            !std::isfinite(transform.position.y) ||
+            !std::isfinite(transform.rotation_degrees) ||
+            !std::isfinite(transform.scale.x) ||
+            !std::isfinite(transform.scale.y) ||
+            !std::isfinite(transform.pivot.x) ||
+            !std::isfinite(transform.pivot.y) || transform.scale.x <= 0.0F ||
+            transform.scale.y <= 0.0F ||
+            std::abs(transform.scale.x - transform.scale.y) > 0.0001F)
+            error(result, project::ErrorCode::invalid_asset,
+                  "instance.transform",
+                  "mechanic instances require a finite positive uniform scale");
+    }
     if (!result.errors.empty()) return result;
 
     auto resolved = graph;
@@ -86,8 +120,13 @@ MechanicPlanResult compile_mechanic_graph(
         const auto target = std::ranges::find(
             node->properties, parameter.target_property,
             &project::MechanicNodeProperty::id);
-        if (target != node->properties.end())
-            target->value = parameter.default_value;
+        if (target != node->properties.end()) {
+            const auto selected = std::ranges::find(
+                overrides, parameter.id,
+                &project::MechanicParameterOverride::parameter_id);
+            target->value = selected == overrides.end()
+                ? parameter.default_value : selected->value;
+        }
     }
 
     MechanicPlan plan;
@@ -198,6 +237,22 @@ MechanicPlanResult compile_mechanic_graph(
             plan.events.push_back(std::move(description));
             break;
         }
+        }
+    }
+    if (result.errors.empty() && instance_transform) {
+        const auto& transform = *instance_transform;
+        for (auto& body : plan.bodies) {
+            body.position = transform_point(body.position, transform);
+            body.size.x *= transform.scale.x;
+            body.size.y *= transform.scale.y;
+            body.rotation_degrees += transform.rotation_degrees;
+        }
+        for (auto& pivot : plan.pivots)
+            pivot.position = transform_point(pivot.position, transform);
+        for (auto& sensor : plan.sensors) {
+            sensor.center = transform_point(sensor.center, transform);
+            sensor.size.x *= transform.scale.x;
+            sensor.size.y *= transform.scale.y;
         }
     }
     if (result.errors.empty()) result.plan = std::move(plan);

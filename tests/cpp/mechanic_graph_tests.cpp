@@ -127,6 +127,19 @@ TEST_CASE("mechanic graph v1 round trips typed ports and parameters") {
                     manifest(), unknown).ok());
 }
 
+TEST_CASE("mechanic parameter overrides require declared ids and exact types") {
+    const auto source = graph();
+    CHECK(fabric::project::validate_mechanic_parameter_overrides(
+        source, {{"speed", 4.0F},
+                 {"position", fabric::core::Vec2{2.0F, 3.0F}}}).ok());
+    CHECK_FALSE(fabric::project::validate_mechanic_parameter_overrides(
+        source, {{"missing", 4.0F}}).ok());
+    CHECK_FALSE(fabric::project::validate_mechanic_parameter_overrides(
+        source, {{"speed", std::int64_t{4}}}).ok());
+    CHECK_FALSE(fabric::project::validate_mechanic_parameter_overrides(
+        source, {{"speed", 4.0F}, {"speed", 5.0F}}).ok());
+}
+
 TEST_CASE("all seven built-in mechanic node schemas are authorable") {
     auto source = graph();
     source.parameters.clear();
