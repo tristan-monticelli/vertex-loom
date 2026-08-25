@@ -121,6 +121,9 @@ graphe headless complet. Une destination existante est refusée avant écriture.
 Le test de session crée aussi une fermeture depuis le même point d'entrée que
 le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
 resélectionne son composant.
+Le resolver de preview est testé sur les quatre presets, l'ordre Z, les
+transforms, les paramètres de composant, les textures manquantes et les cycles
+de composants. Ses paquets sont les mêmes entrées OpenGL que celles du runtime.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

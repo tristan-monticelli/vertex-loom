@@ -136,6 +136,10 @@ C4Component
   compositions et composants. Asset Studio expose la factory par un prompt
   typé qui choisit le preset, la texture de fil et le nombre borné de dents,
   puis sélectionne le composant publié.
+- Le resolver visuel partagé charge récursivement une composition ou un
+  composant, applique paramètres, transforms, opacité et ordre Z stable, refuse
+  les cycles de composants et produit des `VectorDrawPacket` avec leurs bounds.
+  Asset Studio et le runtime consomment ce même résultat.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

@@ -146,6 +146,7 @@ add_library(fabric_render STATIC
     engine/fabric_render/src/svg_vector.cpp
     engine/fabric_render/src/textured_path_geometry.cpp
     engine/fabric_render/src/vector_geometry.cpp
+    engine/fabric_render/src/visual_composition_renderer.cpp
 )
 target_include_directories(fabric_render PUBLIC engine/fabric_render/include
     PRIVATE ${SDL2_image_SOURCE_DIR}/src)
@@ -517,6 +518,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_visual_presets_tests
              COMMAND fabric_visual_presets_tests)
+
+    add_executable(fabric_visual_composition_renderer_tests
+        tests/cpp/visual_composition_renderer_tests.cpp
+    )
+    target_link_libraries(fabric_visual_composition_renderer_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_visual_composition_renderer_tests
+             COMMAND fabric_visual_composition_renderer_tests)
 
     add_executable(fabric_project_session_editing_tests
         tests/cpp/project_session_editing_tests.cpp

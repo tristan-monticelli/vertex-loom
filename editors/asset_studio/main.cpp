@@ -6,6 +6,7 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
 #include "fabric/render/vector_geometry.hpp"
+#include "fabric/render/visual_composition_renderer.hpp"
 #include "import_workflow.hpp"
 
 #include <SDL.h>
@@ -408,6 +409,40 @@ EntityPreviewResult build_entity_preview(
                           std::max(2.0F * margin, max_y - min_y + 2.0F * margin)}};
     }
     return result;
+}
+
+fabric::render::VisualCompositionDrawResult build_visual_preview(
+    const fabric::editor::ProjectSession& session) {
+    if (!session.manifest() || session.selected_resource() == nullptr) return {};
+    using Kind = fabric::editor::StudioResourceKind;
+    const auto kind = session.selected_resource()->kind;
+    if (kind == Kind::visual_component && session.selected_visual_component()) {
+        return fabric::render::resolve_visual_component(
+            session.project_root(), *session.manifest(),
+            *session.selected_visual_component());
+    }
+    if (kind == Kind::visual_composition &&
+        session.selected_visual_composition()) {
+        return fabric::render::resolve_visual_composition(
+            session.project_root(), *session.manifest(),
+            *session.selected_visual_composition());
+    }
+    if (kind == Kind::textured_path && session.selected_textured_path()) {
+        const auto& path = *session.selected_textured_path();
+        const fabric::project::VisualComposition composition{
+            .document = {.schema_version =
+                             fabric::project::current_visual_composition_schema_version,
+                         .type = "visualComposition",
+                         .id = {.value = "studio-path-preview"},
+                         .name = "Studio path preview"},
+            .layers = {{.id = "path",
+                        .name = path.document.name,
+                        .kind = fabric::project::VisualLayerKind::textured_path,
+                        .resource = {path.document.id, "texturedPath"}}}};
+        return fabric::render::resolve_visual_composition(
+            session.project_root(), *session.manifest(), composition);
+    }
+    return {};
 }
 
 void copy_path_to_buffer(const std::filesystem::path& path,
@@ -1001,8 +1036,9 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     }
 }
 
-void draw_entity_preview_canvas(CanvasUiState& canvas,
-                                const ImVec2 available) {
+void draw_packet_preview_canvas(CanvasUiState& canvas,
+                                const ImVec2 available,
+                                const std::string_view label) {
     ImGui::InvisibleButton("Entity canvas", available,
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
@@ -1047,7 +1083,8 @@ void draw_entity_preview_canvas(CanvasUiState& canvas,
                    -world_half_height + canvas.pan.y / pixels_per_unit},
         .size = {2.0F * world_half_width, 2.0F * world_half_height}};
     ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
-    ImGui::TextDisabled("Entity preview · %.0f%%", canvas.zoom * 100.0F);
+    ImGui::TextDisabled("%s · %.0f%%", std::string(label).c_str(),
+                        canvas.zoom * 100.0F);
 }
 
 void draw_workspace(fabric::editor::ProjectSession& session,
@@ -1059,6 +1096,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AssetPreview& pending_import_preview,
                     CanvasUiState& canvas,
                     const EntityPreviewResult& entity_preview,
+                    const fabric::render::VisualCompositionDrawResult&
+                        visual_preview,
                     AnimationUiState& animation_ui,
                     ProjectSettingsUiState& project_settings,
                     bool& request_open,
@@ -1158,6 +1197,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::entity &&
         session.selected_entity();
+    const bool visual_selected = session.selected_resource() != nullptr &&
+        (session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::textured_path ||
+         session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::visual_composition ||
+         session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::visual_component);
     if (native_selected) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         ImGui::TextUnformatted("Gizmo");
@@ -1182,6 +1228,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session, canvas,
             {std::max(1.0F, available.x - 16.0F),
              std::max(1.0F, available.y - 42.0F)});
+    } else if (visual_selected) {
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
+        if (visual_preview.errors.empty()) {
+            ImGui::TextUnformatted("Resolved visual preview");
+        } else {
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                               "Visual preview (%zu unresolved)",
+                               visual_preview.errors.size());
+        }
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
+        draw_packet_preview_canvas(
+            canvas, {std::max(1.0F, available.x - 16.0F),
+                     std::max(1.0F, available.y - 42.0F)},
+            "Visual component");
     } else if (entity_selected ||
                (session.selected_resource() != nullptr &&
                 session.selected_resource()->kind ==
@@ -1198,9 +1258,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                entity_preview.errors.size());
         }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
-        draw_entity_preview_canvas(
+        draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
-                     std::max(1.0F, available.y - 42.0F)});
+                     std::max(1.0F, available.y - 42.0F)},
+            "Entity preview");
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);
@@ -1236,6 +1297,33 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 selected->document_path.generic_string().c_str());
         } else {
             ImGui::TextDisabled("Select a resource to inspect it.");
+        }
+        if (visual_selected) {
+            ImGui::SeparatorText("Resolved visual");
+            ImGui::Text("%zu draw packet(s)", visual_preview.packets.size());
+            ImGui::Text("Bounds %.2f x %.2f", visual_preview.bounds.size.x,
+                        visual_preview.bounds.size.y);
+            if (session.selected_textured_path()) {
+                const auto& path = *session.selected_textured_path();
+                ImGui::Text("%zu path command(s)", path.commands.size());
+                ImGui::Text("Width %.3f", path.width);
+                ImGui::Text("Texture %s", path.texture.id.value.c_str());
+            } else if (session.selected_visual_composition()) {
+                ImGui::Text("%zu layer(s)",
+                            session.selected_visual_composition()->layers.size());
+            } else if (session.selected_visual_component()) {
+                const auto& component = *session.selected_visual_component();
+                ImGui::Text("%zu parameter(s)", component.parameters.size());
+                ImGui::Text("%zu variant(s)", component.variants.size());
+                for (const auto& parameter : component.parameters) {
+                    ImGui::BulletText("%s%s", parameter.name.c_str(),
+                                      parameter.animatable ? " · animatable" : "");
+                }
+            }
+            for (const auto& error : visual_preview.errors) {
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
+                                   error.c_str());
+            }
         }
         if (preview.texture != 0U) {
             ImGui::SeparatorText(preview.kind == PreviewKind::vector
@@ -3072,9 +3160,21 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 session, animation, animation_ui.scrub_time);
             canvas.entity_world_bounds = entity_preview.bounds;
         }
+        const auto visual_preview = build_visual_preview(session);
+        const bool visual_selection = session.selected_resource() != nullptr &&
+            (session.selected_resource()->kind ==
+                 fabric::editor::StudioResourceKind::textured_path ||
+             session.selected_resource()->kind ==
+                 fabric::editor::StudioResourceKind::visual_composition ||
+             session.selected_resource()->kind ==
+                 fabric::editor::StudioResourceKind::visual_component);
+        if (visual_selection) {
+            canvas.entity_world_bounds = visual_preview.bounds;
+        }
 
         draw_workspace(session, window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, entity_preview,
+                       visual_preview,
                        animation_ui,
                        project_settings,
                        request_open, request_png, request_svg,
@@ -3099,13 +3199,19 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             session.created_vector() && session.created_vector()->native;
         const bool render_entity = canvas.native_canvas && entity_selection &&
             !entity_preview.packets.empty();
-        if (render_native_vector || render_entity) {
+        const bool render_visual = canvas.native_canvas && visual_selection &&
+            !visual_preview.packets.empty();
+        if (render_native_vector || render_entity || render_visual) {
             const auto native_packets = render_native_vector
                 ? fabric::render::build_native_draw_packets(*session.created_vector())
                 : fabric::render::VectorGeometryResult{};
             const auto packets = render_native_vector
                 ? std::span<const fabric::render::VectorDrawPacket>(native_packets.packets)
-                : std::span<const fabric::render::VectorDrawPacket>(entity_preview.packets);
+                : render_visual
+                ? std::span<const fabric::render::VectorDrawPacket>(
+                      visual_preview.packets)
+                : std::span<const fabric::render::VectorDrawPacket>(
+                      entity_preview.packets);
             const auto display_size = ImGui::GetIO().DisplaySize;
             const float scale_x = display_size.x > 0.0F
                 ? static_cast<float>(drawable_width) / display_size.x
