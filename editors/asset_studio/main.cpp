@@ -1,5 +1,6 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/project_session.hpp"
+#include "fabric/editor/session_transition.hpp"
 #include "fabric/render/raster_image.hpp"
 
 #include <SDL.h>
@@ -43,13 +44,6 @@ enum class PreviewKind {
     none,
     texture,
     vector,
-};
-
-enum class PendingSessionAction {
-    none,
-    create_project,
-    open_project,
-    quit,
 };
 
 #if defined(__APPLE__)
@@ -479,7 +473,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
-                    PendingSessionAction& pending_session_action,
+                    fabric::editor::SessionTransitionGuard& transition_guard,
                     bool& running,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -1242,28 +1236,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
-    const auto continue_session_action = [&] {
-        switch (pending_session_action) {
-        case PendingSessionAction::create_project:
+    const auto continue_session_action = [&](const fabric::editor::SessionAction action) {
+        switch (action) {
+        case fabric::editor::SessionAction::create_project:
             creation.request_project = true;
             break;
-        case PendingSessionAction::open_project:
+        case fabric::editor::SessionAction::open_project:
             request_open = true;
             break;
-        case PendingSessionAction::quit:
+        case fabric::editor::SessionAction::quit:
             running = false;
             break;
-        case PendingSessionAction::none:
-            break;
         }
-        pending_session_action = PendingSessionAction::none;
     };
-    if (pending_session_action != PendingSessionAction::none) {
-        if (session.dirty()) {
-            ImGui::OpenPopup("Unsaved changes");
-        } else {
-            continue_session_action();
-        }
+    if (const auto ready = transition_guard.take_ready()) {
+        continue_session_action(*ready);
+    }
+    if (transition_guard.confirmation_required()) {
+        ImGui::OpenPopup("Unsaved changes");
     }
     if (ImGui::BeginPopupModal("Unsaved changes", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -1274,19 +1264,28 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (session.save()) {
                 status = "Project saved.";
                 ImGui::CloseCurrentPopup();
-                continue_session_action();
+                if (const auto ready = transition_guard.resolve(
+                        fabric::editor::UnsavedDecision::save)) {
+                    continue_session_action(*ready);
+                }
             } else {
+                static_cast<void>(transition_guard.resolve(
+                    fabric::editor::UnsavedDecision::save, false));
                 status = "Save failed; inspect the diagnostics.";
             }
         }
         ImGui::SameLine();
         if (ImGui::Button("Discard", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();
-            continue_session_action();
+            if (const auto ready = transition_guard.resolve(
+                    fabric::editor::UnsavedDecision::discard)) {
+                continue_session_action(*ready);
+            }
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
-            pending_session_action = PendingSessionAction::none;
+            static_cast<void>(transition_guard.resolve(
+                fabric::editor::UnsavedDecision::cancel));
             ImGui::CloseCurrentPopup();
             status = "Action cancelled; unsaved changes kept.";
         }
@@ -1383,7 +1382,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
-    PendingSessionAction pending_session_action = PendingSessionAction::none;
+    fabric::editor::SessionTransitionGuard transition_guard;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -1403,7 +1402,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 (event.type == SDL_WINDOWEVENT &&
                  event.window.event == SDL_WINDOWEVENT_CLOSE &&
                  event.window.windowID == SDL_GetWindowID(window))) {
-                pending_session_action = PendingSessionAction::quit;
+                transition_guard.request(fabric::editor::SessionAction::quit,
+                                         session.dirty());
             }
         }
 
@@ -1414,13 +1414,17 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("New project...", new_shortcut)) {
-                    pending_session_action = PendingSessionAction::create_project;
+                    transition_guard.request(
+                        fabric::editor::SessionAction::create_project,
+                        session.dirty());
                 }
                 if (ImGui::MenuItem("Open project...", open_shortcut)) {
                     if (session.has_project()) {
                         copy_path_to_buffer(session.project_root(), path_buffer);
                     }
-                    pending_session_action = PendingSessionAction::open_project;
+                    transition_guard.request(
+                        fabric::editor::SessionAction::open_project,
+                        session.dirty());
                 }
                 if (ImGui::MenuItem("Save", save_shortcut, false,
                                     session.has_project())) {
@@ -1450,7 +1454,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 }
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", quit_shortcut)) {
-                    pending_session_action = PendingSessionAction::quit;
+                    transition_guard.request(fabric::editor::SessionAction::quit,
+                                             session.dirty());
                 }
                 ImGui::EndMenu();
             }
@@ -1480,11 +1485,14 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_O, false)) {
-            pending_session_action = PendingSessionAction::open_project;
+            transition_guard.request(fabric::editor::SessionAction::open_project,
+                                     session.dirty());
         }
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_N, false)) {
-            pending_session_action = PendingSessionAction::create_project;
+            transition_guard.request(
+                fabric::editor::SessionAction::create_project,
+                session.dirty());
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_I, false)) {
@@ -1496,7 +1504,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
-            pending_session_action = PendingSessionAction::quit;
+            transition_guard.request(fabric::editor::SessionAction::quit,
+                                     session.dirty());
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_S, false)) {
@@ -1519,7 +1528,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         draw_workspace(session, window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, project_settings,
                        request_open, request_png, request_svg,
-                       pending_session_action, running, status);
+                       transition_guard, running, status);
 
         const auto autosave_status = session.update_autosave();
         if (autosave_status == fabric::editor::AutosaveStatus::saved) {

@@ -1,4 +1,5 @@
 #include "fabric/editor/command_stack.hpp"
+#include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/autosave_scheduler.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -136,6 +137,32 @@ TEST_CASE("mark dirty represents recovered state without fake history") {
     CHECK_FALSE(commands.can_undo());
     commands.mark_clean();
     CHECK_FALSE(commands.dirty());
+}
+
+TEST_CASE("session transitions require an explicit unsaved decision") {
+    fabric::editor::SessionTransitionGuard guard;
+    guard.request(fabric::editor::SessionAction::open_project, false);
+    REQUIRE(guard.take_ready() ==
+            fabric::editor::SessionAction::open_project);
+    CHECK_FALSE(guard.pending());
+
+    guard.request(fabric::editor::SessionAction::quit, true);
+    REQUIRE(guard.confirmation_required());
+    CHECK_FALSE(guard.take_ready().has_value());
+    CHECK_FALSE(guard.resolve(fabric::editor::UnsavedDecision::save, false)
+                    .has_value());
+    CHECK(guard.confirmation_required());
+    CHECK(guard.resolve(fabric::editor::UnsavedDecision::save) ==
+          fabric::editor::SessionAction::quit);
+
+    guard.request(fabric::editor::SessionAction::create_project, true);
+    CHECK_FALSE(guard.resolve(fabric::editor::UnsavedDecision::cancel)
+                    .has_value());
+    CHECK_FALSE(guard.pending());
+
+    guard.request(fabric::editor::SessionAction::open_project, true);
+    CHECK(guard.resolve(fabric::editor::UnsavedDecision::discard) ==
+          fabric::editor::SessionAction::open_project);
 }
 
 TEST_CASE("autosave becomes due after two seconds of inactivity") {

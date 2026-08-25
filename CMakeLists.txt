@@ -116,6 +116,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/project_session.cpp
+    engine/fabric_editor/src/session_transition.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)

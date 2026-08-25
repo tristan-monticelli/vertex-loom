@@ -14,6 +14,7 @@ C4Component
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
+        Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer une session dirty")
     }
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
@@ -29,6 +30,7 @@ C4Component
     Rel(session, project, "Crée ou charge")
     Rel(session, history, "Porte les mutations éditables")
     Rel(session, scheduler, "Signale les modifications")
+    Rel(shell, transition, "Demande une transition")
     Rel(scheduler, project, "Demande un autosave validé")
     Rel(project, files, "Lit et écrit")
 ```
