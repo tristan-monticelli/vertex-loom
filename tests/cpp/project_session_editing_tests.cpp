@@ -302,6 +302,21 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
         position_binding,
         1U, start));
     CHECK(session.selected_animation()->tracks.front().keys.size() == 1U);
+    REQUIRE(session.set_selected_animation_key(
+        position_binding, 0.0F, fabric::core::Vec2{9.0F, 8.0F},
+        fabric::project::AnimationInterpolation::linear, start));
+    REQUIRE(session.selected_animation()->tracks.front().keys.size() == 1U);
+    CHECK(std::get<fabric::core::Vec2>(
+              session.selected_animation()->tracks.front().keys.front().value) ==
+          fabric::core::Vec2{9.0F, 8.0F});
+    REQUIRE(session.undo(start));
+    CHECK(std::get<fabric::core::Vec2>(
+              session.selected_animation()->tracks.front().keys.front().value) ==
+          fabric::core::Vec2{1.0F, 2.0F});
+    REQUIRE(session.redo(start));
+    CHECK(std::get<fabric::core::Vec2>(
+              session.selected_animation()->tracks.front().keys.front().value) ==
+          fabric::core::Vec2{9.0F, 8.0F});
     REQUIRE(session.insert_selected_animation_marker("apex", 1.0F, start));
     CHECK_FALSE(session.insert_selected_animation_marker("apex", 1.25F, start));
     REQUIRE(session.remove_selected_animation_marker("apex", start));

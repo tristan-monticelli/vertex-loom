@@ -20,6 +20,9 @@ public:
     [[nodiscard]] bool insert_key(const project::PropertyBinding& binding,
                                   float time, project::AnimationValue value,
                                   project::AnimationInterpolation interpolation);
+    [[nodiscard]] bool set_key(const project::PropertyBinding& binding,
+                               float time, project::AnimationValue value,
+                               project::AnimationInterpolation interpolation);
     [[nodiscard]] bool move_key(const project::PropertyBinding& binding,
                                 std::size_t key_index, float time);
     [[nodiscard]] bool remove_key(const project::PropertyBinding& binding,

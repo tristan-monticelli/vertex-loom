@@ -1606,7 +1606,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     break;
                 }
             }
-            ImGui::SeparatorText("Insert key");
+            ImGui::SeparatorText("Set key");
             ImGui::InputText("Node id", &animation_ui.node_id);
             ImGui::InputText("Component", &animation_ui.component_id);
             ImGui::InputText("Property", &animation_ui.property_id);
@@ -1647,7 +1647,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                  animation_ui.property_id.empty() ||
                                  (animation_ui.key_kind == 4 &&
                                   animation_ui.key_resource_id.empty()));
-            if (ImGui::Button("Insert key")) {
+            if (ImGui::Button("Set key")) {
                 fabric::project::AnimationValue value;
                 if (animation_ui.key_kind == 0) {
                     value = fabric::core::Vec2{animation_ui.key_value[0],
@@ -1665,7 +1665,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     value = fabric::project::ResourceReference{
                         {.value = animation_ui.key_resource_id}, "resource"};
                 }
-                if (session.insert_selected_animation_key(
+                if (session.set_selected_animation_key(
                         {.node_id = animation_ui.node_id,
                          .component_id = animation_ui.component_id,
                          .property_id = animation_ui.property_id},

@@ -121,6 +121,11 @@ public:
         project::AnimationValue value, project::AnimationInterpolation interpolation,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_animation_key(
+        project::PropertyBinding binding, float time,
+        project::AnimationValue value, project::AnimationInterpolation interpolation,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool remove_selected_animation_key(
         project::PropertyBinding binding, std::size_t key_index,
         AutosaveScheduler::Clock::time_point now =

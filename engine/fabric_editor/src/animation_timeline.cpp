@@ -102,6 +102,35 @@ bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
     return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
+bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
+                                const float time, project::AnimationValue value,
+                                const project::AnimationInterpolation interpolation) {
+    auto next = clip_;
+    auto* track = find_track(next, binding);
+    if (!track) {
+        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}}});
+    } else {
+        if (track->interpolation != interpolation ||
+            (!track->keys.empty() &&
+             !same_value_type(track->keys.front().value, value))) {
+            return false;
+        }
+        const auto existing = std::ranges::find_if(
+            track->keys, [&](const auto& key) { return key.time == time; });
+        if (existing != track->keys.end()) {
+            existing->value = std::move(value);
+        } else {
+            track->keys.push_back({time, std::move(value)});
+        }
+        std::stable_sort(track->keys.begin(), track->keys.end(),
+                         [](const auto& left, const auto& right) {
+                             return left.time < right.time;
+                         });
+    }
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
 bool AnimationTimeline::move_key(const project::PropertyBinding& binding,
                                  std::size_t key_index, float time) {
     auto next = clip_;

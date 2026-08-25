@@ -15,6 +15,11 @@ déplacements continus fusionnent leurs commandes ; le scrubber évalue le clip
 sans modifier le document. Les markers peuvent aussi être ajoutés ou supprimés
 depuis l’inspecteur.
 
+L’action `Set key` est idempotente pour un binding et un temps donnés : elle
+crée la clé si elle n’existe pas et remplace sa valeur si elle existe déjà.
+Cette opération passe par le `CommandStack`, donc un remplacement de clé est
+annulable en une seule commande.
+
 `ProjectSession` orchestre `AnimationTimeline` avec le même `CommandStack`,
 dirty state, autosave miroir, récupération validée et publication atomique que
 les documents vectoriels et d’entité.
@@ -23,6 +28,8 @@ les documents vectoriels et d’entité.
 
 - Un clip créé peut recevoir des données d’animation sans modifier son JSON à
   la main.
+- Le même geste peut être rejoué pendant une édition continue sans créer de
+  clés concurrentes au même instant.
 - Les bindings restent génériques et ne dépendent pas encore d’un type précis
   d’entité ou de matériau.
 - Le scrubbing visuel, l’édition de tangentes et les pistes booléennes/couleur/

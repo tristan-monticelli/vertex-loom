@@ -1581,6 +1581,25 @@ bool ProjectSession::insert_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::set_selected_animation_key(
+    project::PropertyBinding binding, const float time,
+    project::AnimationValue value,
+    const project::AnimationInterpolation interpolation,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.set_key(std::move(binding), time, std::move(value),
+                          interpolation)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks",
+                    "animation key is invalid or conflicts with its track"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::remove_selected_animation_key(
     project::PropertyBinding binding, const std::size_t key_index,
     const AutosaveScheduler::Clock::time_point now) {
