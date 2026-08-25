@@ -29,6 +29,11 @@
 
 namespace fabric::runtime {
 
+struct RuntimePacketBounds {
+    core::Vec2 minimum;
+    core::Vec2 maximum;
+};
+
 struct PreviewRuntime::Impl {
     struct TextureSource {
         std::filesystem::path path;
@@ -85,6 +90,8 @@ struct PreviewRuntime::Impl {
         std::optional<std::vector<project::EntityNode>>> node_evaluation_cache;
     std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
     std::unordered_map<std::string, PacketSortKey> packet_sort_keys;
+    std::vector<RuntimePacketBounds> packet_bounds;
+    std::vector<bool> packet_bounds_dynamic;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
@@ -358,6 +365,29 @@ bool packet_visible(const render::VectorDrawPacket& packet,
         max_y >= bounds.origin.y && min_y <= bounds.origin.y + bounds.size.y;
 }
 
+bool packet_bounds_visible(const RuntimePacketBounds& packet,
+                           const core::Rect& bounds) {
+    return packet.maximum.x >= bounds.origin.x &&
+        packet.minimum.x <= bounds.origin.x + bounds.size.x &&
+        packet.maximum.y >= bounds.origin.y &&
+        packet.minimum.y <= bounds.origin.y + bounds.size.y;
+}
+
+RuntimePacketBounds packet_bounds_for(
+    const render::VectorDrawPacket& packet) {
+    const auto& points = packet.fill_vertices.empty() ? packet.outline : packet.fill_vertices;
+    if (points.empty()) return {};
+    auto result = RuntimePacketBounds{
+        .minimum = points.front(), .maximum = points.front()};
+    for (const auto point : points) {
+        result.minimum.x = std::min(result.minimum.x, point.x);
+        result.minimum.y = std::min(result.minimum.y, point.y);
+        result.maximum.x = std::max(result.maximum.x, point.x);
+        result.maximum.y = std::max(result.maximum.y, point.y);
+    }
+    return result;
+}
+
 } // namespace
 
 PreviewRuntime::PreviewRuntime() : impl_(std::make_unique<Impl>()) {}
@@ -405,6 +435,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->node_evaluation_cache.clear();
     impl_->packet_base_transforms.clear();
     impl_->packet_sort_keys.clear();
+    impl_->packet_bounds.clear();
+    impl_->packet_bounds_dynamic.clear();
     impl_->entity_simulations.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
@@ -789,6 +821,22 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             impl_->packet_indices_by_instance[impl_->packets[index].node_id.substr(0, separator)]
                 .push_back(index);
     }
+    impl_->packet_bounds.reserve(impl_->packets.size());
+    impl_->packet_bounds_dynamic.reserve(impl_->packets.size());
+    for (const auto& packet : impl_->packets) {
+        impl_->packet_bounds.push_back(packet_bounds_for(packet));
+        const auto separator = packet.node_id.find(':');
+        const auto instance_id = separator == std::string::npos
+            ? std::string{} : packet.node_id.substr(0, separator);
+        const auto simulation = impl_->entity_simulations.find(instance_id);
+        const bool dynamic = simulation != impl_->entity_simulations.end() &&
+            (simulation->second.mesh.has_value() ||
+             !simulation->second.constraints.empty() ||
+             !simulation->second.ik_chains.empty() ||
+             impl_->animation_instances.contains(instance_id) ||
+             impl_->animation_state_machines.contains(instance_id));
+        impl_->packet_bounds_dynamic.push_back(dynamic);
+    }
     return true;
 }
 
@@ -1120,13 +1168,22 @@ bool PreviewRuntime::run() {
                 const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
                 if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
                 for (const auto packet_index : packet_indices->second) {
+                    if (packet_index < impl_->packet_bounds.size() &&
+                        !impl_->packet_bounds_dynamic[packet_index] &&
+                        !packet_bounds_visible(impl_->packet_bounds[packet_index], bounds))
+                        continue;
                     const auto packet = animate_packet(impl_->packets[packet_index]);
                     if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
                 }
             }
         } else {
             visible_packets.reserve(impl_->packets.size());
-            for (const auto& source_packet : impl_->packets) {
+            for (std::size_t packet_index = 0; packet_index < impl_->packets.size(); ++packet_index) {
+                if (packet_index < impl_->packet_bounds.size() &&
+                    !impl_->packet_bounds_dynamic[packet_index] &&
+                    !packet_bounds_visible(impl_->packet_bounds[packet_index], bounds))
+                    continue;
+                const auto& source_packet = impl_->packets[packet_index];
                 const auto packet = animate_packet(source_packet);
                 if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
             }
