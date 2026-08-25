@@ -145,8 +145,9 @@ Le payload headless de fill image et la triangulation de sa silhouette sont
 désormais disponibles. Les draw packets appliquent les transforms locales et
 parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
 initialise et dessine les triangles de fills couleur dans le canvas Asset
-Studio ainsi que les contours ouverts/fermés ; le résolveur de textures et la
-validation visuelle complète du gate restent ouverts.
+Studio ainsi que les contours ouverts/fermés. Asset Studio résout maintenant
+les `TextureAsset` locaux à la demande et met leurs handles GPU en cache ; la
+validation visuelle complète du gate reste ouverte.
 
 ## Étape D — Personnalisateur intégré
 

@@ -25,6 +25,7 @@
 #include <numbers>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -1343,6 +1344,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
     fabric::editor::ProjectSession session;
     fabric::render::OpenGLVectorRenderer native_renderer;
+    std::unordered_map<std::string, AssetPreview> texture_cache;
     if (!native_renderer.initialize()) {
         std::cerr << "native OpenGL vector renderer initialization failed\n";
     }
@@ -1543,8 +1545,38 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             };
             glDisable(GL_SCISSOR_TEST);
             glDisable(GL_BLEND);
+            const fabric::render::OpenGLTextureResolver texture_resolver =
+                [&](const fabric::core::ResourceId& id)
+                -> std::optional<fabric::render::OpenGLTextureHandle> {
+                const auto cached = texture_cache.find(id.value);
+                if (cached != texture_cache.end() &&
+                    cached->second.texture != 0U) {
+                    return fabric::render::OpenGLTextureHandle{
+                        .handle = cached->second.texture,
+                        .width = cached->second.width,
+                        .height = cached->second.height,
+                    };
+                }
+                if (!session.manifest()) return std::nullopt;
+                const auto loaded = fabric::project::load_texture_asset(
+                    session.project_root(), *session.manifest(),
+                    fabric::project::texture_document_path(*session.manifest(), id));
+                if (!loaded.ok()) return std::nullopt;
+                const auto decoded = fabric::render::load_png(
+                    session.project_root() / loaded.asset->source);
+                if (!decoded.ok()) return std::nullopt;
+                AssetPreview preview_texture;
+                upload_preview(preview_texture, *decoded.image);
+                const auto [inserted, _] = texture_cache.emplace(
+                    id.value, std::move(preview_texture));
+                return fabric::render::OpenGLTextureHandle{
+                    .handle = inserted->second.texture,
+                    .width = inserted->second.width,
+                    .height = inserted->second.height,
+                };
+            };
             static_cast<void>(native_renderer.draw(
-                packets.packets, native_viewport));
+                packets.packets, native_viewport, texture_resolver));
         }
         SDL_GL_SwapWindow(window);
     }
@@ -1554,6 +1586,9 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     }
     if (pending_import_preview.texture != 0U) {
         glDeleteTextures(1, &pending_import_preview.texture);
+    }
+    for (auto& [_, texture] : texture_cache) {
+        clear_asset_preview(texture);
     }
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
