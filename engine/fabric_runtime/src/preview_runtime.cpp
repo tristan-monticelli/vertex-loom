@@ -285,7 +285,23 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         return false;
     }
     for (const auto& instance : map_->instances) {
+        std::vector<project::MapProperty> properties;
+        if (instance.prefab) {
+            const auto prefab = std::find_if(
+                map_->prefabs.begin(), map_->prefabs.end(),
+                [&](const auto& candidate) {
+                    return candidate.id == instance.prefab->id.value;
+                });
+            if (prefab != map_->prefabs.end()) properties = prefab->overrides;
+        }
         for (const auto& property : instance.properties) {
+            const auto existing = std::find_if(
+                properties.begin(), properties.end(),
+                [&](const auto& candidate) { return candidate.id == property.id; });
+            if (existing != properties.end()) existing->value = property.value;
+            else properties.push_back(property);
+        }
+        for (const auto& property : properties) {
             if (property.id != "animation") continue;
             const auto* reference = std::get_if<project::ResourceReference>(
                 &property.value);

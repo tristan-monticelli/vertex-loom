@@ -1251,8 +1251,18 @@ int run(const std::filesystem::path& project_root,
                 if (ImGui::Button("Apply instance property")) {
                     const auto value = parse_override_value(instance_property_kind,
                                                              instance_property_value);
-                    const auto applied = value && session.set_instance_property(
-                        selected_id, {instance_property_id, *value});
+                    auto property = value
+                        ? std::optional<fabric::project::MapProperty>{
+                              {instance_property_id, *value}}
+                        : std::nullopt;
+                    if (property && property->id == "animation") {
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(&property->value))
+                            reference->expected_type = "animation";
+                        else property.reset();
+                    }
+                    const auto applied = property && session.set_instance_property(
+                        selected_id, std::move(*property));
                     status = applied ? "Instance property applied" : "Instance property rejected";
                     if (applied) {
                         instance_property_id.clear();
@@ -1278,8 +1288,18 @@ int run(const std::filesystem::path& project_root,
                 ImGui::BeginDisabled(override_id.empty() || override_value.empty());
                 if (ImGui::Button("Apply override")) {
                     const auto value = parse_override_value(override_kind, override_value);
-                    const auto applied = value && session.set_prefab_override(
-                        {.value = selected_prefab}, {override_id, *value});
+                    auto property = value
+                        ? std::optional<fabric::project::MapProperty>{
+                              {override_id, *value}}
+                        : std::nullopt;
+                    if (property && property->id == "animation") {
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(&property->value))
+                            reference->expected_type = "animation";
+                        else property.reset();
+                    }
+                    const auto applied = property && session.set_prefab_override(
+                        {.value = selected_prefab}, std::move(*property));
                     status = applied ? "Prefab override applied" : "Prefab override rejected";
                     if (applied) {
                         override_id.clear();

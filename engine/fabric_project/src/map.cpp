@@ -199,6 +199,23 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
             error(report.errors, ErrorCode::duplicate_resource, "prefabs.id", "prefab ids must be valid and unique");
         if (!core::ResourceId::is_valid(prefab.entity.id.value) || prefab.entity.expected_type != "entity")
             error(report.errors, ErrorCode::resource_type_mismatch, "prefabs.entity", "prefab must reference an entity");
+        bool has_animation = false;
+        for (const auto& property : prefab.overrides) {
+            if (property.id != "animation") continue;
+            if (has_animation) {
+                error(report.errors, ErrorCode::duplicate_resource,
+                      "prefabs.animation", "animation override must be unique");
+                continue;
+            }
+            has_animation = true;
+            const auto* reference = std::get_if<ResourceReference>(&property.value);
+            if (reference == nullptr || reference->expected_type != "animation" ||
+                !core::ResourceId::is_valid(reference->id.value)) {
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      "prefabs.animation",
+                      "animation override must reference a valid animation resource");
+            }
+        }
     }
     std::set<std::string> instance_ids;
     for (const auto& instance : map.instances) {

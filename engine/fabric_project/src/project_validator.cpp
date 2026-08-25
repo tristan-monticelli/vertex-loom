@@ -103,6 +103,40 @@ void inspect_asset_documents(
     }
 }
 
+void register_map_prefabs(const std::filesystem::path& project_root,
+                          const ProjectManifest& manifest,
+                          ResourceRegistry& registry,
+                          std::vector<Error>& errors) {
+    const auto map_directory = project_root / manifest.directories.maps;
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(map_directory, filesystem_error) ||
+        filesystem_error) return;
+    for (std::filesystem::directory_iterator iterator(
+             map_directory, filesystem_error), end;
+         !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(filesystem_error) ||
+            !filename.ends_with(".map.json")) continue;
+        const auto loaded_map = load_map(
+            project_root, manifest,
+            iterator->path().lexically_relative(project_root));
+        if (!loaded_map.ok()) continue;
+        for (const auto& prefab : loaded_map.asset->prefabs) {
+            auto registration = registry.register_resource({
+                .document = {.schema_version = current_map_schema_version,
+                             .type = "prefab",
+                             .id = {.value = prefab.id},
+                             .name = prefab.id},
+                .document_path = iterator->path().lexically_relative(project_root),
+                .references = {prefab.entity}});
+            errors.insert(errors.end(),
+                          std::make_move_iterator(registration.errors.begin()),
+                          std::make_move_iterator(registration.errors.end()));
+        }
+    }
+}
+
 } // namespace
 
 ManifestResult load_manifest(const std::filesystem::path& project_root) {
@@ -206,6 +240,7 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, "",
         ".map.json", "maps", load_map, map_resource_references,
         registry, result.errors);
+    register_map_prefabs(project_root, *loaded.manifest, registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.scenes, "",
         ".scene.json", "scenes", load_scene, scene_resource_references,

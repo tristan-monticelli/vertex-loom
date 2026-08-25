@@ -70,8 +70,9 @@ C4Component
   `assets/animations` avant l’initialisation SDL. Chaque document est chargé
   avec un chemin relatif au projet, validé puis indexé par `ResourceId` ; un
   document invalide empêche le chargement du runtime. L’évaluation headless
-  d’un clip est disponible par identifiant et instant, tandis que la liaison
-  aux nœuds d’une entité reste une étape ultérieure du contrat de scène.
+  d’un clip est disponible par identifiant et instant. Une instance de map peut
+  le sélectionner via la propriété `animation`, directement ou par override de
+  prefab ; le runtime applique alors les pistes de transformation supportées.
 - `PropertyDescriptorRegistry` décrit les propriétés exposées par les
   composants, résout les bindings stables et filtre les propriétés animables
   et inscriptibles pour les outils d’édition.
@@ -96,6 +97,10 @@ C4Component
   lecture d’un `ResourceReference` de type `animation`. Elle est unique par
   instance, validée par le parseur MapDocument et résolue par le Preview
   Runtime ; l’absence du clip référencé empêche le chargement runtime.
+- Un `PrefabDefinition` est une ressource logique de type `prefab` enregistrée
+  par le validateur à partir de son `MapDocument`. Son identifiant, son
+  `EntityDefinition` et ses overrides sont donc vérifiés par le graphe global,
+  y compris lorsqu’une instance référence le prefab.
 - `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
   extrait les instances visibles d’un viewport sans accès disque.
 - `SceneDocument v1` est stocké sous `scenes/<id>.scene.json`. Il référence les

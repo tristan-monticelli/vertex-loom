@@ -313,6 +313,10 @@ ressource `entity` ou `prefab`, puis de créer l’instance au clic dans le
 canvas avec snapping et historique.
 `Ctrl + clic` duplique directement l’instance sélectionnée à la position du
 curseur, en conservant le snapping et l’historique déterministe.
+
+Map Studio édite également la propriété d’instance réservée `animation` avec
+un type de référence explicite ; le Preview Runtime la résout directement ou
+depuis les overrides du prefab.
 Un glisser dans le canvas sélectionne maintenant les instances visibles dans
 un rectangle ; Shift ajoute ou retire la zone de la sélection existante.
 Une sélection multiple peut être déplacée en glissant n’importe quelle
