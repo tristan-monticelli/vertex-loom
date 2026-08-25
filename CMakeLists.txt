@@ -154,6 +154,7 @@ add_library(fabric_runtime STATIC
     engine/fabric_runtime/src/input.cpp
     engine/fabric_runtime/src/preview_runtime.cpp
     engine/fabric_runtime/src/replay_player.cpp
+    engine/fabric_runtime/src/scene_session.cpp
 )
 target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include
     PRIVATE ${SDL2_image_SOURCE_DIR}/include)
@@ -347,6 +348,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_replay_player_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_replay_player_tests COMMAND fabric_replay_player_tests)
+
+    add_executable(fabric_scene_session_tests tests/cpp/scene_session_tests.cpp)
+    target_link_libraries(fabric_scene_session_tests PRIVATE
+        fabric_runtime Catch2::Catch2WithMain)
+    add_test(NAME fabric_scene_session_tests COMMAND fabric_scene_session_tests)
 
     add_executable(fabric_character_controller_tests
         tests/cpp/character_controller_tests.cpp)
