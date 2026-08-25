@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/core/types.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/animation.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -147,6 +148,22 @@ struct CreateEntityPrompt {
     std::string material_id;
     core::Transform transform;
     float z_order{};
+
+    void reset() noexcept;
+    [[nodiscard]] PromptValidation validate(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id_for_document(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+};
+
+struct CreateAnimationPrompt {
+    std::string name;
+    double duration{1.0};
+    bool loop{true};
+    std::string marker_id;
+    double marker_time{};
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(

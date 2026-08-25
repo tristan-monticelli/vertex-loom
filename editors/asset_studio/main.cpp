@@ -48,11 +48,13 @@ struct CreationUiState {
     fabric::editor::CreateVectorArtworkPrompt artwork;
     fabric::editor::CreateMaterialPrompt material;
     fabric::editor::CreateEntityPrompt entity;
+    fabric::editor::CreateAnimationPrompt animation;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     bool request_project{};
     bool request_artwork{};
     bool request_material{};
     bool request_entity{};
+    bool request_animation{};
     bool project_publish_attempted{};
 };
 
@@ -216,6 +218,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector);
     draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material);
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
+    draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -721,6 +724,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::MenuItem("New entity...")) {
                 creation.request_entity = true;
             }
+            if (ImGui::MenuItem("New animation...")) {
+                creation.request_animation = true;
+            }
             if (ImGui::MenuItem("Add existing resource...")) {
                 ImGui::OpenPopup("Add existing resource");
             }
@@ -1130,6 +1136,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         creation.entity.reset();
         ImGui::OpenPopup("Create entity");
         creation.request_entity = false;
+    }
+    if (creation.request_animation && session.has_project()) {
+        creation.animation.reset();
+        ImGui::OpenPopup("Create animation");
+        creation.request_animation = false;
     }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
@@ -1555,6 +1566,51 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.entity.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create animation", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Create an AnimationClip v1");
+        ImGui::TextDisabled(
+            "The validated clip is published atomically in the open project.");
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", &creation.animation.name);
+        ImGui::SetNextItemWidth(220.0F);
+        ImGui::InputDouble("Duration (seconds)", &creation.animation.duration,
+                           0.1, 1.0, "%.2f");
+        ImGui::Checkbox("Loop", &creation.animation.loop);
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
+        if (!creation.animation.marker_id.empty()) {
+            ImGui::SetNextItemWidth(220.0F);
+            ImGui::InputDouble("Marker time", &creation.animation.marker_time,
+                               0.1, 1.0, "%.2f");
+        }
+        const auto validation = creation.animation.validate(
+            session.project_root(), *session.manifest());
+        draw_prompt_error(validation, "name");
+        draw_prompt_error(validation, "id");
+        draw_prompt_error(validation, "duration");
+        draw_prompt_error(validation, "marker");
+        draw_prompt_error(validation, "markerTime");
+        draw_prompt_summary(validation);
+        ImGui::BeginDisabled(!validation.ok());
+        if (ImGui::Button("Create animation", {140.0F, 0.0F})) {
+            if (session.create_animation(creation.animation)) {
+                clear_asset_preview(preview);
+                status = "Animation created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Animation creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            creation.animation.reset();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

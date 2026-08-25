@@ -82,7 +82,7 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
-            } else {
+            } else if (kind == StudioResourceKind::entity) {
                 auto loaded = project::load_entity(
                     project_root, manifest, relative);
                 if (!loaded.ok()) {
@@ -91,6 +91,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.entity->document.id,
                                    loaded.entity->document.name, relative, false});
+            } else {
+                auto loaded = project::load_animation(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
             }
         }
         if (error) {
@@ -110,7 +119,9 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                  ".material.json") ||
         !inspect(StudioResourceKind::entity,
                  project_root / manifest.directories.entities,
-                 ".entity.json")) {
+                 ".entity.json") ||
+        !inspect(StudioResourceKind::animation,
+                 assets / "animations", ".animation.json")) {
         return std::nullopt;
     }
     std::ranges::sort(indexed, [](const StudioResource& left,
@@ -207,6 +218,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     created_vector_.reset();
     selected_material_.reset();
     selected_entity_.reset();
+    selected_animation_.reset();
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
@@ -253,6 +265,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     created_vector_.reset();
     selected_material_.reset();
     selected_entity_.reset();
+    selected_animation_.reset();
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
@@ -447,6 +460,7 @@ bool ProjectSession::create_vector_artwork(
     imported_vector_.reset();
     selected_material_.reset();
     selected_entity_.reset();
+    selected_animation_.reset();
     const auto created_id = created_vector_->document.id;
     if (!refresh_resources()) {
         return false;
@@ -505,6 +519,7 @@ bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
     imported_vector_.reset();
     created_vector_.reset();
     selected_entity_.reset();
+    selected_animation_.reset();
     selected_vector_document_path_.clear();
     const auto created_id = selected_material_->document.id;
     if (!refresh_resources()) return false;
@@ -569,10 +584,63 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
     imported_vector_.reset();
     created_vector_.reset();
     selected_material_.reset();
+    selected_animation_.reset();
     selected_vector_document_path_.clear();
     const auto created_id = selected_entity_->document.id;
     if (!refresh_resources()) return false;
     return select_resource(StudioResourceKind::entity, created_id);
+}
+
+bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating an animation"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before creating another resource"}};
+        return false;
+    }
+    const auto prompt_validation = prompt.validate(project_root_, *manifest_);
+    if (!prompt_validation.ok()) {
+        errors_.clear();
+        for (const auto& error : prompt_validation.errors) {
+            errors_.push_back({project::ErrorCode::invalid_asset,
+                               error.field, error.message});
+        }
+        return false;
+    }
+    project::AnimationClip animation{
+        .document = {
+            .schema_version = project::current_animation_schema_version,
+            .type = "animation",
+            .id = prompt.resource_id_for_document(project_root_, *manifest_),
+            .name = prompt.name,
+        },
+        .duration = static_cast<float>(prompt.duration),
+        .loop = prompt.loop,
+    };
+    if (!prompt.marker_id.empty()) {
+        animation.markers.push_back({prompt.marker_id,
+                                     static_cast<float>(prompt.marker_time)});
+    }
+    const auto published = project::publish_animation(
+        project_root_, *manifest_, animation);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    selected_animation_ = std::move(*published.asset);
+    imported_texture_.reset();
+    imported_vector_.reset();
+    created_vector_.reset();
+    selected_material_.reset();
+    selected_entity_.reset();
+    selected_vector_document_path_.clear();
+    const auto created_id = selected_animation_->document.id;
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::animation, created_id);
 }
 
 bool ProjectSession::convert_selected_linked_svg_to_native(
@@ -698,6 +766,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_vector_.reset();
         selected_material_.reset();
         selected_entity_.reset();
+        selected_animation_.reset();
         created_vector_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
@@ -711,6 +780,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_texture_.reset();
         selected_material_.reset();
         selected_entity_.reset();
+        selected_animation_.reset();
         if (loaded.asset->source_kind == project::VectorSourceKind::linked_svg) {
             auto image = render::load_svg_preview(project_root_ / loaded.asset->source);
             if (!image.ok()) {
@@ -761,9 +831,10 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         created_vector_.reset();
         selected_material_ = std::move(*loaded.asset);
         selected_entity_.reset();
+        selected_animation_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
-    } else {
+    } else if (kind == StudioResourceKind::entity) {
         auto loaded = project::load_entity(
             project_root_, *manifest_, match->document_path);
         if (!loaded.ok()) {
@@ -775,6 +846,22 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         created_vector_.reset();
         selected_material_.reset();
         selected_entity_ = std::move(*loaded.entity);
+        selected_animation_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+    } else {
+        auto loaded = project::load_animation(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_ = std::move(*loaded.asset);
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
     }
@@ -1113,6 +1200,11 @@ ProjectSession::selected_material() const noexcept {
 const std::optional<project::EntityDefinition>&
 ProjectSession::selected_entity() const noexcept {
     return selected_entity_;
+}
+
+const std::optional<project::AnimationClip>&
+ProjectSession::selected_animation() const noexcept {
+    return selected_animation_;
 }
 
 const std::vector<StudioResource>&

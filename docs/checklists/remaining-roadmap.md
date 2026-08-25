@@ -93,14 +93,16 @@ runtime et chaque futur document possède un propriétaire clair.
   travail, origine, unités, première forme, fill initial et couleur.
 - [x] Publier réellement l’artwork créé comme `VectorAsset v2 native` par
   sauvegarde atomique après validation complète du prompt et du document.
-- [ ] Ajouter le prompt dédié pour animation après livraison de son contrat ;
-  les prompts matériau/fill et entité sont maintenant fonctionnels.
+- [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation ; les
+  trois créations publient désormais leurs documents atomiquement.
 
 Asset Studio publie désormais un `MaterialDefinition v1` depuis un prompt
 dédié : couleur, opacité, blend, références locales optionnelles et transform
 UV sont validés, écrits atomiquement et réindexés sans créer de bitmap.
 Il publie également un `EntityDefinition v1` mono-nœud avec drawable, matériau
 optionnel et transform, puis l’ajoute au registre des ressources.
+Enfin, il publie un `AnimationClip v1` avec durée, boucle et marker optionnel,
+prêt à recevoir des pistes génériques dans le timeline editor.
 - [x] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
   doit pas modifier le projet ni polluer le prompt suivant.
 - [x] Résoudre automatiquement les conflits d’identifiants par suffixe et

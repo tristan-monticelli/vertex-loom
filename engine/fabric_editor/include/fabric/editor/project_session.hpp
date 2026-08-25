@@ -2,6 +2,7 @@
 
 #include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
+#include "fabric/project/animation.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/material.hpp"
@@ -19,12 +20,14 @@ namespace fabric::editor {
 struct CreateVectorArtworkPrompt;
 struct CreateMaterialPrompt;
 struct CreateEntityPrompt;
+struct CreateAnimationPrompt;
 
 enum class StudioResourceKind {
     texture,
     vector,
     material,
     entity,
+    animation,
 };
 
 struct StudioResource {
@@ -68,6 +71,7 @@ public:
         const CreateVectorArtworkPrompt& prompt);
     [[nodiscard]] bool create_material(const CreateMaterialPrompt& prompt);
     [[nodiscard]] bool create_entity(const CreateEntityPrompt& prompt);
+    [[nodiscard]] bool create_animation(const CreateAnimationPrompt& prompt);
     [[nodiscard]] bool convert_selected_linked_svg_to_native(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -117,6 +121,8 @@ public:
     selected_material() const noexcept;
     [[nodiscard]] const std::optional<project::EntityDefinition>&
     selected_entity() const noexcept;
+    [[nodiscard]] const std::optional<project::AnimationClip>&
+    selected_animation() const noexcept;
     [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
     [[nodiscard]] StudioResource* selected_resource() noexcept;
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
@@ -135,6 +141,7 @@ private:
     std::optional<project::VectorAsset> created_vector_;
     std::optional<project::MaterialDefinition> selected_material_;
     std::optional<project::EntityDefinition> selected_entity_;
+    std::optional<project::AnimationClip> selected_animation_;
     std::vector<StudioResource> resources_;
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;

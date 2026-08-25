@@ -214,6 +214,32 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     CHECK(*loaded.entity == *session.selected_entity());
 }
 
+TEST_CASE("animation prompt publishes and indexes a clip") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateAnimationPrompt prompt;
+    prompt.name = "Walk cycle";
+    prompt.duration = 2.0;
+    prompt.marker_id = "loop-point";
+    prompt.marker_time = 1.5;
+    REQUIRE(session.create_animation(prompt));
+    REQUIRE(session.selected_resource() != nullptr);
+    CHECK(session.selected_resource()->kind ==
+          fabric::editor::StudioResourceKind::animation);
+    REQUIRE(session.selected_animation().has_value());
+    CHECK(session.selected_animation()->duration == 2.0F);
+    REQUIRE(session.selected_animation()->markers.size() == 1U);
+    CHECK(session.selected_animation()->markers.front().id == "loop-point");
+    const auto loaded = fabric::project::load_animation(
+        project.path(), *session.manifest(),
+        fabric::project::animation_document_path(
+            *session.manifest(), session.selected_animation()->document.id));
+    REQUIRE(loaded.ok());
+    CHECK(*loaded.asset == *session.selected_animation());
+}
+
 TEST_CASE("undoing to clean neutralizes a previous autosave") {
     using namespace std::chrono_literals;
     const TemporaryDirectory project;

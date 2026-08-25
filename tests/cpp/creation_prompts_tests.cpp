@@ -236,6 +236,26 @@ TEST_CASE("entity prompt validates drawable and material references") {
     CHECK(prompt.drawable == fabric::project::EntityDrawableKind::none);
 }
 
+TEST_CASE("animation prompt validates clip timing and marker") {
+    TemporaryDirectory project;
+    fabric::editor::CreateAnimationPrompt prompt;
+    prompt.name = "Walk cycle";
+    prompt.duration = 2.0;
+    prompt.marker_id = "loop-point";
+    prompt.marker_time = 1.25;
+    const auto valid = prompt.validate(project.path(), manifest());
+    REQUIRE(valid.ok());
+    CHECK(valid.destination ==
+          project.path() / "assets/animations/walk-cycle.animation.json");
+
+    prompt.marker_time = 3.0;
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("markerTime").has_value());
+    prompt.reset();
+    CHECK(prompt.duration == 1.0);
+    CHECK(prompt.loop);
+}
+
 TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     fabric::editor::CreateProjectPrompt project_prompt;
     fabric::editor::CreateVectorArtworkPrompt artwork_prompt;

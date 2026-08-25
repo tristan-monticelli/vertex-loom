@@ -67,6 +67,9 @@ C4Component
 - Le hub propose aussi `New entity...`. Le prompt crée un nœud racine avec
   drawable, matériau optionnel et transform, valide les références locales,
   publie atomiquement dans `entities`, puis réindexe l’entité.
+- Le hub propose `New animation...`. Le prompt crée un `AnimationClip v1`
+  avec durée, boucle et marker optionnel, le publie atomiquement dans
+  `assets/animations`, puis le réindexe sans imposer de piste métier.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,

@@ -523,6 +523,52 @@ core::ResourceId CreateEntityPrompt::resource_id_for_document(
                                  generated_resource_id(name, "entity"));
 }
 
+void CreateAnimationPrompt::reset() noexcept {
+    *this = CreateAnimationPrompt{};
+}
+
+PromptValidation CreateAnimationPrompt::validate(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    PromptValidation validation;
+    validate_name(validation, name);
+    const auto id = resource_id_for_document(project_root, manifest);
+    if (!core::ResourceId::is_valid(id.value)) {
+        add_error(validation, "id", "Generated resource id is invalid.");
+    }
+    if (!std::isfinite(duration) || duration <= 0.0) {
+        add_error(validation, "duration",
+                  "Duration must be finite and greater than zero.");
+    }
+    if (!marker_id.empty()) {
+        if (!core::ResourceId::is_valid(marker_id)) {
+            add_error(validation, "marker", "Marker id must be valid.");
+        }
+        if (!std::isfinite(marker_time) || marker_time < 0.0 ||
+            marker_time > duration) {
+            add_error(validation, "markerTime",
+                      "Marker time must be finite and within the clip.");
+        }
+    }
+    validation.destination = project_root /
+        project::animation_document_path(manifest, id);
+    validation.summary = {
+        "Create AnimationClip v1: " + name,
+        "Id: " + id.value,
+        "Destination: " + validation.destination.generic_string(),
+        "Duration: " + std::to_string(duration) + " seconds",
+        std::string{"Loop: "} + (loop ? "yes" : "no"),
+    };
+    return validation;
+}
+
+core::ResourceId CreateAnimationPrompt::resource_id_for_document(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    return available_resource_id(project_root, manifest,
+                                 generated_resource_id(name, "animation"));
+}
+
 PromptValidation CreateVectorArtworkPrompt::validate(
     const std::filesystem::path& project_root,
     const project::ProjectManifest& manifest) const {
