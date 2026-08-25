@@ -78,6 +78,9 @@ renderer et refuse les documents liés ou invalides sans créer de fenêtre.
 Les contrats `MaterialDefinition v1` et `EntityDefinition v1` couvrent
 round-trip, publication atomique, références typées, transforms non finies,
 identifiants dupliqués et cycles de parentage.
+Le contrat `AnimationClip v1` couvre parseur strict, round-trip, publication
+atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
+interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

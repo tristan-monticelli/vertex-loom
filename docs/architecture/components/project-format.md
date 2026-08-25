@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1 et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1, AnimationClip v1 et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -61,6 +61,11 @@ C4Component
 - `EntityDefinition v1` est stocké sous `entities/<id>.entity.json` et porte
   des nœuds stables, parentage, transform, ordre Z, drawable vectoriel ou
   texture et matériau optionnel.
+- `AnimationClip v1` est stocké sous
+  `assets/animations/<id>.animation.json`. Il porte une durée, une boucle,
+  des markers et des pistes liées par `nodeId + componentId + propertyId`.
+  Les valeurs v1 sont scalaire, `Vec2`, couleur, booléen ou référence de
+  ressource ; les interpolations disponibles sont step, linear et cubic.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.

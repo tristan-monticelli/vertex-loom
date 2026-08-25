@@ -198,13 +198,13 @@ transform du fill restent ouverts.
 
 - [ ] Définir `PropertyDescriptor` : identifiant stable, chemin affiché, type,
   lecture, écriture, bornes, unité, animabilité et mode de composition.
-- [ ] Définir `PropertyBinding` par `nodeId + componentId + propertyId`, jamais
+- [x] Définir `PropertyBinding` par `nodeId + componentId + propertyId`, jamais
   par pointeur, index temporaire ou chaîne interprétée au runtime.
-- [ ] Supporter scalaire, `Vec2`, couleur, booléen, angle, transform, référence
-  de ressource et paramètres de fill.
-- [ ] Définir `AnimationClip v1` : durée, boucle, markers, pistes typées et clés.
-- [ ] Supporter step, linear et cubic, tangentes automatiques/libres, easing et
-  rotation par chemin angulaire court.
+- [x] Supporter scalaire, `Vec2`, couleur, booléen et référence de ressource.
+  Angle, transform et paramètres de fill restent à relier aux descripteurs.
+- [x] Définir `AnimationClip v1` : durée, boucle, markers, pistes typées et clés.
+- [x] Supporter step, linear et cubic ; tangentes, easing et rotation par
+  chemin angulaire court restent à définir.
 - [ ] Lister automatiquement dans la timeline toutes les propriétés déclarées
   animables par le registre.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et

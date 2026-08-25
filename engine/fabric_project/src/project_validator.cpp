@@ -1,5 +1,6 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/animation.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/resource_registry.hpp"
 #include "fabric/project/texture_asset.hpp"
@@ -190,6 +191,10 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, "materials",
         ".material.json", "assets.materials", load_material,
         material_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, "animations",
+        ".animation.json", "assets.animations", load_animation,
+        animation_resource_references, registry, result.errors);
     const auto entity_directory = project_root / loaded.manifest->directories.entities;
     std::error_code entity_error;
     if (std::filesystem::exists(entity_directory, entity_error)) {
