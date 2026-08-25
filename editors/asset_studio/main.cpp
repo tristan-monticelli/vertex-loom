@@ -120,6 +120,8 @@ struct AnimationUiState {
     int key_kind{};
     float key_scalar{};
     float key_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
+    bool key_boolean{};
+    std::string key_resource_id;
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
 };
@@ -1540,13 +1542,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SliderFloat("Key time", &animation_ui.key_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::Combo("Key type", &animation_ui.key_kind,
-                         "Vec2\0Scalar\0Color\0");
+                         "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
             if (animation_ui.key_kind == 0) {
                 ImGui::InputFloat2("Vec2 value", animation_ui.key_value);
             } else if (animation_ui.key_kind == 1) {
                 ImGui::InputFloat("Scalar value", &animation_ui.key_scalar);
-            } else {
+            } else if (animation_ui.key_kind == 2) {
                 ImGui::ColorEdit4("Color value", animation_ui.key_color);
+            } else if (animation_ui.key_kind == 3) {
+                ImGui::Checkbox("Boolean value", &animation_ui.key_boolean);
+            } else {
+                ImGui::InputText("Resource id", &animation_ui.key_resource_id);
             }
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
@@ -1565,7 +1571,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::BeginDisabled(animation_ui.node_id.empty() ||
                                  animation_ui.component_id.empty() ||
-                                 animation_ui.property_id.empty());
+                                 animation_ui.property_id.empty() ||
+                                 (animation_ui.key_kind == 4 &&
+                                  animation_ui.key_resource_id.empty()));
             if (ImGui::Button("Insert key")) {
                 fabric::project::AnimationValue value;
                 if (animation_ui.key_kind == 0) {
@@ -1573,11 +1581,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                animation_ui.key_value[1]};
                 } else if (animation_ui.key_kind == 1) {
                     value = animation_ui.key_scalar;
-                } else {
+                } else if (animation_ui.key_kind == 2) {
                     value = fabric::core::Color{animation_ui.key_color[0],
                                                 animation_ui.key_color[1],
                                                 animation_ui.key_color[2],
                                                 animation_ui.key_color[3]};
+                } else if (animation_ui.key_kind == 3) {
+                    value = animation_ui.key_boolean;
+                } else {
+                    value = fabric::project::ResourceReference{
+                        {.value = animation_ui.key_resource_id}, "resource"};
                 }
                 if (session.insert_selected_animation_key(
                         {.node_id = animation_ui.node_id,
