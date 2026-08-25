@@ -5,6 +5,7 @@
 #include "fabric/render/svg_vector.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/map_chunk_index.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -43,6 +44,9 @@ struct PreviewRuntime::Impl {
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
+    project::MapChunkIndex chunk_index;
+    std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
+    bool chunk_index_ready{};
     bool sdl_initialized{};
 };
 
@@ -181,6 +185,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packets.clear();
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
+    impl_->packet_indices_by_instance.clear();
+    impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
 
     if (options_.project_root.empty() || !core::ResourceId::is_valid(options_.map_id.value)) {
@@ -224,6 +230,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     manifest_ = std::move(loaded_project.manifest);
     map_ = std::move(loaded_map.asset);
     triggers_ = std::make_unique<TriggerRuntime>(*map_);
+    impl_->chunk_index_ready = impl_->chunk_index.rebuild(*map_);
     if (replay_) replay_player_ = std::make_unique<ReplayPlayer>(*replay_);
     if (!physics_.create() || !physics_.load_map_collisions(*map_)) {
         errors_.push_back("could not create the map physics world");
@@ -385,6 +392,12 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                      [](const auto& left, const auto& right) {
                          return left.node_id < right.node_id;
                      });
+    for (std::size_t index = 0; index < impl_->packets.size(); ++index) {
+        const auto separator = impl_->packets[index].node_id.find(':');
+        if (separator != std::string::npos)
+            impl_->packet_indices_by_instance[impl_->packets[index].node_id.substr(0, separator)]
+                .push_back(index);
+    }
     return true;
 }
 
@@ -555,9 +568,21 @@ bool PreviewRuntime::run() {
 
         const auto bounds = impl_->camera.world_bounds();
         std::vector<render::VectorDrawPacket> visible_packets;
-        visible_packets.reserve(impl_->packets.size());
-        for (const auto& packet : impl_->packets)
-            if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+        if (impl_->chunk_index_ready) {
+            const auto candidate_instances = impl_->chunk_index.query(bounds);
+            for (const auto& instance_id : candidate_instances) {
+                const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
+                if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
+                for (const auto packet_index : packet_indices->second) {
+                    const auto& packet = impl_->packets[packet_index];
+                    if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+                }
+            }
+        } else {
+            visible_packets.reserve(impl_->packets.size());
+            for (const auto& packet : impl_->packets)
+                if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+        }
         glViewport(0, 0, options_.width, options_.height);
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);

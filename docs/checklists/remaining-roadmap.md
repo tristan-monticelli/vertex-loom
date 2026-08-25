@@ -276,6 +276,7 @@ inspectable avec collisions et événements.
 - [ ] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre avec interpolation.
 - [x] Ajouter smoke test, benchmark et replay par checkpoints.
 - [x] Réduire les draw calls des packets contigus compatibles par batching stable
+- [x] Utiliser l’index des chunks pour limiter les instances candidates au culling
 - [ ] Mesurer puis tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
   de référence.
 

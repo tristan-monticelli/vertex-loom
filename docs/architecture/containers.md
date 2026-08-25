@@ -5,7 +5,7 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, résout une scène ou map avec transitions atomiques, traduit les événements SDL vers le CharacterController, interpole Camera2D et culling, route les entrées de zones vers les événements gameplay, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, résout une scène ou map avec transitions atomiques, traduit les événements SDL vers le CharacterController, interpole Camera2D, culling par chunks et culling géométrique, route les entrées de zones vers les événements gameplay, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, fills, entités et animations")
         Container(map, "Map Studio", "C++20 / SDL2 / Dear ImGui", "Édite maps, événements et triggers via MapSession, avec inspection des calques et commandes réversibles")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique et exécute les pas fixes validés")
