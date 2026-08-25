@@ -355,6 +355,8 @@ inspectable avec collisions et événements.
   fenêtre ; l’évaluation headless reste disponible par `ResourceId`.
 - [x] Relier une instance de map à un `AnimationClip v1` par sa propriété
   réservée `animation` et appliquer sa position animée aux draw packets.
+- [x] Appliquer aussi rotation et échelle des pistes `transform` aux draw
+  packets d’une instance liée.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri

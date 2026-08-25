@@ -34,6 +34,13 @@ struct PreviewRuntime::Impl {
         std::uint32_t height{};
     };
 
+    struct PacketBaseTransform {
+        core::Vec2 local_position;
+        float rotation_degrees{};
+        core::Vec2 scale{1.0F, 1.0F};
+        core::Vec2 world_origin;
+    };
+
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
@@ -47,7 +54,7 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
     std::unordered_map<std::string, std::string> animation_instances;
-    std::unordered_map<std::string, core::Vec2> packet_base_positions;
+    std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -191,7 +198,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->texture_handles.clear();
     impl_->animation_clips.clear();
     impl_->animation_instances.clear();
-    impl_->packet_base_positions.clear();
+    impl_->packet_base_transforms.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -415,8 +422,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     }
                     transform_packet(packet, *entity.entity, node_index, instance.transform);
                     packet.node_id = instance.id + ":" + node.id + ":" + packet.node_id;
-                    impl_->packet_base_positions.emplace(
-                        packet.node_id, node.transform.position);
+                    impl_->packet_base_transforms.emplace(
+                        packet.node_id, Impl::PacketBaseTransform{
+                            .local_position = node.transform.position,
+                            .rotation_degrees = node.transform.rotation_degrees,
+                            .scale = node.transform.scale,
+                            .world_origin = apply_node_transform(
+                                {0.0F, 0.0F}, *entity.entity, node_index,
+                                instance.transform)});
                     impl_->packets.push_back(std::move(packet));
                 }
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
@@ -451,8 +464,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 packet.fill_color.reset();
                 transform_packet(packet, *entity.entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
-                impl_->packet_base_positions.emplace(
-                    packet.node_id, node.transform.position);
+                impl_->packet_base_transforms.emplace(
+                    packet.node_id, Impl::PacketBaseTransform{
+                        .local_position = node.transform.position,
+                        .rotation_degrees = node.transform.rotation_degrees,
+                        .scale = node.transform.scale,
+                        .world_origin = apply_node_transform(
+                            {0.0F, 0.0F}, *entity.entity, node_index,
+                            instance.transform)});
                 impl_->packets.push_back(std::move(packet));
             }
         }
@@ -651,27 +670,53 @@ bool PreviewRuntime::run() {
                 second_separator == std::string::npos
                     ? std::string::npos
                     : second_separator - separator - 1U);
-            const auto base_position = impl_->packet_base_positions.find(packet.node_id);
-            if (base_position == impl_->packet_base_positions.end()) return packet;
+            const auto base_transform = impl_->packet_base_transforms.find(packet.node_id);
+            if (base_transform == impl_->packet_base_transforms.end()) return packet;
+            std::optional<core::Vec2> position;
+            std::optional<float> rotation_degrees;
+            std::optional<core::Vec2> scale;
             for (const auto& property : evaluation->properties) {
                 if (property.binding.node_id != node_id ||
-                    property.binding.component_id != "transform" ||
-                    property.binding.property_id != "position") continue;
-                const auto* position = std::get_if<core::Vec2>(&property.value);
-                if (position == nullptr) continue;
-                const core::Vec2 delta{
-                    position->x - base_position->second.x,
-                    position->y - base_position->second.y};
-                for (auto& point : packet.outline) {
-                    point.x += delta.x;
-                    point.y += delta.y;
+                    property.binding.component_id != "transform") continue;
+                if (property.binding.property_id == "position") {
+                    if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                        position = *value;
+                } else if (property.binding.property_id == "rotationDegrees") {
+                    if (const auto* value = std::get_if<float>(&property.value))
+                        rotation_degrees = *value;
+                } else if (property.binding.property_id == "scale") {
+                    if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                        scale = *value;
                 }
-                for (auto& point : packet.fill_vertices) {
-                    point.x += delta.x;
-                    point.y += delta.y;
-                }
-                break;
             }
+            if (!position && !rotation_degrees && !scale) return packet;
+            const auto& base = base_transform->second;
+            const auto target_position = position.value_or(base.local_position);
+            const auto target_rotation = rotation_degrees.value_or(base.rotation_degrees);
+            const auto target_scale = scale.value_or(base.scale);
+            const auto scale_x = std::abs(base.scale.x) > 1.0e-6F
+                ? target_scale.x / base.scale.x : 1.0F;
+            const auto scale_y = std::abs(base.scale.y) > 1.0e-6F
+                ? target_scale.y / base.scale.y : 1.0F;
+            const auto radians = (target_rotation - base.rotation_degrees) *
+                0.017453292519943295F;
+            const auto cosine = std::cos(radians);
+            const auto sine = std::sin(radians);
+            const core::Vec2 position_delta{
+                target_position.x - base.local_position.x,
+                target_position.y - base.local_position.y};
+            const auto animate_point = [&](core::Vec2& point) {
+                point.x -= base.world_origin.x;
+                point.y -= base.world_origin.y;
+                point.x *= scale_x;
+                point.y *= scale_y;
+                const auto rotated_x = point.x * cosine - point.y * sine;
+                const auto rotated_y = point.x * sine + point.y * cosine;
+                point.x = rotated_x + base.world_origin.x + position_delta.x;
+                point.y = rotated_y + base.world_origin.y + position_delta.y;
+            };
+            for (auto& point : packet.outline) animate_point(point);
+            for (auto& point : packet.fill_vertices) animate_point(point);
             return packet;
         };
         std::vector<render::VectorDrawPacket> visible_packets;

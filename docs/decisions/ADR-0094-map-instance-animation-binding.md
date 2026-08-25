@@ -20,14 +20,15 @@ et `PreviewRuntime::load` vérifie que le clip correspondant est chargé avant
 d’initialiser la physique ou SDL.
 
 Pendant le rendu, le runtime évalue le clip à l’horloge fixe de simulation.
-Les pistes `transform.position` sont appliquées aux draw packets du nœud ciblé
-par translation par rapport à sa position de base. Les autres propriétés restent
-évaluables headless mais ne modifient pas encore les packets.
+Les pistes `transform.position`, `transform.rotationDegrees` et
+`transform.scale` sont appliquées aux draw packets du nœud ciblé par rapport à
+sa transformation de base. Les autres propriétés restent évaluables headless
+mais ne modifient pas encore les packets.
 
 ## Conséquences
 
 - Une map peut persister une animation par instance sans changer de schéma.
 - Une référence invalide ou absente est refusée avant toute fenêtre runtime.
 - Le premier binding est déterministe et compatible avec les checkpoints.
-- Rotation, échelle, états, contraintes et animation par défaut d’entité restent
-  des incréments ultérieurs.
+- États, contraintes et animation par défaut d’entité restent des incréments
+  ultérieurs.

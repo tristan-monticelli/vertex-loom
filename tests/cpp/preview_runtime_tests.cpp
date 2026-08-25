@@ -44,6 +44,20 @@ fabric::project::AnimationClip animation() {
                         {1.0F, fabric::core::Vec2{2.0F, 4.0F}}}}}};
 }
 
+fabric::project::AnimationClip transform_animation() {
+    auto result = animation();
+    result.tracks.push_back({
+        {.node_id = "root", .component_id = "transform", .property_id = "rotationDegrees"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, 0.0F}, {1.0F, 90.0F}}});
+    result.tracks.push_back({
+        {.node_id = "root", .component_id = "transform", .property_id = "scale"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, fabric::core::Vec2{1.0F, 1.0F}},
+         {1.0F, fabric::core::Vec2{2.0F, 3.0F}}}});
+    return result;
+}
+
 fabric::project::ReplayDocument replay() {
     return {.document = {.schema_version = 1,
                          .type = "replay",
@@ -159,7 +173,8 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
             std::chrono::steady_clock::now().time_since_epoch().count()));
     REQUIRE(fabric::project::create_project(root, manifest()).ok());
     REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
-    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+    REQUIRE(fabric::project::publish_animation(
+        root, manifest(), transform_animation()).ok());
 
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
@@ -169,7 +184,7 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
         {.value = "runtime-animation"}, 0.5F);
     REQUIRE(evaluated.has_value());
     REQUIRE(evaluated->ok());
-    REQUIRE(evaluated->properties.size() == 1U);
+    REQUIRE(evaluated->properties.size() == 3U);
     const auto position = std::get<fabric::core::Vec2>(
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
