@@ -7,6 +7,7 @@
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/replay.hpp"
+#include "fabric/project/scene.hpp"
 #include "fabric/project/xpbd.hpp"
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
@@ -28,6 +29,7 @@ enum class RuntimeMode { interactive, smoke_test, benchmark };
 struct PreviewRuntimeOptions {
     std::filesystem::path project_root;
     core::ResourceId map_id;
+    std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;
     bool enable_character{};
     std::optional<std::filesystem::path> audio_wav;
@@ -74,6 +76,9 @@ public:
     [[nodiscard]] const std::optional<project::MapDocument>& map() const noexcept {
         return map_;
     }
+    [[nodiscard]] const std::optional<project::SceneDocument>& scene() const noexcept {
+        return scene_;
+    }
     [[nodiscard]] const std::optional<project::ReplayDocument>& replay() const noexcept {
         return replay_;
     }
@@ -102,6 +107,7 @@ private:
 
     PreviewRuntimeOptions options_;
     std::optional<project::ProjectManifest> manifest_;
+    std::optional<project::SceneDocument> scene_;
     std::optional<project::MapDocument> map_;
     std::optional<project::ReplayDocument> replay_;
     std::unique_ptr<class ReplayPlayer> replay_player_;

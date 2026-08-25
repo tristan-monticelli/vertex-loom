@@ -1,6 +1,5 @@
 #include "fabric/runtime/preview_runtime.hpp"
 #include "fabric/runtime/progress_store.hpp"
-#include "fabric/runtime/scene_session.hpp"
 
 #include <filesystem>
 #include <iostream>
@@ -77,15 +76,7 @@ int main(int argc, char** argv) {
         }
     }
 
-    if (scene_id) {
-        fabric::runtime::SceneRuntimeSession scene_session;
-        if (!scene_session.load(options.project_root, *scene_id)) {
-            for (const auto& error : scene_session.errors())
-                std::cerr << "error: " << error << '\n';
-            return 1;
-        }
-        options.map_id = scene_session.map()->document.id;
-    }
+    options.scene_id = scene_id;
 
     fabric::runtime::PreviewRuntime runtime;
     if (!runtime.load(options) || !runtime.run()) {

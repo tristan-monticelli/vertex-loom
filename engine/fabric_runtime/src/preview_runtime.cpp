@@ -414,6 +414,7 @@ PreviewRuntime::~PreviewRuntime() {
 bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     options_ = options;
     manifest_.reset();
+    scene_.reset();
     map_.reset();
     replay_.reset();
     replay_player_.reset();
@@ -444,8 +445,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
 
-    if (options_.project_root.empty() || !core::ResourceId::is_valid(options_.map_id.value)) {
-        errors_.push_back("project and a valid map id are required");
+    const bool valid_map_id = core::ResourceId::is_valid(options_.map_id.value);
+    const bool valid_scene_id = options_.scene_id.has_value() &&
+        core::ResourceId::is_valid(options_.scene_id->value);
+    if (options_.project_root.empty() ||
+        (options_.scene_id.has_value() && !valid_scene_id) ||
+        (!options_.scene_id.has_value() && !valid_map_id) ||
+        (options_.scene_id.has_value() && valid_map_id)) {
+        errors_.push_back("project and exactly one valid map or scene id are required");
         return false;
     }
 
@@ -455,9 +462,26 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         append_errors(errors_, loaded_project.errors);
         return false;
     }
+    std::optional<project::SceneDocument> loaded_scene;
+    auto map_id = options_.map_id;
+    if (options_.scene_id) {
+        auto scene = project::load_scene(
+            options_.project_root, *loaded_project.manifest,
+            project::scene_document_path(*loaded_project.manifest, *options_.scene_id));
+        if (!scene.ok()) {
+            append_errors(errors_, scene.errors);
+            return false;
+        }
+        if (!scene.asset->entry_map) {
+            errors_.push_back("scene has no entry map");
+            return false;
+        }
+        map_id = scene.asset->entry_map->id;
+        loaded_scene = std::move(scene.asset);
+    }
     auto loaded_map = project::load_map(
         options_.project_root, *loaded_project.manifest,
-        project::map_document_path(*loaded_project.manifest, options_.map_id));
+        project::map_document_path(*loaded_project.manifest, map_id));
     if (!loaded_map.ok()) {
         append_errors(errors_, loaded_map.errors);
         return false;
@@ -483,6 +507,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     }
 
     manifest_ = std::move(loaded_project.manifest);
+    scene_ = std::move(loaded_scene);
     map_ = std::move(loaded_map.asset);
     const auto animation_directory = options_.project_root /
         manifest_->directories.assets / "animations";

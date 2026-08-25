@@ -7,8 +7,11 @@ projet, puis résout les transitions par `ResourceId`. Une transition est
 préparée dans des documents temporaires ; la scène courante n’est remplacée
 que si la cible et sa map sont valides.
 
-`game_runtime --scene <id>` réutilise directement cette session pour résoudre
-la map d’entrée avant d’initialiser `PreviewRuntime`.
+`PreviewRuntimeOptions` accepte exactement un `map_id` ou un `scene_id`. Avec
+`scene_id`, Preview Runtime charge et valide lui-même le `SceneDocument`, le
+conserve via `scene()` et résout son `entryMap` avant de charger la map.
+`game_runtime --scene <id>` transmet donc directement l’identifiant au runtime
+sans conversion préalable.
 
 ## Conséquences
 

@@ -31,6 +31,15 @@ fabric::project::MapDocument map() {
                         fabric::project::MapLayerKind::instances, true, false, 0.0F}}};
 }
 
+fabric::project::SceneDocument scene() {
+    return {.document = {.schema_version = 1,
+                         .type = "scene",
+                         .id = {.value = "preview-scene"},
+                         .name = "Preview Scene"},
+            .maps = {{{{.value = "preview"}, "map"}, "instances"}},
+            .entry_map = fabric::project::ResourceReference{{.value = "preview"}, "map"}};
+}
+
 fabric::project::AnimationClip animation() {
     return {.document = {.schema_version = 1,
                          .type = "animation",
@@ -332,6 +341,48 @@ TEST_CASE("preview runtime validates and loads a map before graphics") {
     REQUIRE(runtime.stats().frames == 1);
     REQUIRE(runtime.stats().physics_steps == 1);
     REQUIRE(runtime.stats().p95_frame_ms >= 0.0);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves a scene entry map before graphics") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-scene-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+    REQUIRE(fabric::project::publish_scene(root, project_manifest, scene()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .scene_id = fabric::core::ResourceId{.value = "preview-scene"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.scene().has_value());
+    REQUIRE(runtime.map().has_value());
+    CHECK(runtime.scene()->document.id.value == "preview-scene");
+    CHECK(runtime.map()->document.id.value == "preview");
+    CHECK(runtime.errors().empty());
+    REQUIRE(runtime.run());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime rejects ambiguous map and scene selection") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-selection-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE_FALSE(runtime.load({.project_root = root,
+                                .map_id = fabric::core::ResourceId{.value = "preview"},
+                                .scene_id = fabric::core::ResourceId{.value = "preview-scene"},
+                                .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE_FALSE(runtime.errors().empty());
+    CHECK(runtime.errors().front().find("exactly one") != std::string::npos);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
