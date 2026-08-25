@@ -60,10 +60,21 @@ PNG après sauvegarde, autosave et récupération.
   `ProjectSession` avec composition générique, crop 1 × 2 sur source 2 × 2,
   deux instances d'œil, deux boutons et une couture ; le resolver vérifie ses
   20 draw packets et les UV recadrés.
-- [ ] Prévisualiser et charger la composition dans une entité et une map.
+- [x] Prévisualiser et charger la composition dans une entité et une map.
+
+  Preuve : la fixture crée aussi l'entité `textile-head-entity` et la map
+  `textile-head-preview` avec les sessions Studio. Preview Runtime charge la
+  map et ses 20 draw packets sont appariés par identifiant stable puis comparés
+  aux packets résolus directement : géométrie, UV, indices, couleurs et
+  textures sont identiques.
 
 Gate : la composition conserve le même résultat visible après undo/redo,
 sauvegarde, reload et chargement runtime.
+
+Gate validé : les commandes de composition couvrent undo/redo, autosave,
+récupération, sauvegarde et reload ; la fixture Studio est régénérée octet par
+octet et son entité placée dans une map produit le même contenu de rendu dans
+Preview Runtime.
 
 ## Tranche 2 — Bordure texturée et Beam
 

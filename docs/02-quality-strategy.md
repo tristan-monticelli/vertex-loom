@@ -110,7 +110,10 @@ régénération volontaire s'effectue sur une destination absente avec
 `FABRIC_UPDATE_STUDIO_PRESET_FIXTURE=1 ./build/fabric_visual_presets_tests`.
 La fixture `tests/fixtures/studio-textile-head` suit le même protocole avec
 `FABRIC_UPDATE_STUDIO_HEAD_FIXTURE=1` et vérifie en plus la fermeture du graphe
-composé, les 20 draw packets et les UV du crop raster à mi-largeur.
+composé, les 20 draw packets et les UV du crop raster à mi-largeur. Elle crée
+aussi son entité et sa map par les sessions Studio ; Preview Runtime charge
+cette map et chaque packet est apparié par identifiant stable pour comparer
+géométrie, UV, indices, couleurs et texture au résultat du resolver direct.
 Les commandes d'édition de composition et composant couvrent modification et
 duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
 test session vérifie undo/redo, autosave, récupération, sauvegarde et reload

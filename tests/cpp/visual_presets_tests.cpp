@@ -134,6 +134,35 @@ void create_studio_preset_fixture(const std::filesystem::path& root) {
     REQUIRE(map.save());
 }
 
+void add_textile_head_runtime_documents(const std::filesystem::path& root) {
+    fabric::editor::ProjectSession studio;
+    REQUIRE(studio.open(root));
+    fabric::editor::CreateEntityPrompt entity;
+    entity.name = "Textile Head Entity";
+    entity.node_name = "Head";
+    entity.drawable =
+        fabric::project::EntityDrawableKind::visual_component;
+    entity.resource_id = "textile-head";
+    REQUIRE(studio.create_entity(entity));
+
+    fabric::editor::MapSession map;
+    REQUIRE(map.create(root, {
+        .document = {.schema_version =
+                         fabric::project::current_map_schema_version,
+                     .type = "map",
+                     .id = {.value = "textile-head-preview"},
+                     .name = "Textile Head Preview"},
+        .layers = {{"instances", "Instances",
+                    fabric::project::MapLayerKind::instances,
+                    true, false, 0.0F}}}));
+    REQUIRE(map.place_instance({
+        .id = "textile-head",
+        .entity = fabric::project::ResourceReference{
+            {.value = "textile-head-entity"}, "entity"},
+        .layer_id = "instances"}, {.enabled = false}));
+    REQUIRE(map.save());
+}
+
 void create_textile_head_fixture(const std::filesystem::path& root) {
     fabric::editor::ProjectSession studio;
     REQUIRE(studio.create(root, {
@@ -217,6 +246,7 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
         {.value = "textile-head"}, "Textile Head",
         {.value = "textile-head-composition"},
         {{-4.0F, -3.0F}, {8.0F, 6.0F}}));
+    add_textile_head_runtime_documents(root);
 }
 
 std::vector<std::filesystem::path> fixture_files(
@@ -407,6 +437,29 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     const auto maximum_u = std::ranges::max_element(
         face.fill_uv, {}, &fabric::core::Vec2::x)->x;
     CHECK(maximum_u == Catch::Approx(0.5F));
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({
+        .project_root = fixture,
+        .map_id = {.value = "textile-head-preview"},
+        .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.map()->instances.size() == 1U);
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == resolved.packets.size());
+    for (const auto& studio_packet : resolved.packets) {
+        const auto packet_suffix = std::string{":"} + studio_packet.node_id;
+        const auto runtime_packet_it = std::ranges::find_if(
+            runtime.last_frame_packets(), [&](const auto& packet) {
+                return packet.node_id.ends_with(packet_suffix);
+            });
+        REQUIRE(runtime_packet_it != runtime.last_frame_packets().end());
+        const auto& runtime_packet = *runtime_packet_it;
+        CHECK(runtime_packet.fill_vertices == studio_packet.fill_vertices);
+        CHECK(runtime_packet.fill_uv == studio_packet.fill_uv);
+        CHECK(runtime_packet.fill_indices == studio_packet.fill_indices);
+        CHECK(runtime_packet.fill_color == studio_packet.fill_color);
+        CHECK(runtime_packet.image_fill == studio_packet.image_fill);
+    }
 
     std::error_code ignored;
     std::filesystem::remove_all(regenerated, ignored);
