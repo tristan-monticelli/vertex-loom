@@ -84,8 +84,10 @@ void upload_preview(AssetPreview& preview,
 bool import_texture(fabric::editor::ProjectSession& session,
                     SourceImportFields& fields, AssetPreview& preview) {
     fields.attempted = true;
+    const auto id = fields.prompt.resource_id(session.project_root(),
+                                              *session.manifest());
     if (!session.import_png(fields.prompt.source,
-                            {.value = fields.prompt.id},
+                            id,
                             fields.prompt.name)) {
         return false;
     }
@@ -97,8 +99,10 @@ bool import_texture(fabric::editor::ProjectSession& session,
 bool import_vector(fabric::editor::ProjectSession& session,
                    SourceImportFields& fields, AssetPreview& preview) {
     fields.attempted = true;
+    const auto id = fields.prompt.resource_id(session.project_root(),
+                                              *session.manifest());
     if (!session.import_svg(fields.prompt.source,
-                            {.value = fields.prompt.id},
+                            id,
                             fields.prompt.name)) {
         return false;
     }
@@ -396,8 +400,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (creation.prepared_artwork) {
             ImGui::SeparatorText("Created native artwork");
             ImGui::TextUnformatted(creation.prepared_artwork->name.c_str());
-            ImGui::TextDisabled("%s",
-                                creation.prepared_artwork->id.c_str());
+            if (session.created_vector()) {
+                ImGui::TextDisabled(
+                    "%s", session.created_vector()->document.id.value.c_str());
+            }
             ImGui::Text("%.2f x %.2f world units",
                         creation.prepared_artwork->width,
                         creation.prepared_artwork->height);
@@ -451,6 +457,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         std::array<char, 1024> selected{};
         if (choose_asset_file(window, "PNG image", "png", selected, status)) {
             imports.png.prompt.source = selected.data();
+            imports.png.prompt.name =
+                imports.png.prompt.source.stem().string();
             ImGui::OpenPopup("Import PNG");
         }
         request_png = false;
@@ -460,6 +468,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         std::array<char, 1024> selected{};
         if (choose_asset_file(window, "SVG image", "svg", selected, status)) {
             imports.svg.prompt.source = selected.data();
+            imports.svg.prompt.name =
+                imports.svg.prompt.source.stem().string();
             ImGui::OpenPopup("Import SVG");
         }
         request_svg = false;
@@ -470,15 +480,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextWrapped("%s", imports.png.prompt.source.string().c_str());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &imports.png.prompt.name);
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Resource ID", &imports.png.prompt.id);
         ImGui::TextDisabled("The PNG and its versioned document are copied into assets/textures.");
         const auto validation = imports.png.prompt.validate(
             fabric::editor::ImportSourceKind::png_image,
             session.project_root(), *session.manifest());
         draw_prompt_error(validation, "source");
         draw_prompt_error(validation, "name");
-        draw_prompt_error(validation, "id");
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Import", {110.0F, 0.0F})) {
@@ -511,8 +518,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextWrapped("%s", imports.svg.prompt.source.string().c_str());
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &imports.svg.prompt.name);
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Resource ID", &imports.svg.prompt.id);
         ImGui::TextDisabled(
             "The SVG and its versioned document are copied into assets/vectors.");
         const auto validation = imports.svg.prompt.validate(
@@ -520,7 +525,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.project_root(), *session.manifest());
         draw_prompt_error(validation, "source");
         draw_prompt_error(validation, "name");
-        draw_prompt_error(validation, "id");
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Import", {110.0F, 0.0F})) {
@@ -565,9 +569,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &creation.project.name);
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Resource ID", &creation.project.id);
-        ImGui::TextDisabled("Lowercase letters, digits, dots, underscores or hyphens.");
         const auto preset_label = std::string(fabric::editor::label(
             creation.project.preset));
         ImGui::SetNextItemWidth(300.0F);
@@ -599,7 +600,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.project.validate();
         draw_prompt_error(validation, "destination");
         draw_prompt_error(validation, "name");
-        draw_prompt_error(validation, "id");
         draw_prompt_error(validation, "pixelsPerUnit");
         draw_prompt_summary(validation);
         ImGui::Spacing();
@@ -638,8 +638,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextDisabled("The validated document is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &creation.artwork.name);
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Resource ID", &creation.artwork.id);
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Width", &creation.artwork.width, 1.0, 10.0,
                            "%.2f");

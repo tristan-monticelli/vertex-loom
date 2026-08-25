@@ -23,8 +23,8 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 
 | État | Constat et preuve | Correction attendue |
 | --- | --- | --- |
-| CONFORME | La création de projet valide le nom, l’identifiant et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage et enrichir le prompt. |
-| CONFORME | `CreateProjectPrompt` demande destination, nom, identifiant, unités monde, preset et `pixelsPerUnit`, puis affiche erreurs et résumé avant création. | Conserver les tests headless du modèle. |
+| CONFORME | La création de projet valide le nom, l’identifiant généré et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage. |
+| CONFORME | `CreateProjectPrompt` demande destination, nom, unités monde, preset et `pixelsPerUnit`, puis affiche l’identifiant calculé, les erreurs et le résumé avant création. | Conserver les tests headless du modèle. |
 | MANQUE | Les états PNG et SVG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
 | PARTIEL | `VectorAsset v2 native` persiste primitives et fills couleur/image, mais ne produit pas encore de draw packets ni d’édition de sommets. | Livrer chemins, contours, clips, tessellation et personnalisateur. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
@@ -87,9 +87,9 @@ runtime et chaque futur document possède un propriétaire clair.
   `Create`, `Import` et `Add existing`.
 - [ ] Rendre `Add existing` fonctionnel avec un sélecteur de ressources
   enregistrées ; le bouton actuel est uniquement visible et désactivé.
-- [x] Enrichir `Create project` : destination, nom, identifiant, unités,
+- [x] Enrichir `Create project` : destination, nom, identifiant automatique, unités,
   pixels par unité, preset de projet et résumé final.
-- [x] Ajouter le prompt `Create vector artwork` : nom, identifiant, taille de
+- [x] Ajouter le prompt `Create vector artwork` : nom, identifiant automatique, taille de
   travail, origine, unités, première forme, fill initial et couleur.
 - [x] Publier réellement l’artwork créé comme `VectorAsset v2 native` par
   sauvegarde atomique après validation complète du prompt et du document.
@@ -98,8 +98,8 @@ runtime et chaque futur document possède un propriétaire clair.
   et désactivés.
 - [x] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
   doit pas modifier le projet ni polluer le prompt suivant.
-- [x] Afficher erreurs par champ, conflits d’identifiants et destination exacte
-  avant confirmation.
+- [x] Résoudre automatiquement les conflits d’identifiants par suffixe et
+  afficher l’identifiant calculé ainsi que la destination avant confirmation.
 - [x] Tester les modèles de prompt et leurs validations sans Dear ImGui.
 - [ ] Sortir de `main.cpp` l’orchestration des imports, des previews OpenGL et
   du legacy afin de n’y laisser que le routage et le rendu des widgets.

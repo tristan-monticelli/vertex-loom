@@ -30,9 +30,14 @@ Annuler ne modifie ni la session, ni l’historique, ni le système de fichiers.
 Confirmer produit une commande réversible pour tout document éditable. Les
 imports immuables conservent leur publication sans remplacement.
 
-`Create project` demande au minimum destination, nom, identifiant, unités,
+Les identifiants sont des détails de stockage : ils sont dérivés du nom visible
+en minuscules ASCII et rendus uniques par suffixe numérique. L’utilisateur ne
+les saisit pas. Le résumé montre l’identifiant et la destination calculés pour
+rendre la publication prévisible.
+
+`Create project` demande au minimum destination, nom, unités,
 pixels par unité et preset explicite, puis affiche un résumé avant création.
-`Create vector artwork` demande nom, identifiant, taille de travail, origine,
+`Create vector artwork` demande nom, taille de travail, origine,
 unités, première forme et fill initial. Le fill image demande une texture
 locale existante, son cadrage, transform, opacité et suivi de déformation.
 

@@ -34,8 +34,9 @@ C4Component
 
 - Le chemin peut être fourni au démarrage ; les actions interactives utilisent
   le sélecteur natif de dossier ou de fichier.
-- La création demande un nom, un identifiant de ressource valide et un dossier
-  de destination absent ou vide. Son modèle typé porte unités monde,
+- La création demande un nom et un dossier de destination absent ou vide.
+  L’identifiant interne est généré depuis le nom et rendu unique sans saisie
+  utilisateur. Son modèle typé porte unités monde,
   `pixelsPerUnit`, preset d’échelle, erreurs par champ, destination exacte et
   résumé avant publication.
 - `Create`, `Import` et `Add existing` sont trois intentions distinctes. Chaque
@@ -45,7 +46,7 @@ C4Component
   matériau, entité, animation et ajout existant restent désactivées jusqu’à
   l’arrivée de leur contrat.
 - L’assistant d’artwork valide taille de travail, origine, unités, première
-  forme, fill et conflit d’identifiant. Un fill image référence une texture
+  forme et fill ; il résout seul les conflits d’identifiant. Un fill image référence une texture
   locale et expose cadrage, offset, rotation, échelle, opacité et suivi de la
   déformation. La confirmation publie un `VectorAsset v2 native` atomique.
 - Une ouverture échouée expose les erreurs structurées et ne remplace pas la

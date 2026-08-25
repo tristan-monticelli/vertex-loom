@@ -2,7 +2,9 @@
 
 #include "fabric/project/texture_asset.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <system_error>
 #include <utility>
 
@@ -11,6 +13,7 @@ namespace {
 
 constexpr double maximum_working_size = 1'000'000.0;
 constexpr double maximum_pixels_per_unit = 1'000'000.0;
+constexpr std::size_t maximum_resource_id_length = 128;
 
 bool blank(const std::string_view value) {
     return value.empty() || value.find_first_not_of(" \t\r\n") ==
@@ -23,17 +26,12 @@ void add_error(PromptValidation& validation, std::string field,
         PromptError{std::move(field), std::move(message)});
 }
 
-void validate_identity(PromptValidation& validation,
-                       const std::string_view name,
-                       const std::string_view id) {
+void validate_name(PromptValidation& validation,
+                   const std::string_view name) {
     if (blank(name)) {
         add_error(validation, "name", "Name must not be empty.");
     } else if (name.size() > 255) {
         add_error(validation, "name", "Name must contain at most 255 characters.");
-    }
-    if (!core::ResourceId::is_valid(id)) {
-        add_error(validation, "id",
-                  "Use 1-128 lowercase letters, digits, dots, underscores or hyphens; start and end with a letter or digit.");
     }
 }
 
@@ -70,7 +68,109 @@ bool identifier_conflicts(const std::filesystem::path& project_root,
     return false;
 }
 
+core::ResourceId available_resource_id(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest,
+    const core::ResourceId& preferred) {
+    if (!identifier_conflicts(project_root, manifest, preferred.value)) {
+        return preferred;
+    }
+    for (std::uint32_t sequence = 2;; ++sequence) {
+        const std::string suffix = "-" + std::to_string(sequence);
+        std::string candidate = preferred.value.substr(
+            0, maximum_resource_id_length - suffix.size());
+        while (!candidate.empty() && candidate.back() == '-') {
+            candidate.pop_back();
+        }
+        candidate += suffix;
+        if (!identifier_conflicts(project_root, manifest, candidate)) {
+            return {.value = std::move(candidate)};
+        }
+    }
+}
+
 } // namespace
+
+core::ResourceId generated_resource_id(const std::string_view visible_name,
+                                       const std::string_view fallback) {
+    std::string folded;
+    folded.reserve(visible_name.size());
+    for (std::size_t index = 0; index < visible_name.size(); ++index) {
+        const auto character = static_cast<unsigned char>(visible_name[index]);
+        if (character < 0x80U) {
+            folded.push_back(static_cast<char>(character));
+            continue;
+        }
+        if (character == 0xC3U && index + 1 < visible_name.size()) {
+            const auto continuation =
+                static_cast<unsigned char>(visible_name[++index]);
+            const char replacement =
+                continuation >= 0x80U && continuation <= 0x85U ? 'a'
+                : continuation == 0x87U                         ? 'c'
+                : continuation >= 0x88U && continuation <= 0x8BU ? 'e'
+                : continuation >= 0x8CU && continuation <= 0x8FU ? 'i'
+                : continuation >= 0x92U && continuation <= 0x96U ? 'o'
+                : continuation >= 0x99U && continuation <= 0x9CU ? 'u'
+                : continuation == 0x9FU                         ? 's'
+                : continuation >= 0xA0U && continuation <= 0xA5U ? 'a'
+                : continuation == 0xA7U                         ? 'c'
+                : continuation >= 0xA8U && continuation <= 0xABU ? 'e'
+                : continuation >= 0xACU && continuation <= 0xAFU ? 'i'
+                : continuation >= 0xB2U && continuation <= 0xB6U ? 'o'
+                : continuation >= 0xB9U && continuation <= 0xBCU ? 'u'
+                : continuation == 0xBFU                         ? 'y'
+                                                                 : ' ';
+            folded.push_back(replacement);
+            continue;
+        }
+        if (character == 0xC5U && index + 1 < visible_name.size()) {
+            const auto continuation =
+                static_cast<unsigned char>(visible_name[++index]);
+            if (continuation == 0x92U || continuation == 0x93U) {
+                folded += "oe";
+            } else {
+                folded.push_back(' ');
+            }
+            continue;
+        }
+        folded.push_back(' ');
+        while (index + 1 < visible_name.size() &&
+               (static_cast<unsigned char>(visible_name[index + 1]) & 0xC0U) ==
+                   0x80U) {
+            ++index;
+        }
+    }
+    std::string slug;
+    slug.reserve(std::min(folded.size(), maximum_resource_id_length));
+    bool separator_pending = false;
+    for (const char raw_character : folded) {
+        const auto character = static_cast<unsigned char>(raw_character);
+        const bool uppercase = character >= 'A' && character <= 'Z';
+        const bool lowercase = character >= 'a' && character <= 'z';
+        const bool digit = character >= '0' && character <= '9';
+        if (uppercase || lowercase || digit) {
+            if (separator_pending && !slug.empty() &&
+                slug.size() < maximum_resource_id_length) {
+                slug.push_back('-');
+            }
+            separator_pending = false;
+            if (slug.size() < maximum_resource_id_length) {
+                slug.push_back(uppercase
+                                   ? static_cast<char>(character - 'A' + 'a')
+                                   : static_cast<char>(character));
+            }
+        } else {
+            separator_pending = !slug.empty();
+        }
+    }
+    while (!slug.empty() && slug.back() == '-') {
+        slug.pop_back();
+    }
+    if (slug.empty()) {
+        slug = std::string(fallback);
+    }
+    return {.value = std::move(slug)};
+}
 
 std::optional<std::string_view> PromptValidation::error_for(
     const std::string_view field) const noexcept {
@@ -117,7 +217,7 @@ void CreateProjectPrompt::select_preset(
 PromptValidation CreateProjectPrompt::validate() const {
     PromptValidation validation;
     validation.destination = destination / "project.json";
-    validate_identity(validation, name, id);
+    validate_name(validation, name);
     if (destination.empty()) {
         add_error(validation, "destination", "Choose a project destination.");
     } else {
@@ -143,7 +243,7 @@ PromptValidation CreateProjectPrompt::validate() const {
     validation.summary = {
         "Document: ProjectManifest v2",
         "Project: " + (name.empty() ? std::string{"<unnamed>"} : name),
-        "Resource ID: " + (id.empty() ? std::string{"<missing>"} : id),
+        "Internal ID: " + resource_id().value + " (generated)",
         "Units: world units",
         "Scale preset: " + std::string(label(preset)),
         "Pixels per unit: " + std::to_string(pixels_per_unit),
@@ -152,10 +252,14 @@ PromptValidation CreateProjectPrompt::validate() const {
     return validation;
 }
 
+core::ResourceId CreateProjectPrompt::resource_id() const {
+    return generated_resource_id(name, "project");
+}
+
 project::ProjectManifest CreateProjectPrompt::manifest() const {
     return project::ProjectManifest{
         .schema_version = project::current_schema_version,
-        .id = {.value = id},
+        .id = resource_id(),
         .name = name,
         .pixels_per_unit = pixels_per_unit,
         .directories = {},
@@ -178,7 +282,8 @@ PromptValidation ImportSourcePrompt::validate(
     const ImportSourceKind kind, const std::filesystem::path& project_root,
     const project::ProjectManifest& manifest) const {
     PromptValidation validation;
-    validate_identity(validation, name, id);
+    validate_name(validation, name);
+    const auto id = resource_id(project_root, manifest);
 
     std::string expected_extension;
     std::filesystem::path directory;
@@ -195,7 +300,8 @@ PromptValidation ImportSourcePrompt::validate(
         document_suffix = ".vector.json";
         break;
     }
-    validation.destination = project_root / directory / (id + document_suffix);
+    validation.destination = project_root / directory /
+                             (id.value + document_suffix);
 
     std::error_code error;
     if (source.empty()) {
@@ -215,20 +321,23 @@ PromptValidation ImportSourcePrompt::validate(
                       "The selected file extension does not match this import.");
         }
     }
-    if (core::ResourceId::is_valid(id) &&
-        identifier_conflicts(project_root, manifest, id)) {
-        add_error(validation, "id",
-                  "This resource ID is already registered in the project.");
-    }
     validation.summary = {
         "Operation: Import",
         "Source type: " + std::string(label(kind)),
         "Source: " + (source.empty() ? std::string{"<missing>"}
                                       : source.generic_string()),
-        "Resource ID: " + (id.empty() ? std::string{"<missing>"} : id),
+        "Internal ID: " + id.value + " (generated)",
         "Publish to: " + validation.destination.generic_string(),
     };
     return validation;
+}
+
+core::ResourceId ImportSourcePrompt::resource_id(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    const auto visible_name = blank(name) ? source.stem().string() : name;
+    return available_resource_id(
+        project_root, manifest, generated_resource_id(visible_name));
 }
 
 std::string_view label(const ArtworkOrigin origin) noexcept {
@@ -265,9 +374,10 @@ PromptValidation CreateVectorArtworkPrompt::validate(
     const std::filesystem::path& project_root,
     const project::ProjectManifest& manifest) const {
     PromptValidation validation;
+    const auto id = resource_id(project_root, manifest);
     validation.destination = project_root / manifest.directories.assets /
-                             "vectors" / (id + ".vector.json");
-    validate_identity(validation, name, id);
+                             "vectors" / (id.value + ".vector.json");
+    validate_name(validation, name);
     if (!std::isfinite(width) || width <= 0.0 ||
         width > maximum_working_size) {
         add_error(validation, "width",
@@ -328,15 +438,10 @@ PromptValidation CreateVectorArtworkPrompt::validate(
                       "Image opacity must be a finite value from 0 to 1.");
         }
     }
-    if (core::ResourceId::is_valid(id) &&
-        identifier_conflicts(project_root, manifest, id)) {
-        add_error(validation, "id",
-                  "This resource ID is already registered in the project.");
-    }
     validation.summary = {
         "Document: native VectorAsset v2 creation intent",
         "Artwork: " + (name.empty() ? std::string{"<unnamed>"} : name),
-        "Resource ID: " + (id.empty() ? std::string{"<missing>"} : id),
+        "Internal ID: " + id.value + " (generated)",
         "Working size: " + std::to_string(width) + " x " +
             std::to_string(height) + " world units",
         "Origin: " + std::string(label(origin)),
@@ -355,6 +460,13 @@ PromptValidation CreateVectorArtworkPrompt::validate(
                  (deform_image_with_shape ? "yes" : "no")});
     }
     return validation;
+}
+
+core::ResourceId CreateVectorArtworkPrompt::resource_id(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    return available_resource_id(
+        project_root, manifest, generated_resource_id(name, "artwork"));
 }
 
 } // namespace fabric::editor

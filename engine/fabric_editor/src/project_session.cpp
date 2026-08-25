@@ -248,7 +248,7 @@ bool ProjectSession::create_vector_artwork(
         .document = {
             .schema_version = project::current_vector_schema_version,
             .type = "vector",
-            .id = {.value = prompt.id},
+            .id = prompt.resource_id(project_root_, *manifest_),
             .name = prompt.name,
         },
         .source_kind = project::VectorSourceKind::native,

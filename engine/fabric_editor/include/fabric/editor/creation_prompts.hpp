@@ -43,13 +43,13 @@ enum class ProjectScalePreset {
 struct CreateProjectPrompt {
     std::filesystem::path destination;
     std::string name;
-    std::string id;
     ProjectScalePreset preset{ProjectScalePreset::standard};
     double pixels_per_unit{project::default_pixels_per_unit};
 
     void reset() noexcept;
     void select_preset(ProjectScalePreset selected) noexcept;
     [[nodiscard]] PromptValidation validate() const;
+    [[nodiscard]] core::ResourceId resource_id() const;
     [[nodiscard]] project::ProjectManifest manifest() const;
 };
 
@@ -63,11 +63,13 @@ enum class ImportSourceKind {
 struct ImportSourcePrompt {
     std::filesystem::path source;
     std::string name;
-    std::string id;
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(
         ImportSourceKind kind,
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id(
         const std::filesystem::path& project_root,
         const project::ProjectManifest& manifest) const;
 };
@@ -95,7 +97,6 @@ enum class InitialFill {
 
 struct CreateVectorArtworkPrompt {
     std::string name;
-    std::string id;
     double width{10.0};
     double height{10.0};
     ArtworkOrigin origin{ArtworkOrigin::center};
@@ -112,6 +113,13 @@ struct CreateVectorArtworkPrompt {
     [[nodiscard]] PromptValidation validate(
         const std::filesystem::path& project_root,
         const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
 };
+
+[[nodiscard]] core::ResourceId generated_resource_id(
+    std::string_view visible_name,
+    std::string_view fallback = "resource");
 
 } // namespace fabric::editor

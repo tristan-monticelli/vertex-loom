@@ -70,7 +70,6 @@ TEST_CASE("project creation prompt exposes typed defaults and exact output") {
     fabric::editor::CreateProjectPrompt prompt;
     prompt.destination = parent.path() / "new-project";
     prompt.name = "Needlework";
-    prompt.id = "needlework";
 
     const auto validation = prompt.validate();
     REQUIRE(validation.ok());
@@ -81,20 +80,25 @@ TEST_CASE("project creation prompt exposes typed defaults and exact output") {
               validation.destination.generic_string()) != std::string::npos);
 }
 
+TEST_CASE("visible names produce stable internal identifiers") {
+    CHECK(fabric::editor::generated_resource_id("  Épée d'Œuvre  ").value ==
+          "epee-d-oeuvre");
+    CHECK(fabric::editor::generated_resource_id("日本語", "artwork").value ==
+          "artwork");
+}
+
 TEST_CASE("project prompt reports field errors without publishing") {
     TemporaryDirectory occupied;
     std::ofstream{occupied.path() / "keep.txt"} << "keep";
     fabric::editor::CreateProjectPrompt prompt;
     prompt.destination = occupied.path();
     prompt.name = "   ";
-    prompt.id = "Invalid ID";
     prompt.pixels_per_unit = 0.0;
 
     const auto validation = prompt.validate();
     CHECK_FALSE(validation.ok());
     CHECK(validation.error_for("destination").has_value());
     CHECK(validation.error_for("name").has_value());
-    CHECK(validation.error_for("id").has_value());
     CHECK(validation.error_for("pixelsPerUnit").has_value());
     CHECK_FALSE(std::filesystem::exists(occupied.path() / "project.json"));
 }
@@ -117,7 +121,6 @@ TEST_CASE("source import prompts validate type destination and conflict before i
     fabric::editor::ImportSourcePrompt prompt{
         .source = source,
         .name = "Fabric fill",
-        .id = "fabric-fill",
     };
 
     const auto valid = prompt.validate(
@@ -133,22 +136,23 @@ TEST_CASE("source import prompts validate type destination and conflict before i
     const auto conflict = prompt.validate(
         fabric::editor::ImportSourceKind::png_image, project.path(),
         manifest());
-    CHECK(conflict.error_for("id").has_value());
+    REQUIRE(conflict.ok());
+    CHECK(prompt.resource_id(project.path(), manifest()).value ==
+          "fabric-fill-2");
+    CHECK(conflict.destination ==
+          project.path() / "assets/textures/fabric-fill-2.texture.json");
 }
 
 TEST_CASE("different import prompts never share or retain cancelled state") {
     fabric::editor::ImportSourcePrompt png;
     fabric::editor::ImportSourcePrompt svg;
     png.name = "PNG state";
-    png.id = "png-state";
     svg.name = "SVG state";
-    svg.id = "svg-state";
 
     png.reset();
     CHECK(png.name.empty());
-    CHECK(png.id.empty());
     CHECK(svg.name == "SVG state");
-    CHECK(svg.id == "svg-state");
+    CHECK(fabric::editor::generated_resource_id(svg.name).value == "svg-state");
 }
 
 TEST_CASE("vector artwork prompt validates dimensions and resource conflicts") {
@@ -157,18 +161,16 @@ TEST_CASE("vector artwork prompt validates dimensions and resource conflicts") {
     std::ofstream{project.path() / "assets/vectors/occupied.vector.json"}
         << "{}";
     fabric::editor::CreateVectorArtworkPrompt prompt;
-    prompt.name = "Panel";
-    prompt.id = "occupied";
+    prompt.name = "Occupied";
     prompt.width = -1.0;
     prompt.initial_color.alpha = 2.0F;
 
     const auto validation = prompt.validate(project.path(), manifest());
     CHECK_FALSE(validation.ok());
-    CHECK(validation.error_for("id").has_value());
     CHECK(validation.error_for("width").has_value());
     CHECK(validation.error_for("initialFill").has_value());
     CHECK(validation.destination ==
-          project.path() / "assets/vectors/occupied.vector.json");
+          project.path() / "assets/vectors/occupied-2.vector.json");
 }
 
 TEST_CASE("project and artwork prompt states are isolated and cancellable") {
@@ -176,12 +178,12 @@ TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     fabric::editor::CreateVectorArtworkPrompt artwork_prompt;
     project_prompt.name = "Project state";
     artwork_prompt.name = "Artwork state";
-    artwork_prompt.id = "artwork-state";
 
     project_prompt.reset();
     CHECK(project_prompt.name.empty());
     CHECK(artwork_prompt.name == "Artwork state");
-    CHECK(artwork_prompt.id == "artwork-state");
+    CHECK(fabric::editor::generated_resource_id(artwork_prompt.name).value ==
+          "artwork-state");
 
     artwork_prompt.reset();
     CHECK(artwork_prompt.name.empty());
@@ -194,7 +196,6 @@ TEST_CASE("vector artwork image fill validates resource and adjustable mapping")
     write_texture_resource(project.path(), "woven-photo");
     fabric::editor::CreateVectorArtworkPrompt prompt;
     prompt.name = "Image panel";
-    prompt.id = "image-panel";
     prompt.initial_fill = fabric::editor::InitialFill::image;
     prompt.initial_image_id = "woven-photo";
     prompt.image_fit = fabric::project::VectorImageFit::cover;

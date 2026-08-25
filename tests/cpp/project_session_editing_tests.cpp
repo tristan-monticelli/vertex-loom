@@ -96,7 +96,6 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
     REQUIRE(session.open(project.path()));
     fabric::editor::CreateVectorArtworkPrompt prompt;
     prompt.name = "Centered ellipse";
-    prompt.id = "centered-ellipse";
     prompt.width = 12.0;
     prompt.height = 8.0;
     prompt.first_shape = fabric::editor::InitialShape::ellipse;
@@ -122,7 +121,6 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
         project.path() / "assets/vectors/centered-ellipse.svg"));
 
     prompt.name = "Transparent panel";
-    prompt.id = "transparent-panel";
     prompt.origin = fabric::editor::ArtworkOrigin::top_left;
     prompt.first_shape = fabric::editor::InitialShape::rectangle;
     prompt.initial_fill = fabric::editor::InitialFill::transparent;
@@ -149,7 +147,6 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
                 project.path(), *session.manifest(), texture, image_source)
                 .ok());
     prompt.name = "Image panel";
-    prompt.id = "image-panel";
     prompt.initial_fill = fabric::editor::InitialFill::image;
     prompt.initial_image_id = "image-fill";
     prompt.image_fit = fabric::project::VectorImageFit::free;
