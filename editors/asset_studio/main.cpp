@@ -43,6 +43,33 @@ enum class PreviewKind {
     vector,
 };
 
+enum class PendingSessionAction {
+    none,
+    create_project,
+    open_project,
+    quit,
+};
+
+#if defined(__APPLE__)
+constexpr const char* new_shortcut = "Cmd+N";
+constexpr const char* open_shortcut = "Cmd+O";
+constexpr const char* save_shortcut = "Cmd+S";
+constexpr const char* import_shortcut = "Cmd+I";
+constexpr const char* import_svg_shortcut = "Cmd+Shift+I";
+constexpr const char* quit_shortcut = "Cmd+Q";
+constexpr const char* undo_shortcut = "Cmd+Z";
+constexpr const char* redo_shortcut = "Cmd+Shift+Z";
+#else
+constexpr const char* new_shortcut = "Ctrl+N";
+constexpr const char* open_shortcut = "Ctrl+O";
+constexpr const char* save_shortcut = "Ctrl+S";
+constexpr const char* import_shortcut = "Ctrl+I";
+constexpr const char* import_svg_shortcut = "Ctrl+Shift+I";
+constexpr const char* quit_shortcut = "Ctrl+Q";
+constexpr const char* undo_shortcut = "Ctrl+Z";
+constexpr const char* redo_shortcut = "Ctrl+Shift+Z";
+#endif
+
 struct SourceImportFields {
     fabric::editor::ImportSourcePrompt prompt;
     bool attempted{false};
@@ -261,6 +288,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
+                    PendingSessionAction& pending_session_action,
+                    bool& running,
                     std::string& status) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -803,6 +832,57 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
+    const auto continue_session_action = [&] {
+        switch (pending_session_action) {
+        case PendingSessionAction::create_project:
+            creation.request_project = true;
+            break;
+        case PendingSessionAction::open_project:
+            request_open = true;
+            break;
+        case PendingSessionAction::quit:
+            running = false;
+            break;
+        case PendingSessionAction::none:
+            break;
+        }
+        pending_session_action = PendingSessionAction::none;
+    };
+    if (pending_session_action != PendingSessionAction::none) {
+        if (session.dirty()) {
+            ImGui::OpenPopup("Unsaved changes");
+        } else {
+            continue_session_action();
+        }
+    }
+    if (ImGui::BeginPopupModal("Unsaved changes", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("The current project has unsaved changes.");
+        ImGui::TextWrapped(
+            "Save them before replacing the project or closing Asset Studio?");
+        if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
+            if (session.save()) {
+                status = "Project saved.";
+                ImGui::CloseCurrentPopup();
+                continue_session_action();
+            } else {
+                status = "Save failed; inspect the diagnostics.";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Discard", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+            continue_session_action();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            pending_session_action = PendingSessionAction::none;
+            ImGui::CloseCurrentPopup();
+            status = "Action cancelled; unsaved changes kept.";
+        }
+        ImGui::EndPopup();
+    }
+
 }
 
 int run_asset_studio(const std::filesystem::path& initial_project) {
@@ -890,6 +970,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
+    PendingSessionAction pending_session_action = PendingSessionAction::none;
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
@@ -909,7 +990,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 (event.type == SDL_WINDOWEVENT &&
                  event.window.event == SDL_WINDOWEVENT_CLOSE &&
                  event.window.windowID == SDL_GetWindowID(window))) {
-                running = false;
+                pending_session_action = PendingSessionAction::quit;
             }
         }
 
@@ -919,16 +1000,16 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("New project...", "Ctrl+N")) {
-                    creation.request_project = true;
+                if (ImGui::MenuItem("New project...", new_shortcut)) {
+                    pending_session_action = PendingSessionAction::create_project;
                 }
-                if (ImGui::MenuItem("Open project...", "Ctrl+O")) {
+                if (ImGui::MenuItem("Open project...", open_shortcut)) {
                     if (session.has_project()) {
                         copy_path_to_buffer(session.project_root(), path_buffer);
                     }
-                    request_open = true;
+                    pending_session_action = PendingSessionAction::open_project;
                 }
-                if (ImGui::MenuItem("Save", "Ctrl+S", false,
+                if (ImGui::MenuItem("Save", save_shortcut, false,
                                     session.has_project())) {
                     status = session.save()
                         ? "Project saved."
@@ -946,11 +1027,11 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("Import", session.has_project())) {
-                    if (ImGui::MenuItem("PNG image source...", "Ctrl+I")) {
+                    if (ImGui::MenuItem("PNG image source...", import_shortcut)) {
                         request_png = true;
                     }
                     if (ImGui::MenuItem("Linked SVG source...",
-                                        "Ctrl+Shift+I")) {
+                                        import_svg_shortcut)) {
                         request_svg = true;
                     }
                     ImGui::EndMenu();
@@ -959,18 +1040,18 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 ImGui::MenuItem("Add existing...");
                 ImGui::EndDisabled();
                 ImGui::Separator();
-                if (ImGui::MenuItem("Quit", "Ctrl+Q")) {
-                    running = false;
+                if (ImGui::MenuItem("Quit", quit_shortcut)) {
+                    pending_session_action = PendingSessionAction::quit;
                 }
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Edit")) {
-                if (ImGui::MenuItem("Undo", "Ctrl+Z", false,
+                if (ImGui::MenuItem("Undo", undo_shortcut, false,
                                     session.can_undo())) {
                     static_cast<void>(session.undo());
                     status = "Change undone.";
                 }
-                if (ImGui::MenuItem("Redo", "Ctrl+Shift+Z", false,
+                if (ImGui::MenuItem("Redo", redo_shortcut, false,
                                     session.can_redo())) {
                     static_cast<void>(session.redo());
                     status = "Change redone.";
@@ -981,13 +1062,22 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             ImGui::EndMainMenuBar();
         }
         const auto& io = ImGui::GetIO();
-        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_O, false)) {
-            request_open = true;
+        #if defined(__APPLE__)
+        const bool command_modifier = io.KeySuper;
+        #else
+        const bool command_modifier = io.KeyCtrl;
+        #endif
+        const bool shortcuts_enabled =
+            !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_O, false)) {
+            pending_session_action = PendingSessionAction::open_project;
         }
-        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_N, false)) {
-            creation.request_project = true;
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_N, false)) {
+            pending_session_action = PendingSessionAction::create_project;
         }
-        if (io.KeyCtrl && session.has_project() &&
+        if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_I, false)) {
             if (io.KeyShift) {
                 request_svg = true;
@@ -995,21 +1085,22 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 request_png = true;
             }
         }
-        if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
-            running = false;
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
+            pending_session_action = PendingSessionAction::quit;
         }
-        if (io.KeyCtrl && session.has_project() &&
+        if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_S, false)) {
             status = session.save()
                 ? "Project saved."
                 : "Save failed; inspect the diagnostics.";
         }
-        if (io.KeyCtrl && !io.KeyShift &&
+        if (shortcuts_enabled && command_modifier && !io.KeyShift &&
             ImGui::IsKeyPressed(ImGuiKey_Z, false) && session.can_undo()) {
             static_cast<void>(session.undo());
             status = "Change undone.";
         }
-        if (io.KeyCtrl &&
+        if (shortcuts_enabled && command_modifier &&
             ((io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
              ImGui::IsKeyPressed(ImGuiKey_Y, false)) && session.can_redo()) {
             static_cast<void>(session.redo());
@@ -1017,7 +1108,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
 
         draw_workspace(session, window, path_buffer, creation, imports, preview,
-                       request_open, request_png, request_svg, status);
+                       request_open, request_png, request_svg,
+                       pending_session_action, running, status);
 
         const auto autosave_status = session.update_autosave();
         if (autosave_status == fabric::editor::AutosaveStatus::saved) {

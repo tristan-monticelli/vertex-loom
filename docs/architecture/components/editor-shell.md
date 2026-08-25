@@ -54,6 +54,8 @@ C4Component
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,
   `Discard` ou `Cancel` avant de remplacer la session.
+  `Cancel` et un échec de `Save` conservent la session et son historique ;
+  `Discard` n'abandonne l'état courant que si l'action suivante aboutit.
 - L’assistant d’artwork valide taille de travail, origine, unités, première
   forme et fill ; il résout seul les conflits d’identifiant. Un fill image référence une texture
   locale et expose cadrage, offset, rotation, échelle, opacité et suivi de la
