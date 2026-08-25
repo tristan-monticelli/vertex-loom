@@ -888,7 +888,8 @@ bool PreviewRuntime::run() {
             if (simulation != impl_->entity_simulations.end() &&
                 simulation->second.mesh &&
                 deformation_topology_matches(*simulation->second.mesh, packet)) {
-                const auto deformation = evaluate_instance_deformation(instance_id);
+                const auto deformation = evaluate_instance_deformation(
+                    instance_id, animation_time);
                 if (deformation && deformation->ok() &&
                     deformation->positions.size() == packet.fill_vertices.size()) {
                     for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index)
@@ -1073,6 +1074,12 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_anima
 
 std::optional<project::MeshDeformationResult>
 PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id) const {
+    return evaluate_instance_deformation(instance_id, 0.0F);
+}
+
+std::optional<project::MeshDeformationResult>
+PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id,
+                                              const float time) const {
     if (!impl_) return std::nullopt;
     const auto found = impl_->entity_simulations.find(instance_id);
     if (found == impl_->entity_simulations.end() || !found->second.mesh)
@@ -1084,7 +1091,29 @@ PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id) co
             result.positions.push_back(particle.position);
         return result;
     }
-    return project::deform_mesh(*found->second.mesh, found->second.poses);
+    auto poses = found->second.poses;
+    const auto animation = evaluate_instance_animation(instance_id, time);
+    if (animation && animation->ok()) {
+        for (const auto& property : animation->properties) {
+            const auto pose = std::find_if(poses.begin(), poses.end(),
+                [&](const auto& candidate) {
+                    return candidate.node_id == property.binding.node_id;
+                });
+            if (pose == poses.end() || property.binding.component_id != "transform")
+                continue;
+            if (property.binding.property_id == "position") {
+                if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                    pose->transform.position = *value;
+            } else if (property.binding.property_id == "rotationDegrees") {
+                if (const auto* value = std::get_if<float>(&property.value))
+                    pose->transform.rotation_degrees = *value;
+            } else if (property.binding.property_id == "scale") {
+                if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                    pose->transform.scale = *value;
+            }
+        }
+    }
+    return project::deform_mesh(*found->second.mesh, poses);
 }
 
 std::optional<project::XpbdSystem>

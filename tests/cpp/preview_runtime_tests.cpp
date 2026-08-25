@@ -199,6 +199,14 @@ fabric::project::MapDocument map_with_render_deformed_entity() {
     return result;
 }
 
+fabric::project::MapDocument map_with_animated_render_deformed_entity() {
+    auto result = map_with_render_deformed_entity();
+    result.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-animation"}, "animation"}});
+    return result;
+}
+
 fabric::project::EntityDefinition constrained_entity() {
     auto result = entity();
     result.document.id = {.value = "constrained-entity"};
@@ -491,6 +499,32 @@ TEST_CASE("preview runtime resolves ordered entity constraints before deformatio
     REQUIRE(deformation->ok());
     REQUIRE(deformation->positions.size() == 1U);
     CHECK(deformation->positions.front() == fabric::core::Vec2{3.0F, 4.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime applies animation transforms to deformation poses") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-animated-deformation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_animated_render_deformed_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+    auto source = render_deformed_entity();
+    REQUIRE(fabric::project::publish_entity(root, manifest(), source).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto deformation = runtime.evaluate_instance_deformation("deformed", 0.5F);
+    REQUIRE(deformation.has_value());
+    REQUIRE(deformation->ok());
+    REQUIRE(deformation->positions.size() == 4U);
+    CHECK(deformation->positions.front() == fabric::core::Vec2{0.0F, 1.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

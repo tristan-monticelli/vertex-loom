@@ -83,6 +83,8 @@ public:
         const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::MeshDeformationResult>
     evaluate_instance_deformation(const std::string& instance_id) const;
+    [[nodiscard]] std::optional<project::MeshDeformationResult>
+    evaluate_instance_deformation(const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::XpbdSystem>
     instance_xpbd_state(const std::string& instance_id) const;
 

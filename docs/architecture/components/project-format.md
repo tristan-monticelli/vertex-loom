@@ -75,7 +75,9 @@ C4Component
   d’un clip est disponible par identifiant et instant. Une instance de map peut
   le sélectionner via la propriété `animation`, directement ou par override de
   prefab ; le runtime applique alors les pistes de transformation et de
-  matériau supportées.
+  matériau supportées. Les pistes `transform` sont aussi appliquées aux poses
+  de déformation avant l’évaluation du maillage, avec une API headless pouvant
+  évaluer à un instant donné.
 - `PropertyDescriptorRegistry` décrit les propriétés exposées par les
   composants, résout les bindings stables et filtre les propriétés animables
   et inscriptibles pour les outils d’édition.

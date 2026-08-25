@@ -379,6 +379,8 @@ inspectable avec collisions et événements.
   packets d’une instance liée.
 - [x] Appliquer couleur et opacité des pistes `material` aux draw packets
   vectoriels d’une instance liée.
+- [x] Appliquer les pistes `transform` aux poses de déformation avant le calcul
+  des sommets animés.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
