@@ -9,8 +9,12 @@
 
 #include <filesystem>
 #include <algorithm>
+#include <cstdint>
 #include <iostream>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -20,6 +24,50 @@ void draw_errors(const fabric::editor::MapSession& session) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
         ImGui::TextWrapped("%s: %s", error.field.c_str(), error.message.c_str());
         ImGui::PopStyleColor();
+    }
+}
+
+std::optional<fabric::project::MapPropertyValue> parse_override_value(
+    const int kind, const std::string_view text) {
+    try {
+        switch (kind) {
+        case 0:
+            if (text == "true") return true;
+            if (text == "false") return false;
+            return std::nullopt;
+        case 1: {
+            std::size_t consumed = 0;
+            const auto value = std::stoll(std::string{text}, &consumed);
+            if (consumed != text.size()) return std::nullopt;
+            return static_cast<std::int64_t>(value);
+        }
+        case 2: {
+            std::size_t consumed = 0;
+            const auto value = std::stof(std::string{text}, &consumed);
+            if (consumed != text.size()) return std::nullopt;
+            return value;
+        }
+        case 3:
+            return std::string{text};
+        case 4: {
+            const auto separator = text.find(',');
+            if (separator == std::string_view::npos) return std::nullopt;
+            std::size_t consumed_x = 0;
+            std::size_t consumed_y = 0;
+            const auto x = std::stof(std::string{text.substr(0, separator)}, &consumed_x);
+            const auto y = std::stof(std::string{text.substr(separator + 1)}, &consumed_y);
+            if (consumed_x != separator || consumed_y != text.size() - separator - 1U)
+                return std::nullopt;
+            return fabric::core::Vec2{x, y};
+        }
+        case 5:
+            if (text.empty()) return std::nullopt;
+            return fabric::project::ResourceReference{{.value = std::string{text}}, "resource"};
+        default:
+            return std::nullopt;
+        }
+    } catch (const std::exception&) {
+        return std::nullopt;
     }
 }
 
@@ -76,6 +124,10 @@ int run(const std::filesystem::path& project_root,
     }
     std::string event_id;
     std::vector<std::string> selected_instances;
+    std::string selected_prefab;
+    std::string override_id;
+    std::string override_value;
+    int override_kind = 2;
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -200,6 +252,33 @@ int run(const std::filesystem::path& project_root,
             ImGui::SeparatorText("Triggers");
             for (const auto& trigger : map.triggers)
                 ImGui::BulletText("%s -> %s", trigger.id.c_str(), trigger.event_id.value.c_str());
+            ImGui::SeparatorText("Prefab overrides");
+            for (const auto& prefab : map.prefabs) {
+                const auto selected = selected_prefab == prefab.id;
+                if (ImGui::Selectable(prefab.id.c_str(), selected)) selected_prefab = prefab.id;
+            }
+            if (!selected_prefab.empty()) {
+                ImGui::Text("Selected prefab: %s", selected_prefab.c_str());
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Property id", &override_id);
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::Combo("Type", &override_kind,
+                             "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Value", &override_value);
+                ImGui::BeginDisabled(override_id.empty() || override_value.empty());
+                if (ImGui::Button("Apply override")) {
+                    const auto value = parse_override_value(override_kind, override_value);
+                    const auto applied = value && session.set_prefab_override(
+                        {.value = selected_prefab}, {override_id, *value});
+                    status = applied ? "Prefab override applied" : "Prefab override rejected";
+                    if (applied) {
+                        override_id.clear();
+                        override_value.clear();
+                    }
+                }
+                ImGui::EndDisabled();
+            }
             ImGui::Columns(1);
             if (!status.empty()) ImGui::TextDisabled("%s", status.c_str());
             draw_errors(session);

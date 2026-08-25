@@ -260,6 +260,9 @@ même résultat visible après sauvegarde, rechargement et replay.
   des instances et prefabs ; profondeur, sélection, visibilité et verrouillage
   des calques sont maintenant commandables, avec translation multi-sélection
   atomique, verrouillage effectif, duplication et réordonnancement.
+
+Map Studio expose maintenant un formulaire typé pour éditer les overrides de
+prefabs : booléen, entier, réel, texte, `Vec2` et référence de ressource.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à
