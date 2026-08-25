@@ -278,6 +278,8 @@ Les points des polygones et chaînes sont également éditables, ajoutables et
 supprimables en respectant leur nombre minimal.
 Les poignées de points du canvas permettent en plus de déplacer directement
 un sommet sélectionné, avec un commit atomique.
+Les triggers sont maintenant sélectionnables, éditables (événement et
+collision référencée) et annotés dans le canvas avec le nom de leur événement.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

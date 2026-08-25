@@ -355,6 +355,26 @@ bool MapSession::remove_trigger(const core::ResourceId& trigger_id) {
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::set_trigger(const std::size_t trigger_index,
+                             project::TriggerDefinition trigger) {
+    if (!map_ || trigger_index >= map_->triggers.size() ||
+        !core::ResourceId::is_valid(trigger.id) ||
+        !find_event(*map_, trigger.event_id) ||
+        trigger.collision_index >= map_->collisions.size()) return false;
+    const auto layer = find_layer(*map_, {.value = trigger.layer_id});
+    if (layer && map_->layers[*layer].locked) return false;
+    auto next = *map_;
+    const auto duplicate = std::find_if(next.triggers.begin(), next.triggers.end(),
+        [&](const auto& candidate) {
+            return candidate.id == trigger.id &&
+                   candidate.id != next.triggers[trigger_index].id;
+        });
+    if (duplicate != next.triggers.end()) return false;
+    next.triggers[trigger_index] = std::move(trigger);
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_collision_shape(const std::size_t collision_index,
                                      project::CollisionShape shape) {
     if (!map_ || collision_index >= map_->collisions.size()) return false;

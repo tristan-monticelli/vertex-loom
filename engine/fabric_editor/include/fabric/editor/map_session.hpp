@@ -51,6 +51,8 @@ public:
     [[nodiscard]] bool remove_event(const core::ResourceId& event_id);
     [[nodiscard]] bool add_trigger(project::TriggerDefinition trigger);
     [[nodiscard]] bool remove_trigger(const core::ResourceId& trigger_id);
+    [[nodiscard]] bool set_trigger(std::size_t trigger_index,
+                                   project::TriggerDefinition trigger);
     [[nodiscard]] bool set_collision_shape(std::size_t collision_index,
                                            project::CollisionShape shape);
     [[nodiscard]] bool undo();

@@ -189,6 +189,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      CanvasGizmoState& gizmo,
                      int selected_collision_index,
                      CollisionPointGizmoState& point_gizmo,
+                     int selected_trigger_index,
                      fabric::editor::MapSnapSettings& snapping,
                      std::string& status) {
     if (!session.map()) return;
@@ -335,6 +336,28 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                                       IM_COL32(250, 210, 90, 255));
             }
         }
+    }
+    for (std::size_t trigger_index = 0; trigger_index < map.triggers.size(); ++trigger_index) {
+        const auto& trigger = map.triggers[trigger_index];
+        if (trigger.collision_index >= map.collisions.size()) continue;
+        const auto& collision = map.collisions[trigger.collision_index];
+        if (!layer_visible(map, collision.layer_id)) continue;
+        fabric::core::Vec2 anchor = collision.center;
+        if (!collision.points.empty()) {
+            anchor = {};
+            for (const auto point : collision.points) {
+                anchor.x += point.x;
+                anchor.y += point.y;
+            }
+            const auto count = static_cast<float>(collision.points.size());
+            anchor.x /= count;
+            anchor.y /= count;
+        }
+        const auto label_position = world_to_screen(anchor);
+        const auto color = static_cast<int>(trigger_index) == selected_trigger_index
+            ? IM_COL32(255, 240, 100, 255) : IM_COL32(160, 220, 255, 230);
+        draw->AddText({label_position.x + 8.0F, label_position.y + 8.0F}, color,
+                      trigger.event_id.value.c_str());
     }
     for (const auto& instance : map.instances) {
         if (!layer_visible(map, instance.layer_id)) continue;
@@ -579,6 +602,10 @@ int run(const std::filesystem::path& project_root,
     int selected_collision_index = -1;
     int collision_editor_index = -1;
     fabric::project::CollisionShape collision_editor;
+    int selected_trigger_index = -1;
+    int trigger_editor_index = -1;
+    int trigger_editor_collision_index = 0;
+    fabric::project::TriggerDefinition trigger_editor;
     std::vector<std::string> selected_instances;
     std::string selected_prefab;
     std::string override_id;
@@ -697,8 +724,8 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
-                            selected_collision_index, collision_point_gizmo, canvas_snapping,
-                            status);
+                            selected_collision_index, collision_point_gizmo,
+                            selected_trigger_index, canvas_snapping, status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
@@ -783,10 +810,15 @@ int run(const std::filesystem::path& project_root,
             for (const auto& event_definition : map.events)
                 ImGui::BulletText("%s", event_definition.id.value.c_str());
             ImGui::SeparatorText("Triggers");
-            for (const auto& trigger : map.triggers) {
-                ImGui::PushID(trigger.id.c_str());
-                ImGui::BulletText("%s -> %s (collision %zu)", trigger.id.c_str(),
-                                  trigger.event_id.value.c_str(), trigger.collision_index);
+            for (std::size_t trigger_index = 0; trigger_index < map.triggers.size();
+                 ++trigger_index) {
+                const auto& trigger = map.triggers[trigger_index];
+                ImGui::PushID(static_cast<int>(trigger_index));
+                const auto label = trigger.id + " -> " + trigger.event_id.value +
+                                   " (collision " + std::to_string(trigger.collision_index) + ")";
+                if (ImGui::Selectable(label.c_str(), selected_trigger_index ==
+                                      static_cast<int>(trigger_index)))
+                    selected_trigger_index = static_cast<int>(trigger_index);
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Remove")) {
                     status = session.remove_trigger({.value = trigger.id})
@@ -814,6 +846,32 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            if (selected_trigger_index >= 0 &&
+                static_cast<std::size_t>(selected_trigger_index) < map.triggers.size()) {
+                if (trigger_editor_index != selected_trigger_index) {
+                    trigger_editor_index = selected_trigger_index;
+                    trigger_editor = map.triggers[static_cast<std::size_t>(selected_trigger_index)];
+                    trigger_editor_collision_index =
+                        static_cast<int>(trigger_editor.collision_index);
+                }
+                ImGui::SeparatorText("Selected trigger");
+                ImGui::Text("Id: %s", trigger_editor.id.c_str());
+                ImGui::SetNextItemWidth(220.0F);
+                ImGui::InputText("Event id", &trigger_editor.event_id.value);
+                ImGui::SetNextItemWidth(220.0F);
+                ImGui::InputInt("Collision index", &trigger_editor_collision_index);
+                ImGui::BeginDisabled(trigger_editor_collision_index < 0 ||
+                                     trigger_editor.event_id.value.empty());
+                if (ImGui::Button("Apply trigger")) {
+                    trigger_editor.collision_index = static_cast<std::size_t>(
+                        trigger_editor_collision_index);
+                    const auto applied = session.set_trigger(
+                        static_cast<std::size_t>(selected_trigger_index), trigger_editor);
+                    status = applied ? "Trigger updated" :
+                                       "Trigger update rejected (event, collision or layer)";
+                }
+                ImGui::EndDisabled();
+            }
             if (selected_instances.size() == 1U) {
                 const fabric::core::ResourceId selected_id{selected_instances.front()};
                 ImGui::SeparatorText("Selected instance properties");

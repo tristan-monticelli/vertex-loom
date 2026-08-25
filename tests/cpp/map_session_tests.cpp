@@ -64,8 +64,15 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE_FALSE(session.add_trigger({"invalid-collision", "triggers", 4,
                                        {.value = "on-enter"}, {}}));
     REQUIRE_FALSE(session.remove_event({.value = "on-enter"}));
+    REQUIRE(session.declare_event({{.value = "on-exit"}, {}}));
+    auto trigger = session.map()->triggers.front();
+    trigger.event_id = {.value = "on-exit"};
+    REQUIRE(session.set_trigger(0, trigger));
+    CHECK(session.map()->triggers.front().event_id.value == "on-exit");
+    REQUIRE(session.undo());
     REQUIRE(session.remove_trigger({.value = "enter"}));
     REQUIRE(session.remove_event({.value = "on-enter"}));
+    REQUIRE(session.remove_event({.value = "on-exit"}));
     auto collision = session.map()->collisions.front();
     collision.center = {3.0F, 4.0F};
     collision.radius = 2.0F;
