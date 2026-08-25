@@ -1,5 +1,6 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 
+#define SDL_MAIN_HANDLED
 #include <SDL.h>
 #include <SDL_opengl.h>
 
