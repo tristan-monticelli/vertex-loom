@@ -60,7 +60,9 @@ C4Component
   transform UV, texture optionnelle et motif vectoriel optionnel.
 - `EntityDefinition v1` est stocké sous `entities/<id>.entity.json` et porte
   des nœuds stables, parentage, transform, ordre Z, drawable vectoriel ou
-  texture et matériau optionnel.
+  texture, matériau optionnel et contraintes d’animation ordonnées. Les
+  contraintes référencent uniquement des nœuds de la même entité et sont
+  validées contre les cycles, doublons d’ordre et nœuds manquants.
 - `AnimationClip v1` est stocké sous
   `assets/animations/<id>.animation.json`. Il porte une durée, une boucle,
   des markers et des pistes liées par `nodeId + componentId + propertyId`.

@@ -17,6 +17,7 @@ struct AnimationConstraint {
     bool constrain_position{true};
     bool constrain_rotation{true};
     bool constrain_scale{true};
+    friend bool operator==(const AnimationConstraint&, const AnimationConstraint&) = default;
 };
 
 [[nodiscard]] ValidationReport validate_animation_constraints(

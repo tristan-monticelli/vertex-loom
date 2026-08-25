@@ -2,6 +2,7 @@
 
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/animation_constraints.hpp"
 #include "fabric/core/types.hpp"
 
 #include <filesystem>
@@ -40,6 +41,7 @@ struct EntityDefinition {
         .type = "entity",
     };
     std::vector<EntityNode> nodes;
+    std::vector<AnimationConstraint> constraints;
     friend bool operator==(const EntityDefinition&, const EntityDefinition&) = default;
 };
 

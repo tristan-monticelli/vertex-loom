@@ -109,4 +109,25 @@ TEST_CASE("material and entity references retain their expected types") {
         manifest(), invalid_entity).ok());
 }
 
+TEST_CASE("entity constraints round-trip and require existing nodes") {
+    auto source = entity();
+    source.constraints.push_back({
+        .id = "copy-root-child",
+        .kind = fabric::project::AnimationConstraintKind::copy_transform,
+        .target_node = "child",
+        .source_node = "root",
+        .order = 1,
+        .constrain_position = true,
+        .constrain_rotation = false,
+        .constrain_scale = true});
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.entity == source);
+
+    auto invalid = source;
+    invalid.constraints.front().source_node = "missing";
+    REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
+}
+
 } // namespace
