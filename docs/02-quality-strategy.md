@@ -90,6 +90,8 @@ booléennes/numériques, exit time, priorité déterministe et rejet des endpoin
 ou identifiants invalides.
 Les contraintes couvrent tri par ordre explicite, types supportés, dépendances
 source/cible et rejet des cycles.
+FABRIK couvre convergence déterministe, racine fixe, cible hors de portée,
+chaîne dégénérée, tolérance et nombre maximal d’itérations.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts
