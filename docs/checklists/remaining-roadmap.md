@@ -291,6 +291,8 @@ ressource `entity` ou `prefab`, puis de créer l’instance au clic dans le
 canvas avec snapping et historique.
 `Ctrl + clic` duplique directement l’instance sélectionnée à la position du
 curseur, en conservant le snapping et l’historique déterministe.
+Un glisser dans le canvas sélectionne maintenant les instances visibles dans
+un rectangle ; Shift ajoute ou retire la zone de la sélection existante.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

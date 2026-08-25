@@ -138,6 +138,13 @@ struct CollisionPointGizmoState {
     fabric::core::Vec2 preview_point{};
 };
 
+struct SelectionBoxState {
+    bool active{};
+    bool append{};
+    ImVec2 start_mouse{};
+    ImVec2 current_mouse{};
+};
+
 void draw_transform_editor(fabric::editor::MapSession& session,
                            const std::vector<std::string>& selected_instances,
                            TransformEditorState& state,
@@ -191,6 +198,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      CollisionPointGizmoState& point_gizmo,
                      int selected_trigger_index,
                      const std::string& active_layer_id,
+                     SelectionBoxState& selection_box,
                      bool& placement_mode,
                      std::string& placement_id,
                      std::string& placement_resource_id,
@@ -397,6 +405,18 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     draw->AddRect(canvas_pos,
                   {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
                   IM_COL32(130, 140, 155, 255));
+    if (selection_box.active) {
+        const ImVec2 minimum{std::min(selection_box.start_mouse.x,
+                                      selection_box.current_mouse.x),
+                             std::min(selection_box.start_mouse.y,
+                                      selection_box.current_mouse.y)};
+        const ImVec2 maximum{std::max(selection_box.start_mouse.x,
+                                      selection_box.current_mouse.x),
+                             std::max(selection_box.start_mouse.y,
+                                      selection_box.current_mouse.y)};
+        draw->AddRectFilled(minimum, maximum, IM_COL32(80, 160, 240, 35));
+        draw->AddRect(minimum, maximum, IM_COL32(100, 190, 255, 220));
+    }
 
     if (hovered) {
         const auto& io = ImGui::GetIO();
@@ -558,7 +578,70 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 gizmo.instance_id.clear();
             }
         }
-        if (!gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if (!gizmo.active && !point_gizmo.active && !placement_mode &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyCtrl) {
+            selection_box.active = true;
+            selection_box.append = io.KeyShift;
+            selection_box.start_mouse = io.MousePos;
+            selection_box.current_mouse = io.MousePos;
+        }
+        if (selection_box.active) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                selection_box.current_mouse = io.MousePos;
+            } else {
+                const auto start = screen_to_world(selection_box.start_mouse);
+                const auto end = screen_to_world(selection_box.current_mouse);
+                const auto min_x = std::min(start.x, end.x);
+                const auto max_x = std::max(start.x, end.x);
+                const auto min_y = std::min(start.y, end.y);
+                const auto max_y = std::max(start.y, end.y);
+                const auto width = std::abs(selection_box.current_mouse.x -
+                                            selection_box.start_mouse.x);
+                const auto height = std::abs(selection_box.current_mouse.y -
+                                             selection_box.start_mouse.y);
+                if (width >= 5.0F || height >= 5.0F) {
+                    if (!selection_box.append) selected_instances.clear();
+                    for (const auto& instance : map.instances) {
+                        if (!layer_visible(map, instance.layer_id)) continue;
+                        const auto& position = instance.transform.position;
+                        if (position.x >= min_x && position.x <= max_x &&
+                            position.y >= min_y && position.y <= max_y &&
+                            std::find(selected_instances.begin(), selected_instances.end(),
+                                      instance.id) == selected_instances.end())
+                            selected_instances.push_back(instance.id);
+                    }
+                    status = "Rectangle selection changed";
+                } else {
+                    const auto world = screen_to_world(selection_box.start_mouse);
+                    auto hit = map.instances.end();
+                    float best_distance = 12.0F / zoom;
+                    for (auto candidate = map.instances.begin(); candidate != map.instances.end();
+                         ++candidate) {
+                        if (!layer_visible(map, candidate->layer_id)) continue;
+                        const auto dx = candidate->transform.position.x - world.x;
+                        const auto dy = candidate->transform.position.y - world.y;
+                        const auto distance = std::sqrt(dx * dx + dy * dy);
+                        if (distance <= best_distance) {
+                            best_distance = distance;
+                            hit = candidate;
+                        }
+                    }
+                    if (!selection_box.append) selected_instances.clear();
+                    if (hit != map.instances.end()) {
+                        const auto existing = std::find(selected_instances.begin(),
+                                                        selected_instances.end(), hit->id);
+                        if (selection_box.append && existing != selected_instances.end())
+                            selected_instances.erase(existing);
+                        else if (existing == selected_instances.end())
+                            selected_instances.push_back(hit->id);
+                        status = "Canvas selection changed";
+                    }
+                }
+                selection_box.active = false;
+            }
+        }
+        if (!gizmo.active && !selection_box.active &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             const auto world = screen_to_world(io.MousePos);
             auto hit = map.instances.end();
             float best_distance = 12.0F / zoom;
@@ -674,6 +757,7 @@ int run(const std::filesystem::path& project_root,
     float canvas_zoom = 1.0F;
     CanvasGizmoState canvas_gizmo;
     CollisionPointGizmoState collision_point_gizmo;
+    SelectionBoxState selection_box;
     fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
     bool running = true;
@@ -807,7 +891,8 @@ int run(const std::filesystem::path& project_root,
             ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
-                            selected_trigger_index, active_layer_id, placement_mode,
+                            selected_trigger_index, active_layer_id, selection_box,
+                            placement_mode,
                             placement_id, placement_resource_id, placement_kind,
                             canvas_snapping, status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
