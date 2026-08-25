@@ -263,6 +263,8 @@ même résultat visible après sauvegarde, rechargement et replay.
 
 Map Studio expose maintenant un formulaire typé pour éditer les overrides de
 prefabs : booléen, entier, réel, texte, `Vec2` et référence de ressource.
+Les propriétés effectives d’une instance prefab sont visibles et les valeurs
+locales peuvent remplacer un override hérité depuis le même panneau.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

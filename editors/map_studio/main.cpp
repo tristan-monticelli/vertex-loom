@@ -12,9 +12,11 @@
 #include <cstdint>
 #include <iostream>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace {
@@ -69,6 +71,19 @@ std::optional<fabric::project::MapPropertyValue> parse_override_value(
     } catch (const std::exception&) {
         return std::nullopt;
     }
+}
+
+std::string property_value_text(const fabric::project::MapPropertyValue& value) {
+    return std::visit([](const auto& item) -> std::string {
+        using Value = std::decay_t<decltype(item)>;
+        if constexpr (std::is_same_v<Value, bool>) return item ? "true" : "false";
+        else if constexpr (std::is_same_v<Value, std::int64_t>) return std::to_string(item);
+        else if constexpr (std::is_same_v<Value, float>) return std::to_string(item);
+        else if constexpr (std::is_same_v<Value, std::string>) return item;
+        else if constexpr (std::is_same_v<Value, fabric::core::Vec2>)
+            return std::to_string(item.x) + "," + std::to_string(item.y);
+        else return item.id.value;
+    }, value);
 }
 
 int run(const std::filesystem::path& project_root,
@@ -128,6 +143,9 @@ int run(const std::filesystem::path& project_root,
     std::string override_id;
     std::string override_value;
     int override_kind = 2;
+    std::string instance_property_id;
+    std::string instance_property_value;
+    int instance_property_kind = 2;
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -252,6 +270,33 @@ int run(const std::filesystem::path& project_root,
             ImGui::SeparatorText("Triggers");
             for (const auto& trigger : map.triggers)
                 ImGui::BulletText("%s -> %s", trigger.id.c_str(), trigger.event_id.value.c_str());
+            if (selected_instances.size() == 1U) {
+                const fabric::core::ResourceId selected_id{selected_instances.front()};
+                ImGui::SeparatorText("Selected instance properties");
+                for (const auto& property : session.effective_instance_properties(selected_id))
+                    ImGui::BulletText("%s = %s", property.id.c_str(),
+                                      property_value_text(property.value).c_str());
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Instance property id", &instance_property_id);
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::Combo("Instance type", &instance_property_kind,
+                             "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Instance value", &instance_property_value);
+                ImGui::BeginDisabled(instance_property_id.empty() || instance_property_value.empty());
+                if (ImGui::Button("Apply instance property")) {
+                    const auto value = parse_override_value(instance_property_kind,
+                                                             instance_property_value);
+                    const auto applied = value && session.set_instance_property(
+                        selected_id, {instance_property_id, *value});
+                    status = applied ? "Instance property applied" : "Instance property rejected";
+                    if (applied) {
+                        instance_property_id.clear();
+                        instance_property_value.clear();
+                    }
+                }
+                ImGui::EndDisabled();
+            }
             ImGui::SeparatorText("Prefab overrides");
             for (const auto& prefab : map.prefabs) {
                 const auto selected = selected_prefab == prefab.id;

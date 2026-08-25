@@ -294,6 +294,26 @@ bool MapSession::set_prefab_override(const core::ResourceId& prefab_id,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+std::vector<project::MapProperty> MapSession::effective_instance_properties(
+    const core::ResourceId& instance_id) const {
+    if (!map_) return {};
+    const auto instance_index = find_instance(*map_, instance_id);
+    if (!instance_index) return {};
+    const auto& instance = map_->instances[*instance_index];
+    std::vector<project::MapProperty> result;
+    if (instance.prefab) {
+        const auto prefab = find_prefab(*map_, instance.prefab->id);
+        if (prefab) result = map_->prefabs[*prefab].overrides;
+    }
+    for (const auto& property : instance.properties) {
+        const auto existing = std::find_if(result.begin(), result.end(),
+            [&](const auto& candidate) { return candidate.id == property.id; });
+        if (existing != result.end()) existing->value = property.value;
+        else result.push_back(property);
+    }
+    return result;
+}
+
 bool MapSession::declare_event(project::MapEventDefinition event) {
     if (!map_ || !core::ResourceId::is_valid(event.id.value) ||
         find_event(*map_, event.id)) return false;

@@ -112,8 +112,12 @@ TEST_CASE("map session edits layer state and prefab overrides undoably") {
         ("fabric-map-layer-" + std::to_string(
             std::chrono::steady_clock::now().time_since_epoch().count()));
     REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    auto source = map_with_prefab();
+    source.instances.push_back({"hero", std::nullopt,
+                                fabric::project::ResourceReference{{.value = "hero-prefab"}, "prefab"},
+                                "instances", {}, 0, 0, {}});
     fabric::editor::MapSession session;
-    REQUIRE(session.create(root, map_with_prefab()));
+    REQUIRE(session.create(root, source));
     REQUIRE(session.set_layer_visibility({.value = "gameplay"}, false));
     REQUIRE(session.set_layer_locked({.value = "gameplay"}, true));
     REQUIRE(session.set_layer_depth({.value = "gameplay"}, 8.0F));
@@ -123,6 +127,16 @@ TEST_CASE("map session edits layer state and prefab overrides undoably") {
     REQUIRE(session.set_prefab_override({.value = "hero-prefab"}, {"speed", 2.5F}));
     REQUIRE(session.map()->prefabs.front().overrides.size() == 1);
     CHECK(std::get<float>(session.map()->prefabs.front().overrides.front().value) == 2.5F);
+    auto effective = session.effective_instance_properties({.value = "hero"});
+    REQUIRE(effective.size() == 1);
+    CHECK(effective.front().id == "speed");
+    CHECK(std::get<float>(effective.front().value) == 2.5F);
+    REQUIRE(session.set_instance_property({.value = "hero"}, {"speed", 3.0F}));
+    effective = session.effective_instance_properties({.value = "hero"});
+    REQUIRE(effective.size() == 1);
+    CHECK(std::get<float>(effective.front().value) == 3.0F);
+    REQUIRE(session.undo());
+    CHECK(std::get<float>(session.effective_instance_properties({.value = "hero"}).front().value) == 2.5F);
     REQUIRE(session.undo());
     CHECK(session.map()->prefabs.front().overrides.empty());
     REQUIRE(session.undo());

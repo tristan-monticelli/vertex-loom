@@ -43,6 +43,8 @@ public:
     [[nodiscard]] bool set_layer_depth(const core::ResourceId& layer_id, float depth);
     [[nodiscard]] bool set_prefab_override(const core::ResourceId& prefab_id,
                                             project::MapProperty property);
+    [[nodiscard]] std::vector<project::MapProperty> effective_instance_properties(
+        const core::ResourceId& instance_id) const;
     [[nodiscard]] static core::Vec2 snap_position(core::Vec2 position,
                                                   MapSnapSettings snapping = {}) noexcept;
     [[nodiscard]] bool declare_event(project::MapEventDefinition event);
