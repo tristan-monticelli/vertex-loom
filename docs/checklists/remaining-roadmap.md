@@ -207,6 +207,8 @@ transform du fill restent ouverts.
   chemin angulaire court restent à définir.
 - [ ] Lister automatiquement dans la timeline toutes les propriétés déclarées
   animables par le registre.
+- [x] Définir des états et transitions déterministes avec conditions
+  booléennes/numériques, priorités et exit time normalisé.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
   la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
 - [x] Supporter création explicite de clé, déplacement et suppression de clés

@@ -85,6 +85,9 @@ Le registre de descripteurs couvre résolution par binding, propriétés
 animables/inscriptibles, doublons, identifiants manquants et bornes inversées.
 La timeline couvre insertion, tri, déplacement, suppression protégée de la
 dernière clé, durée, boucle et restauration complète par undo/redo.
+Le graphe d’états couvre références de clips, états initiaux, conditions
+booléennes/numériques, exit time, priorité déterministe et rejet des endpoints
+ou identifiants invalides.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

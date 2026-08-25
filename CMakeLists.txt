@@ -42,6 +42,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/asset_storage.cpp
     engine/fabric_project/src/atomic_save.cpp
     engine/fabric_project/src/animation.cpp
+    engine/fabric_project/src/animation_state_machine.cpp
     engine/fabric_project/src/document_storage.cpp
     engine/fabric_project/src/entity.cpp
     engine/fabric_project/src/manifest.cpp
@@ -245,6 +246,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_animation_timeline_tests
              COMMAND fabric_animation_timeline_tests)
+
+    add_executable(fabric_animation_state_machine_tests
+        tests/cpp/animation_state_machine_tests.cpp
+    )
+    target_link_libraries(fabric_animation_state_machine_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_animation_state_machine_tests
+             COMMAND fabric_animation_state_machine_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp
