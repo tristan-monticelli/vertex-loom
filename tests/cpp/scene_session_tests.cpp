@@ -35,7 +35,8 @@ TEST_CASE("scene runtime session transitions atomically between scenes") {
     REQUIRE(fabric::project::publish_map(root, project_manifest, map("map-a")).ok());
     REQUIRE(fabric::project::publish_map(root, project_manifest, map("map-b")).ok());
     auto first = scene("scene-a", "map-a");
-    first.transitions.push_back({"to-b", {{.value = "scene-b"}, "scene"}, "start"});
+    first.transitions.push_back({"to-b", {{.value = "scene-b"}, "scene"}, "start",
+                                 fabric::core::ResourceId{.value = "open-door"}});
     REQUIRE(fabric::project::publish_scene(root, project_manifest, first).ok());
     REQUIRE(fabric::project::publish_scene(root, project_manifest,
         scene("scene-b", "map-b")).ok());
@@ -45,11 +46,17 @@ TEST_CASE("scene runtime session transitions atomically between scenes") {
     REQUIRE(session.scene().has_value());
     REQUIRE(session.map().has_value());
     CHECK(session.map()->document.id.value == "map-a");
+    CHECK(session.scene()->transitions.front().event_id->value == "open-door");
+    REQUIRE(session.transition_for_event({.value = "open-door"}));
+    CHECK(session.scene()->document.id.value == "scene-b");
+    CHECK(session.map()->document.id.value == "map-b");
+    REQUIRE(session.load(root, {.value = "scene-a"}));
     REQUIRE(session.transition("to-b"));
     CHECK(session.scene()->document.id.value == "scene-b");
     CHECK(session.map()->document.id.value == "map-b");
     CHECK_FALSE(session.transition("missing"));
     CHECK(session.scene()->document.id.value == "scene-b");
+    CHECK_FALSE(session.transition_for_event({.value = "missing-event"}));
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

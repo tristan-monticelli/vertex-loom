@@ -129,7 +129,9 @@ C4Component
   extrait les instances visibles d’un viewport sans accès disque.
 - `SceneDocument v1` est stocké sous `scenes/<id>.scene.json`. Il référence les
   maps de la scène, son `entryMap` et des transitions vers d’autres scènes avec
-  un point d’entrée. Toutes ces références sont vérifiées par le registre global.
+  un point d’entrée. Une transition peut porter un identifiant d’événement
+  gameplay optionnel pour être sélectionnée par le runtime. Toutes ces
+  références sont vérifiées par le registre global.
 - `ReplayDocument v1` est stocké sous `assets/replays/<id>.replay.json`. Il
   conserve le build, la seed, les entrées et événements ordonnés par frame,
   puis les checkpoints quantifiés à `1/4096` pour les positions et `1/65536`

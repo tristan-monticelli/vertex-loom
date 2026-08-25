@@ -16,6 +16,7 @@ public:
     [[nodiscard]] bool load(const std::filesystem::path& project_root,
                             const core::ResourceId& scene_id);
     [[nodiscard]] bool transition(std::string_view transition_id);
+    [[nodiscard]] bool transition_for_event(const core::ResourceId& event_id);
 
     [[nodiscard]] const std::optional<project::SceneDocument>& scene() const noexcept {
         return scene_;

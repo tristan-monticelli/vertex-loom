@@ -90,6 +90,9 @@ ValidationReport validate_scene(const ProjectManifest&, const SceneDocument& sce
         if (transition.entry_point.empty())
             error(report.errors, ErrorCode::invalid_asset, "transitions.entryPoint",
                   "must not be empty");
+        if (transition.event_id && !core::ResourceId::is_valid(transition.event_id->value))
+            error(report.errors, ErrorCode::invalid_resource_id, "transitions.event",
+                  "must be a valid event id");
     }
     return report;
 }
@@ -113,9 +116,13 @@ std::string serialize_scene(const SceneDocument& scene) {
         json["maps"].push_back({{"map", reference(map.map)}, {"layer", map.layer_id}});
     if (scene.entry_map) json["entryMap"] = reference(*scene.entry_map);
     for (const auto& transition : scene.transitions)
-        json["transitions"].push_back({{"id", transition.id},
-                                        {"targetScene", reference(transition.target_scene)},
-                                        {"entryPoint", transition.entry_point}});
+    {
+        Json item = {{"id", transition.id},
+                     {"targetScene", reference(transition.target_scene)},
+                     {"entryPoint", transition.entry_point}};
+        if (transition.event_id) item["event"] = transition.event_id->value;
+        json["transitions"].push_back(std::move(item));
+    }
     return json.dump(2) + "\n";
 }
 
@@ -159,6 +166,13 @@ SceneResult parse_scene(const ProjectManifest& manifest, std::string_view json_t
         text(item, "id", transition.id, result.errors);
         read_reference(item, "targetScene", transition.target_scene, result.errors);
         text(item, "entryPoint", transition.entry_point, result.errors);
+        const auto event = item.find("event");
+        if (event != item.end()) {
+            if (!event->is_string())
+                error(result.errors, ErrorCode::invalid_asset, "transitions.event",
+                      "expected a string");
+            else transition.event_id = core::ResourceId{event->get<std::string>()};
+        }
         scene.transitions.push_back(std::move(transition));
     }
     if (!result.errors.empty()) return result;

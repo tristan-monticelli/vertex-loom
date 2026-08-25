@@ -7,6 +7,11 @@ projet, puis résout les transitions par `ResourceId`. Une transition est
 préparée dans des documents temporaires ; la scène courante n’est remplacée
 que si la cible et sa map sont valides.
 
+Une `SceneTransition` peut porter l’identifiant optionnel d’un événement
+Gameplay. `transition_for_event` sélectionne la première transition déclarée
+pour cet identifiant et réutilise la même préparation atomique que
+`transition`.
+
 `PreviewRuntimeOptions` accepte exactement un `map_id` ou un `scene_id`. Avec
 `scene_id`, Preview Runtime charge et valide lui-même le `SceneDocument`, le
 conserve via `scene()` et résout son `entryMap` avant de charger la map.

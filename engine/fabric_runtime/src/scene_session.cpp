@@ -90,4 +90,18 @@ bool SceneRuntimeSession::transition(const std::string_view transition_id) {
     return load_scene(transition->target_scene.id);
 }
 
+bool SceneRuntimeSession::transition_for_event(const core::ResourceId& event_id) {
+    if (!scene_) {
+        errors_ = {"no scene is loaded"};
+        return false;
+    }
+    const auto transition = std::find_if(scene_->transitions.begin(), scene_->transitions.end(),
+        [&](const auto& value) { return value.event_id && *value.event_id == event_id; });
+    if (transition == scene_->transitions.end()) {
+        errors_ = {"transition not found for event: " + event_id.value};
+        return false;
+    }
+    return load_scene(transition->target_scene.id);
+}
+
 } // namespace fabric::runtime

@@ -22,6 +22,7 @@ struct SceneTransition {
     std::string id;
     ResourceReference target_scene{{}, "scene"};
     std::string entry_point;
+    std::optional<core::ResourceId> event_id;
     friend bool operator==(const SceneTransition&, const SceneTransition&) = default;
 };
 

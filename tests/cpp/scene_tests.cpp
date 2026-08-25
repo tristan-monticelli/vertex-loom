@@ -19,7 +19,8 @@ fabric::project::SceneDocument scene() {
             .maps = {{{{.value = "main-map"}, "map"}, "world"}},
             .entry_map = fabric::project::ResourceReference{{.value = "main-map"}, "map"},
             .transitions = {{"to-menu",
-                             {{.value = "menu-scene"}, "scene"}, "start"}}};
+                             {{.value = "menu-scene"}, "scene"}, "start",
+                             fabric::core::ResourceId{.value = "open-menu"}}}};
 }
 
 TEST_CASE("scene documents round trip and publish atomically") {
