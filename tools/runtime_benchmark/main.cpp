@@ -163,7 +163,10 @@ int main(const int argc, char** argv) {
                        .mode = fabric::runtime::RuntimeMode::benchmark,
                        .frame_limit = options.frames}))
         return fail("runtime_load");
-    if (!runtime.run()) return fail("runtime_run");
+    if (!runtime.run()) {
+        for (const auto& error : runtime.errors()) std::cerr << "detail=" << error << '\n';
+        return fail("runtime_run");
+    }
 
     const auto& stats = runtime.stats();
     const auto fps = stats.p95_frame_ms > 0.0 ? 1000.0 / stats.p95_frame_ms : 0.0;
