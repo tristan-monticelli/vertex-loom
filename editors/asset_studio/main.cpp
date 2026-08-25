@@ -51,12 +51,14 @@ struct CreationUiState {
     fabric::editor::CreateMaterialPrompt material;
     fabric::editor::CreateEntityPrompt entity;
     fabric::editor::CreateAnimationPrompt animation;
+    fabric::editor::CreateInputPrompt input;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     bool request_project{};
     bool request_artwork{};
     bool request_material{};
     bool request_entity{};
     bool request_animation{};
+    bool request_input{};
     bool project_publish_attempted{};
 };
 
@@ -449,6 +451,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material);
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
+    draw_kind("Input bindings", fabric::editor::StudioResourceKind::input);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -1007,6 +1010,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             if (ImGui::MenuItem("New animation...")) {
                 creation.request_animation = true;
+            }
+            if (ImGui::MenuItem("New input bindings...")) {
+                creation.request_input = true;
             }
             if (ImGui::MenuItem("Add existing resource...")) {
                 ImGui::OpenPopup("Add existing resource");
@@ -1744,6 +1750,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::OpenPopup("Create animation");
         creation.request_animation = false;
     }
+    if (creation.request_input && session.has_project()) {
+        creation.input.reset();
+        ImGui::OpenPopup("Create input bindings");
+        creation.request_input = false;
+    }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
             if (session.open(path_buffer.data())) {
@@ -2213,6 +2224,64 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.animation.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create input bindings", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Create an InputDocument v1");
+        ImGui::TextDisabled(
+            "Bindings are saved atomically and can be selected by Preview Runtime.");
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", &creation.input.name);
+        for (std::size_t action_index = 0;
+             action_index < creation.input.actions.size(); ++action_index) {
+            auto& action = creation.input.actions[action_index];
+            ImGui::PushID(static_cast<int>(action_index));
+            ImGui::SeparatorText(("Action " + std::to_string(action_index + 1)).c_str());
+            ImGui::SetNextItemWidth(260.0F);
+            ImGui::InputText("Id", &action.id);
+            for (std::size_t binding_index = 0;
+                 binding_index < action.bindings.size(); ++binding_index) {
+                auto& binding = action.bindings[binding_index];
+                ImGui::PushID(static_cast<int>(binding_index));
+                int device = static_cast<int>(binding.device);
+                const char* devices[] = {"keyboard", "gamepad"};
+                ImGui::SetNextItemWidth(130.0F);
+                if (ImGui::Combo("Device", &device, devices, 2))
+                    binding.device = static_cast<fabric::project::InputDevice>(device);
+                ImGui::SameLine();
+                ImGui::SetNextItemWidth(130.0F);
+                ImGui::InputInt("Code", &binding.code);
+                ImGui::PopID();
+            }
+            if (ImGui::Button("Add binding"))
+                action.bindings.push_back({fabric::project::InputDevice::keyboard, 0});
+            ImGui::PopID();
+        }
+        if (ImGui::Button("Add action"))
+            creation.input.actions.push_back({"action", {}});
+        const auto validation = creation.input.validate(
+            session.project_root(), *session.manifest());
+        draw_prompt_error(validation, "name");
+        draw_prompt_error(validation, "id");
+        draw_prompt_summary(validation);
+        ImGui::BeginDisabled(!validation.ok());
+        if (ImGui::Button("Create input bindings", {180.0F, 0.0F})) {
+            if (session.create_input(creation.input)) {
+                clear_asset_preview(preview);
+                status = "Input bindings created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Input creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            creation.input.reset();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

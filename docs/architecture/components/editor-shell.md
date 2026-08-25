@@ -11,8 +11,8 @@ C4Component
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics")
-        Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui")
+        Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
+        Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
         Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer une session dirty")
@@ -70,6 +70,10 @@ C4Component
 - Le hub propose `New animation...`. Le prompt crée un `AnimationClip v1`
   avec durée, boucle et marker optionnel, le publie atomiquement dans
   `assets/animations`, puis le réindexe sans imposer de piste métier.
+- Le hub propose `New input bindings...`. Le prompt édite le nom, les actions
+  et les couples périphérique/code, refuse les identifiants et bindings
+  dupliqués, publie atomiquement `InputDocument v1` sous
+  `assets/input/<id>.input.json`, puis le réindexe et le sélectionne.
 - L’inspecteur d’entité liste les nœuds dans leur ordre stable et permet de
   modifier nom, parent et transform. Chaque mutation passe par
   `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de

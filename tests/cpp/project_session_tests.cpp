@@ -1,4 +1,5 @@
 #include "fabric/editor/project_session.hpp"
+#include "fabric/editor/creation_prompts.hpp"
 
 #include <array>
 #include <chrono>
@@ -326,6 +327,33 @@ void failed_svg_import_preserves_the_previous_vector() {
             "duplicate SVG import replaced the existing vector state");
 }
 
+void session_creates_and_reopens_input_bindings() {
+    const TemporaryDirectory valid{"input-create"};
+    write_valid_project(valid.path());
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for input creation did not open");
+    fabric::editor::CreateInputPrompt prompt;
+    prompt.name = "Game controls";
+    prompt.actions = {
+        {"move_left", {{fabric::project::InputDevice::keyboard, 74}}},
+        {"move_right", {{fabric::project::InputDevice::keyboard, 76}}},
+        {"jump", {{fabric::project::InputDevice::gamepad, 1}}}};
+    require(session.create_input(prompt), "input document creation failed");
+    require(session.selected_input().has_value(), "created input was not selected");
+    require(std::filesystem::is_regular_file(
+                valid.path() / "assets/input/game-controls.input.json"),
+            "input document was not persisted");
+    require(session.resources().size() == 1,
+            "created input was not added to the resource index");
+    fabric::editor::ProjectSession reopened;
+    require(reopened.open(valid.path()), "project with input could not reopen");
+    require(reopened.select_resource(fabric::editor::StudioResourceKind::input,
+                                     {.value = "game-controls"}),
+            "input resource could not be selected after reopen");
+    require(reopened.selected_input()->actions.size() == 3,
+            "reopened input lost actions");
+}
+
 } // namespace
 
 int main() {
@@ -356,5 +384,8 @@ int main() {
     std::cerr << "[ RUN      ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;
     failed_svg_import_preserves_the_previous_vector();
     std::cerr << "[       OK ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;
+    std::cerr << "[ RUN      ] session_creates_and_reopens_input_bindings\n" << std::flush;
+    session_creates_and_reopens_input_bindings();
+    std::cerr << "[       OK ] session_creates_and_reopens_input_bindings\n" << std::flush;
     return 0;
 }

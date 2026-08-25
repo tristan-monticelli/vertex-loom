@@ -527,6 +527,57 @@ void CreateAnimationPrompt::reset() noexcept {
     *this = CreateAnimationPrompt{};
 }
 
+void CreateInputPrompt::reset() noexcept {
+    *this = CreateInputPrompt{};
+}
+
+PromptValidation CreateInputPrompt::validate(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    PromptValidation validation;
+    validate_name(validation, name);
+    const auto id = resource_id_for_document(project_root, manifest);
+    if (!core::ResourceId::is_valid(id.value))
+        add_error(validation, "id", "Generated resource id is invalid.");
+    std::vector<std::string> action_ids;
+    for (std::size_t action_index = 0; action_index < actions.size(); ++action_index) {
+        const auto& action = actions[action_index];
+        const auto field = "actions[" + std::to_string(action_index) + "]";
+        if (!core::ResourceId::is_valid(action.id))
+            add_error(validation, field + ".id", "Action id must be valid.");
+        if (std::find(action_ids.begin(), action_ids.end(), action.id) != action_ids.end())
+            add_error(validation, field + ".id", "Action id must be unique.");
+        action_ids.push_back(action.id);
+        std::vector<project::InputBinding> bindings;
+        for (std::size_t binding_index = 0; binding_index < action.bindings.size(); ++binding_index) {
+            const auto& binding = action.bindings[binding_index];
+            if (binding.code < 0)
+                add_error(validation, field + ".bindings[" + std::to_string(binding_index) + "]",
+                          "Binding code must be non-negative.");
+            if (std::find(bindings.begin(), bindings.end(), binding) != bindings.end())
+                add_error(validation, field + ".bindings[" + std::to_string(binding_index) + "]",
+                          "Binding must be unique.");
+            bindings.push_back(binding);
+        }
+    }
+    validation.destination = project_root /
+        project::input_document_path(manifest, id);
+    validation.summary = {
+        "Create InputDocument v1: " + name,
+        "Id: " + id.value,
+        "Actions: " + std::to_string(actions.size()),
+        "Destination: " + validation.destination.generic_string(),
+    };
+    return validation;
+}
+
+core::ResourceId CreateInputPrompt::resource_id_for_document(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    return available_resource_id(project_root, manifest,
+                                 generated_resource_id(name, "input"));
+}
+
 PromptValidation CreateAnimationPrompt::validate(
     const std::filesystem::path& project_root,
     const project::ProjectManifest& manifest) const {

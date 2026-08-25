@@ -93,6 +93,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.entity->document.id,
                                    loaded.entity->document.name, relative, false});
+            } else if (kind == StudioResourceKind::input) {
+                auto loaded = project::load_input(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.input->document.id,
+                                   loaded.input->document.name, relative, false});
             } else {
                 auto loaded = project::load_animation(
                     project_root, manifest, relative);
@@ -122,6 +131,8 @@ std::optional<std::vector<StudioResource>> index_project_resources(
         !inspect(StudioResourceKind::entity,
                  project_root / manifest.directories.entities,
                  ".entity.json") ||
+        !inspect(StudioResourceKind::input,
+                 assets / "input", ".input.json") ||
         !inspect(StudioResourceKind::animation,
                  assets / "animations", ".animation.json")) {
         return std::nullopt;
@@ -243,6 +254,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     selected_material_.reset();
     selected_entity_.reset();
     selected_animation_.reset();
+    selected_input_.reset();
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
@@ -294,6 +306,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     selected_material_.reset();
     selected_entity_.reset();
     selected_animation_.reset();
+    selected_input_.reset();
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
@@ -675,6 +688,49 @@ bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
     return select_resource(StudioResourceKind::animation, created_id);
 }
 
+bool ProjectSession::create_input(const CreateInputPrompt& prompt) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating input bindings"}};
+        return false;
+    }
+    if (commands_.dirty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save current changes before creating another resource"}};
+        return false;
+    }
+    const auto prompt_validation = prompt.validate(project_root_, *manifest_);
+    if (!prompt_validation.ok()) {
+        errors_.clear();
+        for (const auto& error : prompt_validation.errors)
+            errors_.push_back({project::ErrorCode::invalid_asset,
+                               error.field, error.message});
+        return false;
+    }
+    project::InputDocument input{
+        .document = {.schema_version = project::current_input_schema_version,
+                     .type = "input",
+                     .id = prompt.resource_id_for_document(project_root_, *manifest_),
+                     .name = prompt.name},
+        .actions = prompt.actions};
+    const auto published = project::publish_input(project_root_, *manifest_, input);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    selected_input_ = std::move(published.input);
+    imported_texture_.reset();
+    imported_vector_.reset();
+    created_vector_.reset();
+    selected_material_.reset();
+    selected_entity_.reset();
+    selected_animation_.reset();
+    selected_vector_document_path_.clear();
+    const auto created_id = selected_input_->document.id;
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::input, created_id);
+}
+
 bool ProjectSession::convert_selected_linked_svg_to_native(
     const AutosaveScheduler::Clock::time_point now) {
     auto* selected = selected_resource();
@@ -780,6 +836,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
     }
     const auto index = static_cast<std::size_t>(
         std::distance(resources_.begin(), match));
+    selected_input_.reset();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -913,6 +970,26 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         if (!recovery.errors.empty()) {
             selection_warnings = std::move(recovery.errors);
         }
+    } else if (kind == StudioResourceKind::input) {
+        auto loaded = project::load_input(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_.reset();
+        selected_input_ = std::move(loaded.input);
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
+        selected_animation_document_path_.clear();
+        recovery_animation_.reset();
     } else {
         auto loaded = project::load_animation(
             project_root_, *manifest_, match->document_path);
@@ -1670,6 +1747,11 @@ ProjectSession::selected_entity() const noexcept {
 const std::optional<project::AnimationClip>&
 ProjectSession::selected_animation() const noexcept {
     return selected_animation_;
+}
+
+const std::optional<project::InputDocument>&
+ProjectSession::selected_input() const noexcept {
+    return selected_input_;
 }
 
 const std::vector<StudioResource>&

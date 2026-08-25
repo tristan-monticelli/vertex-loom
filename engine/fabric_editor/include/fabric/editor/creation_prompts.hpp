@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/core/types.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/input.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/material.hpp"
@@ -164,6 +165,22 @@ struct CreateAnimationPrompt {
     bool loop{true};
     std::string marker_id;
     double marker_time{};
+
+    void reset() noexcept;
+    [[nodiscard]] PromptValidation validate(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id_for_document(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+};
+
+struct CreateInputPrompt {
+    std::string name;
+    std::vector<project::InputActionDefinition> actions{
+        {"move_left", {{project::InputDevice::keyboard, 65}}},
+        {"move_right", {{project::InputDevice::keyboard, 68}}},
+        {"jump", {{project::InputDevice::keyboard, 32}}}};
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(

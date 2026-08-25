@@ -301,3 +301,22 @@ TEST_CASE("vector artwork image fill validates resource and adjustable mapping")
               .error_for("initialImage")
               .has_value());
 }
+
+TEST_CASE("input prompt validates bindings and computes its destination") {
+    TemporaryDirectory project;
+    fabric::editor::CreateInputPrompt prompt;
+    prompt.name = "Desktop controls";
+    prompt.actions = {
+        {"move_left", {{fabric::project::InputDevice::keyboard, 65}}},
+        {"jump", {{fabric::project::InputDevice::gamepad, 0}}}};
+    const auto valid = prompt.validate(project.path(), manifest());
+    REQUIRE(valid.ok());
+    CHECK(valid.destination == project.path() /
+          "assets/input/desktop-controls.input.json");
+
+    prompt.actions[1].bindings.push_back(
+        {fabric::project::InputDevice::gamepad, 0});
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("actions[1].bindings[1]")
+              .has_value());
+}
