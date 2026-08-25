@@ -236,8 +236,13 @@ plateforme tournante pilotée par la présence du personnage.
   payloads et son round-trip est vérifié par `fabric_map_package_tests`.
 - [x] Charger le paquet directement depuis Preview Runtime et le chemin futur
   du catalogue du jeu.
-- [ ] Vérifier qu'un paquet produit sur une plateforme se charge sur les deux
+- [x] Vérifier qu'un paquet produit sur une plateforme se charge sur les deux
   autres sans conversion.
+
+  Preuve : le workflow CI publie `studio-rotating-platform` une seule fois sur
+  Ubuntu avec `fabric_map_package_export`, transfère le dossier inchangé comme
+  artefact, puis lance `game_runtime --package ... --smoke-test 1` sur Ubuntu,
+  macOS et Windows.
 
 Gate : la map de référence est exportée proprement, transférée puis chargée par
 le runtime avec le même résultat visible et physique.

@@ -59,6 +59,9 @@ interplateformes sans bénéfice pour cette première version.
   chemins canoniques et l'existence de tous les documents/payloads, puis
   charge `rootMap` avec les chargeurs de projet communs. Le catalogue futur
   réutilisera cette entrée de chargement.
+- La CI publie un paquet de fixture sur Ubuntu, le transfère comme artefact et
+  le charge avec Preview Runtime sur Ubuntu, macOS et Windows. Le contrôle porte
+  sur les fichiers produits et non sur une conversion spécifique à la plateforme.
 - `publish_map_package` refuse une destination déjà existante, crée le paquet
   uniquement après planification valide et supprime le dossier nouvellement
   créé en cas d'échec de copie.

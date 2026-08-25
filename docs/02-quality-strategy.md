@@ -103,6 +103,10 @@ avant la création d'un dossier de paquet.
 La publication headless vérifie la copie du manifeste et des payloads,
 l'absence d'écrasement d'une destination existante et le rollback d'une
 destination nouvellement créée en cas d'échec.
+Le workflow CI publie une fois `studio-rotating-platform` sur Ubuntu, transfère
+le dossier comme artefact et le charge avec `game_runtime --package` sur Ubuntu,
+macOS et Windows ; aucune conversion ni réécriture n'est exécutée entre les
+plateformes.
 Les actions Map Studio valident la version courante de la session : une map
 dirty est sauvegardée avant `Validate` ou `Publish`, et l'action est annulée si
 la sauvegarde échoue.

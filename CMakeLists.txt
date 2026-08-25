@@ -89,6 +89,9 @@ target_link_libraries(fabric_project PUBLIC fabric_core PRIVATE
 add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)
 
+add_executable(fabric_map_package_export tools/map_package_export/main.cpp)
+target_link_libraries(fabric_map_package_export PRIVATE fabric_project)
+
 add_library(fabric_physics STATIC
     engine/fabric_physics/src/mechanic_plan.cpp
     engine/fabric_physics/src/mechanic_simulation.cpp
