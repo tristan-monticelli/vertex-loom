@@ -130,6 +130,8 @@ struct VectorNode {
     VectorShape shape;
     VectorFill fill;
     std::optional<VectorStroke> stroke;
+    std::optional<std::string> parent_id;
+    std::optional<std::string> clip_node_id;
 
     friend bool operator==(const VectorNode&, const VectorNode&) = default;
 };

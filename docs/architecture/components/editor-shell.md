@@ -95,6 +95,9 @@ C4Component
   Bézier en mémoire sans persister une rasterisation.
 - Un nœud peut conserver un contour avec couleur, largeur, jointure et
   extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
+- Les nœuds natifs peuvent référencer un parent et un clip par identifiants
+  locaux ; le validateur refuse les références manquantes et les cycles avant
+  publication.
 - Un seul document porte des changements à la fois. Changer de ressource avec
   un vecteur dirty est refusé jusqu'à Save ou Undo ; les historiques propres
   sont neutralisés avant de changer de document.

@@ -589,6 +589,27 @@ void stroke_round_trips_and_rejects_invalid_width() {
     require(!validation.ok(), "zero-width stroke was accepted");
 }
 
+void node_hierarchy_and_clip_round_trip_and_reject_cycles() {
+    auto expected = native_rectangle_asset();
+    auto child = expected.native->nodes.front();
+    child.id = "node-2";
+    child.shape.id = "shape-2";
+    child.parent_id = "node-1";
+    child.clip_node_id = "node-1";
+    expected.native->nodes.push_back(child);
+
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(), fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "node hierarchy did not round-trip");
+    require(*parsed.asset == expected, "node hierarchy changed during round-trip");
+
+    auto invalid = expected;
+    invalid.native->nodes[0].parent_id = "node-2";
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "parent cycle was accepted");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
@@ -663,6 +684,7 @@ int main() {
     line_shape_round_trips_and_rejects_invalid_endpoints();
     path_shape_round_trips_and_rejects_invalid_sequences();
     stroke_round_trips_and_rejects_invalid_width();
+    node_hierarchy_and_clip_round_trip_and_reject_cycles();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <iterator>
@@ -530,6 +531,20 @@ std::optional<NativeVectorDefinition> read_native(
         if (stroke != node_json.end()) {
             node.stroke = read_stroke(*stroke, errors, prefix + ".stroke");
         }
+        if (const auto parent = node_json.find("parent");
+            parent != node_json.end()) {
+            std::string parent_id;
+            if (read_string(node_json, "parent", parent_id, errors)) {
+                node.parent_id = std::move(parent_id);
+            }
+        }
+        if (const auto clip = node_json.find("clip");
+            clip != node_json.end()) {
+            std::string clip_id;
+            if (read_string(node_json, "clip", clip_id, errors)) {
+                node.clip_node_id = std::move(clip_id);
+            }
+        }
         native.nodes.push_back(std::move(node));
     }
     return native;
@@ -863,6 +878,50 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                           "none fills must not contain color or image data");
             }
         }
+        const auto& nodes = asset.native->nodes;
+        const auto find_node = [&nodes](const std::string& id)
+            -> const VectorNode* {
+            const auto iterator = std::ranges::find_if(
+                nodes, [&id](const VectorNode& candidate) {
+                    return candidate.id == id;
+                });
+            return iterator == nodes.end() ? nullptr : &*iterator;
+        };
+        for (std::size_t index = 0; index < nodes.size(); ++index) {
+            const auto& node = nodes[index];
+            const std::string prefix =
+                "native.nodes[" + std::to_string(index) + "]";
+            if (node.parent_id.has_value()) {
+                if (!core::ResourceId::is_valid(*node.parent_id) ||
+                    find_node(*node.parent_id) == nullptr ||
+                    *node.parent_id == node.id) {
+                    add_error(report.errors, ErrorCode::invalid_resource_id,
+                              prefix + ".parent",
+                              "must reference an existing different node");
+                } else {
+                    std::set<std::string> visited;
+                    const VectorNode* current = &node;
+                    while (current->parent_id.has_value()) {
+                        if (!visited.insert(current->id).second) {
+                            add_error(report.errors, ErrorCode::invalid_asset,
+                                      prefix + ".parent",
+                                      "parent references must not form a cycle");
+                            break;
+                        }
+                        current = find_node(*current->parent_id);
+                        if (current == nullptr) break;
+                    }
+                }
+            }
+            if (node.clip_node_id.has_value() &&
+                (!core::ResourceId::is_valid(*node.clip_node_id) ||
+                 find_node(*node.clip_node_id) == nullptr ||
+                 *node.clip_node_id == node.id)) {
+                add_error(report.errors, ErrorCode::invalid_resource_id,
+                          prefix + ".clip",
+                          "must reference an existing different node");
+            }
+        }
     }
     return report;
 }
@@ -969,6 +1028,12 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"join", std::string(to_string(stroke.join))},
                     {"cap", std::string(to_string(stroke.cap))},
                 };
+            }
+            if (node.parent_id.has_value()) {
+                node_json["parent"] = *node.parent_id;
+            }
+            if (node.clip_node_id.has_value()) {
+                node_json["clip"] = *node.clip_node_id;
             }
             nodes.push_back(std::move(node_json));
         }

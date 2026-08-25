@@ -127,7 +127,7 @@ lorsqu’elles contiennent encore des variantes non livrées.
   largeur, jointure, extrémité et ordre de dessin.
 - [x] Autoriser une image locale comme contenu d’une forme sans transformer la
   forme en sprite ou en bitmap autonome.
-- [ ] Conserver hiérarchie, groupes, visibilité, verrouillage, transform, pivot
+- [x] Conserver hiérarchie, groupes, visibilité, verrouillage, transform, pivot
   et clipping.
 - [ ] Limiter la première version aux contours simples ; détecter les
   auto-intersections au lieu de produire une géométrie ambiguë.
