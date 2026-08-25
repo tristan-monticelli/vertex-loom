@@ -10,6 +10,12 @@ de position afin de conserver le point sous le curseur ; les zooms sont bornés
 Le Preview Runtime utilise la caméra pour le culling et traduit la molette SDL
 en zoom centré dans les modes interactifs.
 
+`Camera2D` accepte des limites monde optionnelles et une cible de suivi. Les
+limites tiennent compte de la moitié du viewport afin que la caméra ne montre
+pas l’extérieur du rectangle ; si le monde est plus petit que le viewport, le
+centre du monde est conservé. `PreviewRuntimeOptions` peut activer le suivi du
+personnage et fournir ces limites.
+
 ## Conséquences
 
 Le renderer reçoit des bounds monde indépendants de la résolution. Les outils

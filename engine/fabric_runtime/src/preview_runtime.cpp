@@ -931,6 +931,7 @@ bool PreviewRuntime::run() {
         return false;
     }
     impl_->camera.set_viewport(options_.width, options_.height);
+    impl_->camera.set_limits(options_.camera_limits);
     if (impl_->audio_clip) {
         if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
                                           impl_->audio_clip->channels) ||
@@ -1014,7 +1015,6 @@ bool PreviewRuntime::run() {
             : fixed_time_step;
         previous_counter = current_counter;
         accumulator += elapsed;
-        impl_->camera.update(static_cast<float>(elapsed));
         const auto step_physics = [&]() {
             if (replay_player_) {
                 if (!replay_player_->advance(stats_.physics_steps, input_)) {
@@ -1073,6 +1073,12 @@ bool PreviewRuntime::run() {
         } else if (!step_physics()) {
             return false;
         }
+
+        impl_->camera.set_follow_target(
+            options_.follow_character && character_
+                ? std::optional<core::Vec2>{character_->position()}
+                : std::nullopt);
+        impl_->camera.update(static_cast<float>(elapsed));
 
         const auto bounds = impl_->camera.world_bounds();
         const auto interpolation_alpha = options_.mode == RuntimeMode::interactive

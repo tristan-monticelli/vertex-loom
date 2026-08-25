@@ -19,6 +19,22 @@ void Camera2D::set_zoom(const float zoom) noexcept {
     zoom_ = target_zoom_;
 }
 
+void Camera2D::set_limits(const std::optional<core::Rect> limits) noexcept {
+    if (limits && std::isfinite(limits->origin.x) && std::isfinite(limits->origin.y) &&
+        std::isfinite(limits->size.x) && std::isfinite(limits->size.y) &&
+        limits->size.x >= 0.0F && limits->size.y >= 0.0F) {
+        limits_ = limits;
+    } else {
+        limits_.reset();
+    }
+    target_position_ = clamp_position(target_position_, target_zoom_);
+    position_ = clamp_position(position_, zoom_);
+}
+
+void Camera2D::set_follow_target(const std::optional<core::Vec2> target) noexcept {
+    follow_target_ = target;
+}
+
 void Camera2D::pan(const core::Vec2 delta) noexcept {
     target_position_.x += delta.x;
     target_position_.y += delta.y;
@@ -40,10 +56,28 @@ void Camera2D::zoom_at(const core::Vec2 screen, const float factor) noexcept {
 
 void Camera2D::update(const float time_step) noexcept {
     if (!std::isfinite(time_step) || time_step <= 0.0F) return;
+    if (follow_target_) target_position_ = *follow_target_;
+    target_position_ = clamp_position(target_position_, target_zoom_);
     const auto blend = std::clamp(time_step * 12.0F, 0.0F, 1.0F);
     position_.x += (target_position_.x - position_.x) * blend;
     position_.y += (target_position_.y - position_.y) * blend;
     zoom_ += (target_zoom_ - zoom_) * blend;
+    position_ = clamp_position(position_, zoom_);
+}
+
+core::Vec2 Camera2D::clamp_position(const core::Vec2 position,
+                                     const float zoom) const noexcept {
+    if (!limits_) return position;
+    const auto half_width = static_cast<float>(viewport_width_) / (2.0F * zoom);
+    const auto half_height = static_cast<float>(viewport_height_) / (2.0F * zoom);
+    const auto min_x = limits_->origin.x + half_width;
+    const auto max_x = limits_->origin.x + limits_->size.x - half_width;
+    const auto min_y = limits_->origin.y + half_height;
+    const auto max_y = limits_->origin.y + limits_->size.y - half_height;
+    return {min_x > max_x ? limits_->origin.x + limits_->size.x * 0.5F
+                          : std::clamp(position.x, min_x, max_x),
+            min_y > max_y ? limits_->origin.y + limits_->size.y * 0.5F
+                          : std::clamp(position.y, min_y, max_y)};
 }
 
 core::Rect Camera2D::world_bounds() const noexcept {

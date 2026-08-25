@@ -26,3 +26,18 @@ TEST_CASE("camera pans with interpolated motion") {
     CHECK(camera.position().x < 10.0F);
     CHECK(camera.position().y < 0.0F);
 }
+
+TEST_CASE("camera follows a target and clamps to world limits") {
+    fabric::runtime::Camera2D camera;
+    camera.set_viewport(100, 100);
+    camera.set_limits(fabric::core::Rect{{0.0F, 0.0F}, {200.0F, 200.0F}});
+    camera.set_follow_target(fabric::core::Vec2{190.0F, 190.0F});
+    camera.update(1.0F);
+    CHECK(camera.position().x == 150.0F);
+    CHECK(camera.position().y == 150.0F);
+
+    camera.set_follow_target(fabric::core::Vec2{-100.0F, -100.0F});
+    camera.update(1.0F);
+    CHECK(camera.position().x == 50.0F);
+    CHECK(camera.position().y == 50.0F);
+}
