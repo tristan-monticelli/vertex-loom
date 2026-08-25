@@ -165,6 +165,19 @@ int run(const std::filesystem::path& project_root,
                 status = session.translate_instances(ids, {1.0F, 0.0F})
                     ? "Selected instances moved" : "Selection contains a locked instance";
             }
+            if (selected_instances.size() == 1U) {
+                ImGui::SameLine();
+                const fabric::core::ResourceId selected_id{selected_instances.front()};
+                if (ImGui::Button("Duplicate selected")) {
+                    status = session.duplicate_instance(selected_id)
+                        ? "Instance duplicated" : "Instance duplication rejected";
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Move selected to front")) {
+                    status = session.reorder_instance(selected_id, 0U)
+                        ? "Instance reordered" : "Instance reorder rejected";
+                }
+            }
             ImGui::EndDisabled();
             ImGui::Text("Collisions: %zu", map.collisions.size());
             ImGui::Text("Triggers: %zu", map.triggers.size());

@@ -154,6 +154,41 @@ bool MapSession::remove_instance(const core::ResourceId& instance_id) {
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::duplicate_instance(const core::ResourceId& instance_id,
+                                     const core::Vec2 offset,
+                                     const MapSnapSettings snapping) {
+    if (!map_ || !std::isfinite(offset.x) || !std::isfinite(offset.y)) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found || instance_locked(*map_, *found)) return false;
+    auto copy = map_->instances[*found];
+    const auto base_id = copy.id + "-copy";
+    copy.id = base_id;
+    for (std::size_t suffix = 2; find_instance(*map_, {.value = copy.id}); ++suffix)
+        copy.id = base_id + "-" + std::to_string(suffix);
+    copy.transform.position.x += offset.x;
+    copy.transform.position.y += offset.y;
+    copy.transform.position = snap_position(copy.transform.position, snapping);
+    set_chunk(copy);
+    auto next = *map_;
+    next.instances.push_back(std::move(copy));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::reorder_instance(const core::ResourceId& instance_id,
+                                  const std::size_t target_index) {
+    if (!map_ || target_index >= map_->instances.size()) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found || instance_locked(*map_, *found) || *found == target_index) return false;
+    auto next = *map_;
+    auto instance = std::move(next.instances[*found]);
+    next.instances.erase(next.instances.begin() + static_cast<std::ptrdiff_t>(*found));
+    next.instances.insert(next.instances.begin() + static_cast<std::ptrdiff_t>(target_index),
+                          std::move(instance));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
                                          core::Transform transform,
                                          const MapSnapSettings snapping) {

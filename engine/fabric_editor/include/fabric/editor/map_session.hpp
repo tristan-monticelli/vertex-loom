@@ -25,6 +25,11 @@ public:
     [[nodiscard]] bool place_instance(project::MapInstance instance,
                                        MapSnapSettings snapping = {});
     [[nodiscard]] bool remove_instance(const core::ResourceId& instance_id);
+    [[nodiscard]] bool duplicate_instance(const core::ResourceId& instance_id,
+                                          core::Vec2 offset = {1.0F, 1.0F},
+                                          MapSnapSettings snapping = {});
+    [[nodiscard]] bool reorder_instance(const core::ResourceId& instance_id,
+                                        std::size_t target_index);
     [[nodiscard]] bool set_instance_transform(const core::ResourceId& instance_id,
                                                core::Transform transform,
                                                MapSnapSettings snapping = {});

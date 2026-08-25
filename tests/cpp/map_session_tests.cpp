@@ -145,11 +145,22 @@ TEST_CASE("map session translates a selection atomically and respects layer lock
                                          {2.0F, 0.0F}, {.enabled = false}));
     CHECK(session.map()->instances[0].transform.position.x == 3.0F);
     CHECK(session.map()->instances[1].transform.position.x == 5.0F);
+    REQUIRE(session.duplicate_instance({.value = "hero"}, {2.0F, 0.0F}, {.enabled = false}));
+    REQUIRE(session.map()->instances.size() == 3);
+    CHECK(session.map()->instances.back().id == "hero-copy");
+    REQUIRE(session.reorder_instance({.value = "hero-copy"}, 0U));
+    CHECK(session.map()->instances.front().id == "hero-copy");
+    REQUIRE(session.undo());
+    CHECK(session.map()->instances.back().id == "hero-copy");
+    REQUIRE(session.undo());
+    REQUIRE(session.map()->instances.size() == 2);
     REQUIRE(session.undo());
     CHECK(session.map()->instances[0].transform.position.x == 1.0F);
     REQUIRE(session.set_layer_locked({.value = "instances"}, true));
     CHECK_FALSE(session.translate_instances({{.value = "hero"}}, {1.0F, 0.0F},
                                              {.enabled = false}));
+    CHECK_FALSE(session.duplicate_instance({.value = "hero"}));
+    CHECK_FALSE(session.reorder_instance({.value = "hero"}, 0U));
     CHECK_FALSE(session.set_instance_property({.value = "hero"}, {"blocked", true}));
     CHECK_FALSE(session.remove_instance({.value = "hero"}));
     CHECK_FALSE(session.place_instance(instance("new", 0.0F)));

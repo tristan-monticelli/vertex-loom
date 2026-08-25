@@ -259,7 +259,7 @@ même résultat visible après sauvegarde, rechargement et replay.
 - [x] Ajouter placement, snapping configurable et overrides typés réversibles
   des instances et prefabs ; profondeur, sélection, visibilité et verrouillage
   des calques sont maintenant commandables, avec translation multi-sélection
-  atomique et verrouillage effectif.
+  atomique, verrouillage effectif, duplication et réordonnancement.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à
