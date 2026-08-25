@@ -145,6 +145,12 @@ void PhysicsWorld::set_character_velocity(const core::Vec2 velocity) noexcept {
                                                      {velocity.x, velocity.y});
 }
 
+core::Vec2 PhysicsWorld::character_velocity() const noexcept {
+    if (!character_valid()) return {};
+    const auto velocity = b2Body_GetLinearVelocity(impl_->character_body);
+    return {velocity.x, velocity.y};
+}
+
 core::Vec2 PhysicsWorld::character_position() const noexcept {
     if (!character_valid()) return {};
     const auto position = b2Body_GetPosition(impl_->character_body);

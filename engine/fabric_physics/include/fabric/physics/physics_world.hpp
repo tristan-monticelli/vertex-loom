@@ -25,6 +25,7 @@ public:
     [[nodiscard]] bool create_character(core::Vec2 position,
                                         core::Vec2 half_extents = {0.5F, 0.5F}) noexcept;
     void set_character_velocity(core::Vec2 velocity) noexcept;
+    [[nodiscard]] core::Vec2 character_velocity() const noexcept;
     [[nodiscard]] core::Vec2 character_position() const noexcept;
     [[nodiscard]] bool character_valid() const noexcept;
 

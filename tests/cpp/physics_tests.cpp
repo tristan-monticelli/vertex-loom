@@ -44,4 +44,5 @@ TEST_CASE("Box2D physics world exposes a dynamic character body") {
     world.set_character_velocity({3.0F, 0.0F});
     REQUIRE(world.step(1.0F / 60.0F));
     CHECK(world.character_position().x > 0.0F);
+    CHECK(world.character_velocity().x > 0.0F);
 }

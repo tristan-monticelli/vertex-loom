@@ -18,8 +18,9 @@ void CharacterController::update(const InputActionMap& input, const float) noexc
     const auto left = input.held("move_left");
     const auto right = input.held("move_right");
     const auto horizontal = (right ? 1.0F : 0.0F) - (left ? 1.0F : 0.0F);
-    auto velocity = core::Vec2{horizontal * config_.horizontal_speed, 0.0F};
     const auto was_airborne = state_ == LocomotionState::airborne;
+    auto velocity = core::Vec2{horizontal * config_.horizontal_speed,
+                               was_airborne ? world_->character_velocity().y : 0.0F};
     if (!was_airborne && input.pressed("jump")) {
         velocity.y = config_.jump_speed;
         state_ = LocomotionState::airborne;
