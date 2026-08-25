@@ -1,4 +1,5 @@
 #include "fabric/runtime/preview_runtime.hpp"
+#include "fabric/runtime/scene_session.hpp"
 
 #include "fabric/project/entity.hpp"
 #include "fabric/project/texture_asset.hpp"
@@ -429,6 +430,61 @@ TEST_CASE("preview runtime handler can stop after a gameplay event") {
     CHECK(handled);
     CHECK(runtime.stats().gameplay_events == 1U);
     CHECK(runtime.stats().frames == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-runtime-scene-handoff-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+
+    auto source_map = map_with_gameplay_trigger();
+    auto target_map = map();
+    target_map.document.id = {.value = "target-map"};
+    target_map.document.name = "Target Map";
+    REQUIRE(fabric::project::publish_map(root, project_manifest, source_map).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, target_map).ok());
+
+    auto source_scene = scene();
+    source_scene.document.id = {.value = "source-scene"};
+    source_scene.document.name = "Source Scene";
+    source_scene.transitions.push_back({"open-target",
+                                        {{.value = "target-scene"}, "scene"},
+                                        "start",
+                                        fabric::core::ResourceId{.value = "open-door"}});
+    auto target_scene = scene();
+    target_scene.document.id = {.value = "target-scene"};
+    target_scene.document.name = "Target Scene";
+    target_scene.maps.front().map.id = {.value = "target-map"};
+    target_scene.entry_map->id = {.value = "target-map"};
+    REQUIRE(fabric::project::publish_scene(root, project_manifest, source_scene).ok());
+    REQUIRE(fabric::project::publish_scene(root, project_manifest, target_scene).ok());
+
+    fabric::runtime::SceneRuntimeSession session;
+    REQUIRE(session.load(root, {.value = "source-scene"}));
+    bool transitioned = false;
+    for (int pass = 0; pass < 2; ++pass) {
+        fabric::runtime::PreviewRuntime runtime;
+        REQUIRE(runtime.load({.project_root = root,
+                              .scene_id = session.scene()->document.id,
+                              .gameplay_event_handler = [&](const auto& event) {
+                                  if (!session.transition_for_event(event.id)) return true;
+                                  transitioned = true;
+                                  return false;
+                              },
+                              .enable_character = true,
+                              .mode = fabric::runtime::RuntimeMode::smoke_test}));
+        REQUIRE(runtime.run());
+    }
+    REQUIRE(transitioned);
+    REQUIRE(session.scene().has_value());
+    REQUIRE(session.map().has_value());
+    CHECK(session.scene()->document.id.value == "target-scene");
+    CHECK(session.map()->document.id.value == "target-map");
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
