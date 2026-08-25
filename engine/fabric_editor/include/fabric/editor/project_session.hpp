@@ -188,6 +188,18 @@ public:
         std::size_t action_index, project::InputBinding binding,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool add_selected_input_action(
+        project::InputActionDefinition action,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool remove_selected_input_action(
+        std::size_t action_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool remove_selected_input_binding(
+        std::size_t action_index, std::size_t binding_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
     [[nodiscard]] StudioResource* selected_resource() noexcept;
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;

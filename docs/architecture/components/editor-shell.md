@@ -75,8 +75,9 @@ C4Component
   dupliqués, publie atomiquement `InputDocument v1` sous
   `assets/input/<id>.input.json`, puis le réindexe et le sélectionne.
 - L’inspecteur d’un input existant permet de modifier les identifiants d’action,
-  les périphériques et les codes, d’ajouter un binding, puis de sauvegarder avec
-  `CommandStack`, undo/redo et autosave validé.
+  les périphériques et les codes, d’ajouter ou supprimer des actions et des
+  bindings, puis de sauvegarder avec `CommandStack`, undo/redo et autosave
+  validé.
 - L’inspecteur d’entité liste les nœuds dans leur ordre stable et permet de
   modifier nom, parent et transform. Chaque mutation passe par
   `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de

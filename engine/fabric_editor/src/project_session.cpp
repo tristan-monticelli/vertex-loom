@@ -1449,6 +1449,89 @@ bool ProjectSession::add_selected_input_binding(
     return true;
 }
 
+bool ProjectSession::add_selected_input_action(
+    project::InputActionDefinition action,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now)) return false;
+    auto actions = selected_input_->actions;
+    actions.push_back(std::move(action));
+    auto candidate = *selected_input_;
+    candidate.actions = actions;
+    const auto validation = project::validate_input(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::InputActionDefinition>>>(
+            selected_input_->actions, std::move(actions)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "actions", "could not add action"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::remove_selected_input_action(
+    const std::size_t action_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now) || action_index >= selected_input_->actions.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "actions", "action index is invalid"}};
+        return false;
+    }
+    auto actions = selected_input_->actions;
+    actions.erase(actions.begin() + static_cast<std::ptrdiff_t>(action_index));
+    auto candidate = *selected_input_;
+    candidate.actions = actions;
+    const auto validation = project::validate_input(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::InputActionDefinition>>>(
+            selected_input_->actions, std::move(actions)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "actions", "could not remove action"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::remove_selected_input_binding(
+    const std::size_t action_index, const std::size_t binding_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_input_edit(now) || action_index >= selected_input_->actions.size() ||
+        binding_index >= selected_input_->actions[action_index].bindings.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "bindings", "binding index is invalid"}};
+        return false;
+    }
+    auto actions = selected_input_->actions;
+    auto& bindings = actions[action_index].bindings;
+    bindings.erase(bindings.begin() + static_cast<std::ptrdiff_t>(binding_index));
+    auto candidate = *selected_input_;
+    candidate.actions = actions;
+    const auto validation = project::validate_input(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::InputActionDefinition>>>(
+            selected_input_->actions, std::move(actions)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "bindings", "could not remove binding"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::input;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_animation_duration(
     const float duration, const AutosaveScheduler::Clock::time_point now) {
     if (!prepare_animation_edit(now)) return false;

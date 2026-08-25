@@ -1494,6 +1494,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                  action_index < input.actions.size(); ++action_index) {
                 const auto& action = input.actions[action_index];
                 ImGui::PushID(static_cast<int>(action_index));
+                bool action_removed = false;
                 std::string action_id = action.id;
                 if (ImGui::InputText("Action id", &action_id) &&
                     action_id != action.id &&
@@ -1518,17 +1519,38 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             {static_cast<fabric::project::InputDevice>(device), code})) {
                         status = "Input binding rejected; inspect diagnostics.";
                     }
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Remove binding")) {
+                        action_removed = session.remove_selected_input_binding(
+                            action_index, binding_index);
+                        status = action_removed
+                            ? "Input binding removed."
+                            : "Input binding could not be removed; inspect diagnostics.";
+                    }
                     ImGui::PopID();
+                    if (action_removed) break;
                 }
-                if (ImGui::Button("Add binding") &&
+                if (!action_removed && ImGui::Button("Add binding") &&
                     !session.add_selected_input_binding(
                         action_index, {fabric::project::InputDevice::keyboard, 0})) {
                     status = "Input binding could not be added; inspect diagnostics.";
                 }
+                ImGui::SameLine();
+                if (!action_removed && ImGui::SmallButton("Remove action")) {
+                    action_removed = session.remove_selected_input_action(action_index);
+                    status = action_removed
+                        ? "Input action removed."
+                        : "Input action could not be removed; inspect diagnostics.";
+                }
                 ImGui::PopID();
+                if (action_removed) break;
             }
             if (input.actions.empty())
                 ImGui::TextDisabled("No actions defined.");
+            if (ImGui::Button("Add action") &&
+                !session.add_selected_input_action({"action", {}})) {
+                status = "Input action could not be added; inspect diagnostics.";
+            }
         }
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::animation &&

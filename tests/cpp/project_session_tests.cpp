@@ -354,6 +354,28 @@ void session_creates_and_reopens_input_bindings() {
     require(session.selected_input()->actions[0].bindings[0].code == 74,
             "input binding undo did not restore the value");
     require(session.redo(), "input binding redo failed");
+    require(session.add_selected_input_binding(
+                0, {fabric::project::InputDevice::keyboard, 82}),
+            "input binding add failed");
+    require(session.selected_input()->actions[0].bindings.size() == 2,
+            "input binding add was not applied");
+    require(session.remove_selected_input_binding(0, 1),
+            "input binding remove failed");
+    require(session.selected_input()->actions[0].bindings.size() == 1,
+            "input binding remove was not applied");
+    require(session.add_selected_input_action(
+                {"menu", {{fabric::project::InputDevice::keyboard, 77}}}),
+            "input action add failed");
+    require(session.selected_input()->actions.size() == 4,
+            "input action add was not applied");
+    require(session.remove_selected_input_action(3),
+            "input action remove failed");
+    require(session.selected_input()->actions.size() == 3,
+            "input action remove was not applied");
+    require(session.undo(), "input action remove undo failed");
+    require(session.selected_input()->actions.size() == 4,
+            "input action remove undo did not restore the action");
+    require(session.redo(), "input action remove redo failed");
     require(session.save(), "edited input binding was not saved");
     fabric::editor::ProjectSession reopened;
     require(reopened.open(valid.path()), "project with input could not reopen");
