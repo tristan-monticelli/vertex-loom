@@ -216,6 +216,23 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
         if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(instance.transform.rotation_degrees) ||
             !std::isfinite(instance.transform.scale.x) || !std::isfinite(instance.transform.scale.y))
             error(report.errors, ErrorCode::invalid_asset, "instances.transform", "must be finite");
+        bool has_animation = false;
+        for (const auto& property : instance.properties) {
+            if (property.id != "animation") continue;
+            if (has_animation) {
+                error(report.errors, ErrorCode::duplicate_resource,
+                      "instances.animation", "animation property must be unique");
+                continue;
+            }
+            has_animation = true;
+            const auto* reference = std::get_if<ResourceReference>(&property.value);
+            if (reference == nullptr || reference->expected_type != "animation" ||
+                !core::ResourceId::is_valid(reference->id.value)) {
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      "instances.animation",
+                      "animation property must reference a valid animation resource");
+            }
+        }
         const auto expected_x = static_cast<std::int32_t>(std::floor(position.x / map.chunk_size));
         const auto expected_y = static_cast<std::int32_t>(std::floor(position.y / map.chunk_size));
         if (instance.chunk_x != expected_x || instance.chunk_y != expected_y)

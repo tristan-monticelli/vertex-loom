@@ -353,6 +353,8 @@ inspectable avec collisions et événements.
 - [x] Valider tout le graphe avant création de la fenêtre.
 - [x] Charger et évaluer les `AnimationClip v1` du projet avant création de la
   fenêtre ; l’évaluation headless reste disponible par `ResourceId`.
+- [x] Relier une instance de map à un `AnimationClip v1` par sa propriété
+  réservée `animation` et appliquer sa position animée aux draw packets.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri

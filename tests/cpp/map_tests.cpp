@@ -61,4 +61,17 @@ TEST_CASE("map validation rejects chunk mismatches and missing layers") {
     REQUIRE_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
 }
 
+TEST_CASE("map validation rejects malformed instance animation bindings") {
+    auto invalid = map();
+    invalid.instances.front().properties.push_back({
+        "animation", std::string{"not-a-resource-reference"}});
+    REQUIRE_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+
+    invalid = map();
+    invalid.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "walk"}, "texture"}});
+    REQUIRE_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+}
+
 } // namespace

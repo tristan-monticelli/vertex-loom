@@ -22,6 +22,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <string_view>
 #include <unordered_map>
 
 namespace fabric::runtime {
@@ -45,6 +46,8 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
+    std::unordered_map<std::string, std::string> animation_instances;
+    std::unordered_map<std::string, core::Vec2> packet_base_positions;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -187,6 +190,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
     impl_->animation_clips.clear();
+    impl_->animation_instances.clear();
+    impl_->packet_base_positions.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -271,6 +276,23 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     if (directory_error) {
         errors_.push_back("animations: could not enumerate animation documents");
         return false;
+    }
+    for (const auto& instance : map_->instances) {
+        for (const auto& property : instance.properties) {
+            if (property.id != "animation") continue;
+            const auto* reference = std::get_if<project::ResourceReference>(
+                &property.value);
+            if (reference == nullptr || reference->expected_type != "animation") {
+                errors_.push_back(
+                    "instances.animation: expected an animation resource reference");
+                return false;
+            }
+            if (!impl_->animation_clips.contains(reference->id.value)) {
+                errors_.push_back("instances.animation: referenced clip is missing");
+                return false;
+            }
+            impl_->animation_instances.emplace(instance.id, reference->id.value);
+        }
     }
     triggers_ = std::make_unique<TriggerRuntime>(*map_);
     impl_->chunk_index_ready = impl_->chunk_index.rebuild(*map_);
@@ -393,6 +415,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     }
                     transform_packet(packet, *entity.entity, node_index, instance.transform);
                     packet.node_id = instance.id + ":" + node.id + ":" + packet.node_id;
+                    impl_->packet_base_positions.emplace(
+                        packet.node_id, node.transform.position);
                     impl_->packets.push_back(std::move(packet));
                 }
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
@@ -427,6 +451,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 packet.fill_color.reset();
                 transform_packet(packet, *entity.entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
+                impl_->packet_base_positions.emplace(
+                    packet.node_id, node.transform.position);
                 impl_->packets.push_back(std::move(packet));
             }
         }
@@ -610,6 +636,44 @@ bool PreviewRuntime::run() {
         }
 
         const auto bounds = impl_->camera.world_bounds();
+        const auto animation_time = static_cast<float>(stats_.physics_steps) *
+            static_cast<float>(fixed_time_step);
+        const auto animate_packet = [&](render::VectorDrawPacket packet) {
+            const auto separator = packet.node_id.find(':');
+            if (separator == std::string::npos) return packet;
+            const auto instance_id = packet.node_id.substr(0, separator);
+            const auto evaluation = evaluate_instance_animation(
+                instance_id, animation_time);
+            if (!evaluation || !evaluation->ok()) return packet;
+            const auto second_separator = packet.node_id.find(':', separator + 1U);
+            const auto node_id = packet.node_id.substr(
+                separator + 1U,
+                second_separator == std::string::npos
+                    ? std::string::npos
+                    : second_separator - separator - 1U);
+            const auto base_position = impl_->packet_base_positions.find(packet.node_id);
+            if (base_position == impl_->packet_base_positions.end()) return packet;
+            for (const auto& property : evaluation->properties) {
+                if (property.binding.node_id != node_id ||
+                    property.binding.component_id != "transform" ||
+                    property.binding.property_id != "position") continue;
+                const auto* position = std::get_if<core::Vec2>(&property.value);
+                if (position == nullptr) continue;
+                const core::Vec2 delta{
+                    position->x - base_position->second.x,
+                    position->y - base_position->second.y};
+                for (auto& point : packet.outline) {
+                    point.x += delta.x;
+                    point.y += delta.y;
+                }
+                for (auto& point : packet.fill_vertices) {
+                    point.x += delta.x;
+                    point.y += delta.y;
+                }
+                break;
+            }
+            return packet;
+        };
         std::vector<render::VectorDrawPacket> visible_packets;
         if (impl_->chunk_index_ready) {
             const auto candidate_instances = impl_->chunk_index.query(bounds);
@@ -617,14 +681,16 @@ bool PreviewRuntime::run() {
                 const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
                 if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
                 for (const auto packet_index : packet_indices->second) {
-                    const auto& packet = impl_->packets[packet_index];
+                    const auto packet = animate_packet(impl_->packets[packet_index]);
                     if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
                 }
             }
         } else {
             visible_packets.reserve(impl_->packets.size());
-            for (const auto& packet : impl_->packets)
+            for (const auto& source_packet : impl_->packets) {
+                const auto packet = animate_packet(source_packet);
                 if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+            }
         }
         glViewport(0, 0, options_.width, options_.height);
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
@@ -678,6 +744,14 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
     const auto found = impl_->animation_clips.find(animation_id.value);
     if (found == impl_->animation_clips.end()) return std::nullopt;
     return project::evaluate_animation(found->second, time);
+}
+
+std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_animation(
+    const std::string& instance_id, const float time) const {
+    if (!impl_) return std::nullopt;
+    const auto animation = impl_->animation_instances.find(instance_id);
+    if (animation == impl_->animation_instances.end()) return std::nullopt;
+    return evaluate_animation({.value = animation->second}, time);
 }
 
 } // namespace fabric::runtime

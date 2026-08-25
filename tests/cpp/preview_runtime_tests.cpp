@@ -98,6 +98,14 @@ fabric::project::MapDocument map_with_entity() {
     return result;
 }
 
+fabric::project::MapDocument map_with_animated_entity() {
+    auto result = map_with_entity();
+    result.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-animation"}, "animation"}});
+    return result;
+}
+
 fabric::project::EntityDefinition texture_entity() {
     return {.document = {.schema_version = 1,
                          .type = "entity",
@@ -165,6 +173,33 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
     const auto position = std::get<fabric::core::Vec2>(
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves an animation assigned to a map instance") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-instance-animation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_animated_entity()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), animation()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto evaluated = runtime.evaluate_instance_animation("marker", 0.5F);
+    REQUIRE(evaluated.has_value());
+    REQUIRE(evaluated->ok());
+    REQUIRE(evaluated->properties.size() == 1U);
+    const auto position = std::get<fabric::core::Vec2>(
+        evaluated->properties.front().value);
+    CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
+    CHECK_FALSE(runtime.evaluate_instance_animation("missing", 0.5F).has_value());
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

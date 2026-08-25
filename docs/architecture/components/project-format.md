@@ -92,6 +92,10 @@ C4Component
   prefabs, instances, collisions et triggers. Les instances sont indexées par
   chunks de `64 × 64` unités, événements nommés et les propriétés custom ont un
   ensemble de types fermé.
+- Une propriété custom d’instance nommée `animation` est réservée à la
+  lecture d’un `ResourceReference` de type `animation`. Elle est unique par
+  instance, validée par le parseur MapDocument et résolue par le Preview
+  Runtime ; l’absence du clip référencé empêche le chargement runtime.
 - `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
   extrait les instances visibles d’un viewport sans accès disque.
 - `SceneDocument v1` est stocké sous `scenes/<id>.scene.json`. Il référence les
