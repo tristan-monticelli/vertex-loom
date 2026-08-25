@@ -16,6 +16,8 @@
 
 namespace fabric::editor {
 
+struct CreateVectorArtworkPrompt;
+
 enum class AutosaveStatus {
     not_due,
     saved,
@@ -54,6 +56,8 @@ public:
     [[nodiscard]] bool import_svg(const std::filesystem::path& source,
                                   const core::ResourceId& id,
                                   const std::string& name);
+    [[nodiscard]] bool create_vector_artwork(
+        const CreateVectorArtworkPrompt& prompt);
     [[nodiscard]] bool import_aseprite(const std::filesystem::path& source,
                                        const core::ResourceId& id,
                                        const std::string& name);
@@ -101,6 +105,8 @@ public:
     [[nodiscard]] const std::vector<project::Error>& errors() const noexcept;
     [[nodiscard]] const std::optional<ImportedTexture>& imported_texture() const noexcept;
     [[nodiscard]] const std::optional<ImportedVector>& imported_vector() const noexcept;
+    [[nodiscard]] const std::optional<project::VectorAsset>&
+    created_vector() const noexcept;
     [[nodiscard]] const std::optional<ImportedSpriteSheet>&
     imported_sprite_sheet() const noexcept;
 
@@ -109,6 +115,7 @@ private:
     std::optional<project::ProjectManifest> manifest_;
     std::optional<ImportedTexture> imported_texture_;
     std::optional<ImportedVector> imported_vector_;
+    std::optional<project::VectorAsset> created_vector_;
     std::optional<ImportedSpriteSheet> imported_sprite_sheet_;
     std::optional<project::ProjectManifest> recovery_manifest_;
     CommandStack commands_;

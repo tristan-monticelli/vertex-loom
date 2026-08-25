@@ -36,8 +36,9 @@ C4Component
   documents v1 en mémoire vers `sourceKind = linkedSvg`, sans réécrire le SVG,
   qui reste prévisualisé par NanoSVG.
 - Le contrat réserve `sourceKind = native` à une géométrie sans dépendance SVG.
-  Ce mode est actuellement refusé ; sa livraison ajoutera les formes, fills,
-  contours, clips et transforms versionnés.
+  Le socle actuellement chargeable couvre taille, origine, nœuds stables,
+  transforms, rectangles, ellipses et fills couleur ou transparents. Chemins,
+  fills image, contours et clips restent des extensions explicites.
 - Une conversion de SVG lié vers natif est explicite et doit présenter les
   éléments non pris en charge avant publication.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un
@@ -48,5 +49,5 @@ C4Component
   marqueur rendant le vecteur découvrable par les outils et le runtime.
 - L'aperçu OpenGL utilise exactement les pixels validés lors de l'import.
 - Le renderer natif et le personnalisateur représentés ici sont les composants
-  cibles de l’étape suivante ; l’import opaque actuel reste fonctionnel pendant
-  la migration.
+  cibles de l’étape suivante ; le document natif est déjà persistant mais ne
+  possède pas encore de draw packets, et l’import opaque reste fonctionnel.

@@ -1,5 +1,6 @@
 #include "fabric/editor/project_session.hpp"
 
+#include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/render/aseprite.hpp"
 
@@ -229,6 +230,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     manifest_ = std::move(created.manifest);
     imported_texture_.reset();
     imported_vector_.reset();
+    created_vector_.reset();
     imported_sprite_sheet_.reset();
     recovery_manifest_.reset();
     commands_.clear();
@@ -260,6 +262,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     manifest_ = std::move(loaded.manifest);
     imported_texture_.reset();
     imported_vector_.reset();
+    created_vector_.reset();
     imported_sprite_sheet_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
     commands_.clear();
@@ -350,6 +353,78 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
         .asset = std::move(*published.asset),
         .preview = std::move(*decoded.image),
     };
+    created_vector_.reset();
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::create_vector_artwork(
+    const CreateVectorArtworkPrompt& prompt) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating an artwork"}};
+        return false;
+    }
+    const auto prompt_validation = prompt.validate(project_root_, *manifest_);
+    if (!prompt_validation.ok()) {
+        errors_.clear();
+        for (const auto& error : prompt_validation.errors) {
+            errors_.push_back({project::ErrorCode::invalid_asset,
+                               error.field, error.message});
+        }
+        return false;
+    }
+
+    project::NativeVectorDefinition native{
+        .size = {static_cast<float>(prompt.width),
+                 static_cast<float>(prompt.height)},
+        .origin = prompt.origin == ArtworkOrigin::center
+            ? project::VectorOrigin::center
+            : project::VectorOrigin::top_left,
+    };
+    if (prompt.first_shape != InitialShape::empty) {
+        const core::Vec2 shape_origin =
+            prompt.origin == ArtworkOrigin::center
+                ? core::Vec2{-native.size.x * 0.5F, -native.size.y * 0.5F}
+                : core::Vec2{};
+        native.nodes.push_back(project::VectorNode{
+            .id = "node-1",
+            .name = std::string(label(prompt.first_shape)),
+            .shape = {
+                .id = "shape-1",
+                .kind = prompt.first_shape == InitialShape::ellipse
+                    ? project::VectorShapeKind::ellipse
+                    : project::VectorShapeKind::rectangle,
+                .bounds = {.origin = shape_origin, .size = native.size},
+            },
+            .fill = {
+                .kind = prompt.initial_fill == InitialFill::color
+                    ? project::VectorFillKind::solid
+                    : project::VectorFillKind::none,
+                .color = prompt.initial_fill == InitialFill::color
+                    ? std::optional<core::Color>{prompt.initial_color}
+                    : std::optional<core::Color>{},
+            },
+        });
+    }
+    project::VectorAsset asset{
+        .document = {
+            .schema_version = project::current_vector_schema_version,
+            .type = "vector",
+            .id = {.value = prompt.id},
+            .name = prompt.name,
+        },
+        .source_kind = project::VectorSourceKind::native,
+        .native = std::move(native),
+    };
+    auto published = project::publish_native_vector_asset(
+        project_root_, *manifest_, asset);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    created_vector_ = std::move(*published.asset);
+    imported_vector_.reset();
     errors_.clear();
     return true;
 }
@@ -730,6 +805,11 @@ const std::optional<ImportedTexture>& ProjectSession::imported_texture() const n
 
 const std::optional<ImportedVector>& ProjectSession::imported_vector() const noexcept {
     return imported_vector_;
+}
+
+const std::optional<project::VectorAsset>&
+ProjectSession::created_vector() const noexcept {
+    return created_vector_;
 }
 
 const std::optional<ImportedSpriteSheet>&

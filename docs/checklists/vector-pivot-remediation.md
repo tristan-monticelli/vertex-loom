@@ -3,10 +3,10 @@
 ## Verdict du 25 août 2026
 
 La cible est vectorielle native et ne dépendra d’aucune spritesheet. Le produit
-compilé n’a pas encore atteint cette cible : `VectorAsset v2` sait migrer un
-SVG opaque v1 vers `linkedSvg`, mais refuse encore le mode `native` tant que sa
-géométrie n’existe pas. La création d’artwork reste en mémoire et le pipeline
-sprite demeure compilé, validé et accessible sous `Legacy`.
+compilé n’a pas encore atteint toute cette cible : `VectorAsset v2` sait migrer
+un SVG opaque v1 vers `linkedSvg` et publier une première géométrie `native`.
+Les chemins, fills image, contours, clips et le renderer restent à livrer. Le
+pipeline sprite demeure compilé, validé et accessible sous `Legacy`.
 
 Cette checklist distingue la construction de la voie vectorielle cible du
 retrait du legacy. Aucune case de suppression ne peut avancer sans confirmation
@@ -16,15 +16,15 @@ explicite.
 
 - [x] Migrer `VectorAsset v1` vers `VectorAsset v2` avec
   `sourceKind = linkedSvg`, sans réécrire les octets du SVG source.
-- [ ] Livrer la géométrie de `sourceKind = native` ; le parseur la refuse
-  explicitement jusque-là pour éviter un document natif vide.
-- [ ] Publier l’intention `CreateVectorArtworkPrompt` comme document natif par
+- [x] Livrer le socle `sourceKind = native` : taille, origine, nœuds, transform,
+  rectangle, ellipse et fill couleur ou transparent.
+- [x] Publier `CreateVectorArtworkPrompt` comme document natif par
   sauvegarde atomique.
 - [ ] Ajouter identifiants stables, formes, chemins, groupes, transforms,
   fills, contours et clips selon ADR-0022 et ADR-0023.
 - [ ] Permettre un fill image local avec transform UV indépendant et clipping
   par la forme, sans atlas ni frame.
-- [ ] Étendre le registre et le validateur headless aux deux `sourceKind`.
+- [x] Étendre le registre et le validateur headless aux deux `sourceKind`.
 - [ ] Ajouter migration, round-trip, validation stricte et fixtures natives.
 
 Gate : créer, sauvegarder, recharger et valider un artwork natif contenant une

@@ -92,8 +92,8 @@ runtime et chaque futur document possède un propriétaire clair.
   pixels par unité, preset de projet et résumé final.
 - [x] Ajouter le prompt `Create vector artwork` : nom, identifiant, taille de
   travail, origine, unités, première forme, fill initial et couleur.
-- [ ] Publier réellement l’artwork créé ; le prompt actuel prépare seulement
-  une intention en mémoire afin de ne pas écrire un faux document v1.
+- [x] Publier réellement l’artwork créé comme `VectorAsset v2 native` par
+  sauvegarde atomique après validation complète du prompt et du document.
 - [ ] Ajouter les prompts dédiés pour matériau/fill, entité et animation après
   livraison de leurs contrats ; les boutons actuels sont uniquement visibles
   et désactivés.
@@ -109,11 +109,16 @@ Gate : deux opérations différentes ne partagent ni libellé ambigu, ni état
 caché, ni publication implicite.
 
 État : gate partiellement validé. La séparation des libellés, des modèles et
-des états est livrée. `Add existing`, la publication d’artwork et l’extraction
-de l’orchestration hors de `main.cpp` restent ouvertes. La publication native
-commence avec `VectorAsset v2` à l’étape C.
+des états ainsi que la publication d’artwork sont livrées. `Add existing` et
+l’extraction de l’orchestration d’import hors de `main.cpp` restent ouvertes.
 
 ## Étape C — `VectorAsset v2` natif
+
+Tranche livrée : dimensions et origine du document, nœuds et formes à
+identifiants stables, visibilité, verrouillage, transform, rectangle, ellipse,
+fill couleur ou transparent, round-trip, publication atomique et validation
+headless. Les cases ci-dessous restent ouvertes lorsqu’elles contiennent encore
+des variantes non livrées.
 
 - [ ] Définir des identifiants stables pour document, nœuds, formes et
   ressources de fill.

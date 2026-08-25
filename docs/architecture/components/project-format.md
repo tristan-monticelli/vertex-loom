@@ -50,9 +50,10 @@ C4Component
   conserve sa source `assets/vectors/<id>.svg` et devient
   `sourceKind = linkedSvg` sans modifier le fichier source.
 - `sourceKind = linkedSvg` est actuellement chargeable et publiable.
-  `sourceKind = native` est reconnu mais refusé jusqu’à la livraison des nœuds,
-  formes, fills, contours, clips et transforms ; aucun document natif vide ne
-  peut donc être publié comme faux succès.
+  `sourceKind = native` stocke actuellement taille, origine, nœuds stables,
+  visibilité, verrouillage, transform, rectangle ou ellipse et fill couleur ou
+  transparent. Sa publication utilise la sauvegarde atomique des documents et
+  ne crée aucune source SVG.
 - Le contrat hérité `SpriteSheetDefinition v1` déclare
   `assets/textures/<id>.sprite.json`, conserve
   sa source sous `<id>.aseprite` ou `<id>.source.png` et référence l’atlas

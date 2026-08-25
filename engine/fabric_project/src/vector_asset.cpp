@@ -1,12 +1,15 @@
 #include "fabric/project/vector_asset.hpp"
 
 #include "asset_storage.hpp"
+#include "fabric/project/document_storage.hpp"
 
 #include <nlohmann/json.hpp>
 
+#include <cmath>
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <set>
 #include <utility>
 
 namespace fabric::project {
@@ -64,6 +67,246 @@ bool read_source_kind(const Json& object, VectorSourceKind& destination,
     return false;
 }
 
+bool read_bool(const Json& object, const char* key, bool& destination,
+               std::vector<Error>& errors, const std::string& field) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_boolean()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a JSON boolean");
+        return false;
+    }
+    destination = iterator->get<bool>();
+    return true;
+}
+
+bool read_float(const Json& object, const char* key, float& destination,
+                std::vector<Error>& errors, const std::string& field) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_number()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a finite number");
+        return false;
+    }
+    destination = iterator->get<float>();
+    if (!std::isfinite(destination)) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a finite number");
+        return false;
+    }
+    return true;
+}
+
+bool read_vec2(const Json& object, const char* key, core::Vec2& destination,
+               std::vector<Error>& errors, const std::string& field) {
+    const auto iterator = object.find(key);
+    if (iterator == object.end() || !iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected an object with x and y");
+        return false;
+    }
+    const bool x_ok = read_float(*iterator, "x", destination.x, errors,
+                                 field + ".x");
+    const bool y_ok = read_float(*iterator, "y", destination.y, errors,
+                                 field + ".y");
+    return x_ok && y_ok;
+}
+
+Json serialize_vec2(const core::Vec2& value) {
+    return {{"x", value.x}, {"y", value.y}};
+}
+
+Json serialize_transform(const core::Transform& transform) {
+    return {
+        {"position", serialize_vec2(transform.position)},
+        {"rotationDegrees", transform.rotation_degrees},
+        {"scale", serialize_vec2(transform.scale)},
+        {"pivot", serialize_vec2(transform.pivot)},
+    };
+}
+
+bool read_transform(const Json& object, core::Transform& destination,
+                    std::vector<Error>& errors, const std::string& field) {
+    if (!object.is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a transform object");
+        return false;
+    }
+    const bool position_ok = read_vec2(
+        object, "position", destination.position, errors, field + ".position");
+    const bool rotation_ok = read_float(object, "rotationDegrees",
+                                        destination.rotation_degrees, errors,
+                                        field + ".rotationDegrees");
+    const bool scale_ok = read_vec2(
+        object, "scale", destination.scale, errors, field + ".scale");
+    const bool pivot_ok = read_vec2(
+        object, "pivot", destination.pivot, errors, field + ".pivot");
+    return position_ok && rotation_ok && scale_ok && pivot_ok;
+}
+
+bool read_origin(const Json& object, VectorOrigin& destination,
+                 std::vector<Error>& errors) {
+    std::string value;
+    if (!read_string(object, "origin", value, errors)) {
+        return false;
+    }
+    if (value == "center") {
+        destination = VectorOrigin::center;
+        return true;
+    }
+    if (value == "topLeft") {
+        destination = VectorOrigin::top_left;
+        return true;
+    }
+    add_error(errors, ErrorCode::invalid_asset, "native.origin",
+              "must be center or topLeft");
+    return false;
+}
+
+bool read_shape_kind(const Json& object, VectorShapeKind& destination,
+                     std::vector<Error>& errors, const std::string& field) {
+    std::string value;
+    if (!read_string(object, "kind", value, errors)) {
+        return false;
+    }
+    if (value == "rectangle") {
+        destination = VectorShapeKind::rectangle;
+        return true;
+    }
+    if (value == "ellipse") {
+        destination = VectorShapeKind::ellipse;
+        return true;
+    }
+    add_error(errors, ErrorCode::invalid_asset, field,
+              "must be rectangle or ellipse");
+    return false;
+}
+
+bool read_fill_kind(const Json& object, VectorFillKind& destination,
+                    std::vector<Error>& errors, const std::string& field) {
+    std::string value;
+    if (!read_string(object, "kind", value, errors)) {
+        return false;
+    }
+    if (value == "solid") {
+        destination = VectorFillKind::solid;
+        return true;
+    }
+    if (value == "none") {
+        destination = VectorFillKind::none;
+        return true;
+    }
+    add_error(errors, ErrorCode::invalid_asset, field,
+              "must be solid or none");
+    return false;
+}
+
+bool read_color(const Json& object, core::Color& destination,
+                std::vector<Error>& errors, const std::string& field) {
+    if (!object.is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a color object");
+        return false;
+    }
+    const bool red_ok = read_float(
+        object, "red", destination.red, errors, field + ".red");
+    const bool green_ok = read_float(
+        object, "green", destination.green, errors, field + ".green");
+    const bool blue_ok = read_float(
+        object, "blue", destination.blue, errors, field + ".blue");
+    const bool alpha_ok = read_float(
+        object, "alpha", destination.alpha, errors, field + ".alpha");
+    return red_ok && green_ok && blue_ok && alpha_ok;
+}
+
+std::optional<NativeVectorDefinition> read_native(
+    const Json& document, std::vector<Error>& errors) {
+    const auto native_iterator = document.find("native");
+    if (native_iterator == document.end() || !native_iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, "native",
+                  "native vectors require a geometry object");
+        return std::nullopt;
+    }
+    NativeVectorDefinition native;
+    read_vec2(*native_iterator, "size", native.size, errors, "native.size");
+    read_origin(*native_iterator, native.origin, errors);
+    const auto nodes_iterator = native_iterator->find("nodes");
+    if (nodes_iterator == native_iterator->end() ||
+        !nodes_iterator->is_array()) {
+        add_error(errors, ErrorCode::invalid_asset, "native.nodes",
+                  "expected an array");
+        return std::nullopt;
+    }
+    for (std::size_t index = 0; index < nodes_iterator->size(); ++index) {
+        const Json& node_json = (*nodes_iterator)[index];
+        const std::string prefix = "native.nodes[" + std::to_string(index) + "]";
+        if (!node_json.is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, prefix,
+                      "expected a node object");
+            continue;
+        }
+        VectorNode node;
+        read_string(node_json, "id", node.id, errors);
+        read_string(node_json, "name", node.name, errors);
+        read_bool(node_json, "visible", node.visible, errors,
+                  prefix + ".visible");
+        read_bool(node_json, "locked", node.locked, errors,
+                  prefix + ".locked");
+        const auto transform = node_json.find("transform");
+        if (transform == node_json.end()) {
+            add_error(errors, ErrorCode::invalid_asset, prefix + ".transform",
+                      "expected a transform object");
+        } else {
+            read_transform(*transform, node.transform, errors,
+                           prefix + ".transform");
+        }
+        const auto shape = node_json.find("shape");
+        if (shape == node_json.end() || !shape->is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, prefix + ".shape",
+                      "expected a shape object");
+        } else {
+            read_string(*shape, "id", node.shape.id, errors);
+            read_shape_kind(*shape, node.shape.kind, errors,
+                            prefix + ".shape.kind");
+            const auto bounds = shape->find("bounds");
+            if (bounds == shape->end() || !bounds->is_object()) {
+                add_error(errors, ErrorCode::invalid_asset,
+                          prefix + ".shape.bounds", "expected a rect object");
+            } else {
+                read_vec2(*bounds, "origin", node.shape.bounds.origin, errors,
+                          prefix + ".shape.bounds.origin");
+                read_vec2(*bounds, "size", node.shape.bounds.size, errors,
+                          prefix + ".shape.bounds.size");
+            }
+        }
+        const auto fill = node_json.find("fill");
+        if (fill == node_json.end() || !fill->is_object()) {
+            add_error(errors, ErrorCode::invalid_asset, prefix + ".fill",
+                      "expected a fill object");
+        } else if (read_fill_kind(*fill, node.fill.kind, errors,
+                                  prefix + ".fill.kind") &&
+                   node.fill.kind == VectorFillKind::solid) {
+            const auto color = fill->find("color");
+            if (color == fill->end()) {
+                add_error(errors, ErrorCode::invalid_asset,
+                          prefix + ".fill.color", "expected a color object");
+            } else {
+                core::Color parsed_color;
+                if (read_color(*color, parsed_color, errors,
+                               prefix + ".fill.color")) {
+                    node.fill.color = parsed_color;
+                }
+            }
+        } else if (node.fill.kind == VectorFillKind::none &&
+                   fill->contains("color")) {
+            add_error(errors, ErrorCode::invalid_asset,
+                      prefix + ".fill.color",
+                      "none fills must not declare a color");
+        }
+        native.nodes.push_back(std::move(node));
+    }
+    return native;
+}
+
 } // namespace
 
 std::string_view to_string(const VectorSourceKind kind) noexcept {
@@ -72,6 +315,30 @@ std::string_view to_string(const VectorSourceKind kind) noexcept {
     case VectorSourceKind::native: return "native";
     }
     return "native";
+}
+
+std::string_view to_string(const VectorOrigin origin) noexcept {
+    switch (origin) {
+    case VectorOrigin::center: return "center";
+    case VectorOrigin::top_left: return "topLeft";
+    }
+    return "center";
+}
+
+std::string_view to_string(const VectorShapeKind kind) noexcept {
+    switch (kind) {
+    case VectorShapeKind::rectangle: return "rectangle";
+    case VectorShapeKind::ellipse: return "ellipse";
+    }
+    return "rectangle";
+}
+
+std::string_view to_string(const VectorFillKind kind) noexcept {
+    switch (kind) {
+    case VectorFillKind::solid: return "solid";
+    case VectorFillKind::none: return "none";
+    }
+    return "none";
 }
 
 std::filesystem::path vector_source_path(const ProjectManifest& manifest,
@@ -110,13 +377,95 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
             add_error(report.errors, ErrorCode::invalid_path, "source",
                       "linkedSvg source must use the canonical project-relative vector path");
         }
+        if (asset.native.has_value()) {
+            add_error(report.errors, ErrorCode::invalid_asset, "native",
+                      "linkedSvg vectors must not contain native geometry");
+        }
     } else {
         if (!asset.source.empty()) {
             add_error(report.errors, ErrorCode::invalid_asset, "source",
                       "native vectors must not declare an SVG source");
         }
-        add_error(report.errors, ErrorCode::invalid_asset, "native",
-                  "native vector geometry is not available in this migration slice");
+        if (!asset.native.has_value()) {
+            add_error(report.errors, ErrorCode::invalid_asset, "native",
+                      "native vectors require geometry");
+            return report;
+        }
+        const auto finite = [](const float value) {
+            return std::isfinite(value);
+        };
+        const auto positive_size = [&finite](const core::Vec2& size) {
+            return finite(size.x) && finite(size.y) && size.x > 0.0F &&
+                   size.y > 0.0F && size.x <= 1'000'000.0F &&
+                   size.y <= 1'000'000.0F;
+        };
+        if (!positive_size(asset.native->size)) {
+            add_error(report.errors, ErrorCode::invalid_asset, "native.size",
+                      "must be finite, positive and at most 1,000,000 world units");
+        }
+        std::set<std::string> node_ids;
+        std::set<std::string> shape_ids;
+        for (std::size_t index = 0; index < asset.native->nodes.size(); ++index) {
+            const auto& node = asset.native->nodes[index];
+            const std::string prefix =
+                "native.nodes[" + std::to_string(index) + "]";
+            if (!core::ResourceId::is_valid(node.id) ||
+                !node_ids.insert(node.id).second) {
+                add_error(report.errors, ErrorCode::invalid_resource_id,
+                          prefix + ".id", "must be a unique stable identifier");
+            }
+            if (node.name.empty()) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".name", "must not be empty");
+            }
+            const auto& transform = node.transform;
+            if (!finite(transform.position.x) ||
+                !finite(transform.position.y) ||
+                !finite(transform.rotation_degrees) ||
+                !finite(transform.scale.x) || !finite(transform.scale.y) ||
+                transform.scale.x == 0.0F || transform.scale.y == 0.0F ||
+                !finite(transform.pivot.x) || !finite(transform.pivot.y)) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".transform",
+                          "must contain finite values and non-zero scale");
+            }
+            if (!core::ResourceId::is_valid(node.shape.id) ||
+                !shape_ids.insert(node.shape.id).second) {
+                add_error(report.errors, ErrorCode::invalid_resource_id,
+                          prefix + ".shape.id",
+                          "must be a unique stable identifier");
+            }
+            if (!finite(node.shape.bounds.origin.x) ||
+                !finite(node.shape.bounds.origin.y) ||
+                !positive_size(node.shape.bounds.size)) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".shape.bounds",
+                          "must contain a finite origin and positive bounded size");
+            }
+            if (node.fill.kind == VectorFillKind::solid) {
+                if (!node.fill.color.has_value()) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.color",
+                              "solid fills require a color");
+                    continue;
+                }
+                const auto& color = *node.fill.color;
+                const auto valid_channel = [&finite](const float channel) {
+                    return finite(channel) && channel >= 0.0F &&
+                           channel <= 1.0F;
+                };
+                if (!valid_channel(color.red) || !valid_channel(color.green) ||
+                    !valid_channel(color.blue) || !valid_channel(color.alpha)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".fill.color",
+                              "channels must be finite values from 0 to 1");
+                }
+            } else if (node.fill.color.has_value()) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".fill.color",
+                          "none fills must not contain a color");
+            }
+        }
     }
     return report;
 }
@@ -131,6 +480,39 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
     };
     if (asset.source_kind == VectorSourceKind::linked_svg) {
         document["source"] = asset.source.generic_string();
+    } else if (asset.native.has_value()) {
+        Json nodes = Json::array();
+        for (const auto& node : asset.native->nodes) {
+            Json fill = {{"kind", std::string(to_string(node.fill.kind))}};
+            if (node.fill.kind == VectorFillKind::solid &&
+                node.fill.color.has_value()) {
+                fill["color"] = {
+                    {"red", node.fill.color->red},
+                    {"green", node.fill.color->green},
+                    {"blue", node.fill.color->blue},
+                    {"alpha", node.fill.color->alpha},
+                };
+            }
+            nodes.push_back({
+                {"id", node.id},
+                {"name", node.name},
+                {"visible", node.visible},
+                {"locked", node.locked},
+                {"transform", serialize_transform(node.transform)},
+                {"shape",
+                 {{"id", node.shape.id},
+                  {"kind", std::string(to_string(node.shape.kind))},
+                  {"bounds",
+                   {{"origin", serialize_vec2(node.shape.bounds.origin)},
+                    {"size", serialize_vec2(node.shape.bounds.size)}}}}},
+                {"fill", std::move(fill)},
+            });
+        }
+        document["native"] = {
+            {"size", serialize_vec2(asset.native->size)},
+            {"origin", std::string(to_string(asset.native->origin))},
+            {"nodes", std::move(nodes)},
+        };
     }
     return document.dump(2) + '\n';
 }
@@ -173,10 +555,21 @@ VectorAssetResult parse_vector_asset(const ProjectManifest& manifest,
                   "schemaVersion", "only vector schema versions 1 and 2 are readable");
     }
     if (asset.source_kind == VectorSourceKind::linked_svg) {
+        if (source_version == current_vector_schema_version &&
+            document.contains("native")) {
+            add_error(result.errors, ErrorCode::invalid_asset, "native",
+                      "linkedSvg vectors must not declare native geometry");
+        }
         std::string source;
         if (read_string(document, "source", source, result.errors)) {
             asset.source = source;
         }
+    } else if (source_version == current_vector_schema_version) {
+        if (document.contains("source")) {
+            add_error(result.errors, ErrorCode::invalid_asset, "source",
+                      "native vectors must not declare an SVG source");
+        }
+        asset.native = read_native(document, result.errors);
     }
     asset.document.schema_version = current_vector_schema_version;
     if (!result.errors.empty()) {
@@ -238,17 +631,19 @@ VectorAssetResult load_vector_asset(
         return result;
     }
 
-    filesystem_error.clear();
-    const auto canonical_source = std::filesystem::weakly_canonical(
-        project_root / result.asset->source, filesystem_error);
-    const bool source_is_file = !filesystem_error &&
-        std::filesystem::is_regular_file(canonical_source, filesystem_error);
-    if (filesystem_error ||
-        !detail::is_within(canonical_root, canonical_source) ||
-        !source_is_file) {
-        result.asset.reset();
-        add_error(result.errors, ErrorCode::missing_file, "source",
-                  "vector source is missing or outside the project");
+    if (result.asset->source_kind == VectorSourceKind::linked_svg) {
+        filesystem_error.clear();
+        const auto canonical_source = std::filesystem::weakly_canonical(
+            project_root / result.asset->source, filesystem_error);
+        const bool source_is_file = !filesystem_error &&
+            std::filesystem::is_regular_file(canonical_source, filesystem_error);
+        if (filesystem_error ||
+            !detail::is_within(canonical_root, canonical_source) ||
+            !source_is_file) {
+            result.asset.reset();
+            add_error(result.errors, ErrorCode::missing_file, "source",
+                      "vector source is missing or outside the project");
+        }
     }
     return result;
 }
@@ -277,6 +672,37 @@ VectorAssetResult publish_vector_asset(
         "vector");
     if (!publication.ok()) {
         result.errors = std::move(publication.errors);
+        return result;
+    }
+    return load_vector_asset(project_root, manifest, document_relative);
+}
+
+VectorAssetResult publish_native_vector_asset(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest,
+    const VectorAsset& asset) {
+    VectorAssetResult result;
+    if (asset.source_kind != VectorSourceKind::native) {
+        add_error(result.errors, ErrorCode::invalid_asset, "sourceKind",
+                  "publish_native_vector_asset only publishes native vectors");
+        return result;
+    }
+    auto validation = validate_vector_asset(manifest, asset);
+    if (!validation.ok()) {
+        result.errors = std::move(validation.errors);
+        return result;
+    }
+    const auto document_relative = vector_document_path(
+        manifest, asset.document.id);
+    const auto serialized = serialize_vector_asset(asset);
+    auto saved = save_document_atomic(
+        project_root, document_relative, serialized,
+        [&manifest](const std::string_view contents) {
+            auto parsed = parse_vector_asset(manifest, contents);
+            return ValidationReport{.errors = std::move(parsed.errors)};
+        });
+    if (!saved.ok()) {
+        result.errors = std::move(saved.errors);
         return result;
     }
     return load_vector_asset(project_root, manifest, document_relative);

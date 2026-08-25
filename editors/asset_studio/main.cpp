@@ -533,14 +533,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         if (creation.prepared_artwork) {
-            ImGui::SeparatorText("Prepared artwork intent");
+            ImGui::SeparatorText("Created native artwork");
             ImGui::TextUnformatted(creation.prepared_artwork->name.c_str());
             ImGui::TextDisabled("%s",
                                 creation.prepared_artwork->id.c_str());
             ImGui::Text("%.2f x %.2f world units",
                         creation.prepared_artwork->width,
                         creation.prepared_artwork->height);
-            ImGui::TextDisabled("Not published; ready for VectorAsset v2.");
+            ImGui::TextDisabled("Published as VectorAsset v2 native.");
         }
     } else {
         ImGui::TextDisabled("No selection");
@@ -957,8 +957,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create vector artwork", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Prepare a native, editable vector artwork");
-        ImGui::TextDisabled("This creates an isolated intent; VectorAsset v2 publication is enabled in Step C.");
+        ImGui::TextUnformatted("Create a native, editable vector artwork");
+        ImGui::TextDisabled("The validated document is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &creation.artwork.name);
         ImGui::SetNextItemWidth(560.0F);
@@ -1031,10 +1031,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "initialFill");
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
-        if (ImGui::Button("Prepare intent", {140.0F, 0.0F})) {
-            creation.prepared_artwork = creation.artwork;
-            status = "Native artwork intent prepared; no file was written.";
-            ImGui::CloseCurrentPopup();
+        if (ImGui::Button("Create artwork", {140.0F, 0.0F})) {
+            if (session.create_vector_artwork(creation.artwork)) {
+                creation.prepared_artwork = creation.artwork;
+                status = "Native artwork created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Native artwork creation failed; inspect diagnostics.";
+            }
         }
         ImGui::EndDisabled();
         ImGui::SameLine();

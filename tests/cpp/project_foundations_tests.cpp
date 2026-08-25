@@ -295,3 +295,38 @@ TEST_CASE("headless project validation rejects duplicate resource identifiers") 
     CHECK(contains_error(report,
                          fabric::project::ErrorCode::duplicate_resource));
 }
+
+TEST_CASE("headless project validation accepts a native-only vector asset") {
+    const TemporaryDirectory temporary;
+    const fabric::project::ProjectManifest manifest{
+        .id = {.value = "native-only-project"},
+        .name = "Native Only Project",
+    };
+    REQUIRE(fabric::project::create_project(temporary.path(), manifest).ok());
+    const fabric::project::VectorAsset vector{
+        .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
+            .type = "vector",
+            .id = {.value = "native-panel"},
+            .name = "Native Panel",
+        },
+        .source_kind = fabric::project::VectorSourceKind::native,
+        .native = fabric::project::NativeVectorDefinition{
+            .size = {10.0F, 10.0F},
+            .nodes = {{
+                .id = "node-1",
+                .name = "Panel",
+                .shape = {
+                    .id = "shape-1",
+                    .bounds = {.origin = {-5.0F, -5.0F},
+                               .size = {10.0F, 10.0F}},
+                },
+            }},
+        },
+    };
+    REQUIRE(fabric::project::publish_native_vector_asset(
+                temporary.path(), manifest, vector)
+                .ok());
+
+    CHECK(fabric::project::validate_project(temporary.path()).ok());
+}

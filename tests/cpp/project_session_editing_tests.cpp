@@ -1,4 +1,5 @@
 #include "fabric/editor/project_session.hpp"
+#include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -86,6 +87,51 @@ TEST_CASE("project manifest edits use command history and explicit save") {
     REQUIRE(session.save());
     CHECK_FALSE(session.dirty());
     CHECK(load_manifest_or_fail(project.path()).pixels_per_unit == 64.0);
+}
+
+TEST_CASE("vector artwork prompt publishes a reloadable native document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateVectorArtworkPrompt prompt;
+    prompt.name = "Centered ellipse";
+    prompt.id = "centered-ellipse";
+    prompt.width = 12.0;
+    prompt.height = 8.0;
+    prompt.first_shape = fabric::editor::InitialShape::ellipse;
+    prompt.initial_color = {0.25F, 0.5F, 0.75F, 1.0F};
+
+    REQUIRE(session.create_vector_artwork(prompt));
+    REQUIRE(session.created_vector().has_value());
+    CHECK(session.created_vector()->source_kind ==
+          fabric::project::VectorSourceKind::native);
+    REQUIRE(session.created_vector()->native.has_value());
+    REQUIRE(session.created_vector()->native->nodes.size() == 1);
+    CHECK(session.created_vector()->native->nodes.front().shape.kind ==
+          fabric::project::VectorShapeKind::ellipse);
+    CHECK(session.created_vector()->native->nodes.front().shape.bounds.origin ==
+          fabric::core::Vec2{-6.0F, -4.0F});
+
+    auto loaded = fabric::project::load_vector_asset(
+        project.path(), *session.manifest(),
+        "assets/vectors/centered-ellipse.vector.json");
+    REQUIRE(loaded.ok());
+    CHECK(*loaded.asset == *session.created_vector());
+    CHECK_FALSE(std::filesystem::exists(
+        project.path() / "assets/vectors/centered-ellipse.svg"));
+
+    prompt.name = "Transparent panel";
+    prompt.id = "transparent-panel";
+    prompt.origin = fabric::editor::ArtworkOrigin::top_left;
+    prompt.first_shape = fabric::editor::InitialShape::rectangle;
+    prompt.initial_fill = fabric::editor::InitialFill::transparent;
+    REQUIRE(session.create_vector_artwork(prompt));
+    REQUIRE(session.created_vector()->native.has_value());
+    const auto& transparent = session.created_vector()->native->nodes.front();
+    CHECK(transparent.shape.bounds.origin == fabric::core::Vec2{});
+    CHECK(transparent.fill.kind == fabric::project::VectorFillKind::none);
+    CHECK_FALSE(transparent.fill.color.has_value());
 }
 
 TEST_CASE("undoing to clean neutralizes a previous autosave") {

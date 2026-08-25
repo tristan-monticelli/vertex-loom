@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fabric/core/types.hpp"
 #include "fabric/project/asset.hpp"
 #include "fabric/project/manifest.hpp"
 
@@ -21,6 +22,61 @@ enum class VectorSourceKind {
 
 [[nodiscard]] std::string_view to_string(VectorSourceKind kind) noexcept;
 
+enum class VectorOrigin {
+    center,
+    top_left,
+};
+
+enum class VectorShapeKind {
+    rectangle,
+    ellipse,
+};
+
+enum class VectorFillKind {
+    solid,
+    none,
+};
+
+[[nodiscard]] std::string_view to_string(VectorOrigin origin) noexcept;
+[[nodiscard]] std::string_view to_string(VectorShapeKind kind) noexcept;
+[[nodiscard]] std::string_view to_string(VectorFillKind kind) noexcept;
+
+struct VectorFill {
+    VectorFillKind kind{VectorFillKind::none};
+    std::optional<core::Color> color;
+
+    friend bool operator==(const VectorFill&, const VectorFill&) = default;
+};
+
+struct VectorShape {
+    std::string id;
+    VectorShapeKind kind{VectorShapeKind::rectangle};
+    core::Rect bounds;
+
+    friend bool operator==(const VectorShape&, const VectorShape&) = default;
+};
+
+struct VectorNode {
+    std::string id;
+    std::string name;
+    bool visible{true};
+    bool locked{};
+    core::Transform transform;
+    VectorShape shape;
+    VectorFill fill;
+
+    friend bool operator==(const VectorNode&, const VectorNode&) = default;
+};
+
+struct NativeVectorDefinition {
+    core::Vec2 size;
+    VectorOrigin origin{VectorOrigin::center};
+    std::vector<VectorNode> nodes;
+
+    friend bool operator==(const NativeVectorDefinition&,
+                           const NativeVectorDefinition&) = default;
+};
+
 struct VectorAsset {
     AssetDocument document{
         .schema_version = current_vector_schema_version,
@@ -28,6 +84,7 @@ struct VectorAsset {
     };
     VectorSourceKind source_kind{VectorSourceKind::linked_svg};
     std::filesystem::path source;
+    std::optional<NativeVectorDefinition> native;
 
     friend bool operator==(const VectorAsset&, const VectorAsset&) = default;
 };
@@ -59,5 +116,9 @@ struct VectorAssetResult {
     const ProjectManifest& manifest,
     const VectorAsset& asset,
     const std::filesystem::path& validated_source);
+[[nodiscard]] VectorAssetResult publish_native_vector_asset(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest,
+    const VectorAsset& asset);
 
 } // namespace fabric::project

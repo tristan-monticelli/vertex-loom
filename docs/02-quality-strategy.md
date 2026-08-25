@@ -66,9 +66,12 @@ contrôle la source, l’atlas et chaque plage de métadonnées d’une spritesh
 Ces suites protègent désormais un format hérité ; aucun nouveau contrat ne doit
 dépendre d’une frame ou d’un atlas. `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
-champ `format`. Le mode `native` reste refusé jusqu’à ses tests de
-formes/fills/contours/clips, images remplissantes, tessellation déterministe et
-draw packets headless. Les modèles de prompts
+champ `format`. Le socle natif couvre round-trip, dimensions, origine,
+identifiants dupliqués, rectangle/ellipse, fill couleur/transparent,
+publication atomique sans SVG et chargement par le validateur headless. Les
+formes et fills futurs devront ajouter les tests de chemins, contours, clips,
+images remplissantes, tessellation déterministe et draw packets headless. Les
+modèles de prompts
 sont testés sans Dear ImGui : defaults et presets, erreurs par champ,
 destination exacte, conflits de ressources, isolation de projet/artwork/import,
 annulation par reset sans effet et résumé avant publication.

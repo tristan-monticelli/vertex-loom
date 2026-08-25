@@ -381,7 +381,7 @@ void loading_a_legacy_vector_never_rewrites_the_svg() {
             "loading the legacy vector rewrote its SVG source bytes");
 }
 
-void native_vector_is_rejected_until_geometry_is_available() {
+void native_vector_without_geometry_is_rejected() {
     constexpr std::string_view native_without_geometry = R"({
   "schemaVersion": 2,
   "type": "vector",
@@ -395,6 +395,97 @@ void native_vector_is_rejected_until_geometry_is_available() {
             "native vector without geometry was accepted as a false success");
     require(!parsed.errors.empty() && parsed.errors.front().field == "native",
             "native vector rejection did not identify unavailable geometry");
+}
+
+fabric::project::VectorAsset native_rectangle_asset() {
+    return {
+        .document = {
+            .schema_version = fabric::project::current_vector_schema_version,
+            .type = "vector",
+            .id = {.value = "native-panel"},
+            .name = "Native Panel",
+        },
+        .source_kind = fabric::project::VectorSourceKind::native,
+        .native = fabric::project::NativeVectorDefinition{
+            .size = {12.0F, 8.0F},
+            .origin = fabric::project::VectorOrigin::center,
+            .nodes = {{
+                .id = "node-1",
+                .name = "Panel",
+                .shape = {
+                    .id = "shape-1",
+                    .kind = fabric::project::VectorShapeKind::rectangle,
+                    .bounds = {.origin = {-6.0F, -4.0F},
+                               .size = {12.0F, 8.0F}},
+                },
+                .fill = {
+                    .kind = fabric::project::VectorFillKind::solid,
+                    .color = fabric::core::Color{
+                        0.2F, 0.4F, 0.6F, 0.8F},
+                },
+            }},
+        },
+    };
+}
+
+void native_vector_round_trips_and_publishes_without_svg() {
+    const auto manifest = example_manifest();
+    const auto expected = native_rectangle_asset();
+    const auto parsed = fabric::project::parse_vector_asset(
+        manifest, fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "native vector did not round-trip");
+    require(*parsed.asset == expected, "native vector round-trip lost data");
+
+    const TemporaryProject project;
+    const auto published = fabric::project::publish_native_vector_asset(
+        project.root(), manifest, expected);
+    require(published.ok(), "native vector was not published atomically");
+    require(*published.asset == expected,
+            "published native vector did not reload identically");
+    require(std::filesystem::is_regular_file(
+                project.root() /
+                "assets/vectors/native-panel.vector.json"),
+            "native vector document is missing");
+    require(!std::filesystem::exists(
+                project.root() / "assets/vectors/native-panel.svg"),
+            "native vector unexpectedly created an SVG source");
+}
+
+void native_vector_rejects_duplicate_stable_identifiers() {
+    auto invalid = native_rectangle_asset();
+    invalid.native->nodes.push_back(invalid.native->nodes.front());
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "duplicate native identifiers were accepted");
+}
+
+void vector_source_kinds_reject_ambiguous_payloads() {
+    const auto manifest = example_manifest();
+    const auto native_with_source = fabric::project::parse_vector_asset(
+        manifest, R"({
+  "schemaVersion": 2,
+  "type": "vector",
+  "id": "ambiguous-native",
+  "name": "Ambiguous Native",
+  "sourceKind": "native",
+  "source": "assets/vectors/ambiguous-native.svg",
+  "native": {"size": {"x": 1, "y": 1}, "origin": "center", "nodes": []}
+})");
+    require(!native_with_source.ok(),
+            "native vector silently accepted an SVG source");
+
+    const auto linked_with_native = fabric::project::parse_vector_asset(
+        manifest, R"({
+  "schemaVersion": 2,
+  "type": "vector",
+  "id": "ambiguous-linked",
+  "name": "Ambiguous Linked",
+  "sourceKind": "linkedSvg",
+  "source": "assets/vectors/ambiguous-linked.svg",
+  "native": {"size": {"x": 1, "y": 1}, "origin": "center", "nodes": []}
+})");
+    require(!linked_with_native.ok(),
+            "linked SVG silently accepted native geometry");
 }
 
 void invalid_vector_paths_are_rejected() {
@@ -463,7 +554,10 @@ int main() {
     vector_asset_round_trip_is_lossless();
     legacy_vector_asset_migrates_without_changing_its_source();
     loading_a_legacy_vector_never_rewrites_the_svg();
-    native_vector_is_rejected_until_geometry_is_available();
+    native_vector_without_geometry_is_rejected();
+    native_vector_round_trips_and_publishes_without_svg();
+    native_vector_rejects_duplicate_stable_identifiers();
+    vector_source_kinds_reject_ambiguous_payloads();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;
