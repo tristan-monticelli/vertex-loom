@@ -394,7 +394,7 @@ inspectable avec collisions et événements.
   stable et caméra interpolée.
 - [x] Appliquer le tri stable couche → profondeur → Z → identifiant aux packets
   du Preview Runtime.
-- [ ] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre avec interpolation.
+- [x] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre l’état XPBD avec interpolation.
 - [x] Ajouter smoke test, benchmark et replay par checkpoints.
 - [x] Réduire les draw calls des packets contigus compatibles par batching stable
 - [x] Mettre en cache les uniform locations OpenGL et réutiliser la capacité des VBO/IBO

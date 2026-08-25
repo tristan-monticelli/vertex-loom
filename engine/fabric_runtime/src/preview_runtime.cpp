@@ -51,6 +51,8 @@ struct PreviewRuntime::Impl {
     struct EntitySimulation {
         std::optional<project::DeformationMesh> mesh;
         std::optional<project::XpbdSystem> xpbd;
+        std::vector<core::Vec2> previous_xpbd_positions;
+        std::vector<core::Vec2> interpolated_xpbd_positions;
         std::vector<project::EntityNode> nodes;
         std::vector<project::AnimationConstraint> constraints;
         std::vector<project::FabrikChainDefinition> ik_chains;
@@ -631,6 +633,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             .constraints = resolved_entity.constraints,
             .ik_chains = resolved_entity.ik_chains,
             .instance_transform = instance.transform};
+        if (simulation.xpbd) {
+            simulation.previous_xpbd_positions.reserve(simulation.xpbd->particles.size());
+            simulation.interpolated_xpbd_positions.reserve(simulation.xpbd->particles.size());
+            for (const auto& particle : simulation.xpbd->particles) {
+                simulation.previous_xpbd_positions.push_back(particle.position);
+                simulation.interpolated_xpbd_positions.push_back(particle.position);
+            }
+        }
         simulation.poses.reserve(resolved_entity.nodes.size());
         for (const auto& node : resolved_entity.nodes)
             simulation.poses.push_back({.node_id = node.id,
@@ -926,6 +936,10 @@ bool PreviewRuntime::run() {
             if (character_) character_->update(input_, static_cast<float>(fixed_time_step));
             for (auto& [instance_id, simulation] : impl_->entity_simulations) {
                 if (!simulation.xpbd) continue;
+                simulation.previous_xpbd_positions.clear();
+                simulation.previous_xpbd_positions.reserve(simulation.xpbd->particles.size());
+                for (const auto& particle : simulation.xpbd->particles)
+                    simulation.previous_xpbd_positions.push_back(particle.position);
                 const auto result = project::solve_xpbd_substep(
                     *simulation.xpbd, static_cast<float>(fixed_time_step), 4);
                 if (!result.ok()) {
@@ -959,6 +973,23 @@ bool PreviewRuntime::run() {
         }
 
         const auto bounds = impl_->camera.world_bounds();
+        const auto interpolation_alpha = options_.mode == RuntimeMode::interactive
+            ? static_cast<float>(std::clamp(accumulator / fixed_time_step, 0.0, 1.0))
+            : 1.0F;
+        for (auto& [instance_id, simulation] : impl_->entity_simulations) {
+            (void)instance_id;
+            if (!simulation.xpbd) continue;
+            simulation.interpolated_xpbd_positions.clear();
+            simulation.interpolated_xpbd_positions.reserve(simulation.xpbd->particles.size());
+            for (std::size_t index = 0; index < simulation.xpbd->particles.size(); ++index) {
+                const auto current = simulation.xpbd->particles[index].position;
+                const auto previous = index < simulation.previous_xpbd_positions.size()
+                    ? simulation.previous_xpbd_positions[index] : current;
+                simulation.interpolated_xpbd_positions.push_back({
+                    previous.x + (current.x - previous.x) * interpolation_alpha,
+                    previous.y + (current.y - previous.y) * interpolation_alpha});
+            }
+        }
         const auto animation_time = static_cast<float>(stats_.physics_steps) *
             static_cast<float>(fixed_time_step);
         std::unordered_map<std::string, std::vector<project::EntityNode>> evaluated_nodes;
@@ -970,18 +1001,20 @@ bool PreviewRuntime::run() {
             if (simulation != impl_->entity_simulations.end() &&
                 simulation->second.mesh &&
                 deformation_topology_matches(*simulation->second.mesh, packet)) {
-                const auto deformation = evaluate_instance_deformation(
-                    instance_id, animation_time);
-                if (deformation && deformation->ok() &&
-                    deformation->positions.size() == packet.fill_vertices.size()) {
+                std::optional<project::MeshDeformationResult> deformation;
+                if (!simulation->second.xpbd)
+                    deformation = evaluate_instance_deformation(instance_id, animation_time);
+                const auto* positions = deformation && deformation->ok()
+                    ? &deformation->positions : &simulation->second.interpolated_xpbd_positions;
+                if (!positions->empty() && positions->size() == packet.fill_vertices.size()) {
                     for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index)
                         packet.fill_vertices[index] = apply_transform(
-                            deformation->positions[index],
+                            (*positions)[index],
                             simulation->second.instance_transform);
-                    if (packet.outline.size() == deformation->positions.size())
+                    if (packet.outline.size() == positions->size())
                         for (std::size_t index = 0; index < packet.outline.size(); ++index)
                             packet.outline[index] = apply_transform(
-                                deformation->positions[index],
+                                (*positions)[index],
                                 simulation->second.instance_transform);
                     ++stats_.deformed_packets;
                 }
