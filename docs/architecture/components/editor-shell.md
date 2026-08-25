@@ -6,6 +6,7 @@ C4Component
     Container_Boundary(asset, "Asset Studio") {
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
+        Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
         Component(browser, "Resource browser", "Dear ImGui", "Indexe, filtre et sélectionne les documents du projet")
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite forme, fill, contour, clip, hiérarchie et propriétés animables")
     }
@@ -20,6 +21,7 @@ C4Component
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
     Rel(shell, project_ui, "Affiche")
+    Rel(project_ui, imports, "Déclenche")
     Rel(shell, browser, "Affiche")
     Rel(shell, customizer, "Affiche")
     Rel(browser, session, "Charge et sélectionne une ressource")
@@ -27,6 +29,7 @@ C4Component
     Rel(project_ui, prompts, "Construit le prompt du type choisi")
     Rel(prompts, session, "Publie une intention validée")
     Rel(project_ui, dialogs, "Sélectionne dossiers et fichiers")
+    Rel(imports, session, "Publie les imports validés")
     Rel(session, project, "Crée ou charge")
     Rel(session, history, "Porte les mutations éditables")
     Rel(session, scheduler, "Signale les modifications")
@@ -49,8 +52,9 @@ C4Component
 - `Create`, `Import` et `Add existing` sont trois intentions distinctes. Chaque
   type possède son état et sa validation ; annuler ne modifie aucun document.
 - Le hub affiche séparément `Create`, `Import` et `Add existing`. Projet,
-  artwork et chaque source d’import possèdent un état isolé ; les actions
-  matériau, entité, animation et ajout existant restent désactivées jusqu’à
+  artwork et chaque source d’import possèdent un état isolé. `Add existing`
+  ouvre un sélecteur des ressources déjà indexées et ne publie aucun document.
+  Les actions matériau, entité et animation restent désactivées jusqu’à
   l’arrivée de leur contrat.
 - Le panneau gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.

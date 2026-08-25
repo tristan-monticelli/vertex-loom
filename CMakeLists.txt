@@ -157,7 +157,10 @@ if(FABRIC_BUILD_EDITORS)
     target_compile_features(fabric_imgui PUBLIC cxx_std_20)
     target_link_libraries(fabric_imgui PUBLIC SDL2::SDL2-static OpenGL::GL)
 
-    add_executable(asset_studio editors/asset_studio/main.cpp)
+    add_executable(asset_studio
+        editors/asset_studio/main.cpp
+        editors/asset_studio/import_workflow.cpp
+    )
     target_compile_definitions(asset_studio PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(asset_studio PRIVATE
         fabric_editor

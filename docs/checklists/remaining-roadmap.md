@@ -25,7 +25,7 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | --- | --- | --- |
 | CONFORME | La création de projet valide le nom, l’identifiant généré et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage. |
 | CONFORME | `CreateProjectPrompt` demande destination, nom, unités monde, preset et `pixelsPerUnit`, puis affiche l’identifiant calculé, les erreurs et le résumé avant création. | Conserver les tests headless du modèle. |
-| MANQUE | Les états PNG et SVG sont isolés, mais la validation complète et la publication restent déclenchées ensemble ; il n’existe pas encore d’aperçu d’import révisable avant publication. | Séparer sélection, validation/décodage, aperçu et publication. |
+| CONFORME | Les états PNG et SVG sont isolés, l’aperçu précède la publication et `Add existing` sélectionne désormais une ressource indexée sans créer de document. | Conserver la séparation sélection, validation/décodage, aperçu et publication. |
 | PARTIEL | `VectorAsset v2 native` persiste primitives et fills couleur/image, mais ne produit pas encore de draw packets ni d’édition de sommets. | Livrer chemins, contours, clips, tessellation et personnalisateur. |
 | MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
 | MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
@@ -85,8 +85,8 @@ runtime et chaque futur document possède un propriétaire clair.
 
 - [x] Remplacer la colonne d’actions d’import par des sections distinctes
   `Create`, `Import` et `Add existing`.
-- [ ] Rendre `Add existing` fonctionnel avec un sélecteur de ressources
-  enregistrées ; le bouton actuel est uniquement visible et désactivé.
+- [x] Rendre `Add existing` fonctionnel avec un sélecteur de ressources
+  enregistrées ; la sélection recharge le document sans en créer un nouveau.
 - [x] Enrichir `Create project` : destination, nom, identifiant automatique, unités,
   pixels par unité, preset de projet et résumé final.
 - [x] Ajouter le prompt `Create vector artwork` : nom, identifiant automatique, taille de
@@ -101,15 +101,15 @@ runtime et chaque futur document possède un propriétaire clair.
 - [x] Résoudre automatiquement les conflits d’identifiants par suffixe et
   afficher l’identifiant calculé ainsi que la destination avant confirmation.
 - [x] Tester les modèles de prompt et leurs validations sans Dear ImGui.
-- [ ] Sortir de `main.cpp` l’orchestration des imports, des previews OpenGL et
+- [x] Sortir de `main.cpp` l’orchestration des imports, des previews OpenGL et
   du legacy afin de n’y laisser que le routage et le rendu des widgets.
 
 Gate : deux opérations différentes ne partagent ni libellé ambigu, ni état
 caché, ni publication implicite.
 
 État : gate partiellement validé. La séparation des libellés, des modèles et
-des états ainsi que la publication d’artwork sont livrées. `Add existing` et
-l’extraction de l’orchestration d’import hors de `main.cpp` restent ouvertes.
+des états, la publication d’artwork, `Add existing` et l’extraction du workflow
+d’import sont livrées.
 
 ## Étape C — `VectorAsset v2` natif
 
