@@ -28,3 +28,7 @@ poses de nœuds aux positions de repos.
   ressources runtime.
 - Les instances partagent le format mais jamais l’état mutable XPBD.
 - Les tests headless peuvent vérifier les poses et l’évolution XPBD sans GPU.
+
+Les instances sans animation, contrainte, IK, maillage ou état XPBD suivent un
+chemin statique direct pendant le rendu : elles ne réévaluent pas leur graphe de
+nœuds à chaque packet et restent soumises au culling précalculé.

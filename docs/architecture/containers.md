@@ -5,7 +5,7 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge et évalue les AnimationClip v1, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, résout une scène ou map avec transitions atomiques, traduit les événements SDL vers le CharacterController, interpole Camera2D et les positions XPBD, culling par chunks avec bounds statiques précalculés et culling géométrique dynamique, route les entrées de zones vers les événements gameplay, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge et évalue les AnimationClip v1, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, résout une scène ou map avec transitions atomiques, traduit les événements SDL vers le CharacterController, interpole Camera2D et les positions XPBD, culling par chunks avec bounds statiques précalculés, chemin direct des packets statiques visibles et culling géométrique dynamique, route les entrées de zones vers les événements gameplay, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels et matériaux/fills par prompts dédiés, puis prépare entités et animations")
         Container(map, "Map Studio", "C++20 / SDL2 / Dear ImGui", "Édite maps, calque actif, placement, duplication, sélection rectangulaire, raccourcis clavier et déplacement groupé d’instances, avec cadrage caméra clavier, événements et payloads, triggers et collisions via MapSession, overrides typés de prefabs et liaisons d’animation d’instances, inspecteurs de points et triggers, annotations d’événements, canvas 2D, grille, caméra pan/zoom, cadrage automatique, sélection et poignées de transformation réversibles, autosave et récupération proposée")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique et exécute les pas fixes validés")
@@ -15,6 +15,7 @@ C4Container
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie, compositing vectoriels, batching stable des draw packets et réutilisation des scratch CPU/GPU entre frames")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
+        Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
     }
     Rel(creator, asset, "Crée et prévisualise")
@@ -33,6 +34,7 @@ C4Container
     Rel(runtime, renderlib, "Rend les draw packets")
     Rel(projectcli, projectlib, "Utilise")
     Rel(renderbench, renderlib, "Mesure")
+    Rel(runtimebench, runtime, "Charge et mesure")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
     Rel(editorlib, renderlib, "Valide les sources raster et vectorielles")

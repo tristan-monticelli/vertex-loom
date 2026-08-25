@@ -177,6 +177,11 @@ add_executable(fabric_render_benchmark tools/render_benchmark/main.cpp)
 target_link_libraries(fabric_render_benchmark PRIVATE
     fabric_render SDL2::SDL2-static)
 
+if(FABRIC_BUILD_RUNTIME)
+    add_executable(fabric_runtime_benchmark tools/runtime_benchmark/main.cpp)
+    target_link_libraries(fabric_runtime_benchmark PRIVATE fabric_runtime)
+endif()
+
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/animation_timeline.cpp
     engine/fabric_editor/src/autosave_scheduler.cpp

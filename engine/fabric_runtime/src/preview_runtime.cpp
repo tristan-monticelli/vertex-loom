@@ -1046,8 +1046,14 @@ bool PreviewRuntime::run() {
             if (separator == std::string::npos) return packet;
             const auto instance_id = packet.node_id.substr(0, separator);
             const auto simulation = impl_->entity_simulations.find(instance_id);
-            if (simulation != impl_->entity_simulations.end() &&
-                simulation->second.mesh &&
+            if (simulation == impl_->entity_simulations.end()) return packet;
+            const bool dynamic_instance = simulation->second.mesh.has_value() ||
+                !simulation->second.constraints.empty() ||
+                !simulation->second.ik_chains.empty() ||
+                impl_->animation_instances.contains(instance_id) ||
+                impl_->animation_state_machines.contains(instance_id);
+            if (!dynamic_instance) return packet;
+            if (simulation->second.mesh &&
                 deformation_topology_matches(*simulation->second.mesh, packet)) {
                 std::optional<project::MeshDeformationResult> deformation;
                 if (!simulation->second.xpbd)
@@ -1162,37 +1168,52 @@ bool PreviewRuntime::run() {
             return packet;
         };
         std::vector<render::VectorDrawPacket> visible_packets;
-        if (impl_->chunk_index_ready) {
-            const auto candidate_instances = impl_->chunk_index.query(bounds);
-            for (const auto& instance_id : candidate_instances) {
-                const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
-                if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
-                for (const auto packet_index : packet_indices->second) {
-                    if (packet_index < impl_->packet_bounds.size() &&
-                        !impl_->packet_bounds_dynamic[packet_index] &&
-                        !packet_bounds_visible(impl_->packet_bounds[packet_index], bounds))
-                        continue;
-                    const auto packet = animate_packet(impl_->packets[packet_index]);
-                    if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+        bool direct_render = impl_->packets.size() == impl_->packet_bounds.size() &&
+            impl_->packets.size() == impl_->packet_bounds_dynamic.size();
+        if (direct_render) {
+            for (std::size_t packet_index = 0; packet_index < impl_->packets.size(); ++packet_index) {
+                if (impl_->packet_bounds_dynamic[packet_index] ||
+                    !packet_bounds_visible(impl_->packet_bounds[packet_index], bounds)) {
+                    direct_render = false;
+                    break;
                 }
             }
-        } else {
-            visible_packets.reserve(impl_->packets.size());
-            for (std::size_t packet_index = 0; packet_index < impl_->packets.size(); ++packet_index) {
-                if (packet_index < impl_->packet_bounds.size() &&
-                    !impl_->packet_bounds_dynamic[packet_index] &&
-                    !packet_bounds_visible(impl_->packet_bounds[packet_index], bounds))
-                    continue;
-                const auto& source_packet = impl_->packets[packet_index];
-                const auto packet = animate_packet(source_packet);
+        }
+        if (!direct_render) {
+            const auto append_visible_packet = [&](const std::size_t packet_index) {
+                const bool dynamic = packet_index >= impl_->packet_bounds_dynamic.size() ||
+                    impl_->packet_bounds_dynamic[packet_index];
+                if (!dynamic) {
+                    if (packet_index < impl_->packet_bounds.size() &&
+                        packet_bounds_visible(impl_->packet_bounds[packet_index], bounds))
+                        visible_packets.push_back(impl_->packets[packet_index]);
+                    return;
+                }
+                const auto packet = animate_packet(impl_->packets[packet_index]);
                 if (packet_visible(packet, bounds)) visible_packets.push_back(packet);
+            };
+            if (impl_->chunk_index_ready) {
+                const auto candidate_instances = impl_->chunk_index.query(bounds);
+                for (const auto& instance_id : candidate_instances) {
+                    const auto packet_indices = impl_->packet_indices_by_instance.find(instance_id);
+                    if (packet_indices == impl_->packet_indices_by_instance.end()) continue;
+                    for (const auto packet_index : packet_indices->second)
+                        append_visible_packet(packet_index);
+                }
+            } else {
+                visible_packets.reserve(impl_->packets.size());
+                for (std::size_t packet_index = 0; packet_index < impl_->packets.size(); ++packet_index)
+                    append_visible_packet(packet_index);
             }
         }
+        const auto render_packets = direct_render
+            ? std::span<const render::VectorDrawPacket>(impl_->packets)
+            : std::span<const render::VectorDrawPacket>(visible_packets);
         glViewport(0, 0, options_.width, options_.height);
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         const auto render_stats = impl_->renderer.draw(
-            std::span<const render::VectorDrawPacket>(visible_packets),
+            render_packets,
             {.width = options_.width, .height = options_.height, .world_bounds = bounds},
             [this](const core::ResourceId& id) -> std::optional<render::OpenGLTextureHandle> {
                 const auto texture = impl_->texture_handles.find(id.value);
