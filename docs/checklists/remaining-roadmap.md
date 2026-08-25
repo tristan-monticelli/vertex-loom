@@ -209,6 +209,8 @@ transform du fill restent ouverts.
   animables par le registre.
 - [x] Définir des états et transitions déterministes avec conditions
   booléennes/numériques, priorités et exit time normalisé.
+- [x] Définir l’ordre des contraintes copy-transform, limites et look-at et
+  refuser les cycles avant résolution.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
   la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
 - [x] Supporter création explicite de clé, déplacement et suppression de clés

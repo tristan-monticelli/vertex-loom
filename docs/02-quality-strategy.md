@@ -88,6 +88,8 @@ dernière clé, durée, boucle et restauration complète par undo/redo.
 Le graphe d’états couvre références de clips, états initiaux, conditions
 booléennes/numériques, exit time, priorité déterministe et rejet des endpoints
 ou identifiants invalides.
+Les contraintes couvrent tri par ordre explicite, types supportés, dépendances
+source/cible et rejet des cycles.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts
