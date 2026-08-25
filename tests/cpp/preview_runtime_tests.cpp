@@ -2,6 +2,7 @@
 #include "fabric/runtime/scene_session.hpp"
 
 #include "fabric/project/entity.hpp"
+#include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
@@ -86,6 +87,37 @@ fabric::project::AnimationClip transform_animation() {
     return result;
 }
 
+fabric::project::AnimationClip material_animation() {
+    fabric::project::AnimationClip result{
+        .document = {.schema_version = 1,
+                     .type = "animation",
+                     .id = {.value = "runtime-animation"},
+                     .name = "Runtime Material Animation"},
+        .duration = 1.0F,
+        .loop = true};
+    result.tracks.push_back({
+        {.node_id = "root", .component_id = "material", .property_id = "color"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, fabric::core::Color{0.1F, 0.1F, 0.1F, 0.1F}},
+         {1.0F, fabric::core::Color{0.1F, 0.1F, 0.1F, 0.1F}}},
+        fabric::project::AnimationComposition::additive});
+    result.tracks.push_back({
+        {.node_id = "root", .component_id = "material", .property_id = "opacity"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, 0.1F}, {1.0F, 0.1F}},
+        fabric::project::AnimationComposition::additive});
+    return result;
+}
+
+fabric::project::MaterialDefinition material() {
+    return {.document = {.schema_version = 1,
+                         .type = "material",
+                         .id = {.value = "runtime-material"},
+                         .name = "Runtime Material"},
+            .color = {0.5F, 0.5F, 0.5F, 0.5F},
+            .opacity = 0.5F};
+}
+
 fabric::project::ReplayDocument replay() {
     return {.document = {.schema_version = 1,
                          .type = "replay",
@@ -124,6 +156,13 @@ fabric::project::EntityDefinition entity() {
                        .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
                                      .resource = fabric::project::ResourceReference{
                                          {.value = "runtime-vector"}, "vector"}}}}};
+}
+
+fabric::project::EntityDefinition material_entity() {
+    auto result = entity();
+    result.nodes.front().drawable.material =
+        fabric::project::ResourceReference{{.value = "runtime-material"}, "material"};
+    return result;
 }
 
 fabric::project::MapDocument map_with_entity() {
@@ -619,6 +658,33 @@ TEST_CASE("preview runtime resolves an animation assigned to a map instance") {
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
     CHECK_FALSE(runtime.evaluate_instance_animation("missing", 0.5F).has_value());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime applies animated material tracks to submitted packets") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-material-animation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_animated_entity()).ok());
+    REQUIRE(fabric::project::publish_animation(
+        root, manifest(), material_animation()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_material(root, manifest(), material()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), material_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    const auto& packets = runtime.last_frame_packets();
+    REQUIRE(packets.size() == 1U);
+    REQUIRE(packets.front().fill_color.has_value());
+    const auto& color = *packets.front().fill_color;
+    CHECK(color == fabric::core::Color{0.6F, 0.2F, 0.15F, 0.45F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

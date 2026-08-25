@@ -9,6 +9,7 @@
 #include "fabric/project/replay.hpp"
 #include "fabric/project/scene.hpp"
 #include "fabric/project/xpbd.hpp"
+#include "fabric/render/vector_geometry.hpp"
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
 #include "fabric/runtime/input.hpp"
@@ -96,6 +97,9 @@ public:
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
     [[nodiscard]] const std::vector<GameplayEvent>& gameplay_events() const noexcept;
     [[nodiscard]] std::vector<std::string> packet_order() const;
+    // Returns the packets submitted by the most recent frame. Empty before run().
+    [[nodiscard]] const std::vector<render::VectorDrawPacket>&
+    last_frame_packets() const noexcept;
     [[nodiscard]] std::size_t animation_count() const noexcept;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(
         const core::ResourceId& animation_id, float time) const;

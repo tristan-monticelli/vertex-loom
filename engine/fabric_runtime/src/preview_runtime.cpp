@@ -74,6 +74,7 @@ struct PreviewRuntime::Impl {
     SDL_GameController* controller{};
     Camera2D camera;
     std::vector<render::VectorDrawPacket> packets;
+    std::vector<render::VectorDrawPacket> last_frame_packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
     std::unordered_map<std::string, project::VectorAsset> vector_assets;
@@ -441,6 +442,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     errors_.clear();
     stats_ = {};
     impl_->packets.clear();
+    impl_->last_frame_packets.clear();
     impl_->texture_sources.clear();
     impl_->texture_handles.clear();
     impl_->vector_assets.clear();
@@ -1349,6 +1351,7 @@ bool PreviewRuntime::run() {
         const auto render_packets = direct_render
             ? std::span<const render::VectorDrawPacket>(impl_->packets)
             : std::span<const render::VectorDrawPacket>(visible_packets);
+        impl_->last_frame_packets.assign(render_packets.begin(), render_packets.end());
         if (direct_render) ++stats_.direct_render_frames;
         stats_.culled_packets += impl_->packets.size() - render_packets.size();
         glViewport(0, 0, options_.width, options_.height);
@@ -1408,6 +1411,12 @@ std::vector<std::string> PreviewRuntime::packet_order() const {
     result.reserve(impl_->packets.size());
     for (const auto& packet : impl_->packets) result.push_back(packet.node_id);
     return result;
+}
+
+const std::vector<render::VectorDrawPacket>&
+PreviewRuntime::last_frame_packets() const noexcept {
+    static const std::vector<render::VectorDrawPacket> empty;
+    return impl_ ? impl_->last_frame_packets : empty;
 }
 
 std::optional<project::EvaluationResult> PreviewRuntime::evaluate_animation(
