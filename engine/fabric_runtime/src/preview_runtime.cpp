@@ -9,6 +9,7 @@
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/runtime/replay_player.hpp"
+#include "fabric/runtime/camera2d.hpp"
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -38,6 +39,7 @@ struct PreviewRuntime::Impl {
     PcmAudioDevice audio_device;
     std::optional<PcmWavClip> audio_clip;
     SDL_GameController* controller{};
+    Camera2D camera;
     std::vector<render::VectorDrawPacket> packets;
     std::unordered_map<std::string, TextureSource> texture_sources;
     std::unordered_map<std::string, render::OpenGLTextureHandle> texture_handles;
@@ -432,6 +434,7 @@ bool PreviewRuntime::run() {
         errors_.push_back(SDL_GetError());
         return false;
     }
+    impl_->camera.set_viewport(options_.width, options_.height);
     if (impl_->audio_clip) {
         if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
                                           impl_->audio_clip->channels) ||
@@ -491,6 +494,11 @@ bool PreviewRuntime::run() {
         if (options_.enable_character && !replay_player_) input_.begin_frame();
         while (SDL_PollEvent(&event) != 0) {
             if (event.type == SDL_QUIT) running = false;
+            if (event.type == SDL_MOUSEWHEEL && options_.mode == RuntimeMode::interactive)
+                impl_->camera.zoom_at(
+                    {static_cast<float>(event.wheel.mouseX),
+                     static_cast<float>(event.wheel.mouseY)},
+                    std::pow(1.1F, static_cast<float>(event.wheel.y)));
             if (!options_.enable_character || replay_player_) continue;
             if (event.type == SDL_KEYDOWN)
                 input_.press(InputDevice::keyboard, event.key.keysym.sym,
@@ -509,6 +517,7 @@ bool PreviewRuntime::run() {
             : fixed_time_step;
         previous_counter = current_counter;
         accumulator += elapsed;
+        impl_->camera.update(static_cast<float>(elapsed));
         const auto step_physics = [&]() {
             if (replay_player_) {
                 if (!replay_player_->advance(stats_.physics_steps, input_)) {
@@ -540,10 +549,7 @@ bool PreviewRuntime::run() {
             return false;
         }
 
-        const core::Rect bounds{{-static_cast<float>(options_.width) / 2.0F,
-                                 -static_cast<float>(options_.height) / 2.0F},
-                                 {static_cast<float>(options_.width),
-                                 static_cast<float>(options_.height)}};
+        const auto bounds = impl_->camera.world_bounds();
         std::vector<render::VectorDrawPacket> visible_packets;
         visible_packets.reserve(impl_->packets.size());
         for (const auto& packet : impl_->packets)

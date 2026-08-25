@@ -292,9 +292,9 @@ Le runtime accepte désormais `--audio <wav>`, `--save-slot <slot>`,
 `--replay <id>` et `--character` ; les formats et leurs tests headless sont
 validés dans `npm run validate`.
 
-Les actions clavier, les scènes, les transitions headless et le contrôleur SDL
-sont implémentés ; le support manette, la caméra, les zones et les événements
-gameplay restent ouverts.
+Les actions clavier/manette, les scènes, les transitions headless, la caméra et
+le contrôleur SDL sont implémentés ; les zones et les événements gameplay
+restent ouverts.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement
