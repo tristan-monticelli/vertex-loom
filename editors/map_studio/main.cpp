@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -105,6 +106,145 @@ std::string collision_shape_text(const fabric::project::CollisionShape& shape) {
     return result;
 }
 
+bool layer_visible(const fabric::project::MapDocument& map, const std::string& layer_id) {
+    const auto layer = std::find_if(map.layers.begin(), map.layers.end(),
+                                    [&](const auto& candidate) {
+                                        return candidate.id == layer_id;
+                                    });
+    return layer == map.layers.end() || layer->visible;
+}
+
+void draw_map_canvas(const fabric::project::MapDocument& map,
+                     std::vector<std::string>& selected_instances,
+                     ImVec2& pan,
+                     float& zoom,
+                     std::string& status) {
+    ImGui::SeparatorText("Canvas");
+    const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
+    const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
+    ImGui::InvisibleButton("##map-canvas", canvas_size);
+    const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 canvas_center{canvas_pos.x + canvas_size.x * 0.5F,
+                               canvas_pos.y + canvas_size.y * 0.5F};
+    auto world_to_screen = [&](const fabric::core::Vec2 point) {
+        return ImVec2{canvas_center.x + pan.x + point.x * zoom,
+                      canvas_center.y + pan.y - point.y * zoom};
+    };
+    auto screen_to_world = [&](const ImVec2 point) {
+        return fabric::core::Vec2{(point.x - canvas_center.x - pan.x) / zoom,
+                                  -(point.y - canvas_center.y - pan.y) / zoom};
+    };
+
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(canvas_pos,
+                        {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
+                        IM_COL32(22, 25, 31, 255));
+    const float pixels_per_grid = zoom;
+    float grid_step = 1.0F;
+    while (grid_step * pixels_per_grid < 14.0F) grid_step *= 2.0F;
+    while (grid_step * pixels_per_grid > 70.0F) grid_step *= 0.5F;
+    const auto top_left = screen_to_world(canvas_pos);
+    const auto bottom_right = screen_to_world(
+        {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y});
+    const auto first_x = static_cast<int>(std::floor(top_left.x / grid_step)) - 1;
+    const auto last_x = static_cast<int>(std::ceil(bottom_right.x / grid_step)) + 1;
+    const auto first_y = static_cast<int>(std::floor(bottom_right.y / grid_step)) - 1;
+    const auto last_y = static_cast<int>(std::ceil(top_left.y / grid_step)) + 1;
+    for (int x = first_x; x <= last_x; ++x) {
+        const auto line = world_to_screen({static_cast<float>(x) * grid_step, 0.0F});
+        draw->AddLine({line.x, canvas_pos.y},
+                      {line.x, canvas_pos.y + canvas_size.y},
+                      x == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
+    }
+    for (int y = first_y; y <= last_y; ++y) {
+        const auto line = world_to_screen({0.0F, static_cast<float>(y) * grid_step});
+        draw->AddLine({canvas_pos.x, line.y},
+                      {canvas_pos.x + canvas_size.x, line.y},
+                      y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
+    }
+    for (const auto& collision : map.collisions) {
+        if (!layer_visible(map, collision.layer_id)) continue;
+        const auto center = world_to_screen(collision.center);
+        const auto color = collision.sensor ? IM_COL32(240, 190, 80, 210)
+                                            : IM_COL32(220, 90, 90, 210);
+        if (collision.kind == fabric::project::CollisionShapeKind::circle) {
+            draw->AddCircle(center, collision.radius * zoom, color, 32, 2.0F);
+        } else if (collision.kind == fabric::project::CollisionShapeKind::capsule) {
+            const float half_length = collision.length * zoom * 0.5F;
+            draw->AddLine({center.x - half_length, center.y},
+                          {center.x + half_length, center.y}, color, 2.0F);
+            draw->AddCircle({center.x - half_length, center.y}, collision.radius * zoom,
+                            color, 24, 2.0F);
+            draw->AddCircle({center.x + half_length, center.y}, collision.radius * zoom,
+                            color, 24, 2.0F);
+        } else if (collision.points.size() > 1U) {
+            for (std::size_t point = 1; point < collision.points.size(); ++point)
+                draw->AddLine(world_to_screen(collision.points[point - 1]),
+                              world_to_screen(collision.points[point]), color, 2.0F);
+            if (collision.kind == fabric::project::CollisionShapeKind::polygon)
+                draw->AddLine(world_to_screen(collision.points.back()),
+                              world_to_screen(collision.points.front()), color, 2.0F);
+        }
+    }
+    for (const auto& instance : map.instances) {
+        if (!layer_visible(map, instance.layer_id)) continue;
+        const auto point = world_to_screen(instance.transform.position);
+        const bool selected = std::find(selected_instances.begin(), selected_instances.end(),
+                                        instance.id) != selected_instances.end();
+        draw->AddCircleFilled(point, selected ? 8.0F : 6.0F,
+                              selected ? IM_COL32(90, 190, 255, 255)
+                                       : IM_COL32(150, 205, 165, 255));
+        draw->AddText({point.x + 9.0F, point.y - 7.0F}, IM_COL32(220, 225, 235, 230),
+                      instance.id.c_str());
+    }
+    draw->AddRect(canvas_pos,
+                  {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
+                  IM_COL32(130, 140, 155, 255));
+
+    if (hovered) {
+        const auto& io = ImGui::GetIO();
+        if (io.MouseWheel != 0.0F) {
+            const auto before = screen_to_world(io.MousePos);
+            zoom = std::clamp(zoom * std::pow(1.15F, io.MouseWheel), 0.1F, 32.0F);
+            const auto after = world_to_screen(before);
+            pan.x += io.MousePos.x - after.x;
+            pan.y += io.MousePos.y - after.y;
+        }
+        if (ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+            pan.x += io.MouseDelta.x;
+            pan.y += io.MouseDelta.y;
+        }
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            const auto world = screen_to_world(io.MousePos);
+            auto hit = map.instances.end();
+            float best_distance = 12.0F / zoom;
+            for (auto candidate = map.instances.begin(); candidate != map.instances.end();
+                 ++candidate) {
+                if (!layer_visible(map, candidate->layer_id)) continue;
+                const auto dx = candidate->transform.position.x - world.x;
+                const auto dy = candidate->transform.position.y - world.y;
+                const auto distance = std::sqrt(dx * dx + dy * dy);
+                if (distance <= best_distance) {
+                    best_distance = distance;
+                    hit = candidate;
+                }
+            }
+            if (!io.KeyShift) selected_instances.clear();
+            if (hit != map.instances.end()) {
+                const auto selected = std::find(selected_instances.begin(),
+                                                selected_instances.end(), hit->id);
+                if (io.KeyShift && selected != selected_instances.end())
+                    selected_instances.erase(selected);
+                else if (selected == selected_instances.end())
+                    selected_instances.push_back(hit->id);
+                status = "Canvas selection changed";
+            }
+        }
+    }
+    ImGui::TextDisabled("Zoom %.2fx · pan %.1f, %.1f · clic: sélectionner · molette: zoom · bouton milieu: déplacer",
+                       zoom, pan.x, pan.y);
+}
+
 int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id) {
     SDL_SetMainReady();
@@ -168,6 +308,8 @@ int run(const std::filesystem::path& project_root,
     std::string instance_property_id;
     std::string instance_property_value;
     int instance_property_kind = 2;
+    ImVec2 canvas_pan{0.0F, 0.0F};
+    float canvas_zoom = 1.0F;
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -271,6 +413,7 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            draw_map_canvas(map, selected_instances, canvas_pan, canvas_zoom, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
                  ++collision_index) {
