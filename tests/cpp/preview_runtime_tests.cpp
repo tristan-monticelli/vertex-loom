@@ -161,6 +161,33 @@ TEST_CASE("preview runtime consumes a replay on fixed physics frames") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime drives the character controller from replay actions") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-character-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+    auto movement = replay();
+    movement.document.id.value = "movement-replay";
+    movement.inputs = {{0, "move_right", true, false}};
+    movement.events.clear();
+    movement.checkpoints.clear();
+    REQUIRE(fabric::project::publish_replay(root, project_manifest, movement).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .replay_id = fabric::core::ResourceId{.value = "movement-replay"},
+                          .enable_character = true,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test,
+                          .frame_limit = 2}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().character_x > 0.0F);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime resolves native vector entity drawables") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-drawables-" + std::to_string(

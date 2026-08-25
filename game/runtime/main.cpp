@@ -14,6 +14,7 @@ void usage() {
     std::cerr << "usage: game_runtime --project <path> (--map <id> | --scene <id>) "
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
+                 "[--character] "
                  "[--smoke-test [frames]] [--benchmark [frames]]\n";
 }
 
@@ -35,6 +36,8 @@ int main(int argc, char** argv) {
             options.replay_id = fabric::core::ResourceId{argv[++index]};
         } else if (argument == "--save-slot" && index + 1 < argc) {
             save_slot = argv[++index];
+        } else if (argument == "--character") {
+            options.enable_character = true;
         } else if (argument == "--smoke-test") {
             options.mode = fabric::runtime::RuntimeMode::smoke_test;
             if (index + 1 < argc && argv[index + 1][0] != '-')
@@ -114,7 +117,9 @@ int main(int argc, char** argv) {
                   << " elapsed_ms=" << runtime.stats().elapsed_ms
                   << " p95_frame_ms=" << runtime.stats().p95_frame_ms
                   << " replay_events=" << runtime.stats().replay_events
-                  << " replay_checkpoints=" << runtime.stats().replay_checkpoints << '\n';
+                  << " replay_checkpoints=" << runtime.stats().replay_checkpoints
+                  << " character_x=" << runtime.stats().character_x
+                  << " character_y=" << runtime.stats().character_y << '\n';
     }
     return 0;
 }

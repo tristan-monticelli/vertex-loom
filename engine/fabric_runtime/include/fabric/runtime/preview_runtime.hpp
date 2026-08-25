@@ -4,6 +4,7 @@
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/replay.hpp"
+#include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/input.hpp"
 
 #include <cstddef>
@@ -22,6 +23,7 @@ struct PreviewRuntimeOptions {
     std::filesystem::path project_root;
     core::ResourceId map_id;
     std::optional<core::ResourceId> replay_id;
+    bool enable_character{};
     RuntimeMode mode{RuntimeMode::interactive};
     std::int32_t width{1440};
     std::int32_t height{900};
@@ -38,6 +40,8 @@ struct PreviewRuntimeStats {
     double p95_frame_ms{};
     std::size_t replay_events{};
     std::size_t replay_checkpoints{};
+    float character_x{};
+    float character_y{};
 };
 
 class PreviewRuntime {
@@ -71,7 +75,8 @@ private:
     std::optional<project::MapDocument> map_;
     std::optional<project::ReplayDocument> replay_;
     std::unique_ptr<class ReplayPlayer> replay_player_;
-    InputActionMap replay_input_;
+    InputActionMap input_;
+    std::unique_ptr<CharacterController> character_;
     physics::PhysicsWorld physics_;
     std::unique_ptr<Impl> impl_;
     std::vector<std::string> errors_;

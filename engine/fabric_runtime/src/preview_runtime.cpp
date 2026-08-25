@@ -165,7 +165,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     map_.reset();
     replay_.reset();
     replay_player_.reset();
-    replay_input_ = {};
+    input_ = {};
+    character_.reset();
     errors_.clear();
     stats_ = {};
     impl_->packets.clear();
@@ -210,6 +211,26 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         map_.reset();
         manifest_.reset();
         return false;
+    }
+    if (options_.enable_character) {
+        for (const auto action : {"move_left", "move_right", "jump"})
+            if (!input_.define_action(action)) {
+                errors_.push_back("could not define character input action");
+                return false;
+            }
+        if (!input_.bind("move_left", {InputDevice::keyboard, SDLK_a}) ||
+            !input_.bind("move_left", {InputDevice::keyboard, SDLK_LEFT}) ||
+            !input_.bind("move_right", {InputDevice::keyboard, SDLK_d}) ||
+            !input_.bind("move_right", {InputDevice::keyboard, SDLK_RIGHT}) ||
+            !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE})) {
+            errors_.push_back("could not bind character input actions");
+            return false;
+        }
+        character_ = std::make_unique<CharacterController>();
+        if (!character_->create(physics_, {0.0F, 0.0F})) {
+            errors_.push_back("could not create the runtime character");
+            return false;
+        }
     }
 
     const auto ensure_texture = [&](const project::ResourceReference& reference) {
@@ -428,8 +449,15 @@ bool PreviewRuntime::run() {
     while (running && (limit == 0U || stats_.frames < limit)) {
         const auto frame_start = SDL_GetPerformanceCounter();
         SDL_Event event{};
+        if (options_.enable_character && !replay_player_) input_.begin_frame();
         while (SDL_PollEvent(&event) != 0) {
             if (event.type == SDL_QUIT) running = false;
+            if (!options_.enable_character || replay_player_) continue;
+            if (event.type == SDL_KEYDOWN)
+                input_.press(InputDevice::keyboard, event.key.keysym.sym,
+                             event.key.repeat != 0);
+            else if (event.type == SDL_KEYUP)
+                input_.release(InputDevice::keyboard, event.key.keysym.sym);
         }
         const auto current_counter = SDL_GetPerformanceCounter();
         const auto elapsed = options_.mode == RuntimeMode::interactive
@@ -440,18 +468,24 @@ bool PreviewRuntime::run() {
         accumulator += elapsed;
         const auto step_physics = [&]() {
             if (replay_player_) {
-                if (!replay_player_->advance(stats_.physics_steps, replay_input_)) {
+                if (!replay_player_->advance(stats_.physics_steps, input_)) {
                     errors_.push_back("replay frame order is invalid");
                     return false;
                 }
                 stats_.replay_events += replay_player_->events().size();
                 if (replay_player_->checkpoint()) ++stats_.replay_checkpoints;
             }
+            if (character_) character_->update(input_, static_cast<float>(fixed_time_step));
             if (!physics_.step(static_cast<float>(fixed_time_step))) {
                 errors_.push_back("physics step failed");
                 return false;
             }
             ++stats_.physics_steps;
+            if (character_) {
+                const auto position = character_->position();
+                stats_.character_x = position.x;
+                stats_.character_y = position.y;
+            }
             return true;
         };
         if (options_.mode == RuntimeMode::interactive) {
