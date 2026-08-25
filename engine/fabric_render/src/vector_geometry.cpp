@@ -176,4 +176,20 @@ VectorGeometryResult build_native_draw_packets(
     return result;
 }
 
+VectorGeometryResult VectorGeometryCache::get_or_build(
+    const project::VectorAsset& asset, const float curve_tolerance) {
+    const std::string key = project::serialize_vector_asset(asset) +
+                            "\ncurveTolerance=" +
+                            std::to_string(curve_tolerance);
+    const auto existing = entries_.find(key);
+    if (existing != entries_.end()) return existing->second;
+    auto [inserted, _] = entries_.emplace(
+        key, build_native_draw_packets(asset, curve_tolerance));
+    return inserted->second;
+}
+
+void VectorGeometryCache::clear() noexcept { entries_.clear(); }
+
+std::size_t VectorGeometryCache::size() const noexcept { return entries_.size(); }
+
 } // namespace fabric::render

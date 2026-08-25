@@ -129,10 +129,10 @@ lorsqu’elles contiennent encore des variantes non livrées.
   forme en sprite ou en bitmap autonome.
 - [x] Conserver hiérarchie, groupes, visibilité, verrouillage, transform, pivot
   et clipping.
-- [ ] Limiter la première version aux contours simples ; détecter les
+- [x] Limiter la première version aux contours simples ; détecter les
   auto-intersections au lieu de produire une géométrie ambiguë.
-- [ ] Aplatir les Bézier selon le zoom, trianguler de façon déterministe et
-  mettre en cache la géométrie par version de document.
+- [x] Aplatir les Bézier selon une tolérance fournie par la vue, trianguler de
+  façon déterministe et mettre en cache la géométrie par version de document.
 - [ ] Charger les SVG liés avec NanoSVG ; convertir uniquement les primitives
   explicitement prises en charge et signaler toute perte avant validation.
 - [ ] Ajouter round-trip, migration v1, validation stricte, chemins sûrs,

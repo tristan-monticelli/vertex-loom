@@ -181,6 +181,24 @@ void native_geometry_produces_deterministic_packets() {
             "triangle did not produce one deterministic fill triangle");
 }
 
+void native_geometry_cache_invalidates_on_document_or_tolerance_change() {
+    fabric::render::VectorGeometryCache cache;
+    auto asset = native_geometry_fixture();
+    const auto first = cache.get_or_build(asset);
+    const auto second = cache.get_or_build(asset);
+    require(first.packets == second.packets && cache.size() == 1U,
+            "vector geometry cache did not reuse the document version");
+
+    asset.native->nodes.front().fill.color->green = 0.5F;
+    const auto changed = cache.get_or_build(asset);
+    require(changed.packets != first.packets && cache.size() == 2U,
+            "vector geometry cache did not invalidate changed document data");
+
+    static_cast<void>(cache.get_or_build(asset, 0.125F));
+    require(cache.size() == 3U,
+            "vector geometry cache did not separate curve tolerances");
+}
+
 } // namespace
 
 int main() {
@@ -189,5 +207,6 @@ int main() {
     valid_svg_is_rasterized_to_a_bounded_preview();
     invalid_svg_inputs_are_rejected_before_publication();
     native_geometry_produces_deterministic_packets();
+    native_geometry_cache_invalidates_on_document_or_tolerance_change();
     return 0;
 }

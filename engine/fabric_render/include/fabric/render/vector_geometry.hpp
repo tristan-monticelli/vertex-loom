@@ -2,9 +2,11 @@
 
 #include "fabric/project/vector_asset.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace fabric::render {
@@ -31,5 +33,16 @@ struct VectorGeometryResult {
 
 [[nodiscard]] VectorGeometryResult build_native_draw_packets(
     const project::VectorAsset& asset, float curve_tolerance = 0.25F);
+
+class VectorGeometryCache {
+public:
+    [[nodiscard]] VectorGeometryResult get_or_build(
+        const project::VectorAsset& asset, float curve_tolerance = 0.25F);
+    void clear() noexcept;
+    [[nodiscard]] std::size_t size() const noexcept;
+
+private:
+    std::unordered_map<std::string, VectorGeometryResult> entries_;
+};
 
 } // namespace fabric::render

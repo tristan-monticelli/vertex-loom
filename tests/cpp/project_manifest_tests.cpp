@@ -569,6 +569,27 @@ void path_shape_round_trips_and_rejects_invalid_sequences() {
     require(!validation.ok(), "path without an initial move was accepted");
 }
 
+void path_shape_rejects_self_intersections() {
+    auto invalid = native_rectangle_asset();
+    auto& shape = invalid.native->nodes.front().shape;
+    shape.kind = fabric::project::VectorShapeKind::path;
+    shape.bounds = {.origin = {0.0F, 0.0F}, .size = {10.0F, 10.0F}};
+    shape.path = {
+        {.kind = fabric::project::VectorPathCommandKind::move,
+         .point = {0.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {10.0F, 10.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {0.0F, 10.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {10.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::close},
+    };
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "self-intersecting path was accepted");
+}
+
 void stroke_round_trips_and_rejects_invalid_width() {
     auto expected = native_rectangle_asset();
     expected.native->nodes.front().stroke = fabric::project::VectorStroke{
@@ -683,6 +704,7 @@ int main() {
     image_fill_round_trips_with_adjustable_shape_mapping();
     line_shape_round_trips_and_rejects_invalid_endpoints();
     path_shape_round_trips_and_rejects_invalid_sequences();
+    path_shape_rejects_self_intersections();
     stroke_round_trips_and_rejects_invalid_width();
     node_hierarchy_and_clip_round_trip_and_reject_cycles();
     invalid_vector_paths_are_rejected();

@@ -49,6 +49,111 @@ bool read_version(const Json& object, std::uint32_t& destination,
     return true;
 }
 
+struct Segment {
+    core::Vec2 start;
+    core::Vec2 end;
+};
+
+float cross(const core::Vec2 a, const core::Vec2 b, const core::Vec2 c) {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+bool on_segment(const core::Vec2 point, const core::Vec2 start,
+                const core::Vec2 end) {
+    constexpr float epsilon = 1.0e-5F;
+    return point.x >= std::min(start.x, end.x) - epsilon &&
+           point.x <= std::max(start.x, end.x) + epsilon &&
+           point.y >= std::min(start.y, end.y) - epsilon &&
+           point.y <= std::max(start.y, end.y) + epsilon &&
+           std::abs(cross(start, end, point)) <= epsilon;
+}
+
+bool segments_intersect(const Segment& first, const Segment& second) {
+    constexpr float epsilon = 1.0e-5F;
+    const float first_start = cross(first.start, first.end, second.start);
+    const float first_end = cross(first.start, first.end, second.end);
+    const float second_start = cross(second.start, second.end, first.start);
+    const float second_end = cross(second.start, second.end, first.end);
+    const auto opposite = [](const float left, const float right) {
+        return (left > epsilon && right < -epsilon) ||
+               (left < -epsilon && right > epsilon);
+    };
+    if (opposite(first_start, first_end) &&
+        opposite(second_start, second_end)) {
+        return true;
+    }
+    return (std::abs(first_start) <= epsilon &&
+            on_segment(second.start, first.start, first.end)) ||
+           (std::abs(first_end) <= epsilon &&
+            on_segment(second.end, first.start, first.end)) ||
+           (std::abs(second_start) <= epsilon &&
+            on_segment(first.start, second.start, second.end)) ||
+           (std::abs(second_end) <= epsilon &&
+            on_segment(first.end, second.start, second.end));
+}
+
+std::vector<Segment> path_segments(
+    const std::vector<VectorShape::PathCommand>& commands) {
+    std::vector<Segment> segments;
+    core::Vec2 current{};
+    bool has_current = false;
+    constexpr int cubic_steps = 32;
+    for (const auto& command : commands) {
+        if (command.kind == VectorPathCommandKind::move) {
+            current = command.point;
+            has_current = true;
+        } else if (command.kind == VectorPathCommandKind::line &&
+                   has_current) {
+            segments.push_back({current, command.point});
+            current = command.point;
+        } else if (command.kind == VectorPathCommandKind::cubic &&
+                   has_current) {
+            const auto start = current;
+            for (int index = 1; index <= cubic_steps; ++index) {
+                const float t = static_cast<float>(index) /
+                                static_cast<float>(cubic_steps);
+                const float inverse = 1.0F - t;
+                const core::Vec2 next{
+                    inverse * inverse * inverse * start.x +
+                        3.0F * inverse * inverse * t * command.control1.x +
+                        3.0F * inverse * t * t * command.control2.x +
+                        t * t * t * command.point.x,
+                    inverse * inverse * inverse * start.y +
+                        3.0F * inverse * inverse * t * command.control1.y +
+                        3.0F * inverse * t * t * command.control2.y +
+                        t * t * t * command.point.y};
+                segments.push_back({current, next});
+                current = next;
+            }
+        } else if (command.kind == VectorPathCommandKind::close &&
+                   has_current && !segments.empty()) {
+            const auto first = segments.front().start;
+            if (!(current == first)) segments.push_back({current, first});
+            current = first;
+        }
+    }
+    return segments;
+}
+
+bool has_self_intersection(const VectorShape& shape) {
+    if (shape.kind != VectorShapeKind::path) return false;
+    const auto segments = path_segments(shape.path);
+    for (std::size_t first = 0; first < segments.size(); ++first) {
+        for (std::size_t second = first + 1U;
+             second < segments.size(); ++second) {
+            if (second == first + 1U ||
+                (first == 0U && second + 1U == segments.size() &&
+                 segments[first].start == segments[second].end)) {
+                continue;
+            }
+            if (segments_intersect(segments[first], segments[second])) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool read_source_kind(const Json& object, VectorSourceKind& destination,
                       std::vector<Error>& errors) {
     std::string value;
@@ -777,6 +882,10 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                     add_error(report.errors, ErrorCode::invalid_asset,
                               prefix + ".shape.path",
                               "must start with move, contain a segment and end close if present");
+                } else if (has_self_intersection(node.shape)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".shape.path",
+                              "must not contain self-intersections");
                 }
             } else if (!node.shape.points.empty()) {
                 add_error(report.errors, ErrorCode::invalid_asset,
