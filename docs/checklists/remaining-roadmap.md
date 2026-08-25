@@ -273,6 +273,9 @@ leur centre, leurs dimensions et leur statut capteur/solide afin de rendre les
 références de triggers vérifiables dans l’éditeur.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
+  Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,
+  échelle et pivot d’une instance sélectionnée, chaque modification étant
+  enregistrée par `MapSession`.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

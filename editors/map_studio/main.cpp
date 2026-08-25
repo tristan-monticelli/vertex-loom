@@ -114,6 +114,55 @@ bool layer_visible(const fabric::project::MapDocument& map, const std::string& l
     return layer == map.layers.end() || layer->visible;
 }
 
+struct TransformEditorState {
+    std::string instance_id;
+    fabric::core::Transform value{};
+};
+
+void draw_transform_editor(fabric::editor::MapSession& session,
+                           const std::vector<std::string>& selected_instances,
+                           TransformEditorState& state,
+                           std::string& status) {
+    if (selected_instances.size() != 1U || !session.map()) return;
+    const auto& map = *session.map();
+    const auto found = std::find_if(map.instances.begin(), map.instances.end(),
+                                    [&](const auto& instance) {
+                                        return instance.id == selected_instances.front();
+                                    });
+    if (found == map.instances.end()) return;
+    const auto instance_id = found->id;
+    if (state.instance_id != instance_id) {
+        state.instance_id = instance_id;
+        state.value = found->transform;
+    }
+    ImGui::SeparatorText("Transform gizmo");
+    ImGui::TextDisabled("Selected: %s", instance_id.c_str());
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::DragFloat2("Position", &state.value.position.x, 0.1F) &&
+        ImGui::IsItemDeactivatedAfterEdit()) {
+        status = session.set_instance_transform({.value = instance_id}, state.value)
+            ? "Position transformed" : "Transform rejected (layer locked or invalid)";
+    }
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::DragFloat("Rotation (degrees)", &state.value.rotation_degrees, 1.0F) &&
+        ImGui::IsItemDeactivatedAfterEdit()) {
+        status = session.set_instance_transform({.value = instance_id}, state.value)
+            ? "Rotation transformed" : "Transform rejected (layer locked or invalid)";
+    }
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::DragFloat2("Scale", &state.value.scale.x, 0.01F, -32.0F, 32.0F) &&
+        ImGui::IsItemDeactivatedAfterEdit()) {
+        status = session.set_instance_transform({.value = instance_id}, state.value)
+            ? "Scale transformed" : "Transform rejected (layer locked or invalid)";
+    }
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::DragFloat2("Pivot", &state.value.pivot.x, 0.01F) &&
+        ImGui::IsItemDeactivatedAfterEdit()) {
+        status = session.set_instance_transform({.value = instance_id}, state.value)
+            ? "Pivot transformed" : "Transform rejected (layer locked or invalid)";
+    }
+}
+
 void draw_map_canvas(const fabric::project::MapDocument& map,
                      std::vector<std::string>& selected_instances,
                      ImVec2& pan,
@@ -310,6 +359,7 @@ int run(const std::filesystem::path& project_root,
     int instance_property_kind = 2;
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
+    TransformEditorState transform_editor;
     bool running = true;
     while (running) {
         SDL_Event event{};
@@ -414,6 +464,7 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndDisabled();
             draw_map_canvas(map, selected_instances, canvas_pan, canvas_zoom, status);
+            draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
                  ++collision_index) {
