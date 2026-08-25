@@ -108,6 +108,10 @@ avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La
 régénération volontaire s'effectue sur une destination absente avec
 `FABRIC_UPDATE_STUDIO_PRESET_FIXTURE=1 ./build/fabric_visual_presets_tests`.
+Les commandes d'édition de composition et composant couvrent modification et
+duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
+test session vérifie undo/redo, autosave, récupération, sauvegarde et reload
+avant que ces commandes soient exposées par l'inspecteur Asset Studio.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

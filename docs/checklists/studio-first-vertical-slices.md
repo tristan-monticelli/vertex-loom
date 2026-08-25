@@ -47,8 +47,12 @@ PNG après sauvegarde, autosave et récupération.
   Preuve : `tests/fixtures/studio-preset-gallery` est produit par
   `ProjectSession`/`MapSession`, régénéré octet par octet en test, validé
   headless et chargé par Preview Runtime avec 24 draw packets génériques.
-- [ ] Ajouter dans Asset Studio l'arbre de calques, le placement, le Z, la
+- [x] Ajouter dans Asset Studio l'arbre de calques, le placement, le Z, la
   visibilité, les ancrages, la duplication et les paramètres.
+
+  Preuve : l'inspecteur Asset Studio pilote les documents par commandes
+  validées ; le test session couvre undo/redo, autosave, récupération,
+  sauvegarde atomique et reload des calques, ancrages et paramètres.
 - [ ] Construire une tête textile avec crop raster, deux yeux paramétriques,
   boutons et couture uniquement depuis l'outil.
 - [ ] Prévisualiser et charger la composition dans une entité et une map.

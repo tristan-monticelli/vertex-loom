@@ -143,6 +143,10 @@ C4Component
 - Une entité v2 peut instancier un `VisualComponent` avec variante, ancre et
   overrides typés. La session et le runtime appliquent ensuite le transform de
   nœud aux paquets résolus, sans connaître le preset d'origine.
+- `ProjectSession` porte aussi les modifications de `VisualComposition` et
+  `VisualComponent` dans le `CommandStack`. Asset Studio édite les calques,
+  transforms, ordre Z, visibilité, ancrages et paramètres avec le même flux
+  undo/redo, autosave, récupération et sauvegarde atomique que les entités.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

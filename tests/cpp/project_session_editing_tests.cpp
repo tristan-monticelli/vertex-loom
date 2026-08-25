@@ -226,6 +226,106 @@ TEST_CASE("project session creates indexes and reloads a visual preset") {
           "coat-zipper-composition");
 }
 
+TEST_CASE("visual composition and component edits undo autosave and recover") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    const auto thread_source = project.path() / "thread.png";
+    std::ofstream{thread_source, std::ios::binary} << "thread-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), manifest,
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "cotton-thread"},
+                      .name = "Cotton Thread"},
+         .source = "assets/textures/cotton-thread.png",
+         .width = 8U,
+         .height = 8U},
+        thread_source).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.create_visual_preset({
+        .kind = fabric::editor::VisualPresetKind::eye,
+        .id = {.value = "editable-eye"},
+        .name = "Editable eye",
+        .thread_texture = fabric::project::ResourceReference{
+            {.value = "cotton-thread"}, "texture"}}));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::visual_composition,
+        {.value = "editable-eye-composition"}));
+
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    auto composition = *session.selected_visual_composition();
+    composition.layers.front().transform.position = {2.0F, -1.0F};
+    composition.layers.front().anchor = {0.25F, 0.75F};
+    composition.layers.front().z_order = 3.0F;
+    composition.layers.front().visible = false;
+    auto duplicate = composition.layers.front();
+    duplicate.id = "eye-copy";
+    duplicate.name = "Eye copy";
+    duplicate.visible = true;
+    composition.layers.push_back(duplicate);
+    REQUIRE(session.set_selected_visual_composition(composition, start));
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_visual_composition()->layers.size() == 1U);
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_visual_composition()->layers.size() == 2U);
+    CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
+          fabric::editor::AutosaveStatus::saved);
+
+    fabric::editor::ProjectSession recovered_composition;
+    REQUIRE(recovered_composition.open(project.path()));
+    REQUIRE(recovered_composition.select_resource(
+        fabric::editor::StudioResourceKind::visual_composition,
+        {.value = "editable-eye-composition"}));
+    REQUIRE(recovered_composition.has_recovery());
+    REQUIRE(recovered_composition.accept_recovery(
+        start + std::chrono::seconds{3}));
+    CHECK(recovered_composition.selected_visual_composition()->layers.size() ==
+          2U);
+    REQUIRE(recovered_composition.save());
+
+    REQUIRE(session.undo(start + std::chrono::seconds{3}));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::visual_component,
+        {.value = "editable-eye"}));
+    auto component = *session.selected_visual_component();
+    component.anchors.front().position = {0.5F, -0.25F};
+    component.parameters.front().name = "Eye scale";
+    component.parameters.front().default_value =
+        fabric::core::Vec2{1.25F, 0.8F};
+    REQUIRE(session.set_selected_visual_component(
+        component, start + std::chrono::seconds{4}));
+    REQUIRE(session.undo(start + std::chrono::seconds{4}));
+    CHECK(session.selected_visual_component()->anchors.front().position ==
+          fabric::core::Vec2{});
+    REQUIRE(session.redo(start + std::chrono::seconds{4}));
+    CHECK(session.update_autosave(start + std::chrono::seconds{6}) ==
+          fabric::editor::AutosaveStatus::saved);
+
+    fabric::editor::ProjectSession recovered_component;
+    REQUIRE(recovered_component.open(project.path()));
+    REQUIRE(recovered_component.select_resource(
+        fabric::editor::StudioResourceKind::visual_component,
+        {.value = "editable-eye"}));
+    REQUIRE(recovered_component.has_recovery());
+    REQUIRE(recovered_component.accept_recovery(
+        start + std::chrono::seconds{7}));
+    CHECK(recovered_component.selected_visual_component()
+              ->anchors.front().position ==
+          fabric::core::Vec2{0.5F, -0.25F});
+    REQUIRE(recovered_component.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::visual_component,
+        {.value = "editable-eye"}));
+    CHECK(reloaded.selected_visual_component()->parameters.front().name ==
+          "Eye scale");
+}
+
 TEST_CASE("material prompt publishes and indexes a material document") {
     const TemporaryDirectory project;
     write_project(project.path());

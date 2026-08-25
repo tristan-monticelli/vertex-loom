@@ -299,11 +299,15 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_visual_composition_.reset();
+    recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
     selected_texture_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
+    selected_visual_composition_document_path_.clear();
+    selected_visual_component_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -357,11 +361,15 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_visual_composition_.reset();
+    recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
     selected_texture_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
+    selected_visual_composition_document_path_.clear();
+    selected_visual_component_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -914,6 +922,10 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
     selected_textured_path_.reset();
     selected_visual_composition_.reset();
     selected_visual_component_.reset();
+    selected_visual_composition_document_path_.clear();
+    selected_visual_component_document_path_.clear();
+    recovery_visual_composition_.reset();
+    recovery_visual_component_.reset();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -1112,6 +1124,24 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_document_path_.clear();
         recovery_animation_.reset();
         selected_visual_composition_ = std::move(*loaded.asset);
+        selected_visual_composition_document_path_ = match->document_path;
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_visual_composition_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_visual_composition(
+                    *manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_visual_composition(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok())
+                recovery_visual_composition_ = std::move(parsed.asset);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty())
+            selection_warnings = std::move(recovery.errors);
     } else if (kind == StudioResourceKind::visual_component) {
         auto loaded = project::load_visual_component(
             project_root_, *manifest_, match->document_path);
@@ -1134,6 +1164,24 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_document_path_.clear();
         recovery_animation_.reset();
         selected_visual_component_ = std::move(*loaded.asset);
+        selected_visual_component_document_path_ = match->document_path;
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_visual_component_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_visual_component(
+                    *manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_visual_component(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok())
+                recovery_visual_component_ = std::move(parsed.asset);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty())
+            selection_warnings = std::move(recovery.errors);
     } else if (kind == StudioResourceKind::input) {
         auto loaded = project::load_input(
             project_root_, *manifest_, match->document_path);
@@ -1207,7 +1255,9 @@ bool ProjectSession::set_project_name(
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
                               dirty_document_ == DirtyDocument::vector ||
                               dirty_document_ == DirtyDocument::entity ||
-                              dirty_document_ == DirtyDocument::animation)) {
+                              dirty_document_ == DirtyDocument::animation ||
+                              dirty_document_ == DirtyDocument::visual_composition ||
+                              dirty_document_ == DirtyDocument::visual_component)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "save current asset changes before editing project settings"}};
         return false;
@@ -1253,7 +1303,9 @@ bool ProjectSession::set_pixels_per_unit(
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
                               dirty_document_ == DirtyDocument::vector ||
                               dirty_document_ == DirtyDocument::entity ||
-                              dirty_document_ == DirtyDocument::animation)) {
+                              dirty_document_ == DirtyDocument::animation ||
+                              dirty_document_ == DirtyDocument::visual_composition ||
+                              dirty_document_ == DirtyDocument::visual_component)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "save current asset changes before editing project settings"}};
         return false;
@@ -1426,6 +1478,85 @@ bool ProjectSession::set_selected_entity_node(
         return false;
     }
     dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_visual_composition(
+    project::VisualComposition composition,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_visual_composition_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a visual composition before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() &&
+        dirty_document_ != DirtyDocument::visual_composition) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing a composition"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() &&
+            update_autosave(now) == AutosaveStatus::failed) return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto validation = project::validate_visual_composition(
+        *manifest_, composition);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<project::VisualComposition>>(
+                *selected_visual_composition_, std::move(composition)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "composition",
+                    "cannot execute the visual composition modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::visual_composition;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_visual_component(
+    project::VisualComponent component,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_visual_component_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a visual component before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() &&
+        dirty_document_ != DirtyDocument::visual_component) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing a component"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() &&
+            update_autosave(now) == AutosaveStatus::failed) return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto validation = project::validate_visual_component(*manifest_, component);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<project::VisualComponent>>(
+                *selected_visual_component_, std::move(component)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "component",
+                    "cannot execute the visual component modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::visual_component;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -1977,6 +2108,34 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::visual_composition) {
+        if (!selected_visual_composition_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_visual_composition(
+            project_root_, *manifest_, *selected_visual_composition_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
+    } else if (dirty_document_ == DirtyDocument::visual_component) {
+        if (!selected_visual_component_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_visual_component(
+            project_root_, *manifest_, *selected_visual_component_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else {
         auto report = project::save_manifest_atomic(project_root_, *manifest_);
         if (!report.ok()) {
@@ -1997,131 +2156,107 @@ AutosaveStatus ProjectSession::update_autosave(
         autosave_.reset();
         return AutosaveStatus::not_due;
     }
-    if (!commands_.dirty()) {
-        if (!autosave_.pending()) {
-            return AutosaveStatus::not_due;
-        }
-        const bool texture_document = dirty_document_ == DirtyDocument::texture &&
-            imported_texture_ && !selected_texture_document_path_.empty();
-        const bool vector_document = dirty_document_ == DirtyDocument::vector &&
-            created_vector_ && !selected_vector_document_path_.empty();
-        const bool entity_document = dirty_document_ == DirtyDocument::entity &&
-            selected_entity_ && !selected_entity_document_path_.empty();
-        const bool animation_document = dirty_document_ == DirtyDocument::animation &&
-            selected_animation_ && !selected_animation_document_path_.empty();
-        const bool input_document = dirty_document_ == DirtyDocument::input &&
-            selected_input_ && !selected_input_document_path_.empty();
-        auto report = project::save_autosave_atomic(
-            project_root_,
-            texture_document ? selected_texture_document_path_
-            : vector_document ? selected_vector_document_path_
-            : entity_document ? selected_entity_document_path_
-            : animation_document ? selected_animation_document_path_
-            : input_document ? selected_input_document_path_
-                            : std::filesystem::path{"project.json"},
-            texture_document ? project::serialize_texture_asset(imported_texture_->asset)
-            : vector_document ? project::serialize_vector_asset(*created_vector_)
-            : entity_document ? project::serialize_entity(*selected_entity_)
-            : animation_document ? project::serialize_animation(*selected_animation_)
-            : input_document ? project::serialize_input(*selected_input_)
-                            : project::serialize_manifest(*manifest_),
-            texture_document
-            ? project::DocumentValidator{[this](const std::string_view contents) {
-                  auto parsed = project::parse_texture_asset(*manifest_, contents);
-                  return project::ValidationReport{
-                      .errors = std::move(parsed.errors)};
-              }}
-            : vector_document
-                ? project::DocumentValidator{[this](const std::string_view contents) {
-                      auto parsed = project::parse_vector_asset(*manifest_, contents);
-                      return project::ValidationReport{
-                          .errors = std::move(parsed.errors)};
-                  }}
-                : entity_document
-                ? project::DocumentValidator{[this](const std::string_view contents) {
-                      auto parsed = project::parse_entity(*manifest_, contents);
-                      return project::ValidationReport{
-                          .errors = std::move(parsed.errors)};
-                  }}
-                : animation_document
-                ? project::DocumentValidator{[this](const std::string_view contents) {
-                      auto parsed = project::parse_animation(*manifest_, contents);
-                      return project::ValidationReport{
-                          .errors = std::move(parsed.errors)};
-                  }}
-                : input_document
-                ? project::DocumentValidator{[](const std::string_view contents) {
-                      auto parsed = project::parse_input(contents);
-                      return project::ValidationReport{
-                          .errors = std::move(parsed.errors)};
-                  }}
-                : project::DocumentValidator{validate_serialized_manifest});
-        if (!report.ok()) {
-            errors_ = std::move(report.errors);
-            return AutosaveStatus::failed;
-        }
-        autosave_.mark_saved();
-        errors_.clear();
-        return AutosaveStatus::saved;
-    }
-    if (!autosave_.due(now)) {
+    if (!commands_.dirty() && !autosave_.pending())
         return AutosaveStatus::not_due;
+    if (commands_.dirty() && !autosave_.due(now))
+        return AutosaveStatus::not_due;
+
+    std::filesystem::path path{"project.json"};
+    std::string contents = project::serialize_manifest(*manifest_);
+    project::DocumentValidator validator = validate_serialized_manifest;
+    const auto require_document = [&](const bool available,
+                                      const char* label) {
+        if (available) return true;
+        errors_ = {{project::ErrorCode::invalid_asset, "autosave",
+                    std::string{"cannot autosave the selected "} + label}};
+        return false;
+    };
+    switch (dirty_document_) {
+    case DirtyDocument::texture:
+        if (!require_document(imported_texture_.has_value() &&
+                !selected_texture_document_path_.empty(), "texture"))
+            return AutosaveStatus::failed;
+        path = selected_texture_document_path_;
+        contents = project::serialize_texture_asset(imported_texture_->asset);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_texture_asset(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::vector:
+        if (!require_document(created_vector_.has_value() &&
+                !selected_vector_document_path_.empty(), "vector"))
+            return AutosaveStatus::failed;
+        path = selected_vector_document_path_;
+        contents = project::serialize_vector_asset(*created_vector_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_vector_asset(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::entity:
+        if (!require_document(selected_entity_.has_value() &&
+                !selected_entity_document_path_.empty(), "entity"))
+            return AutosaveStatus::failed;
+        path = selected_entity_document_path_;
+        contents = project::serialize_entity(*selected_entity_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_entity(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::animation:
+        if (!require_document(selected_animation_.has_value() &&
+                !selected_animation_document_path_.empty(), "animation"))
+            return AutosaveStatus::failed;
+        path = selected_animation_document_path_;
+        contents = project::serialize_animation(*selected_animation_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_animation(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::input:
+        if (!require_document(selected_input_.has_value() &&
+                !selected_input_document_path_.empty(), "input"))
+            return AutosaveStatus::failed;
+        path = selected_input_document_path_;
+        contents = project::serialize_input(*selected_input_);
+        validator = [](const std::string_view value) {
+            auto parsed = project::parse_input(value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::visual_composition:
+        if (!require_document(selected_visual_composition_.has_value() &&
+                !selected_visual_composition_document_path_.empty(),
+                "visual composition")) return AutosaveStatus::failed;
+        path = selected_visual_composition_document_path_;
+        contents = project::serialize_visual_composition(
+            *selected_visual_composition_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_visual_composition(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::visual_component:
+        if (!require_document(selected_visual_component_.has_value() &&
+                !selected_visual_component_document_path_.empty(),
+                "visual component")) return AutosaveStatus::failed;
+        path = selected_visual_component_document_path_;
+        contents = project::serialize_visual_component(
+            *selected_visual_component_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_visual_component(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
+    case DirtyDocument::none:
+    case DirtyDocument::manifest:
+        break;
     }
-    const bool texture_document = dirty_document_ == DirtyDocument::texture &&
-        imported_texture_ && !selected_texture_document_path_.empty();
-    const bool vector_document = dirty_document_ == DirtyDocument::vector &&
-        created_vector_ && !selected_vector_document_path_.empty();
-    const bool entity_document = dirty_document_ == DirtyDocument::entity &&
-        selected_entity_ && !selected_entity_document_path_.empty();
-    const bool animation_document = dirty_document_ == DirtyDocument::animation &&
-        selected_animation_ && !selected_animation_document_path_.empty();
-    const bool input_document = dirty_document_ == DirtyDocument::input &&
-        selected_input_ && !selected_input_document_path_.empty();
     auto report = project::save_autosave_atomic(
-        project_root_,
-        texture_document ? selected_texture_document_path_
-        : vector_document ? selected_vector_document_path_
-        : entity_document ? selected_entity_document_path_
-        : animation_document ? selected_animation_document_path_
-        : input_document ? selected_input_document_path_
-                        : std::filesystem::path{"project.json"},
-        texture_document ? project::serialize_texture_asset(imported_texture_->asset)
-        : vector_document ? project::serialize_vector_asset(*created_vector_)
-        : entity_document ? project::serialize_entity(*selected_entity_)
-        : animation_document ? project::serialize_animation(*selected_animation_)
-        : input_document ? project::serialize_input(*selected_input_)
-                        : project::serialize_manifest(*manifest_),
-        texture_document
-        ? project::DocumentValidator{[this](const std::string_view contents) {
-              auto parsed = project::parse_texture_asset(*manifest_, contents);
-              return project::ValidationReport{
-                  .errors = std::move(parsed.errors)};
-          }}
-        : vector_document
-            ? project::DocumentValidator{[this](const std::string_view contents) {
-                  auto parsed = project::parse_vector_asset(*manifest_, contents);
-                  return project::ValidationReport{
-                      .errors = std::move(parsed.errors)};
-              }}
-            : entity_document
-            ? project::DocumentValidator{[this](const std::string_view contents) {
-                  auto parsed = project::parse_entity(*manifest_, contents);
-                  return project::ValidationReport{
-                      .errors = std::move(parsed.errors)};
-              }}
-            : animation_document
-            ? project::DocumentValidator{[this](const std::string_view contents) {
-                  auto parsed = project::parse_animation(*manifest_, contents);
-                  return project::ValidationReport{
-                      .errors = std::move(parsed.errors)};
-              }}
-            : input_document
-            ? project::DocumentValidator{[](const std::string_view contents) {
-                  auto parsed = project::parse_input(contents);
-                  return project::ValidationReport{
-                      .errors = std::move(parsed.errors)};
-              }}
-            : project::DocumentValidator{validate_serialized_manifest});
+        project_root_, path, contents, std::move(validator));
     if (!report.ok()) {
         errors_ = std::move(report.errors);
         return AutosaveStatus::failed;
@@ -2173,6 +2308,27 @@ bool ProjectSession::accept_recovery(
         errors_.clear();
         return true;
     }
+    if (recovery_visual_composition_) {
+        selected_visual_composition_ =
+            std::move(recovery_visual_composition_);
+        recovery_visual_composition_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::visual_composition;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
+    if (recovery_visual_component_) {
+        selected_visual_component_ = std::move(recovery_visual_component_);
+        recovery_visual_component_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::visual_component;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (!recovery_manifest_.has_value()) {
         return false;
     }
@@ -2192,6 +2348,8 @@ void ProjectSession::decline_recovery() noexcept {
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_visual_composition_.reset();
+    recovery_visual_component_.reset();
     errors_.clear();
 }
 
@@ -2214,7 +2372,9 @@ bool ProjectSession::can_redo() const noexcept {
 bool ProjectSession::has_recovery() const noexcept {
     return recovery_manifest_.has_value() || recovery_texture_.has_value() ||
         recovery_vector_.has_value() ||
-        recovery_entity_.has_value() || recovery_animation_.has_value();
+        recovery_entity_.has_value() || recovery_animation_.has_value() ||
+        recovery_visual_composition_.has_value() ||
+        recovery_visual_component_.has_value();
 }
 
 const std::filesystem::path& ProjectSession::project_root() const noexcept {

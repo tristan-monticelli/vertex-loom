@@ -1333,16 +1333,197 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::Text("Width %.3f", path.width);
                 ImGui::Text("Texture %s", path.texture.id.value.c_str());
             } else if (session.selected_visual_composition()) {
-                ImGui::Text("%zu layer(s)",
-                            session.selected_visual_composition()->layers.size());
+                const auto& composition =
+                    *session.selected_visual_composition();
+                static std::string selected_composition_id;
+                static std::size_t selected_layer{};
+                if (selected_composition_id != composition.document.id.value) {
+                    selected_composition_id = composition.document.id.value;
+                    selected_layer = 0U;
+                }
+                ImGui::SeparatorText("Layer tree");
+                for (std::size_t index = 0; index < composition.layers.size();
+                     ++index) {
+                    const auto& layer = composition.layers[index];
+                    ImGui::PushID(static_cast<int>(index));
+                    auto flags = ImGuiTreeNodeFlags_Leaf |
+                        ImGuiTreeNodeFlags_NoTreePushOnOpen |
+                        ImGuiTreeNodeFlags_SpanAvailWidth;
+                    if (index == selected_layer)
+                        flags |= ImGuiTreeNodeFlags_Selected;
+                    ImGui::TreeNodeEx("layer", flags, "%s  ·  %s",
+                                      layer.name.c_str(),
+                                      std::string(fabric::project::to_string(
+                                          layer.kind)).c_str());
+                    if (ImGui::IsItemClicked()) selected_layer = index;
+                    ImGui::PopID();
+                }
+                if (!composition.layers.empty() &&
+                    selected_layer < composition.layers.size()) {
+                    if (ImGui::Button("Duplicate layer")) {
+                        auto candidate = composition;
+                        auto copy = candidate.layers[selected_layer];
+                        const auto base = copy.id + "-copy";
+                        copy.id = base;
+                        std::size_t suffix = 2U;
+                        while (std::ranges::any_of(
+                            candidate.layers, [&](const auto& layer) {
+                                return layer.id == copy.id;
+                            })) {
+                            copy.id = base + "-" +
+                                std::to_string(suffix++);
+                        }
+                        copy.name += " copy";
+                        candidate.layers.insert(
+                            candidate.layers.begin() +
+                                static_cast<std::ptrdiff_t>(selected_layer + 1U),
+                            std::move(copy));
+                        if (session.set_selected_visual_composition(
+                                std::move(candidate))) ++selected_layer;
+                    }
+                    const auto& current =
+                        session.selected_visual_composition()
+                            ->layers[selected_layer];
+                    auto layer = current;
+                    bool changed = false;
+                    ImGui::SeparatorText("Selected layer");
+                    changed |= ImGui::Checkbox("Visible", &layer.visible);
+                    changed |= ImGui::DragFloat("Z order", &layer.z_order,
+                                                0.1F);
+                    changed |= ImGui::SliderFloat("Opacity", &layer.opacity,
+                                                  0.0F, 1.0F);
+                    changed |= ImGui::SliderFloat2("Anchor", &layer.anchor.x,
+                                                   0.0F, 1.0F);
+                    changed |= ImGui::DragFloat2("Position",
+                                                 &layer.transform.position.x,
+                                                 0.05F);
+                    changed |= ImGui::DragFloat(
+                        "Rotation", &layer.transform.rotation_degrees, 0.5F);
+                    changed |= ImGui::DragFloat2("Scale",
+                                                 &layer.transform.scale.x,
+                                                 0.01F, 0.001F, 100.0F);
+                    changed |= ImGui::DragFloat2("Pivot",
+                                                 &layer.transform.pivot.x,
+                                                 0.01F);
+                    if (changed) {
+                        auto candidate =
+                            *session.selected_visual_composition();
+                        candidate.layers[selected_layer] = std::move(layer);
+                        (void)session.set_selected_visual_composition(
+                            std::move(candidate));
+                    }
+                }
             } else if (session.selected_visual_component()) {
                 const auto& component = *session.selected_visual_component();
-                ImGui::Text("%zu parameter(s)", component.parameters.size());
-                ImGui::Text("%zu variant(s)", component.variants.size());
-                for (const auto& parameter : component.parameters) {
-                    ImGui::BulletText("%s%s", parameter.name.c_str(),
-                                      parameter.animatable ? " · animatable" : "");
+                static std::string selected_component_id;
+                static std::size_t selected_anchor{};
+                static std::size_t selected_parameter{};
+                if (selected_component_id != component.document.id.value) {
+                    selected_component_id = component.document.id.value;
+                    selected_anchor = 0U;
+                    selected_parameter = 0U;
                 }
+                ImGui::SeparatorText("Anchors");
+                for (std::size_t index = 0; index < component.anchors.size();
+                     ++index) {
+                    const auto& anchor = component.anchors[index];
+                    if (ImGui::Selectable(anchor.name.c_str(),
+                                          selected_anchor == index))
+                        selected_anchor = index;
+                }
+                if (!component.anchors.empty() &&
+                    selected_anchor < component.anchors.size()) {
+                    if (ImGui::Button("Duplicate anchor")) {
+                        auto candidate = component;
+                        auto copy = candidate.anchors[selected_anchor];
+                        const auto base = copy.id + "-copy";
+                        copy.id = base;
+                        std::size_t suffix = 2U;
+                        while (std::ranges::any_of(
+                            candidate.anchors, [&](const auto& anchor) {
+                                return anchor.id == copy.id;
+                            })) {
+                            copy.id = base + "-" +
+                                std::to_string(suffix++);
+                        }
+                        copy.name += " copy";
+                        candidate.anchors.push_back(std::move(copy));
+                        if (session.set_selected_visual_component(
+                                std::move(candidate))) {
+                            selected_anchor = session.selected_visual_component()
+                                ->anchors.size() - 1U;
+                        }
+                    }
+                    auto anchor = session.selected_visual_component()
+                                      ->anchors[selected_anchor];
+                    if (ImGui::DragFloat2("Anchor position",
+                                          &anchor.position.x, 0.05F)) {
+                        auto candidate =
+                            *session.selected_visual_component();
+                        candidate.anchors[selected_anchor] = std::move(anchor);
+                        (void)session.set_selected_visual_component(
+                            std::move(candidate));
+                    }
+                }
+
+                const auto& current_component =
+                    *session.selected_visual_component();
+                ImGui::SeparatorText("Parameters");
+                for (std::size_t index = 0;
+                     index < current_component.parameters.size(); ++index) {
+                    const auto& parameter = current_component.parameters[index];
+                    if (ImGui::Selectable(parameter.name.c_str(),
+                                          selected_parameter == index))
+                        selected_parameter = index;
+                }
+                if (!current_component.parameters.empty() &&
+                    selected_parameter < current_component.parameters.size()) {
+                    auto parameter =
+                        current_component.parameters[selected_parameter];
+                    bool changed = ImGui::Checkbox(
+                        "Animatable", &parameter.animatable);
+                    ImGui::TextDisabled("Target %s.%s.%s",
+                        parameter.target.node_id.c_str(),
+                        parameter.target.component_id.c_str(),
+                        parameter.target.property_id.c_str());
+                    if (auto* value = std::get_if<float>(
+                            &parameter.default_value)) {
+                        changed |= ImGui::DragFloat("Default", value, 0.05F);
+                    } else if (auto* value = std::get_if<std::int64_t>(
+                                   &parameter.default_value)) {
+                        changed |= ImGui::InputScalar(
+                            "Default", ImGuiDataType_S64, value);
+                    } else if (auto* value = std::get_if<bool>(
+                                   &parameter.default_value)) {
+                        changed |= ImGui::Checkbox("Default", value);
+                    } else if (auto* value = std::get_if<std::string>(
+                                   &parameter.default_value)) {
+                        changed |= ImGui::InputText("Default", value);
+                    } else if (auto* value = std::get_if<fabric::core::Vec2>(
+                                   &parameter.default_value)) {
+                        changed |= ImGui::DragFloat2("Default", &value->x,
+                                                     0.05F);
+                    } else if (auto* value = std::get_if<fabric::core::Color>(
+                                   &parameter.default_value)) {
+                        changed |= ImGui::ColorEdit4("Default", &value->red);
+                    } else if (const auto* value = std::get_if<
+                                   fabric::project::ResourceReference>(
+                                   &parameter.default_value)) {
+                        ImGui::TextDisabled("Default %s (%s)",
+                                            value->id.value.c_str(),
+                                            value->expected_type.c_str());
+                    }
+                    if (changed) {
+                        auto candidate =
+                            *session.selected_visual_component();
+                        candidate.parameters[selected_parameter] =
+                            std::move(parameter);
+                        (void)session.set_selected_visual_component(
+                            std::move(candidate));
+                    }
+                }
+                ImGui::TextDisabled("%zu variant(s)",
+                                    current_component.variants.size());
             }
             for (const auto& error : visual_preview.errors) {
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
