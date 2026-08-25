@@ -66,6 +66,16 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE_FALSE(session.remove_event({.value = "on-enter"}));
     REQUIRE(session.remove_trigger({.value = "enter"}));
     REQUIRE(session.remove_event({.value = "on-enter"}));
+    auto collision = session.map()->collisions.front();
+    collision.center = {3.0F, 4.0F};
+    collision.radius = 2.0F;
+    collision.sensor = false;
+    REQUIRE(session.set_collision_shape(0, collision));
+    CHECK(session.map()->collisions.front().center == fabric::core::Vec2{3.0F, 4.0F});
+    REQUIRE(session.undo());
+    CHECK(session.map()->collisions.front().center == fabric::core::Vec2{});
+    REQUIRE(session.set_layer_locked({.value = "collision"}, true));
+    REQUIRE_FALSE(session.set_collision_shape(0, collision));
     REQUIRE(session.save());
 
     fabric::editor::MapSession reopened;

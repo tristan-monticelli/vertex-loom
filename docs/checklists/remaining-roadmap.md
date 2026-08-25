@@ -271,6 +271,9 @@ par l’historique réversible de `MapSession`.
 Les collisions sont également listées avec leur index, leur forme, leur couche,
 leur centre, leurs dimensions et leur statut capteur/solide afin de rendre les
 références de triggers vérifiables dans l’éditeur.
+Une collision sélectionnée peut maintenant être modifiée depuis l’inspecteur
+(centre, rayon, longueur de capsule et statut capteur) puis enregistrée comme
+une commande réversible ; les calques verrouillés refusent la mutation.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

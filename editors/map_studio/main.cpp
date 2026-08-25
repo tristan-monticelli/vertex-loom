@@ -496,6 +496,9 @@ int run(const std::filesystem::path& project_root,
     std::string trigger_id;
     std::string trigger_event_id;
     int trigger_collision_index = 0;
+    int selected_collision_index = -1;
+    int collision_editor_index = -1;
+    fabric::project::CollisionShape collision_editor;
     std::vector<std::string> selected_instances;
     std::string selected_prefab;
     std::string override_id;
@@ -619,9 +622,47 @@ int run(const std::filesystem::path& project_root,
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
                  ++collision_index) {
                 const auto& collision = map.collisions[collision_index];
-                ImGui::BulletText("[%zu] %s / layer %s", collision_index,
-                                  collision_shape_text(collision).c_str(),
-                                  collision.layer_id.c_str());
+                ImGui::PushID(static_cast<int>(collision_index));
+                const auto label = "[" + std::to_string(collision_index) + "] " +
+                                   collision_shape_text(collision) + " / layer " +
+                                   collision.layer_id;
+                if (ImGui::Selectable(label.c_str(),
+                                      selected_collision_index ==
+                                          static_cast<int>(collision_index))) {
+                    selected_collision_index = static_cast<int>(collision_index);
+                }
+                ImGui::PopID();
+            }
+            if (selected_collision_index >= 0 &&
+                static_cast<std::size_t>(selected_collision_index) < map.collisions.size()) {
+                if (collision_editor_index != selected_collision_index) {
+                    collision_editor_index = selected_collision_index;
+                    collision_editor = map.collisions[static_cast<std::size_t>(
+                        selected_collision_index)];
+                }
+                ImGui::SeparatorText("Selected collision");
+                ImGui::Text("Layer: %s", collision_editor.layer_id.c_str());
+                ImGui::Text("Kind: %s", collision_shape_text(collision_editor).c_str());
+                ImGui::Checkbox("Sensor", &collision_editor.sensor);
+                ImGui::SetNextItemWidth(220.0F);
+                ImGui::DragFloat2("Center", &collision_editor.center.x, 0.1F);
+                if (collision_editor.kind == fabric::project::CollisionShapeKind::circle ||
+                    collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
+                    ImGui::SetNextItemWidth(220.0F);
+                    ImGui::DragFloat("Radius", &collision_editor.radius, 0.1F, 0.0F,
+                                     4096.0F);
+                }
+                if (collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
+                    ImGui::SetNextItemWidth(220.0F);
+                    ImGui::DragFloat("Length", &collision_editor.length, 0.1F, 0.0F,
+                                     4096.0F);
+                }
+                if (ImGui::Button("Apply collision")) {
+                    const auto applied = session.set_collision_shape(
+                        static_cast<std::size_t>(selected_collision_index), collision_editor);
+                    status = applied ? "Collision updated" :
+                                       "Collision update rejected (layer locked or invalid)";
+                }
             }
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
