@@ -705,6 +705,33 @@ TEST_CASE("preview runtime emits crossed markers for animated instances") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime emits markers for state machine clips") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-state-marker-events-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    auto source_animation = animation();
+    source_animation.markers = {{"state-frame", 0.01F}};
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_state_machine_entity()).ok());
+    REQUIRE(fabric::project::publish_animation(root, manifest(), source_animation).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), state_machine_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.animation_marker_events().size() == 1U);
+    CHECK(runtime.animation_marker_events().front().instance_id == "state-machine");
+    CHECK(runtime.animation_marker_events().front().marker.id == "state-frame");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime applies animated material tracks to submitted packets") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-material-animation-" + std::to_string(

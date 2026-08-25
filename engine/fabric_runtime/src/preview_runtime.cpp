@@ -1165,16 +1165,56 @@ bool PreviewRuntime::run() {
             static_cast<float>(fixed_time_step);
         const auto previous_animation_time = animation_time -
             static_cast<float>(fixed_time_step);
-        for (const auto& [instance_id, clip_id] : impl_->animation_instances) {
-            const auto clip = impl_->animation_clips.find(clip_id);
-            if (clip == impl_->animation_clips.end()) continue;
-            const auto markers = project::animation_markers_between(
-                clip->second, previous_animation_time, animation_time);
+        const auto append_marker_events = [&](const std::string& instance_id,
+                                              const std::string& clip_id,
+                                              const std::vector<project::AnimationMarkerHit>& markers) {
             for (const auto& marker : markers)
                 impl_->animation_marker_events.push_back({
                     .instance_id = instance_id,
                     .clip_id = {.value = clip_id},
                     .marker = marker});
+        };
+        for (const auto& [instance_id, clip_id] : impl_->animation_instances) {
+            const auto clip = impl_->animation_clips.find(clip_id);
+            if (clip == impl_->animation_clips.end()) continue;
+            append_marker_events(instance_id, clip_id,
+                project::animation_markers_between(
+                    clip->second, previous_animation_time, animation_time));
+        }
+        for (const auto& [instance_id, machine] : impl_->animation_state_machines) {
+            const auto previous = evaluate_instance_state(
+                instance_id, previous_animation_time);
+            const auto current = evaluate_instance_state(instance_id, animation_time);
+            if (!previous || !current) continue;
+            const auto clip = impl_->animation_clips.find(current->clip_id.value);
+            if (clip == impl_->animation_clips.end()) continue;
+            if (previous->state_id == current->state_id &&
+                previous->clip_id == current->clip_id) {
+                auto end_time = current->local_time;
+                if (clip->second.loop && end_time < previous->local_time)
+                    end_time += clip->second.duration;
+                append_marker_events(instance_id, current->clip_id.value,
+                    project::animation_markers_between(
+                        clip->second, previous->local_time, end_time));
+                continue;
+            }
+            const auto previous_clip = impl_->animation_clips.find(previous->clip_id.value);
+            if (previous_clip != impl_->animation_clips.end()) {
+                const auto* transition = project::select_animation_transition(
+                    machine, previous->state_id,
+                    impl_->animation_parameters.at(instance_id),
+                    previous_clip->second.duration > 0.0F
+                        ? previous->local_time / previous_clip->second.duration : 1.0F);
+                auto old_end = previous->local_time;
+                if (transition && transition->exit_time)
+                    old_end = previous_clip->second.duration * *transition->exit_time;
+                append_marker_events(instance_id, previous->clip_id.value,
+                    project::animation_markers_between(
+                        previous_clip->second, previous->local_time, old_end));
+            }
+            append_marker_events(instance_id, current->clip_id.value,
+                project::animation_markers_between(
+                    clip->second, 0.0F, current->local_time));
         }
         stats_.animation_marker_events = impl_->animation_marker_events.size();
         std::unordered_map<std::string, std::vector<project::EntityNode>> evaluated_nodes;
