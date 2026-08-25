@@ -253,6 +253,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   l’entité, avec ordre déterministe, cycles et nœuds absents refusés.
 - [x] Persister un maillage de déformation optionnel avec positions de repos,
   influences de nœuds et triangles validés headless.
+- [x] Persister un état XPBD optionnel avec particules, lambdas et les cinq
+  familles de contraintes validées headless.
 - [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des

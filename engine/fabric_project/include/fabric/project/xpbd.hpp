@@ -11,6 +11,7 @@ namespace fabric::project {
 struct XpbdParticle {
     core::Vec2 position;
     float inverse_mass{1.0F};
+    friend bool operator==(const XpbdParticle&, const XpbdParticle&) = default;
 };
 
 struct XpbdDistanceConstraint {
@@ -19,6 +20,7 @@ struct XpbdDistanceConstraint {
     float rest_length{};
     float compliance{};
     float lambda{};
+    friend bool operator==(const XpbdDistanceConstraint&, const XpbdDistanceConstraint&) = default;
 };
 
 struct XpbdPinConstraint {
@@ -26,6 +28,7 @@ struct XpbdPinConstraint {
     core::Vec2 target;
     float compliance{};
     core::Vec2 lambda;
+    friend bool operator==(const XpbdPinConstraint&, const XpbdPinConstraint&) = default;
 };
 
 struct XpbdBendingConstraint {
@@ -35,6 +38,7 @@ struct XpbdBendingConstraint {
     float rest_length{};
     float compliance{};
     float lambda{};
+    friend bool operator==(const XpbdBendingConstraint&, const XpbdBendingConstraint&) = default;
 };
 
 struct XpbdAreaConstraint {
@@ -44,6 +48,7 @@ struct XpbdAreaConstraint {
     float rest_area{};
     float compliance{};
     float lambda{};
+    friend bool operator==(const XpbdAreaConstraint&, const XpbdAreaConstraint&) = default;
 };
 
 struct XpbdCollisionConstraint {
@@ -52,6 +57,7 @@ struct XpbdCollisionConstraint {
     float offset{};
     float compliance{};
     float lambda{};
+    friend bool operator==(const XpbdCollisionConstraint&, const XpbdCollisionConstraint&) = default;
 };
 
 struct XpbdSystem {
@@ -61,6 +67,7 @@ struct XpbdSystem {
     std::vector<XpbdBendingConstraint> bending_constraints;
     std::vector<XpbdAreaConstraint> area_constraints;
     std::vector<XpbdCollisionConstraint> collision_constraints;
+    friend bool operator==(const XpbdSystem&, const XpbdSystem&) = default;
 };
 
 struct XpbdResult {

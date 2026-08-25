@@ -153,4 +153,36 @@ TEST_CASE("entity deformation mesh round-trips and requires valid nodes") {
     REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
 }
 
+TEST_CASE("entity XPBD state round-trips and rejects invalid particle indices") {
+    auto source = entity();
+    source.xpbd = fabric::project::XpbdSystem{};
+    source.xpbd->particles = {
+        {.position = {0.0F, 0.0F}, .inverse_mass = 1.0F},
+        {.position = {1.0F, 0.0F}, .inverse_mass = 1.0F},
+        {.position = {0.0F, 1.0F}, .inverse_mass = 1.0F}};
+    source.xpbd->distance_constraints.push_back({
+        .first = 0, .second = 1, .rest_length = 1.0F,
+        .compliance = 0.01F, .lambda = 0.2F});
+    source.xpbd->pin_constraints.push_back({
+        .particle = 0, .target = {0.0F, 0.0F}, .compliance = 0.0F,
+        .lambda = {0.0F, 0.0F}});
+    source.xpbd->bending_constraints.push_back({
+        .first = 0, .middle = 1, .third = 2, .rest_length = 1.0F,
+        .compliance = 0.01F, .lambda = 0.0F});
+    source.xpbd->area_constraints.push_back({
+        .first = 0, .second = 1, .third = 2, .rest_area = 0.5F,
+        .compliance = 0.01F, .lambda = 0.0F});
+    source.xpbd->collision_constraints.push_back({
+        .particle = 2, .normal = {0.0F, 1.0F}, .offset = -1.0F,
+        .compliance = 0.01F, .lambda = 0.0F});
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.entity == source);
+
+    auto invalid = source;
+    invalid.xpbd->distance_constraints.front().second = 99;
+    REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
+}
+
 } // namespace
