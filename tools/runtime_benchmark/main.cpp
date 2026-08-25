@@ -9,6 +9,7 @@
 #include <cmath>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <string_view>
@@ -19,6 +20,7 @@ struct Options {
     std::size_t instances{10000U};
     std::size_t frames{600U};
     double minimum_fps{};
+    std::filesystem::path report;
 };
 
 bool positive(const char* value, std::size_t& output) {
@@ -52,8 +54,11 @@ bool parse_options(const int argc, char** argv, Options& options) {
             if (!positive(argv[++index], options.frames)) return false;
         } else if (argument == "--min-fps" && index + 1 < argc) {
             if (!non_negative(argv[++index], options.minimum_fps)) return false;
+        } else if (argument == "--report" && index + 1 < argc) {
+            options.report = argv[++index];
+            if (options.report.empty()) return false;
         } else if (argument == "--help") {
-            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N] [--min-fps N]\n";
+            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N] [--min-fps N] [--report path]\n";
             return false;
         } else {
             return false;
@@ -161,6 +166,30 @@ int main(const int argc, char** argv) {
     if (!runtime.run()) return fail("runtime_run");
 
     const auto& stats = runtime.stats();
+    const auto fps = stats.p95_frame_ms > 0.0 ? 1000.0 / stats.p95_frame_ms : 0.0;
+    const bool passed = stats.visible_instances == options.instances &&
+        fps >= options.minimum_fps;
+    if (!options.report.empty()) {
+        std::ofstream report(options.report, std::ios::binary | std::ios::trunc);
+        if (!report) return fail("report_open");
+        report << "{\n"
+               << "  \"instances\": " << options.instances << ",\n"
+               << "  \"framesRequested\": " << options.frames << ",\n"
+               << "  \"minimumFps\": " << options.minimum_fps << ",\n"
+               << "  \"visibleInstances\": " << stats.visible_instances << ",\n"
+               << "  \"cullingCandidates\": " << stats.culling_candidates << ",\n"
+               << "  \"culledPackets\": " << stats.culled_packets << ",\n"
+               << "  \"directRenderFrames\": " << stats.direct_render_frames << ",\n"
+               << "  \"frames\": " << stats.frames << ",\n"
+               << "  \"drawCallsTotal\": " << stats.draw_calls << ",\n"
+               << "  \"trianglesTotal\": " << stats.triangles << ",\n"
+               << "  \"elapsedMs\": " << stats.elapsed_ms << ",\n"
+               << "  \"p95FrameMs\": " << stats.p95_frame_ms << ",\n"
+               << "  \"fpsP95\": " << fps << ",\n"
+               << "  \"passed\": " << (passed ? "true" : "false") << "\n"
+               << "}\n";
+        if (!report) return fail("report_write");
+    }
     std::cout << "instances=" << options.instances
               << " visible=" << stats.visible_instances
               << " culling_candidates=" << stats.culling_candidates
@@ -171,10 +200,8 @@ int main(const int argc, char** argv) {
               << " triangles_total=" << stats.triangles
               << " elapsed_ms=" << stats.elapsed_ms
               << " p95_frame_ms=" << stats.p95_frame_ms
-              << " fps_p95=" << (stats.p95_frame_ms > 0.0
-                  ? 1000.0 / stats.p95_frame_ms : 0.0) << '\n';
+              << " fps_p95=" << fps << '\n';
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
-    const auto fps = stats.p95_frame_ms > 0.0 ? 1000.0 / stats.p95_frame_ms : 0.0;
-    return stats.visible_instances == options.instances && fps >= options.minimum_fps ? 0 : 1;
+    return passed ? 0 : 1;
 }
