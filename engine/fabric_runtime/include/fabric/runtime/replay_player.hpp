@@ -4,10 +4,29 @@
 #include "fabric/runtime/input.hpp"
 
 #include <cstdint>
+#include <cstddef>
 #include <optional>
+#include <string>
 #include <vector>
 
 namespace fabric::runtime {
+
+struct ReplayObservedState {
+    std::string node_id;
+    float x{};
+    float y{};
+    float rotation_turns{};
+};
+
+struct ReplayCheckpointVerification {
+    std::size_t mismatches{};
+    std::size_t corrected{};
+    std::size_t missing{};
+    [[nodiscard]] bool matched() const noexcept { return mismatches == 0U && missing == 0U; }
+};
+
+[[nodiscard]] ReplayCheckpointVerification verify_and_correct_checkpoint(
+    const project::ReplayCheckpoint&, std::vector<ReplayObservedState>&) noexcept;
 
 class ReplayPlayer {
 public:

@@ -36,4 +36,20 @@ TEST_CASE("replay player applies actions, events and checkpoints by frame") {
     CHECK_FALSE(player.advance(3, input));
 }
 
+TEST_CASE("checkpoint verification corrects quantized divergent state") {
+    const fabric::project::ReplayCheckpoint checkpoint{
+        .frame = 60,
+        .states = {{"player", 4096, -2048, 8192}}};
+    std::vector<fabric::runtime::ReplayObservedState> observed{
+        {"player", 1.1F, -0.4F, 0.2F}, {"missing-from-checkpoint", 2.0F, 0.0F, 0.0F}};
+    const auto result = fabric::runtime::verify_and_correct_checkpoint(checkpoint, observed);
+    CHECK(result.mismatches == 1);
+    CHECK(result.corrected == 1);
+    CHECK(result.missing == 0);
+    CHECK_FALSE(result.matched());
+    CHECK(observed.front().x == 1.0F);
+    CHECK(observed.front().y == -0.5F);
+    CHECK(observed.front().rotation_turns == 0.125F);
+}
+
 } // namespace
