@@ -1,4 +1,6 @@
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/entity.hpp"
+#include "fabric/project/material.hpp"
 #include "fabric/project/resource_registry.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -184,6 +186,51 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, "vectors",
         ".vector.json", "assets.vectors", load_vector_asset,
         vector_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root, "materials",
+        ".material.json", "assets.materials", load_material,
+        material_resource_references, registry, result.errors);
+    const auto entity_directory = project_root / loaded.manifest->directories.entities;
+    std::error_code entity_error;
+    if (std::filesystem::exists(entity_directory, entity_error)) {
+        const auto canonical_entity_directory = std::filesystem::weakly_canonical(
+            entity_directory, entity_error);
+        if (entity_error || !is_within_project(canonical_root,
+                                               canonical_entity_directory)) {
+            add_error(result.errors, ErrorCode::invalid_path, "entities",
+                      "entity directory must remain inside the project root");
+        } else {
+            for (std::filesystem::directory_iterator iterator(
+                     entity_directory, entity_error), end;
+                 !entity_error && iterator != end;
+                 iterator.increment(entity_error)) {
+                const auto filename = iterator->path().filename().string();
+                if (!iterator->is_regular_file(entity_error) ||
+                    !filename.ends_with(".entity.json")) continue;
+                auto loaded_entity = load_entity(
+                    project_root, *loaded.manifest,
+                    iterator->path().lexically_relative(project_root));
+                if (loaded_entity.ok()) {
+                    auto registration = registry.register_resource({
+                        .document = loaded_entity.entity->document,
+                        .document_path = iterator->path().lexically_relative(project_root),
+                        .references = entity_resource_references(*loaded_entity.entity),
+                    });
+                    result.errors.insert(result.errors.end(),
+                                         std::make_move_iterator(registration.errors.begin()),
+                                         std::make_move_iterator(registration.errors.end()));
+                }
+                result.errors.insert(result.errors.end(),
+                                     std::make_move_iterator(loaded_entity.errors.begin()),
+                                     std::make_move_iterator(loaded_entity.errors.end()));
+            }
+            if (entity_error) add_error(result.errors, ErrorCode::io_error,
+                                        "entities", "cannot inspect entity documents");
+        }
+    } else if (entity_error) {
+        add_error(result.errors, ErrorCode::io_error, "entities",
+                  "cannot inspect entity directory");
+    }
     auto graph_validation = registry.validate();
     result.errors.insert(
         result.errors.end(),

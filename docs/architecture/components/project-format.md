@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1 et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -55,6 +55,12 @@ C4Component
   transparent. Un fill image référence un `TextureAsset`, conserve son mode de
   cadrage, son transform indépendant, son opacité et son choix de suivre la
   déformation de la forme. Sa publication est atomique et ne crée aucun SVG.
+- `MaterialDefinition v1` est stocké sous
+  `assets/materials/<id>.material.json` et porte couleur, opacité, blend,
+  transform UV, texture optionnelle et motif vectoriel optionnel.
+- `EntityDefinition v1` est stocké sous `entities/<id>.entity.json` et porte
+  des nœuds stables, parentage, transform, ordre Z, drawable vectoriel ou
+  texture et matériau optionnel.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
@@ -71,6 +77,9 @@ C4Component
   une source manquante, extérieure au projet ou incohérente avec le contrat.
 - Le validateur headless applique les contrôles propres à `linkedSvg` ou
   `native` après migration de chaque `*.vector.json`.
+- Le validateur headless charge aussi les documents matériau et entité,
+  enregistre leurs références typées et refuse les cycles de parentage ou de
+  dépendances.
 - Après chargement, le validateur headless refuse les identifiants dupliqués,
   références manquantes, types incompatibles et cycles du registre.
 - `ResourceRegistry` est instancié par chargement de projet, sans singleton ;

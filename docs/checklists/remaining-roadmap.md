@@ -225,9 +225,9 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
 
 ## Étape F — Entités, matériaux et déformations
 
-- [ ] Définir `MaterialDefinition v1` autour des fills et contours, sans
+- [x] Définir `MaterialDefinition v1` autour des fills et contours, sans
   dépendance sprite.
-- [ ] Définir `EntityDefinition v1` avec nœuds stables, parentage, transforms,
+- [x] Définir `EntityDefinition v1` avec nœuds stables, parentage, transforms,
   drawables vectoriels et références d’artworks.
 - [ ] Refuser cycles, références invalides et valeurs non finies.
 - [ ] Ajouter contraintes copy-transform, limites, look-at et ordre explicite.

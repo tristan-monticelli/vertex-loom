@@ -75,6 +75,9 @@ La session éditeur couvre la conversion liée-vers-native, sa publication,
 undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 `fabric_asset_preview` est vérifié headless sur les mêmes draw packets que le
 renderer et refuse les documents liés ou invalides sans créer de fenêtre.
+Les contrats `MaterialDefinition v1` et `EntityDefinition v1` couvrent
+round-trip, publication atomique, références typées, transforms non finies,
+identifiants dupliqués et cycles de parentage.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

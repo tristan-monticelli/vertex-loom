@@ -1,0 +1,112 @@
+#include "fabric/project/entity.hpp"
+#include "fabric/project/material.hpp"
+
+#include <chrono>
+#include <algorithm>
+#include <filesystem>
+#include <stdexcept>
+#include <string_view>
+
+#include <catch2/catch_test_macros.hpp>
+
+namespace {
+
+fabric::project::ProjectManifest manifest() {
+    return {.schema_version = fabric::project::current_schema_version,
+            .id = {.value = "contract-test"},
+            .name = "Contract Test",
+            .directories = {}};
+}
+
+fabric::project::MaterialDefinition material() {
+    return {
+        .document = {.schema_version = 1,
+                     .type = "material",
+                     .id = {.value = "wool-material"},
+                     .name = "Wool Material"},
+        .color = {0.8F, 0.6F, 0.3F, 1.0F},
+        .opacity = 0.75F,
+        .blend = fabric::project::MaterialBlendMode::multiply,
+        .texture = fabric::project::ResourceReference{
+            {.value = "wool-fill"}, "texture"},
+        .uv_transform = {.position = {0.1F, -0.2F},
+                         .rotation_degrees = 15.0F,
+                         .scale = {1.2F, 0.8F},
+                         .pivot = {0.5F, 0.5F}},
+    };
+}
+
+fabric::project::EntityDefinition entity() {
+    return {
+        .document = {.schema_version = 1,
+                     .type = "entity",
+                     .id = {.value = "wool-entity"},
+                     .name = "Wool Entity"},
+        .nodes = {{
+            .id = "root",
+            .name = "Root",
+            .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
+                         .resource = fabric::project::ResourceReference{
+                             {.value = "thread-outline"}, "vector"},
+                         .material = fabric::project::ResourceReference{
+                             {.value = "wool-material"}, "material"}},
+        }, {
+            .id = "child",
+            .name = "Child",
+            .parent = "root",
+            .z_order = 2.0F,
+            .drawable = {.kind = fabric::project::EntityDrawableKind::texture,
+                         .resource = fabric::project::ResourceReference{
+                             {.value = "wool-fill"}, "texture"}},
+        }},
+    };
+}
+
+TEST_CASE("material definition round trips and publishes atomically") {
+    const auto source = material();
+    const auto parsed = fabric::project::parse_material(
+        manifest(), fabric::project::serialize_material(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(*parsed.asset == source);
+
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-material-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root / "assets");
+    const auto published = fabric::project::publish_material(root, manifest(), source);
+    REQUIRE(published.ok());
+    REQUIRE(std::filesystem::is_regular_file(
+        root / "assets/materials/wool-material.material.json"));
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("entity definition round trips and rejects parent cycles") {
+    const auto source = entity();
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(*parsed.entity == source);
+
+    auto cyclic = source;
+    cyclic.nodes[0].parent = "child";
+    const auto report = fabric::project::validate_entity(manifest(), cyclic);
+    REQUIRE_FALSE(report.ok());
+    REQUIRE(std::ranges::any_of(report.errors, [](const auto& error) {
+        return error.code == fabric::project::ErrorCode::resource_cycle;
+    }));
+}
+
+TEST_CASE("material and entity references retain their expected types") {
+    auto invalid_material = material();
+    invalid_material.texture->expected_type = "vector";
+    REQUIRE_FALSE(fabric::project::validate_material(
+        manifest(), invalid_material).ok());
+
+    auto invalid_entity = entity();
+    invalid_entity.nodes.front().drawable.resource->expected_type = "texture";
+    REQUIRE_FALSE(fabric::project::validate_entity(
+        manifest(), invalid_entity).ok());
+}
+
+} // namespace
