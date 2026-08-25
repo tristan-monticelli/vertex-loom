@@ -1,5 +1,18 @@
 # Checklist restante après audit produit
 
+## Priorité produit studio-first
+
+La feuille [Tranches verticales studio-first](studio-first-vertical-slices.md)
+est désormais le gate prioritaire de cette roadmap. Chaque nouvelle capacité
+doit être créable, prévisualisable, sauvegardable et testable dans le studio
+qui la possède avant d'être considérée comme disponible dans le runtime.
+
+Le premier gate corrige les ajouts visuels existants sans les supprimer : les
+textures restent des sources immuables, le cadrage devient un crop réversible,
+les composants visuels restent des calques séparés et les chemins vectoriels
+peuvent recevoir une texture répétée. La première mécanique verticale associe
+ces capacités à une plateforme tournante éditable dans Map Studio.
+
 ## Intention corrigée
 
 Vertex Loom est un atelier et un moteur 2D à rendu vectoriel. « Vectoriel » ne
@@ -7,10 +20,11 @@ signifie pas que le format interne doit être du SVG : le SVG est un format
 d’échange possible, tandis que le projet conserve une géométrie native,
 éditable, stable et animable.
 
-La géométrie définit la silhouette, le masque et le contour esthétique. Son
-remplissage peut être une couleur, un matériau, un motif ou une image locale.
-Une image placée dans une forme reste découpée par cette forme ; son cadrage et
-sa transformation sont éditables indépendamment du contour.
+La géométrie peut définir une silhouette, un masque ou un contour esthétique,
+mais une image n'est jamais forcée dans cette représentation. Une source
+raster peut rester rectangulaire et recevoir un crop non destructif, ou être
+placée explicitement dans une forme comme fill. Son cadrage, sa transformation
+et ses overlays restent éditables indépendamment de la source.
 
 Le produit n’utilise pas de spritesheets. Le lecteur Aseprite, le packer
 d’atlas et `SpriteSheetDefinition v1` ont été retirés après inventaire et
@@ -26,13 +40,13 @@ typé. Un import de source n’est pas présenté comme la création d’un docu
 | CONFORME | La création de projet valide le nom, l’identifiant généré et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage. |
 | CONFORME | `CreateProjectPrompt` demande destination, nom, unités monde, preset et `pixelsPerUnit`, puis affiche l’identifiant calculé, les erreurs et le résumé avant création. | Conserver les tests headless du modèle. |
 | CONFORME | Les états PNG et SVG sont isolés, l’aperçu précède la publication et `Add existing` sélectionne désormais une ressource indexée sans créer de document. | Conserver la séparation sélection, validation/décodage, aperçu et publication. |
-| PARTIEL | `VectorAsset v2 native` persiste primitives, chemins, fills, contours et clips et produit désormais des draw packets headless ; l’édition de sommets et le cache GPU restent ouverts. | Livrer personnalisateur et cache de géométrie. |
-| MANQUE | L’aperçu SVG est rasterisé et téléversé en texture ; aucun nœud, contour, fill ou masque n’est éditable. | Construire un renderer de géométrie native et le personnalisateur intégré. |
-| MANQUE | Il n’existe ni contrat `AnimationClip`, ni timeline, ni liaison de propriété générique. | Livrer le registre de propriétés typées et l’évaluateur de keyframes avant toute animation spécialisée. |
+| PARTIEL | `VectorAsset v2 native` persiste primitives, chemins, fills, contours et clips, produit des draw packets headless et dispose d'un cache de géométrie ; l'édition complète des sommets et clips imbriqués reste ouverte. | Terminer le personnalisateur et sa validation visuelle. |
+| CONFORME | Un SVG importé reste lié et opaque ; sa conversion explicite produit les chemins cubiques, fills couleur et contours pris en charge avec diagnostic des pertes. | Conserver l'absence de conversion automatique. |
+| PARTIEL | `AnimationClip v1`, bindings génériques, timeline, auto-key, composition additive, markers et preview runtime sont livrés ; la sélection multiple et les workflows avancés restent ouverts. | Fermer le gate UX et replay sans ajouter de piste métier. |
 | CONFORME | Le pipeline sprite a été retiré du build, des contrats, du validateur et de l’interface par ADR-0025. | Empêcher sa réintroduction dans les futurs contrats. |
 | CONFORME | `CommandStack`, sauvegarde atomique, autosave et récupération sont testés sans fenêtre. | Réutiliser ces services pour chaque futur document éditable. |
 | CONFORME | Le registre de ressources vérifie types, doublons, documents manquants et cycles. | Étendre ses types aux formes, fills, animations, entités et maps. |
-| CONFORME | La branche passe `npm run validate` et la matrice macOS/Windows/Linux. | Garder ce gate après chaque incrément. |
+| PARTIEL | La branche passe `npm run validate` localement ; la matrice macOS/Windows/Linux doit être confirmée pour chaque nouveau HEAD avant de fermer un gate. | Garder ce gate après chaque incrément. |
 
 ## Décisions architecturales acceptées
 

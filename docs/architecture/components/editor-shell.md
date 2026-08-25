@@ -9,6 +9,7 @@ C4Component
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
         Component(browser, "Resource browser", "Dear ImGui", "Indexe, filtre et sélectionne les documents du projet")
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
+        Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
@@ -24,6 +25,7 @@ C4Component
     Rel(project_ui, imports, "Déclenche")
     Rel(shell, browser, "Affiche")
     Rel(shell, customizer, "Affiche")
+    Rel(shell, composer, "Affiche")
     Rel(browser, session, "Charge et sélectionne une ressource")
     Rel(project_ui, session, "Demande la création ou l'ouverture")
     Rel(project_ui, prompts, "Construit le prompt du type choisi")
@@ -115,6 +117,16 @@ C4Component
   un échec conserve le dernier import vectoriel réussi.
 - Asset Studio n’expose aucun import sprite ; PNG alimente les textures et SVG
   les ressources vectorielles liées conformément à ADR-0025.
+- Une texture importée reste immuable. Le composer stocke une vue de crop en
+  pixels source et des calques séparés ; aucune action de cadrage ne réécrit le
+  PNG ou ne convertit implicitement son contenu en géométrie.
+- Les yeux, boutons, fermetures, coutures et effets similaires sont des
+  instances de composants paramétriques ancrées à la composition. Leur rendu,
+  leurs propriétés animables et leur ordre de profondeur sont prévisualisés
+  avec les mêmes draw packets que le runtime.
+- Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
+  géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
+  texture, ni une collision implicite.
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.

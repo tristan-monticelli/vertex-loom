@@ -68,6 +68,24 @@ chemins miroir, les versions absentes, invalides ou anciennes et les décisions
 de récupération acceptée ou refusée sans interface graphique.
 Le pipeline sprite retiré par ADR-0025 ne fait plus partie de la matrice. Les
 audits structurels vérifient son absence des contrats et du build.
+Le pipeline visuel studio-first couvrira l'identité des octets PNG avant et
+après édition, le crop réversible en pixels source, les limites de crop, le
+round-trip des compositions et la migration d'une référence texture directe
+vers une composition implicite sans changement visible. Les overlays,
+composants paramétriques et chemins texturés seront évalués par les mêmes draw
+packets en test headless, Asset Studio, Map Studio et Preview Runtime.
+Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
+étirement, largeur variable, UV continus, raccords, texture manquante et
+séparation stricte entre ruban de rendu et collision.
+Le graphe de mécaniques couvrira validation des ports, références, cycles
+interdits, ordre déterministe, corps et joints invalides, capteurs, moteurs,
+undo/redo et reconstruction du monde après reset de preview. La première
+fixture sera une plateforme tournante activable par présence et transportant
+le personnage sans logique propre à la map.
+L'export de map couvrira fermeture transitive des dépendances, ordre
+déterministe, chemins portables, absence de ressources externes et chargement
+du paquet par Preview Runtime. Une comparaison de scène vérifiera le même
+résultat visible avant sauvegarde, après reload et depuis le paquet publié.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

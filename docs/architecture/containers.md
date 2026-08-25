@@ -6,17 +6,18 @@ C4Container
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
     Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge directement une scène et son entryMap ou une map, évalue les AnimationClip v1 et leurs markers franchis, publie les événements de markers des instances animées, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, expose les packets de la dernière frame pour inspection headless, résout les transitions atomiques et les transitions associées aux événements gameplay, remet proprement la boucle au runtime après une transition, traduit les actions SDL configurables vers le CharacterController, interpole Camera2D avec suivi de personnage et limites monde, interpole les positions XPBD, émet les entrées et sorties de zones, culling par chunks avec bounds statiques précalculés, chemin direct des packets statiques visibles et culling géométrique dynamique, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
-        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, matériaux/fills, entités, animations et InputDocument v1 par prompts dédiés")
-        Container(map, "Map Studio", "C++20 / SDL2 / Dear ImGui", "Édite maps, calque actif, placement, duplication, sélection rectangulaire, raccourcis clavier et déplacement groupé d’instances, avec cadrage caméra clavier, événements et payloads, triggers et collisions via MapSession, overrides typés de prefabs et liaisons d’animation d’instances, inspecteurs de points et triggers, annotations d’événements, canvas 2D, grille, caméra pan/zoom, cadrage automatique, sélection et poignées de transformation réversibles, autosave et récupération proposée")
+        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, vues raster non destructives, compositions par calques, composants paramétriques, chemins texturés, matériaux, entités, animations et InputDocument v1")
+        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose et simule maps, assets visuels, composants, mécaniques physiques, événements, collisions et dépendances avant publication portable")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique et exécute les pas fixes validés")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
-        Container(editorlib, "fabric_editor", "C++20 static library", "Session projet, prompts typés, historique réversible, autosave et orchestration d’authoring")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, géométrie, compositing vectoriels, batching stable des draw packets et réutilisation des scratch CPU/GPU entre frames")
+        Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées par les studios, prompts typés, historique réversible, autosave, preview et publication")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, crop raster, compositions, géométrie et chemins texturés, batching stable des draw packets")
         Container(projectcli, "fabric_project_validate", "C++20 CLI", "Valide un dossier projet sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
         Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
+        ContainerDb(mapbundle, "Portable Map Package", "MapDocument + dépendances", "Unité validée de publication et de chargement par le catalogue du jeu")
     }
     Rel(creator, asset, "Crée et prévisualise")
     Rel(creator, map, "Compose et teste")
@@ -29,9 +30,11 @@ C4Container
     Rel(asset, renderlib, "Prévisualise les draw packets vectoriels")
     Rel(map, projectlib, "Lit et écrit")
     Rel(map, physics, "Construit et inspecte la physique")
+    Rel(map, mapbundle, "Publie après validation")
     Rel(physics, runtime, "Fournit le monde physique")
     Rel(runtime, projectlib, "Charge")
     Rel(runtime, renderlib, "Rend les draw packets")
+    Rel(runtime, mapbundle, "Charge sans conversion manuelle")
     Rel(projectcli, projectlib, "Utilise")
     Rel(renderbench, renderlib, "Mesure")
     Rel(runtimebench, runtime, "Charge et mesure")
@@ -58,3 +61,9 @@ pipeline sprite a été retiré par ADR-0025.
 Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
+
+Une tranche fonctionnelle suit la même direction de données dans les outils et
+le runtime : contrat partagé, commande d'authoring, preview du studio,
+sauvegarde dans le projet, composition dans Map Studio, puis chargement du
+paquet de map. Une capacité disponible uniquement dans le runtime ne ferme pas
+son gate produit.

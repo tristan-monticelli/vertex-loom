@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, InputDocument v1, MaterialDefinition v1, EntityDefinition v1 avec maillage de déformation et état XPBD optionnels, AnimationClip v1, SceneDocument v1, ReplayDocument v1, ProgressSave v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1, map events, fabric_physics shapes et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "Manifest, ressources, entités, animations, maps, scènes, replay, progression et cibles studio-first : RasterView, VisualComposition, VisualComponent, TexturedPath, MechanicGraph et paquet portable")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -50,6 +50,20 @@ C4Component
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source
   normalisée est `assets/textures/<id>.png`. Le document JSON est le marqueur
   de publication : une source sans document n'est pas un asset chargeable.
+- `RasterView v1` sera une vue non destructive d'un `TextureAsset`. Elle
+  conservera un rectangle de crop en pixels source, un pivot, un transform et
+  le filtrage, sans posséder ni réécrire les pixels.
+- `VisualComposition v1` ordonnera une vue raster, des drawables vectoriels,
+  des instances de `VisualComponent v1` et des `TexturedPath v1`. Chaque calque
+  conservera son ancrage, son transform, sa visibilité, son opacité et son Z.
+  Les anciennes références directes à une texture resteront valides et seront
+  interprétées comme une composition à un seul calque non recadré.
+- `TexturedPath v1` conservera un chemin, une largeur éventuellement variable,
+  une référence texture, répétition ou étirement, offset, couleur, opacité et
+  raccords. La collision restera une référence optionnelle et séparée.
+- `MechanicGraph v1` composera corps, pivots, joints, moteurs, capteurs,
+  contraintes et liaisons événementielles. Ses instances exposeront des
+  paramètres typés et seront simulables dans Map Studio avant le runtime.
 - `VectorAsset v2` est la version écrite. Un document v1 est accepté en lecture,
   conserve sa source `assets/vectors/<id>.svg` et devient
   `sourceKind = linkedSvg` sans modifier le fichier source.
@@ -134,6 +148,10 @@ C4Component
   prefabs, instances, collisions et triggers. Les instances sont indexées par
   chunks de `64 × 64` unités, événements nommés et les propriétés custom ont un
   ensemble de types fermé.
+- Une map est la racine de publication du catalogue. Son export portable
+  conservera le `MapDocument`, les ressources transitivement référencées et
+  une version minimale de runtime ; les chemins absolus et dépendances non
+  résolues empêcheront la publication.
 - Une propriété custom d’instance nommée `animation` est réservée à la
   lecture d’un `ResourceReference` de type `animation`. Elle est unique par
   instance, validée par le parseur MapDocument et résolue par le Preview

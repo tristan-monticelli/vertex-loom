@@ -8,6 +8,9 @@ Ce dossier conserve les feuilles de route vérifiables du produit.
 - [Remédiation du pivot vectoriel](vector-pivot-remediation.md) : écarts relevés
   par l’audit, ordre de correction et gates avant toute affirmation « sans
   sprites ».
+- [Tranches verticales studio-first](studio-first-vertical-slices.md) :
+  correction visuelle non destructive, composants paramétriques, chemins
+  texturés, mécaniques physiques éditables et publication de maps.
 
 Une case n’est cochée qu’après mise à jour des contrats et diagrammes requis,
 tests verts sur macOS, Windows et Linux, puis commit fonctionnel dédié.

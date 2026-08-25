@@ -74,8 +74,8 @@ and `schemas` directories. See the
 3. Map Studio composition, collisions, triggers, and events without sprite dependencies.
 4. Preview runtime, followed by the game runtime.
 
-The deterministic sprite pipeline remains available only as legacy
-compatibility and is not a foundation of the target runtime.
+The sprite pipeline has been removed. Local PNG textures and linked SVG sources
+remain supported without an atlas or automatic vector conversion.
 
 Vertex Loom does not include or reproduce Nintendo characters or assets.
 
