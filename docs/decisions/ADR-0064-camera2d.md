@@ -16,6 +16,10 @@ pas l’extérieur du rectangle ; si le monde est plus petit que le viewport, le
 centre du monde est conservé. `PreviewRuntimeOptions` peut activer le suivi du
 personnage et fournir ces limites.
 
+`game_runtime` expose ces réglages avec `--follow-character` et
+`--camera-limits <x> <y> <width> <height>` ; les dimensions négatives ou les
+valeurs non finies sont refusées avant le chargement du runtime.
+
 ## Conséquences
 
 Le renderer reçoit des bounds monde indépendants de la résolution. Les outils

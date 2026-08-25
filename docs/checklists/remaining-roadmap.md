@@ -423,6 +423,9 @@ Les actions clavier/manette, les scènes, les transitions headless, la caméra e
 le contrôleur SDL sont implémentés. Les événements de zones peuvent maintenant
 déclencher une transition de scène via un hand-off propre ; les autres
 événements gameplay restent ouverts.
+
+`game_runtime` expose aussi le suivi de caméra et les limites monde via des
+options CLI validées.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement

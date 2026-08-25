@@ -2,6 +2,7 @@
 #include "fabric/runtime/progress_store.hpp"
 #include "fabric/runtime/scene_session.hpp"
 
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -16,8 +17,21 @@ void usage() {
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
                  "[--character] "
+                 "[--follow-character] "
+                 "[--camera-limits <x> <y> <width> <height>] "
                  "[--audio <wav>] "
                  "[--smoke-test [frames]] [--benchmark [frames]]\n";
+}
+
+bool parse_float(const char* value, float& output) {
+    try {
+        std::size_t consumed = 0;
+        const std::string text(value);
+        output = std::stof(text, &consumed);
+        return consumed == text.size() && std::isfinite(output);
+    } catch (...) {
+        return false;
+    }
 }
 
 } // namespace
@@ -40,6 +54,17 @@ int main(int argc, char** argv) {
             save_slot = argv[++index];
         } else if (argument == "--character") {
             options.enable_character = true;
+        } else if (argument == "--follow-character") {
+            options.follow_character = true;
+        } else if (argument == "--camera-limits" && index + 4 < argc) {
+            float x{}, y{}, width{}, height{};
+            if (!parse_float(argv[++index], x) || !parse_float(argv[++index], y) ||
+                !parse_float(argv[++index], width) || !parse_float(argv[++index], height) ||
+                width < 0.0F || height < 0.0F) {
+                std::cerr << "error: --camera-limits expects finite x y width height\n";
+                return 2;
+            }
+            options.camera_limits = fabric::core::Rect{{x, y}, {width, height}};
         } else if (argument == "--audio" && index + 1 < argc) {
             options.audio_wav = argv[++index];
         } else if (argument == "--smoke-test") {
