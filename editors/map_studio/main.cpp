@@ -411,6 +411,24 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
+        if (!placement_mode && !gizmo.active && !point_gizmo.active && io.KeyCtrl &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_instances.size() == 1U) {
+            const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
+                                               [&](const auto& instance) {
+                                                   return instance.id == selected_instances.front();
+                                               });
+            if (selected != map.instances.end()) {
+                const auto target = screen_to_world(io.MousePos);
+                const fabric::core::Vec2 offset{
+                    target.x - selected->transform.position.x,
+                    target.y - selected->transform.position.y};
+                const auto duplicated = session.duplicate_instance(
+                    {.value = selected->id}, offset, snapping);
+                status = duplicated ? "Instance duplicated at cursor"
+                                    : "Duplication rejected (locked or invalid)";
+                return;
+            }
+        }
         if (placement_mode && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             fabric::project::MapInstance instance;
             instance.id = placement_id;
