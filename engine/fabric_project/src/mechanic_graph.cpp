@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <ranges>
@@ -35,15 +36,7 @@ void reject_unknown(const Json& object,
 }
 
 std::string_view value_type_name(const MechanicValueType type) {
-    switch (type) {
-    case MechanicValueType::boolean: return "bool";
-    case MechanicValueType::integer: return "integer";
-    case MechanicValueType::scalar: return "scalar";
-    case MechanicValueType::text: return "text";
-    case MechanicValueType::vec2: return "vec2";
-    case MechanicValueType::resource: return "resource";
-    }
-    return "scalar";
+    return to_string(type);
 }
 
 std::optional<MechanicValueType> parse_value_type(const std::string_view type) {
@@ -53,6 +46,9 @@ std::optional<MechanicValueType> parse_value_type(const std::string_view type) {
     if (type == "text") return MechanicValueType::text;
     if (type == "vec2") return MechanicValueType::vec2;
     if (type == "resource") return MechanicValueType::resource;
+    if (type == "body") return MechanicValueType::body_handle;
+    if (type == "pivot") return MechanicValueType::pivot_handle;
+    if (type == "joint") return MechanicValueType::joint_handle;
     return std::nullopt;
 }
 
@@ -187,6 +183,116 @@ const MechanicPortDefinition* find_port(const MechanicNodeDefinition* node,
     return found == node->ports.end() ? nullptr : &*found;
 }
 
+const MechanicNodeProperty* find_property(const MechanicNodeDefinition& node,
+                                          const std::string_view id) {
+    const auto found = std::ranges::find(node.properties, id,
+                                         &MechanicNodeProperty::id);
+    return found == node.properties.end() ? nullptr : &*found;
+}
+
+template <typename Value>
+const Value* property_value(const MechanicNodeDefinition& node,
+                            const std::string_view id) {
+    const auto* property = find_property(node, id);
+    return property == nullptr ? nullptr : std::get_if<Value>(&property->value);
+}
+
+void validate_builtin_node(const MechanicNodeDefinition& node,
+                           const std::string& field,
+                           std::vector<Error>& errors) {
+    const auto kind = mechanic_node_kind(node.type);
+    if (!kind) {
+        error(errors, ErrorCode::invalid_asset, field + ".nodeType",
+              "unsupported mechanic node type");
+        return;
+    }
+    const auto& schema = mechanic_node_schema(*kind);
+    for (const auto& expected : schema.ports) {
+        const auto* port = find_port(&node, std::string{expected.id});
+        if (port == nullptr) {
+            error(errors, ErrorCode::missing_resource, field + ".ports",
+                  "required port is missing: " + std::string{expected.id});
+            continue;
+        }
+        if (port->direction != expected.direction || port->type != expected.type)
+            error(errors, ErrorCode::resource_type_mismatch,
+                  field + ".ports." + std::string{expected.id},
+                  "port does not match its built-in schema");
+    }
+    for (const auto& port : node.ports)
+        if (!std::ranges::any_of(schema.ports, [&](const auto& expected) {
+                return expected.id == port.id;
+            }))
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".ports." + port.id,
+                  "port is not supported by this node type");
+
+    for (const auto& expected : schema.properties) {
+        const auto* property = find_property(node, expected.id);
+        if (property == nullptr) {
+            if (expected.required)
+                error(errors, ErrorCode::missing_resource,
+                      field + ".properties",
+                      "required property is missing: " +
+                          std::string{expected.id});
+            continue;
+        }
+        if (!mechanic_value_matches(expected.type, property->value))
+            error(errors, ErrorCode::resource_type_mismatch,
+                  field + ".properties." + std::string{expected.id},
+                  "property does not match its built-in schema");
+    }
+    for (const auto& property : node.properties)
+        if (!std::ranges::any_of(schema.properties, [&](const auto& expected) {
+                return expected.id == property.id;
+            }))
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties." + property.id,
+                  "property is not supported by this node type");
+
+    if (*kind == MechanicNodeKind::body) {
+        const auto* body_type = property_value<std::string>(node, "body-type");
+        if (body_type && *body_type != "static" && *body_type != "kinematic" &&
+            *body_type != "dynamic")
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.body-type", "unsupported body type");
+        const auto* size = property_value<core::Vec2>(node, "size");
+        if (size && (size->x <= 0.0F || size->y <= 0.0F))
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.size", "body size must be positive");
+        const auto* density = property_value<float>(node, "density");
+        if (density && *density < 0.0F)
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.density", "must be non-negative");
+        const auto* friction = property_value<float>(node, "friction");
+        if (friction && (*friction < 0.0F || *friction > 1.0F))
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.friction", "must be in [0,1]");
+    } else if (*kind == MechanicNodeKind::joint ||
+               *kind == MechanicNodeKind::constraint) {
+        const auto* minimum = property_value<float>(node, "min-angle");
+        const auto* maximum = property_value<float>(node, "max-angle");
+        if (minimum && maximum && *minimum > *maximum)
+            error(errors, ErrorCode::invalid_asset, field + ".properties",
+                  "minimum angle must not exceed maximum angle");
+    } else if (*kind == MechanicNodeKind::motor) {
+        const auto* torque = property_value<float>(node, "max-torque");
+        if (torque && *torque < 0.0F)
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.max-torque", "must be non-negative");
+    } else if (*kind == MechanicNodeKind::sensor) {
+        const auto* size = property_value<core::Vec2>(node, "size");
+        if (size && (size->x <= 0.0F || size->y <= 0.0F))
+            error(errors, ErrorCode::invalid_asset,
+                  field + ".properties.size", "sensor size must be positive");
+    } else if (*kind == MechanicNodeKind::event) {
+        const auto* event_id = property_value<std::string>(node, "event-id");
+        if (event_id && !core::ResourceId::is_valid(*event_id))
+            error(errors, ErrorCode::invalid_resource_id,
+                  field + ".properties.event-id", "must be a valid event id");
+    }
+}
+
 bool has_connection_cycle(const MechanicGraph& graph) {
     std::unordered_map<std::string, std::vector<std::string>> edges;
     for (const auto& connection : graph.connections)
@@ -227,8 +333,95 @@ bool mechanic_value_matches(const MechanicValueType type,
     case MechanicValueType::vec2: return std::holds_alternative<core::Vec2>(value);
     case MechanicValueType::resource:
         return std::holds_alternative<ResourceReference>(value);
+    case MechanicValueType::body_handle:
+    case MechanicValueType::pivot_handle:
+    case MechanicValueType::joint_handle:
+        return false;
     }
     return false;
+}
+
+std::string_view to_string(const MechanicValueType type) noexcept {
+    switch (type) {
+    case MechanicValueType::boolean: return "bool";
+    case MechanicValueType::integer: return "integer";
+    case MechanicValueType::scalar: return "scalar";
+    case MechanicValueType::text: return "text";
+    case MechanicValueType::vec2: return "vec2";
+    case MechanicValueType::resource: return "resource";
+    case MechanicValueType::body_handle: return "body";
+    case MechanicValueType::pivot_handle: return "pivot";
+    case MechanicValueType::joint_handle: return "joint";
+    }
+    return "scalar";
+}
+
+std::string_view to_string(const MechanicNodeKind kind) noexcept {
+    switch (kind) {
+    case MechanicNodeKind::body: return "body";
+    case MechanicNodeKind::pivot: return "pivot";
+    case MechanicNodeKind::joint: return "joint";
+    case MechanicNodeKind::motor: return "motor";
+    case MechanicNodeKind::sensor: return "sensor";
+    case MechanicNodeKind::constraint: return "constraint";
+    case MechanicNodeKind::event: return "event";
+    }
+    return "body";
+}
+
+std::optional<MechanicNodeKind> mechanic_node_kind(
+    const std::string_view type) noexcept {
+    if (type == "body") return MechanicNodeKind::body;
+    if (type == "pivot") return MechanicNodeKind::pivot;
+    if (type == "joint") return MechanicNodeKind::joint;
+    if (type == "motor") return MechanicNodeKind::motor;
+    if (type == "sensor") return MechanicNodeKind::sensor;
+    if (type == "constraint") return MechanicNodeKind::constraint;
+    if (type == "event") return MechanicNodeKind::event;
+    return std::nullopt;
+}
+
+const MechanicNodeSchema& mechanic_node_schema(const MechanicNodeKind kind) {
+    using Direction = MechanicPortDirection;
+    using Type = MechanicValueType;
+    static const std::array<MechanicNodeSchema, 7> schemas{{
+        {MechanicNodeKind::body, "body",
+         {{"body", Direction::output, Type::body_handle}},
+         {{"body-type", Type::text}, {"position", Type::vec2},
+          {"size", Type::vec2}, {"rotation", Type::scalar},
+          {"density", Type::scalar}, {"friction", Type::scalar},
+          {"entity", Type::resource, false}}},
+        {MechanicNodeKind::pivot, "pivot",
+         {{"body", Direction::input, Type::body_handle},
+          {"pivot", Direction::output, Type::pivot_handle}},
+         {{"position", Type::vec2}}},
+        {MechanicNodeKind::joint, "joint",
+         {{"body-a", Direction::input, Type::body_handle},
+          {"body-b", Direction::input, Type::body_handle},
+          {"pivot", Direction::input, Type::pivot_handle},
+          {"joint", Direction::output, Type::joint_handle}},
+         {{"limit-enabled", Type::boolean}, {"min-angle", Type::scalar},
+          {"max-angle", Type::scalar}}},
+        {MechanicNodeKind::motor, "motor",
+         {{"joint", Direction::input, Type::joint_handle},
+          {"enabled", Direction::input, Type::boolean},
+          {"active", Direction::output, Type::boolean}},
+         {{"speed", Type::scalar}, {"max-torque", Type::scalar}}},
+        {MechanicNodeKind::sensor, "sensor",
+         {{"body", Direction::input, Type::body_handle},
+          {"active", Direction::output, Type::boolean}},
+         {{"center", Type::vec2}, {"size", Type::vec2},
+          {"layer-mask", Type::integer, false}}},
+        {MechanicNodeKind::constraint, "constraint",
+         {{"body", Direction::input, Type::body_handle},
+          {"pivot", Direction::input, Type::pivot_handle},
+          {"active", Direction::output, Type::boolean}},
+         {{"min-angle", Type::scalar}, {"max-angle", Type::scalar}}},
+        {MechanicNodeKind::event, "event",
+         {{"trigger", Direction::input, Type::boolean}},
+         {{"event-id", Type::text}}},
+    }};
+    return schemas[static_cast<std::size_t>(kind)];
 }
 
 std::filesystem::path mechanic_graph_document_path(
@@ -254,6 +447,7 @@ ValidationReport validate_mechanic_graph(const ProjectManifest&,
               "must not be empty");
 
     std::unordered_set<std::string> parameter_ids;
+    std::unordered_set<std::string> parameter_targets;
     for (std::size_t index = 0; index < graph.parameters.size(); ++index) {
         const auto& parameter = graph.parameters[index];
         const auto field = "parameters[" + std::to_string(index) + "]";
@@ -271,6 +465,28 @@ ValidationReport validate_mechanic_graph(const ProjectManifest&,
                   field + ".defaultValue", "does not match parameter type");
         validate_value(parameter.default_value, field + ".defaultValue",
                        report.errors);
+        const auto* target_node = find_node(graph, parameter.target_node);
+        const auto* target_property = target_node == nullptr
+            ? nullptr : find_property(*target_node, parameter.target_property);
+        if (target_node == nullptr || target_property == nullptr) {
+            error(report.errors, ErrorCode::missing_resource, field + ".target",
+                  "parameter target node or property is missing");
+        } else if (const auto kind = mechanic_node_kind(target_node->type)) {
+            const auto& schema = mechanic_node_schema(*kind);
+            const auto expected = std::ranges::find(
+                schema.properties, parameter.target_property,
+                &MechanicNodePropertySchema::id);
+            if (expected == schema.properties.end() ||
+                expected->type != parameter.type)
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      field + ".target",
+                      "parameter type does not match target property");
+        }
+        const auto target_key = parameter.target_node + "." +
+            parameter.target_property;
+        if (!parameter_targets.insert(target_key).second)
+            error(report.errors, ErrorCode::duplicate_resource,
+                  field + ".target", "parameter target is duplicated");
     }
 
     std::unordered_set<std::string> node_ids;
@@ -316,6 +532,7 @@ ValidationReport validate_mechanic_graph(const ProjectManifest&,
             validate_value(property.value, property_field + ".value",
                            report.errors);
         }
+        validate_builtin_node(node, field, report.errors);
     }
 
     std::unordered_set<std::string> connections;
@@ -384,7 +601,9 @@ std::string serialize_mechanic_graph(const MechanicGraph& graph) {
         json["parameters"].push_back({
             {"id", parameter.id}, {"name", parameter.name},
             {"valueType", value_type_name(parameter.type)},
-            {"defaultValue", serialize_value(parameter.default_value)}});
+            {"defaultValue", serialize_value(parameter.default_value)},
+            {"targetNode", parameter.target_node},
+            {"targetProperty", parameter.target_property}});
     for (const auto& node : graph.nodes) {
         Json item{{"id", node.id}, {"nodeType", node.type},
                   {"ports", Json::array()}, {"properties", Json::array()}};
@@ -449,12 +668,17 @@ MechanicGraphResult parse_mechanic_graph(
                   "expected an object");
             continue;
         }
-        reject_unknown(item, {"id", "name", "valueType", "defaultValue"},
+        reject_unknown(item, {"id", "name", "valueType", "defaultValue",
+                              "targetNode", "targetProperty"},
                        field, result.errors);
         MechanicParameterDefinition parameter;
         read_text(item, "id", parameter.id, result.errors, field);
         read_text(item, "name", parameter.name, result.errors, field);
         read_value_type(item, "valueType", parameter.type, result.errors, field);
+        read_text(item, "targetNode", parameter.target_node, result.errors,
+                  field);
+        read_text(item, "targetProperty", parameter.target_property,
+                  result.errors, field);
         const auto value = item.find("defaultValue");
         if (value == item.end())
             error(result.errors, ErrorCode::invalid_asset,

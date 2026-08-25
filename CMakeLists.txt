@@ -89,11 +89,12 @@ add_executable(fabric_project_validate tools/project_validate/main.cpp)
 target_link_libraries(fabric_project_validate PRIVATE fabric_project)
 
 add_library(fabric_physics STATIC
+    engine/fabric_physics/src/mechanic_plan.cpp
     engine/fabric_physics/src/physics_world.cpp
 )
 target_include_directories(fabric_physics PUBLIC engine/fabric_physics/include)
 target_compile_features(fabric_physics PUBLIC cxx_std_20)
-target_link_libraries(fabric_physics PUBLIC box2d PRIVATE fabric_project)
+target_link_libraries(fabric_physics PUBLIC box2d fabric_project)
 
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)

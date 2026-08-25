@@ -1,7 +1,96 @@
 #include "fabric/physics/physics_world.hpp"
+#include "fabric/physics/mechanic_plan.hpp"
 #include "fabric/project/map.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <array>
+#include <ranges>
+
+namespace {
+
+fabric::project::MechanicValue default_value(
+    const fabric::project::MechanicValueType type,
+    const std::string_view id) {
+    using Type = fabric::project::MechanicValueType;
+    switch (type) {
+    case Type::boolean: return false;
+    case Type::integer: return std::int64_t{};
+    case Type::scalar: return 0.0F;
+    case Type::text:
+        if (id == "body-type") return std::string{"kinematic"};
+        if (id == "event-id") return std::string{"platform-start"};
+        return std::string{"value"};
+    case Type::vec2: return fabric::core::Vec2{1.0F, 1.0F};
+    case Type::resource:
+        return fabric::project::ResourceReference{{.value = "resource"}, "entity"};
+    case Type::body_handle:
+    case Type::pivot_handle:
+    case Type::joint_handle:
+        break;
+    }
+    return false;
+}
+
+fabric::project::MechanicNodeDefinition node(
+    const fabric::project::MechanicNodeKind kind, std::string id) {
+    const auto& schema = fabric::project::mechanic_node_schema(kind);
+    fabric::project::MechanicNodeDefinition result{
+        .id = std::move(id), .type = std::string{schema.type}};
+    for (const auto& port : schema.ports)
+        result.ports.push_back({
+            .id = std::string{port.id}, .name = std::string{port.id},
+            .direction = port.direction, .type = port.type});
+    for (const auto& property : schema.properties) {
+        if (!property.required) continue;
+        result.properties.push_back({
+            .id = std::string{property.id},
+            .value = default_value(property.type, property.id)});
+    }
+    return result;
+}
+
+fabric::project::MechanicGraph complete_mechanic() {
+    using Kind = fabric::project::MechanicNodeKind;
+    fabric::project::MechanicGraph graph{
+        .document = {.schema_version = 1,
+                     .type = "mechanic",
+                     .id = {.value = "platform-mechanic"},
+                     .name = "Platform Mechanic"},
+        .nodes = {node(Kind::body, "platform"),
+                  node(Kind::pivot, "anchor"),
+                  node(Kind::joint, "hinge"),
+                  node(Kind::motor, "motor"),
+                  node(Kind::sensor, "presence"),
+                  node(Kind::constraint, "limit"),
+                  node(Kind::event, "notify")}};
+    graph.connections = {
+        {"platform", "body", "anchor", "body"},
+        {"platform", "body", "hinge", "body-a"},
+        {"anchor", "pivot", "hinge", "pivot"},
+        {"hinge", "joint", "motor", "joint"},
+        {"platform", "body", "presence", "body"},
+        {"presence", "active", "motor", "enabled"},
+        {"platform", "body", "limit", "body"},
+        {"anchor", "pivot", "limit", "pivot"},
+        {"motor", "active", "notify", "trigger"}};
+    graph.parameters = {{
+        .id = "speed", .name = "Speed",
+        .type = fabric::project::MechanicValueType::scalar,
+        .default_value = 90.0F,
+        .target_node = "motor", .target_property = "speed"}};
+    return graph;
+}
+
+fabric::project::MapDocument mechanic_map() {
+    fabric::project::MapDocument map;
+    map.document.id = {.value = "mechanic-map"};
+    map.document.name = "Mechanic Map";
+    map.events = {{{.value = "platform-start"}, {}}};
+    return map;
+}
+
+} // namespace
 
 TEST_CASE("Box2D physics world owns a fixed-step world") {
     fabric::physics::PhysicsWorld world;
@@ -45,4 +134,39 @@ TEST_CASE("Box2D physics world exposes a dynamic character body") {
     REQUIRE(world.step(1.0F / 60.0F));
     CHECK(world.character_position().x > 0.0F);
     CHECK(world.character_velocity().x > 0.0F);
+}
+
+TEST_CASE("all mechanic nodes compile deterministically into fabric_physics") {
+    const auto graph = complete_mechanic();
+    const auto map = mechanic_map();
+    const auto first = fabric::physics::compile_mechanic_graph(graph, map);
+    const auto second = fabric::physics::compile_mechanic_graph(graph, map);
+    REQUIRE(first.ok());
+    REQUIRE(second.ok());
+    CHECK(*first.plan == *second.plan);
+    CHECK(first.plan->bodies.size() == 1U);
+    CHECK(first.plan->pivots.size() == 1U);
+    CHECK(first.plan->joints.size() == 1U);
+    CHECK(first.plan->motors.size() == 1U);
+    CHECK(first.plan->sensors.size() == 1U);
+    CHECK(first.plan->constraints.size() == 1U);
+    CHECK(first.plan->events.size() == 1U);
+    CHECK(first.plan->events.front().event_id.value == "platform-start");
+    CHECK(first.plan->motors.front().enabled_source_node_id == "presence");
+    CHECK(first.plan->motors.front().speed_degrees_per_second == 90.0F);
+}
+
+TEST_CASE("mechanic compilation rejects missing wiring and map events") {
+    auto graph = complete_mechanic();
+    auto map = mechanic_map();
+    map.events.clear();
+    CHECK_FALSE(fabric::physics::compile_mechanic_graph(graph, map).ok());
+
+    map = mechanic_map();
+    graph.connections.erase(std::ranges::find_if(
+        graph.connections, [](const auto& connection) {
+            return connection.to_node == "motor" &&
+                   connection.to_port == "joint";
+        }));
+    CHECK_FALSE(fabric::physics::compile_mechanic_graph(graph, map).ok());
 }

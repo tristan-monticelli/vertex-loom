@@ -16,8 +16,27 @@ namespace fabric::project {
 
 inline constexpr std::uint32_t current_mechanic_graph_schema_version = 1;
 
-enum class MechanicValueType { boolean, integer, scalar, text, vec2, resource };
+enum class MechanicValueType {
+    boolean,
+    integer,
+    scalar,
+    text,
+    vec2,
+    resource,
+    body_handle,
+    pivot_handle,
+    joint_handle,
+};
 enum class MechanicPortDirection { input, output };
+enum class MechanicNodeKind {
+    body,
+    pivot,
+    joint,
+    motor,
+    sensor,
+    constraint,
+    event,
+};
 
 using MechanicValue = std::variant<bool, std::int64_t, float, std::string,
                                    core::Vec2, ResourceReference>;
@@ -27,6 +46,8 @@ struct MechanicParameterDefinition {
     std::string name;
     MechanicValueType type{MechanicValueType::scalar};
     MechanicValue default_value{0.0F};
+    std::string target_node;
+    std::string target_property;
     friend bool operator==(const MechanicParameterDefinition&,
                            const MechanicParameterDefinition&) = default;
 };
@@ -65,6 +86,25 @@ struct MechanicConnection {
                            const MechanicConnection&) = default;
 };
 
+struct MechanicNodePortSchema {
+    std::string_view id;
+    MechanicPortDirection direction;
+    MechanicValueType type;
+};
+
+struct MechanicNodePropertySchema {
+    std::string_view id;
+    MechanicValueType type;
+    bool required{true};
+};
+
+struct MechanicNodeSchema {
+    MechanicNodeKind kind;
+    std::string_view type;
+    std::vector<MechanicNodePortSchema> ports;
+    std::vector<MechanicNodePropertySchema> properties;
+};
+
 struct MechanicGraph {
     DocumentHeader document{
         .schema_version = current_mechanic_graph_schema_version,
@@ -86,6 +126,12 @@ struct MechanicGraphResult {
 
 [[nodiscard]] bool mechanic_value_matches(
     MechanicValueType, const MechanicValue&) noexcept;
+[[nodiscard]] std::string_view to_string(MechanicValueType) noexcept;
+[[nodiscard]] std::string_view to_string(MechanicNodeKind) noexcept;
+[[nodiscard]] std::optional<MechanicNodeKind> mechanic_node_kind(
+    std::string_view) noexcept;
+[[nodiscard]] const MechanicNodeSchema& mechanic_node_schema(
+    MechanicNodeKind);
 [[nodiscard]] std::filesystem::path mechanic_graph_document_path(
     const ProjectManifest&, const core::ResourceId&);
 [[nodiscard]] ValidationReport validate_mechanic_graph(

@@ -128,8 +128,15 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
   round-trip, champs inconnus, valeurs non finies ou incompatibles, ports et
   nœuds absents, entrée liée plusieurs fois, doublons, cycles, sauvegarde
   atomique et résolution des références par le validateur headless.
-- [ ] Ajouter les nœuds corps, pivot, joint, moteur, capteur, contrainte et
+- [x] Ajouter les nœuds corps, pivot, joint, moteur, capteur, contrainte et
   événement en réutilisant `fabric_physics` et les événements map.
+
+  Preuve : les sept types possèdent un schéma fermé de propriétés et ports
+  typés, y compris les handles réservés aux ports `body`, `pivot` et `joint`.
+  `fabric_physics` applique les paramètres liés puis compile dans l'ordre un
+  plan headless contenant les sept descriptions, sans handle Box2D persistant.
+  Les événements sont résolus contre ceux de la map ; câblages obligatoires,
+  événements absents et configurations physiques invalides sont refusés.
 - [ ] Ajouter dans Map Studio l'édition du graphe, l'inspecteur, la simulation,
   pause, pas-à-pas et reset.
 - [ ] Livrer une plateforme tournante paramétrique avec activation par capteur
