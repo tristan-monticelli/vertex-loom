@@ -227,13 +227,14 @@ EntityPreviewResult build_entity_preview(
     EntityPreviewResult result;
     if (!session.selected_entity() || !session.manifest()) return result;
     auto entity = *session.selected_entity();
+    std::optional<fabric::project::EvaluationResult> evaluated_animation;
     if (animation != nullptr) {
-        const auto evaluated = fabric::project::evaluate_animation(
+        evaluated_animation = fabric::project::evaluate_animation(
             *animation, animation_time);
-        if (!evaluated.ok()) {
+        if (!evaluated_animation->ok()) {
             result.errors.push_back("animation: evaluation failed");
         }
-        for (const auto& property : evaluated.properties) {
+        for (const auto& property : evaluated_animation->properties) {
             if (property.binding.component_id != "transform") continue;
             const auto node = std::find_if(
                 entity.nodes.begin(), entity.nodes.end(),
@@ -286,6 +287,32 @@ EntityPreviewResult build_entity_preview(
                 continue;
             }
             material = *loaded.asset;
+        }
+        if (material && evaluated_animation && evaluated_animation->ok()) {
+            for (const auto& property : evaluated_animation->properties) {
+                if (property.binding.node_id != node.id ||
+                    property.binding.component_id != "material") continue;
+                const bool additive = property.composition ==
+                    fabric::project::AnimationComposition::additive;
+                if (property.binding.property_id == "opacity") {
+                    if (const auto* value = std::get_if<float>(&property.value)) {
+                        material->opacity = additive
+                            ? material->opacity + *value : *value;
+                    }
+                } else if (property.binding.property_id == "color") {
+                    if (const auto* value = std::get_if<fabric::core::Color>(
+                            &property.value)) {
+                        material->color = additive
+                            ? fabric::core::Color{
+                                  material->color.red + value->red,
+                                  material->color.green + value->green,
+                                  material->color.blue + value->blue,
+                                  material->color.alpha + value->alpha}
+                            : *value;
+                    }
+                }
+            }
+            material->opacity = std::clamp(material->opacity, 0.0F, 1.0F);
         }
         if (node.drawable.kind == fabric::project::EntityDrawableKind::vector &&
             node.drawable.resource) {

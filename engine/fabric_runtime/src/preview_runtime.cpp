@@ -1217,6 +1217,10 @@ bool PreviewRuntime::run() {
             std::optional<core::Vec2> scale;
             std::optional<core::Color> color;
             std::optional<float> opacity;
+            project::AnimationComposition color_composition =
+                project::AnimationComposition::replace;
+            project::AnimationComposition opacity_composition =
+                project::AnimationComposition::replace;
             if (evaluation && evaluation->ok()) for (const auto& property : evaluation->properties) {
                 if (property.binding.node_id != node_id) continue;
                 if (property.binding.component_id == "transform" &&
@@ -1234,11 +1238,13 @@ bool PreviewRuntime::run() {
                 } else if (property.binding.component_id == "material" &&
                            property.binding.property_id == "color") {
                     if (const auto* value = std::get_if<core::Color>(&property.value))
-                        color = *value;
+                        color = *value,
+                        color_composition = property.composition;
                 } else if (property.binding.component_id == "material" &&
                            property.binding.property_id == "opacity") {
                     if (const auto* value = std::get_if<float>(&property.value))
-                        opacity = *value;
+                        opacity = *value,
+                        opacity_composition = property.composition;
                 }
             }
             if (resolved_node) {
@@ -1248,10 +1254,27 @@ bool PreviewRuntime::run() {
             }
             if (!position && !rotation_degrees && !scale && !color && !opacity)
                 return packet;
-            if (color && packet.fill_color) packet.fill_color = *color;
+            if (color && packet.fill_color) {
+                if (color_composition == project::AnimationComposition::additive) {
+                    packet.fill_color->red += color->red;
+                    packet.fill_color->green += color->green;
+                    packet.fill_color->blue += color->blue;
+                    packet.fill_color->alpha += color->alpha;
+                } else {
+                    packet.fill_color = *color;
+                }
+            }
             if (opacity) {
-                if (packet.fill_color) packet.fill_color->alpha = *opacity;
-                if (packet.image_fill) packet.image_fill->opacity = *opacity;
+                if (packet.fill_color) {
+                    packet.fill_color->alpha = opacity_composition ==
+                        project::AnimationComposition::additive
+                        ? packet.fill_color->alpha + *opacity : *opacity;
+                }
+                if (packet.image_fill) {
+                    packet.image_fill->opacity = opacity_composition ==
+                        project::AnimationComposition::additive
+                        ? packet.image_fill->opacity + *opacity : *opacity;
+                }
             }
             if (!position && !rotation_degrees && !scale) return packet;
             const auto& base = base_transform->second;
