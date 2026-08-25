@@ -70,6 +70,8 @@ C4Component
   l'aperçu ; un échec conserve le dernier import réussi.
 - Un import PNG ou SVG décode et présente d'abord un aperçu temporaire. La
   publication ne se produit qu'après confirmation de l'utilisateur.
+  Annuler libère cet aperçu et ne modifie ni la sélection ni les fichiers du
+  projet. Les fills image choisissent une texture indexée par son nom visible.
 - Un import SVG réussi conserve le `VectorAsset` et son aperçu RGBA8 borné ;
   un échec conserve le dernier import vectoriel réussi.
 - Asset Studio n’expose aucun import sprite ; PNG alimente les textures et SVG
