@@ -131,6 +131,13 @@ struct CanvasGizmoState {
     fabric::core::Transform preview_transform{};
 };
 
+struct CollisionPointGizmoState {
+    bool active{};
+    int collision_index{-1};
+    std::size_t point_index{};
+    fabric::core::Vec2 preview_point{};
+};
+
 void draw_transform_editor(fabric::editor::MapSession& session,
                            const std::vector<std::string>& selected_instances,
                            TransformEditorState& state,
@@ -180,6 +187,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      ImVec2& pan,
                      float& zoom,
                      CanvasGizmoState& gizmo,
+                     int selected_collision_index,
+                     CollisionPointGizmoState& point_gizmo,
                      fabric::editor::MapSnapSettings& snapping,
                      std::string& status) {
     if (!session.map()) return;
@@ -243,6 +252,14 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         return gizmo.active && gizmo.instance_id == instance.id
             ? gizmo.preview_transform : instance.transform;
     };
+    auto collision_point_for = [&](const std::size_t collision_index,
+                                   const std::size_t point_index,
+                                   const fabric::core::Vec2 point) {
+        return point_gizmo.active &&
+                       point_gizmo.collision_index == static_cast<int>(collision_index) &&
+                       point_gizmo.point_index == point_index
+                   ? point_gizmo.preview_point : point;
+    };
 
     auto* draw = ImGui::GetWindowDrawList();
     draw->AddRectFilled(canvas_pos,
@@ -271,7 +288,9 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                       {canvas_pos.x + canvas_size.x, line.y},
                       y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
     }
-    for (const auto& collision : map.collisions) {
+    for (std::size_t collision_index = 0; collision_index < map.collisions.size();
+         ++collision_index) {
+        const auto& collision = map.collisions[collision_index];
         if (!layer_visible(map, collision.layer_id)) continue;
         const auto center = world_to_screen(collision.center);
         const auto color = collision.sensor ? IM_COL32(240, 190, 80, 210)
@@ -288,11 +307,33 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                             color, 24, 2.0F);
         } else if (collision.points.size() > 1U) {
             for (std::size_t point = 1; point < collision.points.size(); ++point)
-                draw->AddLine(world_to_screen(collision.points[point - 1]),
-                              world_to_screen(collision.points[point]), color, 2.0F);
+                draw->AddLine(world_to_screen(collision_point_for(
+                                  collision_index, point - 1, collision.points[point - 1])),
+                              world_to_screen(collision_point_for(
+                                  collision_index, point, collision.points[point])), color, 2.0F);
             if (collision.kind == fabric::project::CollisionShapeKind::polygon)
-                draw->AddLine(world_to_screen(collision.points.back()),
-                              world_to_screen(collision.points.front()), color, 2.0F);
+                draw->AddLine(world_to_screen(collision_point_for(
+                                  collision_index, collision.points.size() - 1,
+                                  collision.points.back())),
+                              world_to_screen(collision_point_for(
+                                  collision_index, 0, collision.points.front())), color, 2.0F);
+        }
+    }
+    if (selected_collision_index >= 0 &&
+        static_cast<std::size_t>(selected_collision_index) < map.collisions.size()) {
+        const auto& collision = map.collisions[static_cast<std::size_t>(selected_collision_index)];
+        if (collision.kind == fabric::project::CollisionShapeKind::polygon ||
+            collision.kind == fabric::project::CollisionShapeKind::chain) {
+            for (std::size_t point = 0; point < collision.points.size(); ++point) {
+                const auto position = world_to_screen(collision_point_for(
+                    static_cast<std::size_t>(selected_collision_index), point,
+                    collision.points[point]));
+                const auto active = point_gizmo.active &&
+                    point_gizmo.collision_index == selected_collision_index &&
+                    point_gizmo.point_index == point;
+                draw->AddCircleFilled(position, active ? 7.0F : 5.0F,
+                                      IM_COL32(250, 210, 90, 255));
+            }
         }
     }
     for (const auto& instance : map.instances) {
@@ -341,7 +382,46 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
-        if (!gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+        if (!gizmo.active && !point_gizmo.active &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_collision_index >= 0) {
+            const auto collision_index = static_cast<std::size_t>(selected_collision_index);
+            if (collision_index < map.collisions.size()) {
+                const auto& collision = map.collisions[collision_index];
+                if (collision.kind == fabric::project::CollisionShapeKind::polygon ||
+                    collision.kind == fabric::project::CollisionShapeKind::chain) {
+                    for (std::size_t point = 0; point < collision.points.size(); ++point) {
+                        const auto screen = world_to_screen(collision.points[point]);
+                        const auto dx = io.MousePos.x - screen.x;
+                        const auto dy = io.MousePos.y - screen.y;
+                        if (std::sqrt(dx * dx + dy * dy) <= 10.0F) {
+                            point_gizmo.active = true;
+                            point_gizmo.collision_index = selected_collision_index;
+                            point_gizmo.point_index = point;
+                            point_gizmo.preview_point = collision.points[point];
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if (point_gizmo.active) {
+            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+                point_gizmo.preview_point = screen_to_world(io.MousePos);
+            } else {
+                const auto index = static_cast<std::size_t>(point_gizmo.collision_index);
+                if (index < map.collisions.size() &&
+                    point_gizmo.point_index < map.collisions[index].points.size()) {
+                    auto shape = map.collisions[index];
+                    shape.points[point_gizmo.point_index] = point_gizmo.preview_point;
+                    const auto committed = session.set_collision_shape(index, std::move(shape));
+                    status = committed ? "Collision point committed"
+                                       : "Collision point rejected (layer locked or invalid)";
+                }
+                point_gizmo.active = false;
+                point_gizmo.collision_index = -1;
+            }
+        }
+        if (!gizmo.active && !point_gizmo.active && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
             selected_instances.size() == 1U) {
             const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
                                                [&](const auto& instance) {
@@ -510,6 +590,7 @@ int run(const std::filesystem::path& project_root,
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
     CanvasGizmoState canvas_gizmo;
+    CollisionPointGizmoState collision_point_gizmo;
     fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
     bool running = true;
@@ -616,7 +697,8 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
-                            canvas_snapping, status);
+                            selected_collision_index, collision_point_gizmo, canvas_snapping,
+                            status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
@@ -656,6 +738,25 @@ int run(const std::filesystem::path& project_root,
                     ImGui::SetNextItemWidth(220.0F);
                     ImGui::DragFloat("Length", &collision_editor.length, 0.1F, 0.0F,
                                      4096.0F);
+                }
+                if (collision_editor.kind == fabric::project::CollisionShapeKind::polygon ||
+                    collision_editor.kind == fabric::project::CollisionShapeKind::chain) {
+                    ImGui::Text("Points: %zu", collision_editor.points.size());
+                    for (std::size_t point_index = 0;
+                         point_index < collision_editor.points.size(); ++point_index) {
+                        ImGui::PushID(static_cast<int>(point_index));
+                        ImGui::SetNextItemWidth(220.0F);
+                        ImGui::DragFloat2("Point", &collision_editor.points[point_index].x,
+                                          0.1F);
+                        ImGui::PopID();
+                    }
+                    const auto minimum_points = collision_editor.kind ==
+                        fabric::project::CollisionShapeKind::polygon ? 3U : 2U;
+                    ImGui::BeginDisabled(collision_editor.points.size() <= minimum_points);
+                    if (ImGui::Button("Remove last point")) collision_editor.points.pop_back();
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    if (ImGui::Button("Add point")) collision_editor.points.push_back({});
                 }
                 if (ImGui::Button("Apply collision")) {
                     const auto applied = session.set_collision_shape(

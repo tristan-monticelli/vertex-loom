@@ -274,6 +274,10 @@ références de triggers vérifiables dans l’éditeur.
 Une collision sélectionnée peut maintenant être modifiée depuis l’inspecteur
 (centre, rayon, longueur de capsule et statut capteur) puis enregistrée comme
 une commande réversible ; les calques verrouillés refusent la mutation.
+Les points des polygones et chaînes sont également éditables, ajoutables et
+supprimables en respectant leur nombre minimal.
+Les poignées de points du canvas permettent en plus de déplacer directement
+un sommet sélectionné, avec un commit atomique.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,

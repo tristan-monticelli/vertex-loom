@@ -74,6 +74,11 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     CHECK(session.map()->collisions.front().center == fabric::core::Vec2{3.0F, 4.0F});
     REQUIRE(session.undo());
     CHECK(session.map()->collisions.front().center == fabric::core::Vec2{});
+    collision.kind = fabric::project::CollisionShapeKind::polygon;
+    collision.points = {{-1.0F, -1.0F}, {1.0F, -1.0F}, {0.0F, 1.0F}};
+    REQUIRE(session.set_collision_shape(0, collision));
+    CHECK(session.map()->collisions.front().points.size() == 3);
+    REQUIRE(session.undo());
     REQUIRE(session.set_layer_locked({.value = "collision"}, true));
     REQUIRE_FALSE(session.set_collision_shape(0, collision));
     REQUIRE(session.save());
