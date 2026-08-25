@@ -286,7 +286,11 @@ trois plateformes.
 - [ ] Ajouter actions clavier/manette, scènes, transitions et points d’entrée.
 - [ ] Ajouter contrôleur de personnage, caméra, zones et événements en
   réutilisant les propriétés et animations génériques.
-- [ ] Ajouter audio PCM WAV, progression versionnée atomique et replay gameplay.
+- [x] Ajouter audio PCM WAV, progression versionnée atomique et replay gameplay.
+
+Le runtime accepte désormais `--audio <wav>`, `--save-slot <slot>`,
+`--replay <id>` et `--character` ; les formats et leurs tests headless sont
+validés dans `npm run validate`.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement
