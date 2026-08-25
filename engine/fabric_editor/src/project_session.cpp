@@ -1997,7 +1997,7 @@ AutosaveStatus ProjectSession::update_autosave(
 
 bool ProjectSession::accept_recovery(
     const AutosaveScheduler::Clock::time_point now) {
-    if (recovery_texture_) {
+    if (recovery_texture_ && imported_texture_) {
         imported_texture_->asset = std::move(*recovery_texture_);
         recovery_texture_.reset();
         commands_.clear();
