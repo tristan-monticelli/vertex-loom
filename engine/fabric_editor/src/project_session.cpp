@@ -3,6 +3,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
 
+#include <algorithm>
 #include <memory>
 #include <limits>
 #include <string_view>
@@ -15,6 +16,90 @@ project::ValidationReport validate_serialized_manifest(
     const std::string_view contents) {
     auto parsed = project::parse_manifest(contents);
     return {.errors = std::move(parsed.errors)};
+}
+
+std::optional<std::vector<StudioResource>> index_project_resources(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest,
+    std::vector<project::Error>& errors) {
+    std::vector<StudioResource> indexed;
+    const auto inspect = [&](const StudioResourceKind kind,
+                             const std::filesystem::path& directory,
+                             const std::string_view suffix) -> bool {
+        std::error_code error;
+        const bool exists = std::filesystem::exists(directory, error);
+        if (!exists && !error) {
+            return true;
+        }
+        if (error || !std::filesystem::is_directory(directory, error)) {
+            errors = {{project::ErrorCode::io_error, "resources",
+                       "cannot inspect the resource directory"}};
+            return false;
+        }
+        for (std::filesystem::directory_iterator iterator{directory, error};
+             !error && iterator != std::filesystem::directory_iterator{};
+             iterator.increment(error)) {
+            if (!iterator->is_regular_file(error)) {
+                error.clear();
+                continue;
+            }
+            const auto filename = iterator->path().filename().string();
+            if (!filename.ends_with(suffix)) {
+                continue;
+            }
+            const auto relative = std::filesystem::relative(
+                iterator->path(), project_root, error);
+            if (error) {
+                break;
+            }
+            if (kind == StudioResourceKind::texture) {
+                auto loaded = project::load_texture_asset(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
+            } else {
+                auto loaded = project::load_vector_asset(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({
+                    kind, loaded.asset->document.id, loaded.asset->document.name,
+                    relative,
+                    loaded.asset->source_kind == project::VectorSourceKind::native});
+            }
+        }
+        if (error) {
+            errors = {{project::ErrorCode::io_error, "resources",
+                       "cannot enumerate the resource directory"}};
+            return false;
+        }
+        return true;
+    };
+
+    const auto assets = project_root / manifest.directories.assets;
+    if (!inspect(StudioResourceKind::texture, assets / "textures",
+                 ".texture.json") ||
+        !inspect(StudioResourceKind::vector, assets / "vectors",
+                 ".vector.json")) {
+        return std::nullopt;
+    }
+    std::ranges::sort(indexed, [](const StudioResource& left,
+                                 const StudioResource& right) {
+        if (left.kind != right.kind) {
+            return left.kind < right.kind;
+        }
+        if (left.name != right.name) {
+            return left.name < right.name;
+        }
+        return left.id.value < right.id.value;
+    });
+    return indexed;
 }
 
 template <typename Value>
@@ -63,6 +148,8 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
+    resources_.clear();
+    selected_resource_index_.reset();
     recovery_manifest_.reset();
     commands_.clear();
     autosave_.reset();
@@ -74,6 +161,14 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     auto loaded = project::load_project(project_root);
     if (!loaded.ok()) {
         errors_ = std::move(loaded.errors);
+        return false;
+    }
+
+    std::vector<project::Error> index_errors;
+    auto indexed = index_project_resources(
+        project_root, *loaded.manifest, index_errors);
+    if (!indexed) {
+        errors_ = std::move(index_errors);
         return false;
     }
 
@@ -94,6 +189,8 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
+    resources_ = std::move(*indexed);
+    selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
     commands_.clear();
     autosave_.reset();
@@ -141,8 +238,10 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
         .asset = std::move(*published.asset),
         .image = std::move(*decoded.image),
     };
-    errors_.clear();
-    return true;
+    if (!refresh_resources()) {
+        return false;
+    }
+    return select_resource(StudioResourceKind::texture, id);
 }
 
 bool ProjectSession::import_svg(const std::filesystem::path& source,
@@ -184,8 +283,10 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
         .preview = std::move(*decoded.image),
     };
     created_vector_.reset();
-    errors_.clear();
-    return true;
+    if (!refresh_resources()) {
+        return false;
+    }
+    return select_resource(StudioResourceKind::vector, id);
 }
 
 bool ProjectSession::create_vector_artwork(
@@ -262,6 +363,100 @@ bool ProjectSession::create_vector_artwork(
     }
     created_vector_ = std::move(*published.asset);
     imported_vector_.reset();
+    const auto created_id = created_vector_->document.id;
+    if (!refresh_resources()) {
+        return false;
+    }
+    return select_resource(StudioResourceKind::vector, created_id);
+}
+
+bool ProjectSession::refresh_resources() {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before indexing resources"}};
+        return false;
+    }
+
+    std::optional<std::pair<StudioResourceKind, core::ResourceId>> previous;
+    if (const auto* selected = selected_resource()) {
+        previous = std::pair{selected->kind, selected->id};
+    }
+    auto indexed = index_project_resources(project_root_, *manifest_, errors_);
+    if (!indexed) {
+        return false;
+    }
+    resources_ = std::move(*indexed);
+    selected_resource_index_.reset();
+    if (previous) {
+        const auto match = std::ranges::find_if(
+            resources_, [&](const StudioResource& resource) {
+                return resource.kind == previous->first &&
+                    resource.id == previous->second;
+            });
+        if (match != resources_.end()) {
+            selected_resource_index_ =
+                static_cast<std::size_t>(std::distance(resources_.begin(), match));
+        }
+    }
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::select_resource(const StudioResourceKind kind,
+                                     const core::ResourceId& id) {
+    const auto match = std::ranges::find_if(
+        resources_, [&](const StudioResource& resource) {
+            return resource.kind == kind && resource.id == id;
+        });
+    if (match == resources_.end()) {
+        errors_ = {{project::ErrorCode::missing_resource, "selection",
+                    "the selected resource is not indexed"}};
+        return false;
+    }
+    const auto index = static_cast<std::size_t>(
+        std::distance(resources_.begin(), match));
+    if (kind == StudioResourceKind::texture) {
+        auto loaded = project::load_texture_asset(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        auto image = render::load_png(project_root_ / loaded.asset->source);
+        if (!image.ok()) {
+            errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                        image.error->message}};
+            return false;
+        }
+        imported_texture_ = ImportedTexture{
+            .asset = std::move(*loaded.asset), .image = std::move(*image.image)};
+        imported_vector_.reset();
+        created_vector_.reset();
+    } else {
+        auto loaded = project::load_vector_asset(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        if (loaded.asset->source_kind == project::VectorSourceKind::linked_svg) {
+            auto image = render::load_svg_preview(project_root_ / loaded.asset->source);
+            if (!image.ok()) {
+                errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                            image.error->message}};
+                return false;
+            }
+            imported_vector_ = ImportedVector{
+                .asset = std::move(*loaded.asset),
+                .preview = std::move(*image.image)};
+            created_vector_.reset();
+        } else {
+            created_vector_ = std::move(*loaded.asset);
+            imported_vector_.reset();
+        }
+    }
+    selected_resource_index_ = index;
     errors_.clear();
     return true;
 }
@@ -457,6 +652,18 @@ const std::optional<ImportedVector>& ProjectSession::imported_vector() const noe
 const std::optional<project::VectorAsset>&
 ProjectSession::created_vector() const noexcept {
     return created_vector_;
+}
+
+const std::vector<StudioResource>&
+ProjectSession::resources() const noexcept {
+    return resources_;
+}
+
+const StudioResource* ProjectSession::selected_resource() const noexcept {
+    if (!selected_resource_index_ || *selected_resource_index_ >= resources_.size()) {
+        return nullptr;
+    }
+    return &resources_[*selected_resource_index_];
 }
 
 } // namespace fabric::editor

@@ -50,6 +50,8 @@ C4Component
   l’arrivée de leur contrat.
 - Le panneau gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
+  L'index est reconstruit à l'ouverture et après publication ; sélectionner
+  recharge le document validé et son aperçu depuis le projet.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,

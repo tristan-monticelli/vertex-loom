@@ -22,6 +22,21 @@ enum class AutosaveStatus {
     failed,
 };
 
+enum class StudioResourceKind {
+    texture,
+    vector,
+};
+
+struct StudioResource {
+    StudioResourceKind kind{StudioResourceKind::texture};
+    core::ResourceId id;
+    std::string name;
+    std::filesystem::path document_path;
+    bool native{};
+
+    friend bool operator==(const StudioResource&, const StudioResource&) = default;
+};
+
 struct ImportedTexture {
     project::TextureAsset asset;
     render::RasterImage image;
@@ -73,6 +88,9 @@ public:
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
     void decline_recovery() noexcept;
+    [[nodiscard]] bool refresh_resources();
+    [[nodiscard]] bool select_resource(StudioResourceKind kind,
+                                       const core::ResourceId& id);
 
     [[nodiscard]] bool has_project() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
@@ -86,6 +104,8 @@ public:
     [[nodiscard]] const std::optional<ImportedVector>& imported_vector() const noexcept;
     [[nodiscard]] const std::optional<project::VectorAsset>&
     created_vector() const noexcept;
+    [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
+    [[nodiscard]] const StudioResource* selected_resource() const noexcept;
 
 private:
     std::filesystem::path project_root_;
@@ -93,6 +113,8 @@ private:
     std::optional<ImportedTexture> imported_texture_;
     std::optional<ImportedVector> imported_vector_;
     std::optional<project::VectorAsset> created_vector_;
+    std::vector<StudioResource> resources_;
+    std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;
     CommandStack commands_;
     AutosaveScheduler autosave_;

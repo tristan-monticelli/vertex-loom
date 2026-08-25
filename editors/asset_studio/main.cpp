@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdio>
 #include <cstddef>
 #include <filesystem>
@@ -78,6 +79,12 @@ struct SourceImportFields {
 struct ImportUiState {
     SourceImportFields png;
     SourceImportFields svg;
+};
+
+struct ProjectSettingsUiState {
+    std::string name;
+    double pixels_per_unit{fabric::project::default_pixels_per_unit};
+    bool request{};
 };
 
 struct AssetPreview {
@@ -223,28 +230,63 @@ void apply_studio_style() {
     colors[ImGuiCol_CheckMark] = {0.89F, 0.68F, 0.34F, 1.0F};
 }
 
-void draw_project_tree(const fabric::editor::ProjectSession& session) {
+void draw_project_tree(fabric::editor::ProjectSession& session,
+                       AssetPreview& preview, std::string& status) {
     if (!session.has_project()) {
         ImGui::TextDisabled("No project open");
         ImGui::Spacing();
-        ImGui::TextWrapped("Open a Vertex Loom project directory to inspect its content.");
+        ImGui::TextWrapped("Create or open a Vertex Loom project to begin.");
         return;
     }
 
-    const auto& directories = session.manifest()->directories;
-    const std::array entries{
-        std::pair{"Assets", &directories.assets},
-        std::pair{"Entities", &directories.entities},
-        std::pair{"Maps", &directories.maps},
-        std::pair{"Scenes", &directories.scenes},
-        std::pair{"Schemas", &directories.schemas},
-    };
-    for (const auto& [label, path] : entries) {
-        if (ImGui::TreeNodeEx(label, ImGuiTreeNodeFlags_Leaf)) {
-            ImGui::TextDisabled("%s", path->generic_string().c_str());
-            ImGui::TreePop();
+    static ImGuiTextFilter filter;
+    filter.Draw("Search", -1.0F);
+    ImGui::Spacing();
+    const auto draw_kind = [&](const char* label,
+                               const fabric::editor::StudioResourceKind kind) {
+        ImGui::SeparatorText(label);
+        bool any = false;
+        for (const auto& resource : session.resources()) {
+            if (resource.kind != kind ||
+                !filter.PassFilter(resource.name.c_str(),
+                                   resource.id.value.c_str())) {
+                continue;
+            }
+            any = true;
+            const auto* selected = session.selected_resource();
+            const bool is_selected = selected != nullptr &&
+                selected->kind == resource.kind && selected->id == resource.id;
+            const std::string item_label = resource.name + "##" +
+                resource.id.value;
+            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                if (session.select_resource(resource.kind, resource.id)) {
+                    if (session.imported_texture()) {
+                        upload_preview(preview,
+                                       session.imported_texture()->image);
+                        preview.kind = PreviewKind::texture;
+                    } else if (session.imported_vector()) {
+                        upload_preview(preview,
+                                       session.imported_vector()->preview);
+                        preview.kind = PreviewKind::vector;
+                    } else {
+                        clear_asset_preview(preview);
+                    }
+                    status = "Selected: " + resource.name;
+                } else {
+                    status = "Resource could not be loaded; inspect diagnostics.";
+                }
+            }
+            if (resource.native) {
+                ImGui::SameLine();
+                ImGui::TextDisabled("native");
+            }
         }
-    }
+        if (!any) {
+            ImGui::TextDisabled("None");
+        }
+    };
+    draw_kind("Textures", fabric::editor::StudioResourceKind::texture);
+    draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector);
 }
 
 void draw_diagnostics(const fabric::editor::ProjectSession& session) {
@@ -285,6 +327,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     CreationUiState& creation,
                     ImportUiState& imports,
                     AssetPreview& preview,
+                    ProjectSettingsUiState& project_settings,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
@@ -301,7 +344,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
-    draw_project_tree(session);
+    draw_project_tree(session, preview, status);
     ImGui::Spacing();
     ImGui::SeparatorText("Create");
     if (!session.has_project()) {
@@ -385,21 +428,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowSize({right_width, content_height});
     ImGui::Begin("Inspector", nullptr, fixed_panel_flags);
     if (session.has_project()) {
-        ImGui::TextUnformatted(session.manifest()->name.c_str());
-        ImGui::TextDisabled("%s", session.manifest()->id.value.c_str());
-        ImGui::Separator();
-        ImGui::Text("Schema version: %u", session.manifest()->schema_version);
-        double pixels_per_unit = session.manifest()->pixels_per_unit;
-        ImGui::SetNextItemWidth(-1.0F);
-        if (ImGui::InputDouble("Pixels per unit", &pixels_per_unit, 1.0,
-                               10.0, "%.2f")) {
-            if (session.set_pixels_per_unit(pixels_per_unit)) {
-                status = "Project units changed";
-            } else {
-                status = "Invalid project units; inspect the diagnostics.";
-            }
+        const auto* selected = session.selected_resource();
+        if (selected != nullptr) {
+            ImGui::TextUnformatted(selected->name.c_str());
+            ImGui::TextDisabled("%s", selected->id.value.c_str());
+            ImGui::TextDisabled("%s",
+                                selected->document_path.generic_string().c_str());
+        } else {
+            ImGui::TextDisabled("Select a resource to inspect it.");
         }
-        ImGui::TextWrapped("%s", session.project_root().string().c_str());
         if (preview.texture != 0U) {
             ImGui::SeparatorText(preview.kind == PreviewKind::vector
                                      ? "Imported vector"
@@ -426,7 +463,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     session.imported_vector()->asset.source.generic_string().c_str());
             }
         }
-        if (creation.prepared_artwork) {
+        if (creation.prepared_artwork && selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::vector &&
+            selected->native) {
             ImGui::SeparatorText("Created native artwork");
             ImGui::TextUnformatted(creation.prepared_artwork->name.c_str());
             if (session.created_vector()) {
@@ -445,6 +484,45 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SeparatorText("Diagnostics");
     draw_diagnostics(session);
     ImGui::End();
+
+    if (project_settings.request && session.has_project()) {
+        project_settings.name = session.manifest()->name;
+        project_settings.pixels_per_unit = session.manifest()->pixels_per_unit;
+        ImGui::OpenPopup("Project settings");
+        project_settings.request = false;
+    }
+    if (ImGui::BeginPopupModal("Project settings", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::SetNextItemWidth(420.0F);
+        ImGui::InputText("Project name", &project_settings.name);
+        ImGui::SetNextItemWidth(220.0F);
+        ImGui::InputDouble("Pixels per unit",
+                           &project_settings.pixels_per_unit, 1.0, 10.0,
+                           "%.2f");
+        ImGui::TextDisabled("%s", session.project_root().string().c_str());
+        const bool valid = !project_settings.name.empty() &&
+            std::isfinite(project_settings.pixels_per_unit) &&
+            project_settings.pixels_per_unit > 0.0;
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Apply", {110.0F, 0.0F})) {
+            const bool name_updated =
+                session.set_project_name(project_settings.name);
+            const bool units_updated = session.set_pixels_per_unit(
+                project_settings.pixels_per_unit);
+            if (name_updated && units_updated) {
+                status = "Project settings changed.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Invalid project settings; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
 
     ImGui::SetNextWindowPos({viewport->Pos.x,
                              viewport->Pos.y + viewport->Size.y - status_height});
@@ -967,6 +1045,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     CreationUiState creation;
     ImportUiState imports;
     AssetPreview preview;
+    ProjectSettingsUiState project_settings;
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
@@ -1014,6 +1093,10 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     status = session.save()
                         ? "Project saved."
                         : "Save failed; inspect the diagnostics.";
+                }
+                if (ImGui::MenuItem("Project settings...", nullptr, false,
+                                    session.has_project())) {
+                    project_settings.request = true;
                 }
                 if (ImGui::BeginMenu("Create", session.has_project())) {
                     if (ImGui::MenuItem("Vector artwork...")) {
@@ -1108,6 +1191,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
 
         draw_workspace(session, window, path_buffer, creation, imports, preview,
+                       project_settings,
                        request_open, request_png, request_svg,
                        pending_session_action, running, status);
 

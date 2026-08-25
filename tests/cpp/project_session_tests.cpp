@@ -174,6 +174,11 @@ void session_imports_a_valid_png_persistently() {
             "successful import retained no texture");
     require(session.imported_texture()->image.width == 1,
             "import retained the wrong decoded image");
+    require(session.resources().size() == 1,
+            "imported texture was not added to the resource index");
+    require(session.selected_resource() != nullptr &&
+                session.selected_resource()->id.value == "wool-fill",
+            "imported texture was not selected");
     require(std::filesystem::is_regular_file(
                 valid.path() / "assets/textures/wool-fill.png"),
             "import did not persist the PNG");
@@ -182,6 +187,18 @@ void session_imports_a_valid_png_persistently() {
             "import did not persist the texture document");
     require(fabric::project::validate_project(valid.path()).ok(),
             "project validator rejected an imported texture");
+
+    fabric::editor::ProjectSession reopened;
+    require(reopened.open(valid.path()),
+            "project with imported texture could not be reopened");
+    require(reopened.resources().size() == 1,
+            "reopened project did not index its texture");
+    require(reopened.select_resource(
+                fabric::editor::StudioResourceKind::texture,
+                {.value = "wool-fill"}),
+            "indexed texture could not be selected after reopen");
+    require(reopened.imported_texture()->image.width == 1,
+            "selected texture was not decoded after reopen");
 }
 
 void failed_import_writes_no_asset_and_preserves_the_previous_import() {
@@ -227,6 +244,11 @@ void session_imports_a_valid_svg_persistently() {
             "successful import retained no vector");
     require(session.imported_vector()->preview.width == 2048,
             "import retained the wrong SVG preview");
+    require(session.resources().size() == 1,
+            "imported vector was not added to the resource index");
+    require(session.selected_resource() != nullptr &&
+                session.selected_resource()->id.value == "thread-outline",
+            "imported vector was not selected");
     require(std::filesystem::is_regular_file(
                 valid.path() / "assets/vectors/thread-outline.svg"),
             "import did not persist the SVG");
