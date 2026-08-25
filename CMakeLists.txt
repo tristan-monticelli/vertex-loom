@@ -130,6 +130,7 @@ target_link_libraries(fabric_asset_preview PRIVATE
 )
 
 add_library(fabric_editor STATIC
+    engine/fabric_editor/src/animation_timeline.cpp
     engine/fabric_editor/src/autosave_scheduler.cpp
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
@@ -236,6 +237,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_property_descriptor_tests
              COMMAND fabric_property_descriptor_tests)
+
+    add_executable(fabric_animation_timeline_tests
+        tests/cpp/animation_timeline_tests.cpp
+    )
+    target_link_libraries(fabric_animation_timeline_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_animation_timeline_tests
+             COMMAND fabric_animation_timeline_tests)
 
     add_executable(fabric_document_storage_tests
         tests/cpp/document_storage_tests.cpp

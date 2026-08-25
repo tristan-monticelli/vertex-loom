@@ -209,8 +209,9 @@ transform du fill restent ouverts.
   animables par le registre.
 - [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
   la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
-- [ ] Supporter auto-key optionnel, création explicite de clé, déplacement de
-  clés, multi-sélection, copier/coller, snapping et scrubbing.
+- [x] Supporter création explicite de clé, déplacement et suppression de clés
+  par commandes undo/redo. Auto-key, multi-sélection, copier/coller, snapping
+  et scrubbing restent à ajouter.
 - [ ] Permettre valeurs absolues, offsets relatifs et composition additive sans
   coder une animation particulière dans le moteur.
 - [ ] Prévisualiser une animation sur n’importe quelle propriété compatible et

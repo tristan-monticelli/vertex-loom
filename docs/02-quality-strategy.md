@@ -83,6 +83,8 @@ atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
 interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
 Le registre de descripteurs couvre résolution par binding, propriétés
 animables/inscriptibles, doublons, identifiants manquants et bornes inversées.
+La timeline couvre insertion, tri, déplacement, suppression protégée de la
+dernière clé, durée, boucle et restauration complète par undo/redo.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

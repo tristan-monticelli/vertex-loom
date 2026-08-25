@@ -54,7 +54,7 @@ C4Component
 - Le hub affiche séparément `Create`, `Import` et `Add existing`. Projet,
   artwork et chaque source d’import possèdent un état isolé. `Add existing`
   ouvre un sélecteur des ressources déjà indexées et ne publie aucun document.
-  Les actions matériau, entité et animation restent désactivées jusqu’à
+  Les actions matériau et entité restent désactivées jusqu’à
   l’arrivée de leur contrat.
 - Le panneau gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
