@@ -273,8 +273,10 @@ ImU32 color_to_u32(const fabric::core::Color& color) {
                     channel(color.blue), channel(color.alpha));
 }
 
-void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
+void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                                CanvasUiState& canvas, const ImVec2 available) {
+    if (!session.created_vector()) return;
+    const auto& asset = *session.created_vector();
     if (!asset.native || asset.native->size.x <= 0.0F ||
         asset.native->size.y <= 0.0F) {
         ImGui::TextDisabled("Native artwork has no drawable canvas.");
@@ -341,6 +343,19 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
     const int last_vertical = static_cast<int>(std::ceil(world_right / grid_step));
     const int first_horizontal = static_cast<int>(std::floor(world_bottom / grid_step));
     const int last_horizontal = static_cast<int>(std::ceil(world_top / grid_step));
+    if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Left) &&
+        !asset.native->nodes.empty() &&
+        canvas.selected_node < asset.native->nodes.size()) {
+        auto node = asset.native->nodes[canvas.selected_node];
+        if (!node.locked) {
+            const ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+            node.transform.position.x += delta.x / pixels_per_unit;
+            node.transform.position.y -= delta.y / pixels_per_unit;
+            static_cast<void>(session.set_selected_vector_node(
+                canvas.selected_node, std::move(node)));
+        }
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
+    }
     draw_list->PushClipRect(origin, {origin.x + available.x,
                                      origin.y + available.y}, true);
     for (int index = first_vertical; index <= last_vertical; ++index) {
@@ -493,7 +508,7 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
     }
     draw_list->PopClipRect();
     if (hovered) {
-        ImGui::SetTooltip("Middle drag: pan  |  Wheel: zoom %.0f%%",
+        ImGui::SetTooltip("Left drag: move selected node  |  Middle drag: pan  |  Wheel: zoom %.0f%%",
                           canvas.zoom * 100.0F);
     }
 }
@@ -586,7 +601,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             fabric::editor::StudioResourceKind::vector &&
         session.selected_resource()->native && session.created_vector();
     if (native_selected) {
-        draw_native_vector_canvas(*session.created_vector(), canvas, available);
+        draw_native_vector_canvas(session, canvas, available);
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);

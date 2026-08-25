@@ -85,4 +85,6 @@ textures et vecteurs, la sélection et le rechargement, l'aperçu temporaire san
 publication, le choix d'une texture par ressource et les mutations natives via
 undo, redo, dirty et autosave. Un test de contrôleur vérifie les décisions
 Save/Discard/Cancel avant remplacement de session ; les raccourcis et la mise
-en page restent dans le smoke test visuel multiplateforme.
+en page restent dans le smoke test visuel multiplateforme. Le déplacement par
+glisser du nœud sélectionné réutilise le même chemin de commande que l’inspecteur
+et fusionne les positions continues.
