@@ -134,6 +134,7 @@ struct AnimationUiState {
     std::string component_id{"transform"};
     std::string property_id{"position"};
     int binding_preset{};
+    std::string visual_component_id;
     std::string marker_id{"marker"};
     float scrub_time{};
     float key_time{};
@@ -2465,6 +2466,85 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::InputText("Component", &animation_ui.component_id);
             ImGui::InputText("Property", &animation_ui.property_id);
+            ImGui::SeparatorText("Visual component properties");
+            const auto selected_component_resource = std::ranges::find_if(
+                session.resources(), [&](const auto& resource) {
+                    return resource.kind ==
+                            fabric::editor::StudioResourceKind::visual_component &&
+                        resource.id.value == animation_ui.visual_component_id;
+                });
+            const char* selected_component_label =
+                selected_component_resource == session.resources().end()
+                ? "Choose a visual component..."
+                : selected_component_resource->name.c_str();
+            if (ImGui::BeginCombo("Component resource",
+                                  selected_component_label)) {
+                for (const auto& resource : session.resources()) {
+                    if (resource.kind !=
+                        fabric::editor::StudioResourceKind::visual_component)
+                        continue;
+                    const bool selected_component =
+                        resource.id.value == animation_ui.visual_component_id;
+                    if (ImGui::Selectable(resource.name.c_str(),
+                                          selected_component))
+                        animation_ui.visual_component_id = resource.id.value;
+                }
+                ImGui::EndCombo();
+            }
+            if (selected_component_resource != session.resources().end()) {
+                const auto component = fabric::project::load_visual_component(
+                    session.project_root(), *session.manifest(),
+                    selected_component_resource->document_path);
+                if (component.ok()) {
+                    fabric::project::PropertyDescriptorRegistry registry;
+                    for (auto descriptor :
+                         fabric::project::visual_component_property_descriptors(
+                             *component.asset))
+                        (void)registry.register_descriptor(
+                            std::move(descriptor));
+                    const auto descriptors = registry.animatable();
+                    const auto current_descriptor = std::ranges::find_if(
+                        descriptors, [&](const auto* descriptor) {
+                            return descriptor->component_id ==
+                                    animation_ui.component_id &&
+                                descriptor->property_id ==
+                                    animation_ui.property_id;
+                        });
+                    const char* descriptor_label =
+                        current_descriptor == descriptors.end()
+                        ? "Choose an animatable property..."
+                        : (*current_descriptor)->display_path.c_str();
+                    if (ImGui::BeginCombo("Animatable property",
+                                          descriptor_label)) {
+                        for (const auto* descriptor : descriptors) {
+                            const bool selected_descriptor =
+                                descriptor == (current_descriptor ==
+                                    descriptors.end() ? nullptr
+                                                      : *current_descriptor);
+                            if (ImGui::Selectable(
+                                    descriptor->display_path.c_str(),
+                                    selected_descriptor)) {
+                                animation_ui.component_id =
+                                    descriptor->component_id;
+                                animation_ui.property_id =
+                                    descriptor->property_id;
+                                using Kind =
+                                    fabric::project::PropertyValueKind;
+                                if (descriptor->value_kind == Kind::vec2)
+                                    animation_ui.key_kind = 0;
+                                else if (descriptor->value_kind == Kind::color)
+                                    animation_ui.key_kind = 2;
+                                else if (descriptor->value_kind == Kind::boolean)
+                                    animation_ui.key_kind = 3;
+                                else if (descriptor->value_kind == Kind::resource)
+                                    animation_ui.key_kind = 4;
+                                else animation_ui.key_kind = 1;
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+            }
             animation_ui.key_time = std::clamp(animation_ui.key_time, 0.0F,
                                                 std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Key time", &animation_ui.key_time, 0.0F,

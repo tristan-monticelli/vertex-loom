@@ -150,6 +150,11 @@ C4Component
   La création générique publie une composition vide puis, séparément, un
   composant réutilisable qui la référence ; l'ajout de calque choisit toujours
   une ressource déjà indexée et typée.
+- La timeline peut sélectionner un `VisualComponent` indexé, enregistrer ses
+  `PropertyDescriptor` animables dans le registre et produire un binding
+  `node + component + property`. Les paramètres de Beam, couture ou fermeture
+  utilisent ainsi les mêmes pistes scalaire, `Vec2` et couleur que les autres
+  propriétés, sans type de piste propre au preset.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

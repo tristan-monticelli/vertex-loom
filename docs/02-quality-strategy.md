@@ -137,6 +137,9 @@ bouton, couture et fermeture. Les tests inspectent les primitives natives, les
 deux rails texturés, le nombre borné de dents, le curseur et les paramètres
 animables, puis publient les quatre bundles dans un même projet et valident le
 graphe headless complet. Une destination existante est refusée avant écriture.
+Le Beam réutilise le preset couture : son paramètre d'offset est découvert par
+le registre de propriétés, sélectionné comme binding de timeline et interpolé
+par `AnimationClip v1` sans piste ni valeur spécialisée.
 Le test de session crée aussi une fermeture depuis le même point d'entrée que
 le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
 resélectionne son composant.

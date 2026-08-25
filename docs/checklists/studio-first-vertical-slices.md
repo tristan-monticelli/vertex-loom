@@ -89,8 +89,13 @@ Preview Runtime.
   style et UV via `ProjectSession`. La preview reconstruit le packet depuis le
   document en mémoire et propose un défilement UV temporaire ; les tests
   couvrent packet, undo/redo, autosave, récupération, sauvegarde et reload.
-- [ ] Réutiliser le registre de propriétés pour animer le Beam sans type de
+- [x] Réutiliser le registre de propriétés pour animer le Beam sans type de
   piste spécialisé.
+
+  Preuve : Asset Studio charge les descripteurs animables du composant choisi
+  et renseigne le binding générique de timeline. Le test `beam` découvre
+  `beam/offset`, crée deux clés scalaires et vérifie leur interpolation sans
+  branche de code ni type d'animation propre au Beam.
 - [ ] Afficher le même Beam dans Asset Studio, Map Studio et Preview Runtime.
 - [ ] Vérifier explicitement qu'aucune collision n'est générée sans référence
   de collision déclarée.

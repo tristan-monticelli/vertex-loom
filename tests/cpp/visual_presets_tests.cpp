@@ -1,4 +1,5 @@
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/animation_timeline.hpp"
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
@@ -304,6 +305,45 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
     CHECK(first.bundle->composition.layers.front().kind ==
           fabric::project::VisualLayerKind::textured_path);
     CHECK(first.bundle->component.parameters.size() == 5U);
+}
+
+TEST_CASE("Beam texture offset uses a generic component animation property") {
+    const auto beam_request = request(
+        fabric::editor::VisualPresetKind::seam, "beam");
+    const auto bundle = fabric::editor::build_visual_preset(
+        manifest(), beam_request);
+    REQUIRE(bundle.ok());
+
+    fabric::project::PropertyDescriptorRegistry registry;
+    for (auto descriptor :
+         fabric::project::visual_component_property_descriptors(
+             bundle.bundle->component))
+        REQUIRE(registry.register_descriptor(std::move(descriptor)).ok());
+    const auto bindings = fabric::editor::AnimationTimeline::animatable_bindings(
+        "beam-node", registry);
+    const auto offset_binding = std::ranges::find(
+        bindings, fabric::project::PropertyBinding{
+            "beam-node", "beam", "offset"});
+    REQUIRE(offset_binding != bindings.end());
+
+    fabric::project::AnimationClip clip{
+        .document = {.type = "animation",
+                     .id = {.value = "beam-scroll"},
+                     .name = "Beam Scroll"},
+        .duration = 1.0F,
+        .loop = true};
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(clip, commands);
+    REQUIRE(timeline.insert_key(*offset_binding, 0.0F, 0.0F,
+                                fabric::project::AnimationInterpolation::linear));
+    REQUIRE(timeline.insert_key(*offset_binding, 1.0F, 4.0F,
+                                fabric::project::AnimationInterpolation::linear));
+    const auto evaluated = fabric::project::evaluate_animation(clip, 0.5F);
+    REQUIRE(evaluated.ok());
+    REQUIRE(evaluated.properties.size() == 1U);
+    CHECK(evaluated.properties.front().binding == *offset_binding);
+    CHECK(std::get<float>(evaluated.properties.front().value) ==
+          Catch::Approx(2.0F));
 }
 
 TEST_CASE("zipper composes two rails repeated teeth and one slider") {
