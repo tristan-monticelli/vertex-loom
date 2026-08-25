@@ -32,6 +32,7 @@ fabric::project::MapDocument map() {
         .collisions = {{CollisionShapeKind::circle, "collision", false,
                         {0.0F, 0.0F}, 2.0F, 0.0F, {}}},
         .triggers = {{"spawn", "triggers", 0, {.value = "on-spawn"}, {}}},
+        .events = {{{.value = "on-spawn"}, {}}},
     };
 }
 

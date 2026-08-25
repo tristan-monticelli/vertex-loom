@@ -99,6 +99,8 @@ poids nuls, poses dupliquées et références de poses manquantes.
 `MapDocument v1` couvre round-trip, publication atomique, chunks 64 × 64,
 calques, prefabs, instances, formes de collision, capteurs, triggers,
 événements et propriétés custom strictement typées.
+Les événements map couvrent déclarations uniques, payloads typés et rejet des
+triggers qui référencent un événement absent.
 L’index de chunks couvre 100 000 instances, coordonnées négatives, ordre
 déterministe et extraction par viewport.
 `fabric_physics` couvre la création/destruction d’un monde Box2D v3.1.1,

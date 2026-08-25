@@ -79,6 +79,12 @@ struct TriggerDefinition {
     friend bool operator==(const TriggerDefinition&, const TriggerDefinition&) = default;
 };
 
+struct MapEventDefinition {
+    core::ResourceId id;
+    std::vector<MapProperty> payload;
+    friend bool operator==(const MapEventDefinition&, const MapEventDefinition&) = default;
+};
+
 struct MapDocument {
     DocumentHeader document{
         .schema_version = current_map_schema_version,
@@ -90,6 +96,7 @@ struct MapDocument {
     std::vector<MapInstance> instances;
     std::vector<CollisionShape> collisions;
     std::vector<TriggerDefinition> triggers;
+    std::vector<MapEventDefinition> events;
     friend bool operator==(const MapDocument&, const MapDocument&) = default;
 };
 

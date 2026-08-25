@@ -84,8 +84,8 @@ C4Component
   influences pondérées et valide les triangles et références de poses.
 - `MapDocument v1` est stocké sous `maps/<id>.map.json` et sépare calques,
   prefabs, instances, collisions et triggers. Les instances sont indexées par
-  chunks de `64 × 64` unités et les propriétés custom ont un ensemble de types
-  fermé.
+  chunks de `64 × 64` unités, événements nommés et les propriétés custom ont un
+  ensemble de types fermé.
 - `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
   extrait les instances visibles d’un viewport sans accès disque.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont

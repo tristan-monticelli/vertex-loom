@@ -231,12 +231,18 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
             error(report.errors, ErrorCode::invalid_asset, "collisions.points", "shape has too few points");
     }
     std::set<std::string> trigger_ids;
+    std::set<std::string> event_ids;
+    for (const auto& event : map.events) {
+        if (!core::ResourceId::is_valid(event.id.value) || !event_ids.insert(event.id.value).second)
+            error(report.errors, ErrorCode::duplicate_resource, "events.id", "event ids must be valid and unique");
+    }
     for (const auto& trigger : map.triggers) {
         if (!core::ResourceId::is_valid(trigger.id) || !trigger_ids.insert(trigger.id).second)
             error(report.errors, ErrorCode::duplicate_resource, "triggers.id", "trigger ids must be valid and unique");
         if (!layer_exists(map, trigger.layer_id, MapLayerKind::triggers))
             error(report.errors, ErrorCode::missing_resource, "triggers.layer", "trigger layer is missing");
-        if (trigger.collision_index >= map.collisions.size() || !core::ResourceId::is_valid(trigger.event_id.value))
+        if (trigger.collision_index >= map.collisions.size() || !core::ResourceId::is_valid(trigger.event_id.value) ||
+            event_ids.find(trigger.event_id.value) == event_ids.end())
             error(report.errors, ErrorCode::invalid_asset, "triggers", "trigger shape or event is invalid");
     }
     return report;
@@ -258,7 +264,8 @@ std::string serialize_map(const MapDocument& map) {
     Json json = {{"schemaVersion", map.document.schema_version}, {"type", map.document.type},
                  {"id", map.document.id.value}, {"name", map.document.name},
                  {"chunkSize", map.chunk_size}, {"layers", Json::array()}, {"prefabs", Json::array()},
-                 {"instances", Json::array()}, {"collisions", Json::array()}, {"triggers", Json::array()}};
+                 {"instances", Json::array()}, {"collisions", Json::array()}, {"triggers", Json::array()},
+                 {"events", Json::array()}};
     for (const auto& layer : map.layers) json["layers"].push_back({{"id", layer.id}, {"name", layer.name}, {"kind", std::string(to_string(layer.kind))}, {"visible", layer.visible}, {"locked", layer.locked}, {"depth", layer.depth}});
     for (const auto& prefab : map.prefabs) json["prefabs"].push_back({{"id", prefab.id}, {"entity", ref(prefab.entity)}, {"overrides", properties(prefab.overrides)}});
     for (const auto& instance : map.instances) {
@@ -272,6 +279,7 @@ std::string serialize_map(const MapDocument& map) {
         json["collisions"].push_back({{"kind", collision.kind == CollisionShapeKind::circle ? "circle" : collision.kind == CollisionShapeKind::capsule ? "capsule" : collision.kind == CollisionShapeKind::polygon ? "polygon" : "chain"}, {"layer", collision.layer_id}, {"sensor", collision.sensor}, {"center", vec(collision.center)}, {"radius", collision.radius}, {"length", collision.length}, {"points", points}});
     }
     for (const auto& trigger : map.triggers) json["triggers"].push_back({{"id", trigger.id}, {"layer", trigger.layer_id}, {"collision", trigger.collision_index}, {"event", trigger.event_id.value}, {"properties", properties(trigger.properties)}});
+    for (const auto& event : map.events) json["events"].push_back({{"id", event.id.value}, {"payload", properties(event.payload)}});
     return json.dump(2) + "\n";
 }
 
@@ -294,6 +302,8 @@ MapResult parse_map(const ProjectManifest& manifest, std::string_view serialized
     if (collisions == json.end() || !collisions->is_array()) error(result.errors, ErrorCode::invalid_asset, "collisions", "expected an array"); else for (const auto& value : *collisions) { CollisionShape collision; std::string kind; text(value, "kind", kind, result.errors); if (kind == "circle") collision.kind = CollisionShapeKind::circle; else if (kind == "capsule") collision.kind = CollisionShapeKind::capsule; else if (kind == "polygon") collision.kind = CollisionShapeKind::polygon; else if (kind == "chain") collision.kind = CollisionShapeKind::chain; else error(result.errors, ErrorCode::invalid_asset, "kind", "unsupported collision kind"); text(value, "layer", collision.layer_id, result.errors); const auto sensor = value.find("sensor"); if (sensor == value.end() || !sensor->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "sensor", "expected boolean"); else collision.sensor = sensor->get<bool>(); vec_read(value, "center", collision.center, result.errors); number(value, "radius", collision.radius, result.errors); number(value, "length", collision.length, result.errors); const auto points = value.find("points"); if (points == value.end() || !points->is_array()) error(result.errors, ErrorCode::invalid_asset, "points", "expected an array"); else for (const auto& point : *points) { core::Vec2 parsed{}; if (point.is_object() && number(point, "x", parsed.x, result.errors) && number(point, "y", parsed.y, result.errors)) collision.points.push_back(parsed); } map.collisions.push_back(std::move(collision)); }
     const auto triggers = json.find("triggers");
     if (triggers == json.end() || !triggers->is_array()) error(result.errors, ErrorCode::invalid_asset, "triggers", "expected an array"); else for (const auto& value : *triggers) { TriggerDefinition trigger; text(value, "id", trigger.id, result.errors); text(value, "layer", trigger.layer_id, result.errors); std::int64_t index{}; integer(value, "collision", index, result.errors); trigger.collision_index = static_cast<std::size_t>(std::max<std::int64_t>(0, index)); text(value, "event", trigger.event_id.value, result.errors); properties_read(value, "properties", trigger.properties, result.errors); map.triggers.push_back(std::move(trigger)); }
+    const auto events = json.find("events");
+    if (events == json.end() || !events->is_array()) error(result.errors, ErrorCode::invalid_asset, "events", "expected an array"); else for (const auto& value : *events) { MapEventDefinition event; text(value, "id", event.id.value, result.errors); properties_read(value, "payload", event.payload, result.errors); map.events.push_back(std::move(event)); }
     if (!result.errors.empty()) return result;
     const auto validation = validate_map(manifest, map); if (!validation.ok()) { result.errors = validation.errors; return result; }
     result.asset = std::move(map); return result;
