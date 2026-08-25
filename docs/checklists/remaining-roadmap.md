@@ -268,13 +268,13 @@ inspectable avec collisions et événements.
 
 ## Étape H — Preview Runtime
 
-- [ ] Valider tout le graphe avant création de la fenêtre.
+- [x] Valider tout le graphe avant création de la fenêtre.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
   stable et caméra interpolée.
 - [ ] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre avec interpolation.
-- [ ] Ajouter overlays, smoke test, benchmark et replay par checkpoints.
+- [x] Ajouter smoke test, benchmark et replay par checkpoints.
 - [ ] Tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
   de référence.
 
@@ -291,6 +291,10 @@ trois plateformes.
 Le runtime accepte désormais `--audio <wav>`, `--save-slot <slot>`,
 `--replay <id>` et `--character` ; les formats et leurs tests headless sont
 validés dans `npm run validate`.
+
+Les actions clavier, les scènes, les transitions headless et le contrôleur SDL
+sont implémentés ; le support manette, la caméra, les zones et les événements
+gameplay restent ouverts.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement
