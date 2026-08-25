@@ -206,6 +206,50 @@ void native_geometry_produces_deterministic_packets() {
             "triangle did not produce one deterministic fill triangle");
 }
 
+void raster_views_produce_shared_deterministic_packets() {
+    const fabric::project::ResourceReference texture{
+        {.value = "woven-source"}, "texture"};
+    const fabric::project::RasterView view{
+        .crop = {{2.0F, 0.0F}, {2.0F, 2.0F}},
+        .pivot = {0.25F, 0.5F},
+        .transform = {.position = {1.0F, 2.0F}, .scale = {2.0F, 1.0F}},
+        .filter = fabric::project::RasterFilter::nearest,
+    };
+    const fabric::render::RasterViewPacketInput input{
+        .node_id = "cropped",
+        .texture = texture,
+        .source_width = 4U,
+        .source_height = 2U,
+        .pixels_per_unit = 2.0F,
+        .view = view,
+    };
+    const auto first = fabric::render::build_raster_view_draw_packets(input);
+    const auto second = fabric::render::build_raster_view_draw_packets(input);
+    require(first.ok() && second.ok() && first.packets == second.packets &&
+                first.errors == second.errors && first.packets.size() == 1U,
+            "raster view packet was not deterministic");
+    const auto& packet = first.packets.front();
+    require(packet.fill_vertices == std::vector<fabric::core::Vec2>{
+                {0.5F, 1.5F}, {2.5F, 1.5F},
+                {2.5F, 2.5F}, {0.5F, 2.5F}} &&
+                packet.fill_uv == std::vector<fabric::core::Vec2>{
+                    {0.5F, 0.0F}, {1.0F, 0.0F},
+                    {1.0F, 1.0F}, {0.5F, 1.0F}},
+            "raster crop geometry or UV coordinates changed");
+
+    const auto historical = fabric::render::build_raster_view_draw_packets({
+        .node_id = "historical",
+        .texture = texture,
+        .source_width = 4U,
+        .source_height = 2U,
+        .pixels_per_unit = 2.0F,
+    });
+    require(historical.ok() && historical.packets.front().fill_uv ==
+                std::vector<fabric::core::Vec2>{{0.0F, 0.0F}, {1.0F, 0.0F},
+                                                {1.0F, 1.0F}, {0.0F, 1.0F}},
+            "historical texture did not retain a full-source view");
+}
+
 void native_geometry_cache_invalidates_on_document_or_tolerance_change() {
     fabric::render::VectorGeometryCache cache;
     auto asset = native_geometry_fixture();
@@ -306,6 +350,7 @@ int main() {
     invalid_svg_inputs_are_rejected_before_publication();
     svg_can_be_converted_to_native_paths();
     native_geometry_produces_deterministic_packets();
+    raster_views_produce_shared_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
     native_geometry_applies_node_and_parent_transforms();

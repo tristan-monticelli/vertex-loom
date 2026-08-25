@@ -35,7 +35,8 @@ reste un smoke test de release tant qu'aucun environnement graphique virtuel
 n'est configuré. `npm run test:gl` ajoute un smoke test OpenGL opt-in : il crée
 un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
-disponible et retourne `77` lorsqu'aucun contexte n'est disponible.
+disponible, puis un crop raster sur une texture bicolore avec lecture du pixel
+attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
 Le workflow manuel `workflow_dispatch` exécute aussi
 `fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60` sur
 macOS, Windows et Linux sous Xvfb, puis archive un rapport JSON par plateforme.
@@ -88,8 +89,10 @@ du paquet par Preview Runtime. Une comparaison de scène vérifiera le même
 résultat visible avant sauvegarde, après reload et depuis le paquet publié.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
-conservation byte-for-byte de la source PNG. Le test de comparaison pixel et
-draw-packet entre les deux applications reste le prochain verrou de la tranche.
+conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
+utilisent le même constructeur de packet raster ; un test d'intégration compare
+le packet runtime au packet studio attendu et le smoke OpenGL vérifie le pixel
+de référence réellement échantillonné après crop.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

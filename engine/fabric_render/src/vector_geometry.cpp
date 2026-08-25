@@ -211,6 +211,73 @@ bool transform_outline(const std::vector<project::VectorNode>& nodes,
 
 } // namespace
 
+VectorGeometryResult build_raster_view_draw_packets(
+    const RasterViewPacketInput& input) {
+    VectorGeometryResult result;
+    if (input.source_width == 0U || input.source_height == 0U) {
+        result.errors.push_back("raster source dimensions must be positive");
+        return result;
+    }
+    if (!std::isfinite(input.pixels_per_unit) || input.pixels_per_unit <= 0.0F) {
+        result.errors.push_back("raster pixels per unit must be finite and positive");
+        return result;
+    }
+    if (input.texture.expected_type != "texture" ||
+        !core::ResourceId::is_valid(input.texture.id.value)) {
+        result.errors.push_back("raster packet requires a valid texture reference");
+        return result;
+    }
+    if (input.view) {
+        const auto validation = project::validate_raster_view(
+            *input.view, input.source_width, input.source_height);
+        for (const auto& error : validation.errors) {
+            result.errors.push_back(error.field + ": " + error.message);
+        }
+        if (!result.errors.empty()) return result;
+    }
+
+    const auto crop = input.view
+        ? input.view->crop
+        : core::Rect{{0.0F, 0.0F},
+                     {static_cast<float>(input.source_width),
+                      static_cast<float>(input.source_height)}};
+    const auto pivot = input.view
+        ? input.view->pivot : core::Vec2{0.5F, 0.5F};
+    const float width = crop.size.x / input.pixels_per_unit;
+    const float height = crop.size.y / input.pixels_per_unit;
+    const float left = -width * pivot.x;
+    const float right = width * (1.0F - pivot.x);
+    const float top = -height * pivot.y;
+    const float bottom = height * (1.0F - pivot.y);
+    std::vector<core::Vec2> quad{
+        {left, top}, {right, top}, {right, bottom}, {left, bottom}};
+    if (input.view) {
+        for (auto& point : quad) point = apply_transform(point, input.view->transform);
+    }
+    const auto uv_min = core::Vec2{
+        crop.origin.x / static_cast<float>(input.source_width),
+        crop.origin.y / static_cast<float>(input.source_height)};
+    const auto uv_max = core::Vec2{
+        (crop.origin.x + crop.size.x) / static_cast<float>(input.source_width),
+        (crop.origin.y + crop.size.y) / static_cast<float>(input.source_height)};
+
+    result.packets.push_back({
+        .node_id = input.node_id,
+        .image_fill = project::VectorImageFill{
+            .texture = input.texture,
+            .transform = input.view ? input.view->transform : core::Transform{}},
+        .raster_filter = input.view
+            ? input.view->filter : project::RasterFilter::linear,
+        .outline = quad,
+        .fill_vertices = quad,
+        .fill_uv = {{uv_min.x, uv_min.y}, {uv_max.x, uv_min.y},
+                    {uv_max.x, uv_max.y}, {uv_min.x, uv_max.y}},
+        .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
+        .closed_outline = true,
+    });
+    return result;
+}
+
 VectorGeometryResult build_native_draw_packets(
     const project::VectorAsset& asset, const float curve_tolerance) {
     VectorGeometryResult result;

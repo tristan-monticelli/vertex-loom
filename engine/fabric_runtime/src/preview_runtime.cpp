@@ -854,56 +854,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     impl_->packets.push_back(std::move(packet));
                 }
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
-                // Texture upload is handled by the next resolver slice. Keep a
-                // deterministic placeholder so the entity remains visible.
                 if (!node.drawable.resource || !ensure_texture(*node.drawable.resource))
                     return false;
                 const auto& source = impl_->texture_sources.at(node.drawable.resource->id.value);
-                const auto pixels_per_unit = static_cast<float>(manifest_->pixels_per_unit);
-                const auto crop = source.view
-                    ? source.view->crop
-                    : core::Rect{{0.0F, 0.0F},
-                                 {static_cast<float>(source.width),
-                                  static_cast<float>(source.height)}};
-                const auto pivot = source.view
-                    ? source.view->pivot : core::Vec2{0.5F, 0.5F};
-                const auto width = crop.size.x / pixels_per_unit;
-                const auto height = crop.size.y / pixels_per_unit;
-                const auto left = -width * pivot.x;
-                const auto right = width * (1.0F - pivot.x);
-                const auto top = -height * pivot.y;
-                const auto bottom = height * (1.0F - pivot.y);
-                std::array<core::Vec2, 4> texture_quad{
-                    core::Vec2{left, top}, core::Vec2{right, top},
-                    core::Vec2{right, bottom}, core::Vec2{left, bottom}};
-                if (source.view) {
-                    for (auto& point : texture_quad)
-                        point = apply_transform(point, source.view->transform);
-                }
-                const auto uv_min = core::Vec2{
-                    crop.origin.x / static_cast<float>(source.width),
-                    crop.origin.y / static_cast<float>(source.height)};
-                const auto uv_max = core::Vec2{
-                    (crop.origin.x + crop.size.x) /
-                        static_cast<float>(source.width),
-                    (crop.origin.y + crop.size.y) /
-                        static_cast<float>(source.height)};
-                auto packet = render::VectorDrawPacket{
+                auto geometry = render::build_raster_view_draw_packets({
                     .node_id = node.id,
-                    .fill_color = std::nullopt,
-                    .image_fill = project::VectorImageFill{
-                        .texture = *node.drawable.resource,
-                        .transform = source.view
-                            ? source.view->transform : core::Transform{}},
-                    .outline = std::vector<core::Vec2>(texture_quad.begin(), texture_quad.end()),
-                    .fill_vertices = std::vector<core::Vec2>(texture_quad.begin(), texture_quad.end()),
-                    .fill_uv = {core::Vec2{uv_min.x, uv_min.y},
-                               core::Vec2{uv_max.x, uv_min.y},
-                               core::Vec2{uv_max.x, uv_max.y},
-                               core::Vec2{uv_min.x, uv_max.y}},
-                    .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
-                    .closed_outline = true};
-                packet.fill_color.reset();
+                    .texture = *node.drawable.resource,
+                    .source_width = source.width,
+                    .source_height = source.height,
+                    .pixels_per_unit = static_cast<float>(
+                        manifest_->pixels_per_unit),
+                    .view = source.view,
+                });
+                if (!geometry.ok()) {
+                    errors_.insert(errors_.end(), geometry.errors.begin(),
+                                   geometry.errors.end());
+                    return false;
+                }
+                auto packet = std::move(geometry.packets.front());
                 transform_packet(packet, resolved_entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
                 impl_->packet_base_transforms.emplace(

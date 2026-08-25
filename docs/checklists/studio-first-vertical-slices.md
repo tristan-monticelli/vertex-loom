@@ -23,11 +23,16 @@ complet Asset Studio → Map Studio → Preview Runtime → publication de map.
   Studio avec undo/redo, autosave et récupération.
 - [x] Afficher simultanément la source complète, les paramètres du cadre de
   crop et le rendu final sans réécrire le PNG.
-- [ ] Comparer les draw packets et pixels de référence entre Asset Studio et
+- [x] Comparer les draw packets et pixels de référence entre Asset Studio et
   Preview Runtime.
 
 Gate : importer une image, la recadrer, sauvegarder, recharger et la rendre
 sans modifier les octets de la source ni créer une géométrie implicite.
+
+Gate validé : le constructeur de packet raster partagé garantit les mêmes
+quad, UV et filtres dans Asset Studio et Preview Runtime ; les tests vérifient
+leur égalité, un pixel OpenGL de référence après crop et l'identité des octets
+PNG après sauvegarde, autosave et récupération.
 
 ## Tranche 1 — Composition et composants visuels
 

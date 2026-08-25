@@ -127,11 +127,52 @@ int main() {
         (clipped_stats.ok() && clipped_stats.packets_drawn == 1U &&
          clipped_stats.triangles_drawn == 2U && clipped_inside[1] > 200U &&
          clipped_outside[1] < 40U);
+    GLuint texture = 0U;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    constexpr std::array<std::uint8_t, 8> reference_pixels{
+        255U, 0U, 0U, 255U, 0U, 255U, 0U, 255U};
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 1, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, reference_pixels.data());
+    const auto raster_packets = fabric::render::build_raster_view_draw_packets({
+        .node_id = "raster-crop",
+        .texture = {{.value = "reference-texture"}, "texture"},
+        .source_width = 2U,
+        .source_height = 1U,
+        .pixels_per_unit = 1.0F,
+        .view = fabric::project::RasterView{
+            .crop = {{1.0F, 0.0F}, {1.0F, 1.0F}},
+            .filter = fabric::project::RasterFilter::nearest,
+        },
+    });
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto raster_stats = renderer.draw(
+        raster_packets.packets,
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {-0.5F, -0.5F},
+                          .size = {1.0F, 1.0F}}},
+        [texture](const fabric::core::ResourceId& id)
+            -> std::optional<fabric::render::OpenGLTextureHandle> {
+            if (id.value != "reference-texture") return std::nullopt;
+            return fabric::render::OpenGLTextureHandle{
+                .handle = texture, .width = 2U, .height = 1U};
+        });
+    glFinish();
+    std::array<std::uint8_t, 4> raster_pixel{};
+    glReadPixels(32, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 raster_pixel.data());
+    const bool raster_crop = raster_packets.ok() && raster_stats.ok() &&
+        raster_stats.packets_drawn == 1U && raster_pixel[0] < 40U &&
+        raster_pixel[1] > 200U && raster_pixel[2] < 40U;
+    glDeleteTextures(1, &texture);
     renderer.shutdown();
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    if (!rendered || !clipping) {
+    if (!rendered || !clipping || !raster_crop) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "
                   << stats.packets_drawn << "/" << stats.triangles_drawn
                   << " pixel=" << static_cast<int>(pixel[0]) << ","
@@ -143,7 +184,11 @@ int main() {
                   << static_cast<int>(clipped_inside[1]) << " outside="
                   << static_cast<int>(clipped_outside[0]) << ","
                   << static_cast<int>(clipped_outside[1]) << " stencil="
-                  << stencil_bits << "\n";
+                  << stencil_bits << " raster="
+                  << raster_stats.packets_drawn << "/"
+                  << static_cast<int>(raster_pixel[0]) << ","
+                  << static_cast<int>(raster_pixel[1]) << ","
+                  << static_cast<int>(raster_pixel[2]) << "\n";
         return 1;
     }
     return 0;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 
 #include <cstddef>
@@ -15,6 +16,7 @@ struct VectorDrawPacket {
     std::string node_id;
     std::optional<core::Color> fill_color;
     std::optional<project::VectorImageFill> image_fill;
+    std::optional<project::RasterFilter> raster_filter;
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
     std::vector<core::Vec2> fill_vertices;
@@ -33,6 +35,18 @@ struct VectorGeometryResult {
 
     [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
 };
+
+struct RasterViewPacketInput {
+    std::string node_id;
+    project::ResourceReference texture;
+    std::uint32_t source_width{};
+    std::uint32_t source_height{};
+    float pixels_per_unit{100.0F};
+    std::optional<project::RasterView> view;
+};
+
+[[nodiscard]] VectorGeometryResult build_raster_view_draw_packets(
+    const RasterViewPacketInput& input);
 
 [[nodiscard]] VectorGeometryResult build_native_draw_packets(
     const project::VectorAsset& asset, float curve_tolerance = 0.25F);

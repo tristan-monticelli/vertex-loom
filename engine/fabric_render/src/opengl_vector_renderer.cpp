@@ -423,7 +423,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             if (left.image_fill) {
                 return right.image_fill &&
                     left.image_fill->texture.id == right.image_fill->texture.id &&
-                    left.image_fill->opacity == right.image_fill->opacity;
+                    left.image_fill->opacity == right.image_fill->opacity &&
+                    left.raster_filter == right.raster_filter;
             }
             if (!left.fill_color || !right.fill_color) return false;
             return left.fill_color->red == right.fill_color->red &&
@@ -486,6 +487,13 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 glEnable(GL_TEXTURE_2D);
                 glEnableClientState(GL_TEXTURE_COORD_ARRAY);
                 glBindTexture(GL_TEXTURE_2D, texture->handle);
+                if (packet.raster_filter) {
+                    const auto filter = *packet.raster_filter ==
+                            project::RasterFilter::nearest
+                        ? GL_NEAREST : GL_LINEAR;
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+                    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+                }
                 glColor4f(1.0F, 1.0F, 1.0F, packet.image_fill->opacity);
                 glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex),
                                   reinterpret_cast<const std::byte*>(
@@ -603,6 +611,13 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(image_texture_uniform_, 0);
             functions.active_texture(GL_TEXTURE0);
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
+            if (packet.raster_filter) {
+                const auto filter = *packet.raster_filter ==
+                        project::RasterFilter::nearest
+                    ? GL_NEAREST : GL_LINEAR;
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+            }
         } else {
             const auto color = stencil_only
                 ? core::Color{1.0F, 1.0F, 1.0F, 1.0F}
@@ -648,7 +663,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         if (left.image_fill.has_value() != right.image_fill.has_value()) return false;
         if (left.image_fill) {
             return left.image_fill->texture.id == right.image_fill->texture.id &&
-                left.image_fill->opacity == right.image_fill->opacity;
+                left.image_fill->opacity == right.image_fill->opacity &&
+                left.raster_filter == right.raster_filter;
         }
         if (left.fill_color.has_value() != right.fill_color.has_value()) return false;
         if (!left.fill_color) return true;
@@ -717,6 +733,13 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(image_texture_uniform_, 0);
             functions.active_texture(GL_TEXTURE0);
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
+            if (first.raster_filter) {
+                const auto filter = *first.raster_filter ==
+                        project::RasterFilter::nearest
+                    ? GL_NEAREST : GL_LINEAR;
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+            }
         } else {
             const auto& color = *first.fill_color;
             functions.uniform_4f(color_uniform_, color.red, color.green, color.blue, color.alpha);

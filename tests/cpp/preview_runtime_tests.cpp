@@ -5,6 +5,7 @@
 #include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/render/vector_geometry.hpp"
 
 #include <array>
 #include <algorithm>
@@ -1097,11 +1098,20 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
     REQUIRE(packets.size() == 1U);
     REQUIRE(packets.front().image_fill.has_value());
     REQUIRE(packets.front().fill_uv.size() == 4U);
-    CHECK(packets.front().fill_uv[1].x == 0.5F);
-    const auto packet_width = packets.front().fill_vertices[1].x -
-        packets.front().fill_vertices[0].x;
-    CHECK(packet_width > 0.0049F);
-    CHECK(packet_width < 0.0051F);
+    const auto studio_packet = fabric::render::build_raster_view_draw_packets({
+        .node_id = "textured:root",
+        .texture = {{.value = "runtime-texture"}, "texture"},
+        .source_width = 1U,
+        .source_height = 1U,
+        .pixels_per_unit = 100.0F,
+        .view = fabric::project::RasterView{
+            .crop = {{0.0F, 0.0F}, {0.5F, 1.0F}},
+            .pivot = {0.5F, 0.5F},
+        },
+    });
+    REQUIRE(studio_packet.ok());
+    REQUIRE(studio_packet.packets.size() == 1U);
+    CHECK(packets.front() == studio_packet.packets.front());
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

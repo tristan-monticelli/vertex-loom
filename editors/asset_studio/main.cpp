@@ -364,53 +364,21 @@ EntityPreviewResult build_entity_preview(
                 }
                 continue;
             }
-            const float ppu = static_cast<float>(session.manifest()->pixels_per_unit);
-            const auto crop = loaded.asset->view
-                ? loaded.asset->view->crop
-                : fabric::core::Rect{{0.0F, 0.0F},
-                    {static_cast<float>(loaded.asset->width),
-                     static_cast<float>(loaded.asset->height)}};
-            const auto pivot = loaded.asset->view
-                ? loaded.asset->view->pivot : fabric::core::Vec2{0.5F, 0.5F};
-            const float width = crop.size.x / ppu;
-            const float height = crop.size.y / ppu;
-            const float left = -width * pivot.x;
-            const float right = width * (1.0F - pivot.x);
-            const float top = -height * pivot.y;
-            const float bottom = height * (1.0F - pivot.y);
-            const fabric::core::Vec2 uv_min{
-                crop.origin.x / static_cast<float>(loaded.asset->width),
-                crop.origin.y / static_cast<float>(loaded.asset->height)};
-            const fabric::core::Vec2 uv_max{
-                (crop.origin.x + crop.size.x) /
-                    static_cast<float>(loaded.asset->width),
-                (crop.origin.y + crop.size.y) /
-                    static_cast<float>(loaded.asset->height)};
-            fabric::render::VectorDrawPacket packet{
+            auto geometry = fabric::render::build_raster_view_draw_packets({
                 .node_id = entity.document.id.value + ":" + node.id,
-                .fill_color = material && !material->texture
-                    ? std::optional{fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F}}
-                    : std::nullopt,
-                .image_fill = fabric::project::VectorImageFill{
-                    .texture = *node.drawable.resource,
-                    .transform = loaded.asset->view
-                        ? loaded.asset->view->transform : fabric::core::Transform{}},
-                .outline = {{left, top}, {right, top}, {right, bottom},
-                            {left, bottom}},
-                .fill_vertices = {{left, top}, {right, top}, {right, bottom},
-                                  {left, bottom}},
-                .fill_uv = {uv_min, {uv_max.x, uv_min.y}, uv_max,
-                            {uv_min.x, uv_max.y}},
-                .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
-                .closed_outline = true};
-            if (loaded.asset->view) {
-                for (auto& point : packet.outline)
-                    point = transform_entity_point(
-                        point, loaded.asset->view->transform);
-                for (auto& point : packet.fill_vertices)
-                    point = transform_entity_point(
-                        point, loaded.asset->view->transform);
+                .texture = *node.drawable.resource,
+                .source_width = loaded.asset->width,
+                .source_height = loaded.asset->height,
+                .pixels_per_unit = static_cast<float>(
+                    session.manifest()->pixels_per_unit),
+                .view = loaded.asset->view,
+            });
+            if (!geometry.ok()) {
+                result.errors.insert(result.errors.end(), geometry.errors.begin(),
+                                     geometry.errors.end());
+                continue;
             }
+            auto packet = std::move(geometry.packets.front());
             if (material) apply_entity_material(packet, *material);
             transform_entity_packet(packet, entity, node_index);
             result.packets.push_back(std::move(packet));
