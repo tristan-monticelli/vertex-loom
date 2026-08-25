@@ -111,6 +111,20 @@ bool read_vec2(const Json& object, const char* key, core::Vec2& destination,
     return x_ok && y_ok;
 }
 
+bool read_point(const Json& object, core::Vec2& destination,
+                std::vector<Error>& errors, const std::string& field) {
+    if (!object.is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected an object with x and y");
+        return false;
+    }
+    const bool x_ok = read_float(object, "x", destination.x, errors,
+                                 field + ".x");
+    const bool y_ok = read_float(object, "y", destination.y, errors,
+                                 field + ".y");
+    return x_ok && y_ok;
+}
+
 Json serialize_vec2(const core::Vec2& value) {
     return {{"x", value.x}, {"y", value.y}};
 }
@@ -176,8 +190,12 @@ bool read_shape_kind(const Json& object, VectorShapeKind& destination,
         destination = VectorShapeKind::ellipse;
         return true;
     }
+    if (value == "line") {
+        destination = VectorShapeKind::line;
+        return true;
+    }
     add_error(errors, ErrorCode::invalid_asset, field,
-              "must be rectangle or ellipse");
+              "must be rectangle, ellipse or line");
     return false;
 }
 
@@ -333,6 +351,24 @@ std::optional<NativeVectorDefinition> read_native(
                 read_vec2(*bounds, "size", node.shape.bounds.size, errors,
                           prefix + ".shape.bounds.size");
             }
+            if (node.shape.kind == VectorShapeKind::line) {
+                const auto points = shape->find("points");
+                if (points == shape->end() || !points->is_array()) {
+                    add_error(errors, ErrorCode::invalid_asset,
+                              prefix + ".shape.points",
+                              "line shapes require exactly two points");
+                } else {
+                    for (std::size_t point_index = 0;
+                         point_index < points->size(); ++point_index) {
+                        core::Vec2 point;
+                        if (read_point((*points)[point_index], point, errors,
+                                       prefix + ".shape.points[" +
+                                           std::to_string(point_index) + "]")) {
+                            node.shape.points.push_back(point);
+                        }
+                    }
+                }
+            }
         }
         const auto fill = node_json.find("fill");
         if (fill == node_json.end() || !fill->is_object()) {
@@ -397,6 +433,7 @@ std::string_view to_string(const VectorShapeKind kind) noexcept {
     switch (kind) {
     case VectorShapeKind::rectangle: return "rectangle";
     case VectorShapeKind::ellipse: return "ellipse";
+    case VectorShapeKind::line: return "line";
     }
     return "rectangle";
 }
@@ -521,6 +558,27 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                           prefix + ".shape.bounds",
                           "must contain a finite origin and positive bounded size");
             }
+            if (node.shape.kind == VectorShapeKind::line) {
+                if (node.shape.points.size() != 2U) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".shape.points",
+                              "line shapes require exactly two points");
+                } else {
+                    const auto& first = node.shape.points[0];
+                    const auto& second = node.shape.points[1];
+                    if (!finite(first.x) || !finite(first.y) ||
+                        !finite(second.x) || !finite(second.y) ||
+                        (first.x == second.x && first.y == second.y)) {
+                        add_error(report.errors, ErrorCode::invalid_asset,
+                                  prefix + ".shape.points",
+                                  "line endpoints must be finite and distinct");
+                    }
+                }
+            } else if (!node.shape.points.empty()) {
+                add_error(report.errors, ErrorCode::invalid_asset,
+                          prefix + ".shape.points",
+                          "only line shapes may declare points");
+            }
             if (node.fill.kind == VectorFillKind::solid) {
                 if (!node.fill.color.has_value()) {
                     add_error(report.errors, ErrorCode::invalid_asset,
@@ -643,18 +701,26 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"deformWithShape", image.deform_with_shape},
                 };
             }
+            Json shape = {
+                {"id", node.shape.id},
+                {"kind", std::string(to_string(node.shape.kind))},
+                {"bounds",
+                 {{"origin", serialize_vec2(node.shape.bounds.origin)},
+                  {"size", serialize_vec2(node.shape.bounds.size)}}},
+            };
+            if (node.shape.kind == VectorShapeKind::line) {
+                shape["points"] = Json::array();
+                for (const auto& point : node.shape.points) {
+                    shape["points"].push_back(serialize_vec2(point));
+                }
+            }
             nodes.push_back({
                 {"id", node.id},
                 {"name", node.name},
                 {"visible", node.visible},
                 {"locked", node.locked},
                 {"transform", serialize_transform(node.transform)},
-                {"shape",
-                 {{"id", node.shape.id},
-                  {"kind", std::string(to_string(node.shape.kind))},
-                  {"bounds",
-                   {{"origin", serialize_vec2(node.shape.bounds.origin)},
-                    {"size", serialize_vec2(node.shape.bounds.size)}}}}},
+                {"shape", std::move(shape)},
                 {"fill", std::move(fill)},
             });
         }

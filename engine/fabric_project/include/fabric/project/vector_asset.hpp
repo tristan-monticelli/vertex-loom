@@ -30,6 +30,7 @@ enum class VectorOrigin {
 enum class VectorShapeKind {
     rectangle,
     ellipse,
+    line,
 };
 
 enum class VectorFillKind {
@@ -73,6 +74,7 @@ struct VectorShape {
     std::string id;
     VectorShapeKind kind{VectorShapeKind::rectangle};
     core::Rect bounds;
+    std::vector<core::Vec2> points;
 
     friend bool operator==(const VectorShape&, const VectorShape&) = default;
 };

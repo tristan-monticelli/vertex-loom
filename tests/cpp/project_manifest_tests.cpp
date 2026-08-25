@@ -520,6 +520,25 @@ void image_fill_round_trips_with_adjustable_shape_mapping() {
             "image fill texture was not exposed to the resource graph");
 }
 
+void line_shape_round_trips_and_rejects_invalid_endpoints() {
+    auto expected = native_rectangle_asset();
+    auto& shape = expected.native->nodes.front().shape;
+    shape.kind = fabric::project::VectorShapeKind::line;
+    shape.bounds = {.origin = {-4.0F, -2.0F}, .size = {8.0F, 4.0F}};
+    shape.points = {{-4.0F, -2.0F}, {4.0F, 2.0F}};
+
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(), fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "line vector did not round-trip");
+    require(*parsed.asset == expected, "line points changed during round-trip");
+
+    auto invalid = expected;
+    invalid.native->nodes.front().shape.points = {{0.0F, 0.0F}, {0.0F, 0.0F}};
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "coincident line endpoints were accepted");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
@@ -591,6 +610,7 @@ int main() {
     native_vector_rejects_duplicate_stable_identifiers();
     vector_source_kinds_reject_ambiguous_payloads();
     image_fill_round_trips_with_adjustable_shape_mapping();
+    line_shape_round_trips_and_rejects_invalid_endpoints();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

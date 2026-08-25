@@ -120,7 +120,7 @@ opacité, liaison à la déformation, round-trip, publication atomique et
 validation du graphe headless. Les cases ci-dessous restent ouvertes
 lorsqu’elles contiennent encore des variantes non livrées.
 
-- [ ] Définir des identifiants stables pour document, nœuds, formes et
+- [x] Définir des identifiants stables pour document, nœuds, formes et
   ressources de fill.
 - [ ] Stocker rectangle, ellipse, ligne et chemin `move/line/cubic/close`.
 - [ ] Stocker fill couleur, fill image, transform du fill, opacité, contour,

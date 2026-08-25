@@ -344,6 +344,10 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                     ellipse_center.x + std::cos(angle) * bounds.size.x * 0.5F,
                     ellipse_center.y + std::sin(angle) * bounds.size.y * 0.5F})));
             }
+        } else if (node.shape.kind == fabric::project::VectorShapeKind::line &&
+                   node.shape.points.size() == 2U) {
+            points = {to_screen(transform_point(node.shape.points[0])),
+                      to_screen(transform_point(node.shape.points[1]))};
         } else {
             points = {
                 to_screen(transform_point(bounds.origin)),
@@ -364,7 +368,8 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
         } else if (node.fill.kind == fabric::project::VectorFillKind::image) {
             fill = {0.89F, 0.68F, 0.34F, 0.8F};
         }
-        if (fill.alpha > 0.0F) {
+        if (fill.alpha > 0.0F &&
+            node.shape.kind != fabric::project::VectorShapeKind::line) {
             draw_list->AddConvexPolyFilled(points.data(),
                                            static_cast<int>(points.size()),
                                            color_to_u32(fill));
@@ -374,7 +379,10 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
             points.data(), static_cast<int>(points.size()),
             selected ? IM_COL32(236, 180, 75, 255)
                      : IM_COL32(225, 230, 235, 255),
-            ImDrawFlags_Closed, selected ? 2.5F : 1.5F);
+            node.shape.kind == fabric::project::VectorShapeKind::line
+                ? ImDrawFlags_None
+                : ImDrawFlags_Closed,
+            selected ? 2.5F : 1.5F);
     }
     if (hovered) {
         ImGui::SetTooltip("Middle drag: pan  |  Wheel: zoom %.0f%%",
