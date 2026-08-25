@@ -25,6 +25,7 @@ public:
     [[nodiscard]] bool place_instance(project::MapInstance instance,
                                        MapSnapSettings snapping = {});
     [[nodiscard]] bool remove_instance(const core::ResourceId& instance_id);
+    [[nodiscard]] bool remove_instances(const std::vector<core::ResourceId>& instance_ids);
     [[nodiscard]] bool duplicate_instance(const core::ResourceId& instance_id,
                                           core::Vec2 offset = {1.0F, 1.0F},
                                           MapSnapSettings snapping = {});

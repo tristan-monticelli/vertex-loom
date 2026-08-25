@@ -67,6 +67,11 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.set_instances_layer({{.value = "hero"}}, {.value = "instances-secondary"}));
     CHECK(session.map()->instances.front().layer_id == "instances-secondary");
     REQUIRE(session.undo());
+    REQUIRE(session.place_instance(instance("hero-two", 2.0F)));
+    REQUIRE(session.remove_instances({{.value = "hero"}, {.value = "hero-two"}}));
+    CHECK(session.map()->instances.empty());
+    REQUIRE(session.undo());
+    REQUIRE(session.remove_instance({.value = "hero-two"}));
     REQUIRE(session.declare_event({{.value = "on-enter"}, {}}));
     REQUIRE(session.add_trigger({"enter", "triggers", 0, {.value = "on-enter"}, {}}));
     REQUIRE_FALSE(session.add_trigger({"invalid-collision", "triggers", 4,

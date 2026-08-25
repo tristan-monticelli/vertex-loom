@@ -463,6 +463,37 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             pan.x += io.MouseDelta.x;
             pan.y += io.MouseDelta.y;
         }
+        if (!io.WantTextInput && !placement_mode && !gizmo.active &&
+            !point_gizmo.active && !selection_box.active && !selected_instances.empty()) {
+            std::vector<fabric::core::ResourceId> ids;
+            for (const auto& id : selected_instances) ids.push_back({.value = id});
+            if (ImGui::IsKeyPressed(ImGuiKey_Delete, false)) {
+                const auto removed = session.remove_instances(ids);
+                status = removed ? "Selected instances deleted"
+                                 : "Delete rejected (selection locked or invalid)";
+                if (removed) selected_instances.clear();
+                return;
+            }
+            fabric::core::Vec2 nudge{};
+            if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false)) nudge.x = -1.0F;
+            if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, false)) nudge.x = 1.0F;
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow, false)) nudge.y = 1.0F;
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow, false)) nudge.y = -1.0F;
+            if (nudge.x != 0.0F || nudge.y != 0.0F) {
+                const auto moved = session.translate_instances(ids, nudge, snapping);
+                status = moved ? "Selected instances nudged"
+                                : "Nudge rejected (selection locked or invalid)";
+                return;
+            }
+            if (io.KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_D, false) &&
+                selected_instances.size() == 1U) {
+                const auto duplicated = session.duplicate_instance(
+                    ids.front(), {1.0F, 1.0F}, snapping);
+                status = duplicated ? "Selected instance duplicated"
+                                    : "Duplication rejected (locked or invalid)";
+                return;
+            }
+        }
         if (!placement_mode && !gizmo.active && !point_gizmo.active && io.KeyCtrl &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_instances.size() == 1U) {
             const auto selected = std::find_if(map.instances.begin(), map.instances.end(),

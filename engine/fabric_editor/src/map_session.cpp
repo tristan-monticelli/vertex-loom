@@ -154,6 +154,25 @@ bool MapSession::remove_instance(const core::ResourceId& instance_id) {
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::remove_instances(const std::vector<core::ResourceId>& instance_ids) {
+    if (!map_ || instance_ids.empty()) return false;
+    std::set<std::string> unique_ids;
+    std::vector<std::size_t> indices;
+    indices.reserve(instance_ids.size());
+    for (const auto& instance_id : instance_ids) {
+        if (!unique_ids.insert(instance_id.value).second) return false;
+        const auto found = find_instance(*map_, instance_id);
+        if (!found || instance_locked(*map_, *found)) return false;
+        indices.push_back(*found);
+    }
+    std::sort(indices.rbegin(), indices.rend());
+    auto next = *map_;
+    for (const auto index : indices)
+        next.instances.erase(next.instances.begin() + static_cast<std::ptrdiff_t>(index));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::duplicate_instance(const core::ResourceId& instance_id,
                                      const core::Vec2 offset,
                                      const MapSnapSettings snapping) {

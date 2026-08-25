@@ -296,6 +296,9 @@ un rectangle ; Shift ajoute ou retire la zone de la sélection existante.
 Une sélection multiple peut être déplacée en glissant n’importe quelle
 instance du groupe ; le delta commun est soumis au snapping et enregistré en
 une seule commande.
+Le canvas accepte maintenant `Delete`, les flèches directionnelles et `Ctrl+D`
+pour supprimer, nudger ou dupliquer la sélection, avec la même validation et
+le même historique que les boutons.
 - [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
   centré sous le curseur, rendu des instances/collisions et sélection au clic.
   Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,
