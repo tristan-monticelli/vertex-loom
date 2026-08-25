@@ -1,7 +1,11 @@
 #include "fabric/runtime/preview_runtime.hpp"
 
 #include "fabric/render/opengl_vector_renderer.hpp"
+#include "fabric/render/svg_vector.hpp"
+#include "fabric/project/entity.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/material.hpp"
+#include "fabric/project/vector_asset.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -12,6 +16,7 @@
 #include <iostream>
 #include <memory>
 #include <span>
+#include <unordered_map>
 
 namespace fabric::runtime {
 
@@ -19,6 +24,7 @@ struct PreviewRuntime::Impl {
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
+    std::vector<render::VectorDrawPacket> packets;
     bool sdl_initialized{};
 };
 
@@ -30,23 +36,57 @@ void append_errors(std::vector<std::string>& output,
         output.push_back(error.field + ": " + error.message);
 }
 
-render::VectorDrawPacket instance_packet(const project::MapInstance& instance) {
-    const auto half_width = std::max(0.25F, std::abs(instance.transform.scale.x) * 0.5F);
-    const auto half_height = std::max(0.25F, std::abs(instance.transform.scale.y) * 0.5F);
-    const auto x = instance.transform.position.x;
-    const auto y = instance.transform.position.y;
-    return {.node_id = instance.id,
-            .fill_color = core::Color{0.25F, 0.65F, 1.0F, 1.0F},
-            .outline = {{x - half_width, y - half_height},
-                        {x + half_width, y - half_height},
-                        {x + half_width, y + half_height},
-                        {x - half_width, y + half_height}},
-            .fill_vertices = {{x - half_width, y - half_height},
-                              {x + half_width, y - half_height},
-                              {x + half_width, y + half_height},
-                              {x - half_width, y + half_height}},
-            .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
-            .closed_outline = true};
+core::Vec2 apply_transform(core::Vec2 point, const core::Transform& transform) {
+    point.x = (point.x - transform.pivot.x) * transform.scale.x;
+    point.y = (point.y - transform.pivot.y) * transform.scale.y;
+    const auto radians = transform.rotation_degrees * 0.017453292519943295F;
+    const auto cosine = std::cos(radians);
+    const auto sine = std::sin(radians);
+    return {point.x * cosine - point.y * sine + transform.pivot.x + transform.position.x,
+            point.x * sine + point.y * cosine + transform.pivot.y + transform.position.y};
+}
+
+core::Vec2 apply_node_transform(core::Vec2 point,
+                                const project::EntityDefinition& entity,
+                                std::size_t node_index,
+                                const core::Transform& instance_transform) {
+    const auto& node = entity.nodes[node_index];
+    point = apply_transform(point, node.transform);
+    if (node.parent) {
+        const auto parent = std::find_if(entity.nodes.begin(), entity.nodes.end(),
+            [&](const auto& candidate) { return candidate.id == *node.parent; });
+        if (parent != entity.nodes.end()) {
+            return apply_node_transform(point, entity,
+                static_cast<std::size_t>(std::distance(entity.nodes.begin(), parent)),
+                instance_transform);
+        }
+    }
+    return apply_transform(point, instance_transform);
+}
+
+void transform_packet(render::VectorDrawPacket& packet,
+                      const project::EntityDefinition& entity,
+                      const std::size_t node_index,
+                      const core::Transform& instance_transform) {
+    const auto transform = [&](core::Vec2 point) {
+        return apply_node_transform(point, entity, node_index, instance_transform);
+    };
+    for (auto& point : packet.outline) point = transform(point);
+    for (auto& point : packet.fill_vertices) point = transform(point);
+}
+
+void apply_material(render::VectorDrawPacket& packet,
+                    const project::MaterialDefinition& material) {
+    if (packet.fill_color) {
+        packet.fill_color->red *= material.color.red;
+        packet.fill_color->green *= material.color.green;
+        packet.fill_color->blue *= material.color.blue;
+        packet.fill_color->alpha *= material.color.alpha * material.opacity;
+    } else {
+        auto color = material.color;
+        color.alpha *= material.opacity;
+        packet.fill_color = color;
+    }
 }
 
 } // namespace
@@ -65,6 +105,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     map_.reset();
     errors_.clear();
     stats_ = {};
+    impl_->packets.clear();
 
     if (options_.project_root.empty() || !core::ResourceId::is_valid(options_.map_id.value)) {
         errors_.push_back("project and a valid map id are required");
@@ -92,6 +133,88 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         map_.reset();
         manifest_.reset();
         return false;
+    }
+
+    for (const auto& instance : map_->instances) {
+        std::optional<core::ResourceId> entity_id;
+        if (instance.entity) {
+            entity_id = instance.entity->id;
+        } else if (instance.prefab) {
+            const auto prefab = std::find_if(map_->prefabs.begin(), map_->prefabs.end(),
+                [&](const auto& candidate) { return candidate.id == instance.prefab->id.value; });
+            if (prefab != map_->prefabs.end()) entity_id = prefab->entity.id;
+        }
+        if (!entity_id) continue;
+        auto entity = project::load_entity(
+            options_.project_root, *manifest_,
+            project::entity_document_path(*manifest_, *entity_id));
+        if (!entity.ok()) {
+            append_errors(errors_, entity.errors);
+            return false;
+        }
+        for (std::size_t node_index = 0; node_index < entity.entity->nodes.size(); ++node_index) {
+            const auto& node = entity.entity->nodes[node_index];
+            if (node.drawable.kind == project::EntityDrawableKind::vector &&
+                node.drawable.resource) {
+                auto vector = project::load_vector_asset(
+                    options_.project_root, *manifest_,
+                    project::vector_document_path(*manifest_, node.drawable.resource->id));
+                if (!vector.ok()) {
+                    append_errors(errors_, vector.errors);
+                    return false;
+                }
+                project::VectorAsset drawable = std::move(*vector.asset);
+                if (drawable.source_kind == project::VectorSourceKind::linked_svg) {
+                    auto converted = render::convert_svg_to_native(
+                        options_.project_root / drawable.source,
+                        drawable.document.id, drawable.document.name);
+                    if (!converted.ok()) {
+                        append_errors(errors_, converted.errors);
+                        return false;
+                    }
+                    drawable = std::move(*converted.asset);
+                }
+                auto geometry = render::build_native_draw_packets(drawable);
+                if (!geometry.ok()) {
+                    errors_.insert(errors_.end(), geometry.errors.begin(), geometry.errors.end());
+                    return false;
+                }
+                std::optional<project::MaterialDefinition> material;
+                if (node.drawable.material) {
+                    auto loaded_material = project::load_material(
+                        options_.project_root, *manifest_,
+                        project::material_document_path(*manifest_,
+                                                       node.drawable.material->id));
+                    if (!loaded_material.ok()) {
+                        append_errors(errors_, loaded_material.errors);
+                        return false;
+                    }
+                    material = std::move(*loaded_material.asset);
+                }
+                for (auto& packet : geometry.packets) {
+                    if (material) apply_material(packet, *material);
+                    transform_packet(packet, *entity.entity, node_index, instance.transform);
+                    packet.node_id = instance.id + ":" + node.id + ":" + packet.node_id;
+                    impl_->packets.push_back(std::move(packet));
+                }
+            } else if (node.drawable.kind == project::EntityDrawableKind::texture) {
+                // Texture upload is handled by the next resolver slice. Keep a
+                // deterministic placeholder so the entity remains visible.
+                constexpr std::array<core::Vec2, 4> square{
+                    core::Vec2{-0.5F, -0.5F}, core::Vec2{0.5F, -0.5F},
+                    core::Vec2{0.5F, 0.5F}, core::Vec2{-0.5F, 0.5F}};
+                auto packet = render::VectorDrawPacket{
+                    .node_id = node.id,
+                    .fill_color = core::Color{0.7F, 0.7F, 0.7F, 1.0F},
+                    .outline = std::vector<core::Vec2>(square.begin(), square.end()),
+                    .fill_vertices = std::vector<core::Vec2>(square.begin(), square.end()),
+                    .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
+                    .closed_outline = true};
+                transform_packet(packet, *entity.entity, node_index, instance.transform);
+                packet.node_id = instance.id + ":" + node.id;
+                impl_->packets.push_back(std::move(packet));
+            }
+        }
     }
     return true;
 }
@@ -147,9 +270,6 @@ bool PreviewRuntime::run() {
             return false;
         }
 
-        std::vector<render::VectorDrawPacket> packets;
-        packets.reserve(map_->instances.size());
-        for (const auto& instance : map_->instances) packets.push_back(instance_packet(instance));
         const core::Rect bounds{{-static_cast<float>(options_.width) / 2.0F,
                                  -static_cast<float>(options_.height) / 2.0F},
                                 {static_cast<float>(options_.width),
@@ -158,7 +278,7 @@ bool PreviewRuntime::run() {
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         const auto render_stats = impl_->renderer.draw(
-            std::span<const render::VectorDrawPacket>(packets),
+            std::span<const render::VectorDrawPacket>(impl_->packets),
             {.width = options_.width, .height = options_.height, .world_bounds = bounds});
         if (!render_stats.ok()) {
             errors_.insert(errors_.end(), render_stats.errors.begin(), render_stats.errors.end());
