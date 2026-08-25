@@ -86,6 +86,25 @@ std::string property_value_text(const fabric::project::MapPropertyValue& value) 
     }, value);
 }
 
+std::string collision_shape_text(const fabric::project::CollisionShape& shape) {
+    std::string result;
+    switch (shape.kind) {
+    case fabric::project::CollisionShapeKind::circle: result = "circle"; break;
+    case fabric::project::CollisionShapeKind::capsule: result = "capsule"; break;
+    case fabric::project::CollisionShapeKind::polygon: result = "polygon"; break;
+    case fabric::project::CollisionShapeKind::chain: result = "chain"; break;
+    }
+    result += " @ " + std::to_string(shape.center.x) + "," +
+              std::to_string(shape.center.y);
+    if (shape.kind == fabric::project::CollisionShapeKind::circle ||
+        shape.kind == fabric::project::CollisionShapeKind::capsule)
+        result += " r=" + std::to_string(shape.radius);
+    if (shape.kind == fabric::project::CollisionShapeKind::capsule)
+        result += " l=" + std::to_string(shape.length);
+    result += shape.sensor ? " [sensor]" : " [solid]";
+    return result;
+}
+
 int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id) {
     SDL_SetMainReady();
@@ -253,6 +272,13 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndDisabled();
             ImGui::Text("Collisions: %zu", map.collisions.size());
+            for (std::size_t collision_index = 0; collision_index < map.collisions.size();
+                 ++collision_index) {
+                const auto& collision = map.collisions[collision_index];
+                ImGui::BulletText("[%zu] %s / layer %s", collision_index,
+                                  collision_shape_text(collision).c_str(),
+                                  collision.layer_id.c_str());
+            }
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
             ImGui::NextColumn();

@@ -268,6 +268,9 @@ locales peuvent remplacer un override hérité depuis le même panneau.
 Les triggers sont maintenant créables et supprimables depuis le panneau, avec
 référence explicite à un événement et à une collision ; ces actions passent
 par l’historique réversible de `MapSession`.
+Les collisions sont également listées avec leur index, leur forme, leur couche,
+leur centre, leurs dimensions et leur statut capteur/solide afin de rendre les
+références de triggers vérifiables dans l’éditeur.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à
