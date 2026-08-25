@@ -95,6 +95,8 @@ C4Component
 - `PreviewRuntime` charge ces simulations par instance avant SDL, expose leur
   évaluation headless et exécute XPBD à pas fixe ; l’injection des sommets
   déformés dans les draw packets reste une tranche de rendu distincte.
+  Lorsque les deux contrats sont associés, leurs sommets et particules sont
+  validés en correspondance 1:1.
 - `MapDocument v1` est stocké sous `maps/<id>.map.json` et sépare calques,
   prefabs, instances, collisions et triggers. Les instances sont indexées par
   chunks de `64 × 64` unités, événements nommés et les propriétés custom ont un

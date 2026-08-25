@@ -183,6 +183,13 @@ TEST_CASE("entity XPBD state round-trips and rejects invalid particle indices") 
     auto invalid = source;
     invalid.xpbd->distance_constraints.front().second = 99;
     REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
+
+    auto mismatched = source;
+    mismatched.deformation_mesh = fabric::project::DeformationMesh{};
+    mismatched.deformation_mesh->vertices.push_back({
+        .rest_position = {0.0F, 0.0F},
+        .influences = {{.node_id = "root", .weight = 1.0F}}});
+    REQUIRE_FALSE(fabric::project::validate_entity(manifest(), mismatched).ok());
 }
 
 } // namespace

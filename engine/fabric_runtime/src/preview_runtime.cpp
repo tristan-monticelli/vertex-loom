@@ -870,6 +870,13 @@ PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id) co
     const auto found = impl_->entity_simulations.find(instance_id);
     if (found == impl_->entity_simulations.end() || !found->second.mesh)
         return std::nullopt;
+    if (found->second.xpbd) {
+        project::MeshDeformationResult result;
+        result.positions.reserve(found->second.xpbd->particles.size());
+        for (const auto& particle : found->second.xpbd->particles)
+            result.positions.push_back(particle.position);
+        return result;
+    }
     return project::deform_mesh(*found->second.mesh, found->second.poses);
 }
 

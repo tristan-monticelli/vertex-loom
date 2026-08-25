@@ -279,13 +279,19 @@ TEST_CASE("preview runtime loads per-instance deformation and XPBD state headles
     REQUIRE(deformation.has_value());
     REQUIRE(deformation->ok());
     REQUIRE(deformation->positions.size() == 2U);
-    CHECK(deformation->positions[1] == fabric::core::Vec2{1.0F, 0.0F});
+    CHECK(deformation->positions[0] == fabric::core::Vec2{0.0F, 0.0F});
+    CHECK(deformation->positions[1] == fabric::core::Vec2{2.0F, 0.0F});
     const auto xpbd = runtime.instance_xpbd_state("simulated");
     REQUIRE(xpbd.has_value());
     REQUIRE(xpbd->particles.size() == 2U);
     CHECK_FALSE(runtime.evaluate_instance_deformation("missing").has_value());
     REQUIRE(runtime.run());
     CHECK(runtime.stats().xpbd_steps == 1U);
+    const auto solved_deformation = runtime.evaluate_instance_deformation("simulated");
+    REQUIRE(solved_deformation.has_value());
+    REQUIRE(solved_deformation->positions.size() == 2U);
+    CHECK(solved_deformation->positions[0] == fabric::core::Vec2{0.5F, 0.0F});
+    CHECK(solved_deformation->positions[1] == fabric::core::Vec2{1.5F, 0.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

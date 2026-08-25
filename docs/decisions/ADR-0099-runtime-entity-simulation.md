@@ -17,6 +17,11 @@ accessible par l’API runtime et l’intégration de ses sommets au rendu sera 
 étape dédiée, afin de conserver une correspondance explicite entre topologie,
 triangles et packets.
 
+Quand `deformationMesh` et `xpbd` sont tous deux présents, le validateur exige
+une correspondance 1:1 entre sommets et particules. L’évaluation runtime
+retourne alors les positions XPBD quantifiées ; sans XPBD, elle applique les
+poses de nœuds aux positions de repos.
+
 ## Conséquences
 
 - Une entité invalidement sérialisée est refusée avant SDL, comme les autres

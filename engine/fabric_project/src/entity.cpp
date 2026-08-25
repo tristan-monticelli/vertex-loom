@@ -151,6 +151,10 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
     if (a.xpbd) {
         const auto xpbd = validate_xpbd_system(*a.xpbd, 1.0F / 60.0F, 1);
         r.errors.insert(r.errors.end(), xpbd.errors.begin(), xpbd.errors.end());
+        if (a.deformation_mesh &&
+            a.deformation_mesh->vertices.size() != a.xpbd->particles.size())
+            error(r.errors, ErrorCode::invalid_asset, "xpbd.particles",
+                  "XPBD particle count must match deformation mesh vertices");
     }
     return r;
 }
