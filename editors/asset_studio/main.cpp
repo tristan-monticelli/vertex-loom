@@ -27,6 +27,7 @@
 #include <numbers>
 #include <optional>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -114,6 +115,7 @@ struct AnimationUiState {
     std::string node_id{"root"};
     std::string component_id{"transform"};
     std::string property_id{"position"};
+    int binding_preset{};
     std::string marker_id{"marker"};
     float scrub_time{};
     float key_time{};
@@ -1581,6 +1583,33 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 clip, animation_ui.scrub_time);
             ImGui::TextDisabled("Evaluated properties: %zu",
                                 evaluated.properties.size());
+            for (const auto& property : evaluated.properties) {
+                const auto value_label = std::visit(
+                    [](const auto& value) {
+                        using Value = std::decay_t<decltype(value)>;
+                        if constexpr (std::is_same_v<Value, float>) {
+                            return std::to_string(value);
+                        } else if constexpr (std::is_same_v<Value, fabric::core::Vec2>) {
+                            return "(" + std::to_string(value.x) + ", " +
+                                std::to_string(value.y) + ")";
+                        } else if constexpr (std::is_same_v<Value, fabric::core::Color>) {
+                            return "rgba(" + std::to_string(value.red) + ", " +
+                                std::to_string(value.green) + ", " +
+                                std::to_string(value.blue) + ", " +
+                                std::to_string(value.alpha) + ")";
+                        } else if constexpr (std::is_same_v<Value, bool>) {
+                            return value ? std::string{"true"} : std::string{"false"};
+                        } else {
+                            return value.id.value;
+                        }
+                    }, property.value);
+                ImGui::BulletText("%s / %s / %s = %s [%s]",
+                                  property.binding.node_id.c_str(),
+                                  property.binding.component_id.c_str(),
+                                  property.binding.property_id.c_str(),
+                                  value_label.c_str(),
+                                  fabric::project::to_string(property.composition).data());
+            }
             ImGui::SeparatorText("Markers");
             ImGui::InputText("Marker id", &animation_ui.marker_id);
             animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
@@ -1612,6 +1641,42 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::SeparatorText("Set key");
             ImGui::InputText("Node id", &animation_ui.node_id);
+            const char* binding_presets[] = {
+                "Custom", "Transform / Position", "Transform / Rotation",
+                "Transform / Scale", "Material / Opacity", "Material / Color"};
+            if (ImGui::Combo("Binding preset", &animation_ui.binding_preset,
+                             binding_presets,
+                             static_cast<int>(std::size(binding_presets)))) {
+                switch (animation_ui.binding_preset) {
+                case 1:
+                    animation_ui.component_id = "transform";
+                    animation_ui.property_id = "position";
+                    animation_ui.key_kind = 0;
+                    break;
+                case 2:
+                    animation_ui.component_id = "transform";
+                    animation_ui.property_id = "rotationDegrees";
+                    animation_ui.key_kind = 1;
+                    break;
+                case 3:
+                    animation_ui.component_id = "transform";
+                    animation_ui.property_id = "scale";
+                    animation_ui.key_kind = 0;
+                    break;
+                case 4:
+                    animation_ui.component_id = "material";
+                    animation_ui.property_id = "opacity";
+                    animation_ui.key_kind = 1;
+                    break;
+                case 5:
+                    animation_ui.component_id = "material";
+                    animation_ui.property_id = "color";
+                    animation_ui.key_kind = 2;
+                    break;
+                default:
+                    break;
+                }
+            }
             ImGui::InputText("Component", &animation_ui.component_id);
             ImGui::InputText("Property", &animation_ui.property_id);
             animation_ui.key_time = std::clamp(animation_ui.key_time, 0.0F,

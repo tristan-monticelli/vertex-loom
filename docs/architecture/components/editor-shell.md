@@ -88,6 +88,9 @@ C4Component
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.
+  Des presets de binding transform/material accélèrent la création sans
+  supprimer le mode `Custom`, et le scrubber affiche chaque valeur évaluée,
+  son binding et sa composition.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,
