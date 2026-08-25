@@ -259,8 +259,8 @@ même résultat visible après sauvegarde, rechargement et replay.
 - [ ] Ajouter placement, overrides typés, snapping, profondeur, sélection,
   visibilité et verrouillage.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
-  et validation headless. La création des formes, capteurs et événements dans
-  le monde reste à relier.
+  et validation headless. Les formes/capteurs restent à instancier dans le
+  monde depuis les documents.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à
   toutes les opérations.
 
