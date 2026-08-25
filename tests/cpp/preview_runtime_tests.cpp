@@ -146,6 +146,33 @@ fabric::project::EntityDefinition texture_entity() {
                                          {.value = "runtime-texture"}, "texture"}}}}};
 }
 
+fabric::project::EntityDefinition simulated_entity() {
+    auto result = entity();
+    result.deformation_mesh = fabric::project::DeformationMesh{
+        .vertices = {
+            {.rest_position = {-1.0F, 0.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}},
+            {.rest_position = {1.0F, 0.0F},
+             .influences = {{.node_id = "root", .weight = 1.0F}}}},
+        .triangles = {}};
+    result.xpbd = fabric::project::XpbdSystem{
+        .particles = {{.position = {0.0F, 0.0F}, .inverse_mass = 1.0F},
+                      {.position = {2.0F, 0.0F}, .inverse_mass = 1.0F}},
+        .distance_constraints = {{.first = 0, .second = 1,
+                                  .rest_length = 1.0F,
+                                  .compliance = 0.0F, .lambda = 0.0F}}};
+    return result;
+}
+
+fabric::project::MapDocument map_with_simulated_entity() {
+    auto result = map();
+    result.instances.push_back({"simulated",
+                                fabric::project::ResourceReference{
+                                    {.value = "runtime-entity"}, "entity"},
+                                std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
 fabric::project::MapDocument map_with_texture_entity() {
     auto result = map();
     result.instances.push_back({"textured",
@@ -227,6 +254,38 @@ TEST_CASE("preview runtime resolves an animation assigned to a map instance") {
         evaluated->properties.front().value);
     CHECK(position == fabric::core::Vec2{1.0F, 2.0F});
     CHECK_FALSE(runtime.evaluate_instance_animation("missing", 0.5F).has_value());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime loads per-instance deformation and XPBD state headlessly") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-simulation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_simulated_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), simulated_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.stats().deformation_instances == 1U);
+    const auto deformation = runtime.evaluate_instance_deformation("simulated");
+    REQUIRE(deformation.has_value());
+    REQUIRE(deformation->ok());
+    REQUIRE(deformation->positions.size() == 2U);
+    CHECK(deformation->positions[1] == fabric::core::Vec2{1.0F, 0.0F});
+    const auto xpbd = runtime.instance_xpbd_state("simulated");
+    REQUIRE(xpbd.has_value());
+    REQUIRE(xpbd->particles.size() == 2U);
+    CHECK_FALSE(runtime.evaluate_instance_deformation("missing").has_value());
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().xpbd_steps == 1U);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

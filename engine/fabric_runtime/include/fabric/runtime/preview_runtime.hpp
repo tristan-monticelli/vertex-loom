@@ -3,8 +3,10 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
+#include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/replay.hpp"
+#include "fabric/project/xpbd.hpp"
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
 #include "fabric/runtime/input.hpp"
@@ -37,6 +39,8 @@ struct PreviewRuntimeOptions {
 struct PreviewRuntimeStats {
     std::size_t frames{};
     std::size_t physics_steps{};
+    std::size_t xpbd_steps{};
+    std::size_t deformation_instances{};
     std::size_t visible_instances{};
     std::size_t draw_calls{};
     std::size_t triangles{};
@@ -76,6 +80,10 @@ public:
         const core::ResourceId& animation_id, float time) const;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_instance_animation(
         const std::string& instance_id, float time) const;
+    [[nodiscard]] std::optional<project::MeshDeformationResult>
+    evaluate_instance_deformation(const std::string& instance_id) const;
+    [[nodiscard]] std::optional<project::XpbdSystem>
+    instance_xpbd_state(const std::string& instance_id) const;
 
 private:
     struct Impl;

@@ -41,6 +41,12 @@ struct PreviewRuntime::Impl {
         core::Vec2 world_origin;
     };
 
+    struct EntitySimulation {
+        std::optional<project::DeformationMesh> mesh;
+        std::optional<project::XpbdSystem> xpbd;
+        std::vector<project::DeformationPose> poses;
+    };
+
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
@@ -55,6 +61,7 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
     std::unordered_map<std::string, std::string> animation_instances;
     std::unordered_map<std::string, PacketBaseTransform> packet_base_transforms;
+    std::unordered_map<std::string, EntitySimulation> entity_simulations;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -199,6 +206,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->animation_clips.clear();
     impl_->animation_instances.clear();
     impl_->packet_base_transforms.clear();
+    impl_->entity_simulations.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -383,6 +391,16 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             append_errors(errors_, entity.errors);
             return false;
         }
+        if (entity.entity->deformation_mesh || entity.entity->xpbd) {
+            Impl::EntitySimulation simulation{
+                .mesh = entity.entity->deformation_mesh,
+                .xpbd = entity.entity->xpbd};
+            simulation.poses.reserve(entity.entity->nodes.size());
+            for (const auto& node : entity.entity->nodes)
+                simulation.poses.push_back({.node_id = node.id,
+                                            .transform = node.transform});
+            impl_->entity_simulations.emplace(instance.id, std::move(simulation));
+        }
         for (std::size_t node_index = 0; node_index < entity.entity->nodes.size(); ++node_index) {
             const auto& node = entity.entity->nodes[node_index];
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
@@ -492,6 +510,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             }
         }
     }
+    stats_.deformation_instances = impl_->entity_simulations.size();
     std::stable_sort(impl_->packets.begin(), impl_->packets.end(),
                      [](const auto& left, const auto& right) {
                          return left.node_id < right.node_id;
@@ -647,6 +666,17 @@ bool PreviewRuntime::run() {
                 if (replay_player_->checkpoint()) ++stats_.replay_checkpoints;
             }
             if (character_) character_->update(input_, static_cast<float>(fixed_time_step));
+            for (auto& [instance_id, simulation] : impl_->entity_simulations) {
+                if (!simulation.xpbd) continue;
+                const auto result = project::solve_xpbd_substep(
+                    *simulation.xpbd, static_cast<float>(fixed_time_step), 4);
+                if (!result.ok()) {
+                    append_errors(errors_, result.errors);
+                    return false;
+                }
+                (void)instance_id;
+                ++stats_.xpbd_steps;
+            }
             if (!physics_.step(static_cast<float>(fixed_time_step))) {
                 errors_.push_back("physics step failed");
                 return false;
@@ -832,6 +862,24 @@ std::optional<project::EvaluationResult> PreviewRuntime::evaluate_instance_anima
     const auto animation = impl_->animation_instances.find(instance_id);
     if (animation == impl_->animation_instances.end()) return std::nullopt;
     return evaluate_animation({.value = animation->second}, time);
+}
+
+std::optional<project::MeshDeformationResult>
+PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id) const {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->entity_simulations.find(instance_id);
+    if (found == impl_->entity_simulations.end() || !found->second.mesh)
+        return std::nullopt;
+    return project::deform_mesh(*found->second.mesh, found->second.poses);
+}
+
+std::optional<project::XpbdSystem>
+PreviewRuntime::instance_xpbd_state(const std::string& instance_id) const {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->entity_simulations.find(instance_id);
+    if (found == impl_->entity_simulations.end() || !found->second.xpbd)
+        return std::nullopt;
+    return found->second.xpbd;
 }
 
 } // namespace fabric::runtime

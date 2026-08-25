@@ -255,6 +255,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   influences de nœuds et triangles validés headless.
 - [x] Persister un état XPBD optionnel avec particules, lambdas et les cinq
   familles de contraintes validées headless.
+- [x] Charger les maillages et états XPBD par instance dans Preview Runtime,
+  exposer leur évaluation headless et exécuter XPBD à pas fixe.
 - [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
