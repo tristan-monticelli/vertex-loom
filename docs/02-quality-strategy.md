@@ -114,6 +114,12 @@ composé, les 20 draw packets et les UV du crop raster à mi-largeur. Elle crée
 aussi son entité et sa map par les sessions Studio ; Preview Runtime charge
 cette map et chaque packet est apparié par identifiant stable pour comparer
 géométrie, UV, indices, couleurs et texture au résultat du resolver direct.
+La fixture `tests/fixtures/studio-rotating-platform` conserve le graphe créé
+par Map Studio et l'entité textile créée par Asset Studio. Son test headless
+matérialise le capteur Box2D, place un personnage dynamique, vérifie son
+transport par friction, les états actif/inactif et les transitions
+`begin/end`. Le build de Map Studio vérifie en plus les overlays de corps,
+capteur et personnage consommant exactement ces états de preview.
 Les commandes d'édition de composition et composant couvrent modification et
 duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
 test session vérifie undo/redo, autosave, récupération, sauvegarde et reload

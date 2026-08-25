@@ -245,6 +245,48 @@ TEST_CASE("rotating platform responds to sensor and event signals with limits") 
     CHECK(sensor_direction_angle * platform_angle(simulation) < 0.0F);
 }
 
+TEST_CASE("physical presence activates and carries the preview character") {
+    auto request = fabric::editor::RotatingPlatformPresetRequest{
+        .limit_enabled = true,
+        .minimum_angle_degrees = -30.0F,
+        .maximum_angle_degrees = 30.0F};
+    const auto built = fabric::editor::build_rotating_platform_preset(
+        manifest(), map(), request);
+    REQUIRE(built.ok());
+    const auto compiled = fabric::physics::compile_mechanic_graph(
+        *built.graph, map());
+    REQUIRE(compiled.ok());
+    fabric::physics::MechanicSimulation simulation;
+    REQUIRE(simulation.load(*compiled.plan));
+    REQUIRE(simulation.place_preview_character({
+        .position = {1.0F, 0.76F},
+        .size = {0.6F, 1.0F},
+        .density = 1.0F,
+        .friction = 1.2F}));
+
+    REQUIRE(simulation.step_once());
+    REQUIRE(simulation.signal_states().front().active);
+    CHECK(simulation.signal_states().front().physical_overlap_count == 1U);
+    REQUIRE(simulation.sensor_states().front().active);
+    CHECK(simulation.sensor_states().front().size == request.sensor_size);
+    REQUIRE(simulation.activation_states().front().active);
+    REQUIRE(simulation.debug_events().size() == 1U);
+    CHECK(simulation.debug_events().front().transition ==
+          fabric::physics::MechanicActivationTransition::begin);
+    for (int step = 0; step < 40; ++step) REQUIRE(simulation.step_once());
+    const auto transported = simulation.preview_character_state();
+    REQUIRE(transported.has_value());
+    CHECK(transported->position.x > 1.15F);
+    CHECK(std::abs(platform_angle(simulation)) > 5.0F);
+
+    REQUIRE(simulation.place_preview_character({.position = {10.0F, 4.0F}}));
+    CHECK_FALSE(simulation.signal_states().front().active);
+    CHECK_FALSE(simulation.activation_states().front().active);
+    REQUIRE(simulation.debug_events().size() == 2U);
+    CHECK(simulation.debug_events().back().transition ==
+          fabric::physics::MechanicActivationTransition::end);
+}
+
 TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     const auto fixture = std::filesystem::path{FABRIC_SOURCE_DIR} /
         "tests/fixtures/studio-rotating-platform";
@@ -275,6 +317,21 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     REQUIRE(compiled.plan->bodies.front().visual_entity.has_value());
     CHECK(compiled.plan->bodies.front().visual_entity->id.value ==
           "platform-visual");
+    fabric::physics::MechanicSimulation fixture_simulation;
+    REQUIRE(fixture_simulation.load(*compiled.plan));
+    REQUIRE(fixture_simulation.place_preview_character({
+        .position = {-1.0F, 2.81F},
+        .size = {0.6F, 1.0F},
+        .density = 1.0F,
+        .friction = 1.2F}));
+    for (int step = 0; step < 41; ++step)
+        REQUIRE(fixture_simulation.step_once());
+    const auto fixture_character = fixture_simulation.preview_character_state();
+    REQUIRE(fixture_character.has_value());
+    CHECK(std::abs(fixture_character->position.x + 1.0F) > 0.15F);
+    CHECK(fixture_simulation.activation_states().front().active);
+    CHECK(fixture_simulation.debug_events().front().transition ==
+          fabric::physics::MechanicActivationTransition::begin);
     const auto visual = fabric::project::load_entity(
         fixture, *loaded_manifest.manifest,
         "entities/platform-visual.entity.json");

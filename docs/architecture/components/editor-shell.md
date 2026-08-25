@@ -13,7 +13,7 @@ C4Component
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
-        Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph par commandes, sauvegarde atomique, autosave et récupération, puis pilote sa preview Box2D contre la map ouverte")
+        Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph par commandes, sauvegarde atomique, autosave et récupération, puis pilote sa preview Box2D, son personnage de test et ses overlays de cycle de vie")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
         Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
@@ -245,6 +245,11 @@ C4Component
   vérifier les deux modes avant qu'un personnage ne soit ajouté à la map.
   Une entité visuelle Asset Studio optionnelle est liée au corps de plateforme
   sans devenir sa collision.
+- La simulation matérialise les nœuds capteur dans Box2D. L'inspecteur peut
+  créer ou réinitialiser un personnage dynamique de preview, lui appliquer une
+  vitesse horizontale et observer son transport par contact. Les overlays
+  listent l'état actif de chaque moteur et le journal borné de ses transitions
+  `begin/end`, ordonné par numéro de pas fixe.
 - L’inspecteur d’animation expose une première timeline générique : durée,
   boucle, binding `node/component/property`, interpolation et insertion de
   clés `Vec2`. Les clips suivent le même historique de commandes, autosave,

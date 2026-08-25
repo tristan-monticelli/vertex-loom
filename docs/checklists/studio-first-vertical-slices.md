@@ -163,8 +163,16 @@ dans les trois previews et aucune donnée de collision implicite n'apparaît.
   la mécanique qui la référence sans confondre visuel et collision. Les tests
   couvrent mode inactif, capteur, événement, direction, accélération, limites,
   référence visuelle, reload et validation du projet complet.
-- [ ] Faire transporter le personnage et exposer début, fin et état de la
+- [x] Faire transporter le personnage et exposer début, fin et état de la
   mécanique dans les overlays de debug.
+
+  Preuve : la preview matérialise le capteur du graphe comme forme Box2D et
+  permet à Map Studio de placer et déplacer un personnage dynamique. La
+  friction du même monde l'entraîne sur la plateforme, sans parentage ou
+  correction propre au preset. Le canvas superpose corps, capteur actif et
+  personnage ; l'inspecteur affiche l'état courant et un journal borné
+  `begin/end` ordonné par pas fixe. Les tests headless couvrent entrée physique,
+  transport, sortie, injection manuelle et la fixture Studio versionnée.
 - [ ] Sauvegarder la mécanique dans un prefab et modifier ses paramètres par
   overrides typés.
 

@@ -34,6 +34,18 @@ La première mécanique de référence est une plateforme tournante avec pivot,
 vitesse, direction, accélération, limites optionnelles, capteur de présence,
 activation événementielle, collision et transport du personnage.
 
+La preview matérialise chaque nœud capteur comme une forme Box2D sensorielle.
+Un personnage de test dynamique peut être créé et déplacé depuis Map Studio ;
+il reste un état éphémère de preview et n'est jamais sérialisé dans le graphe.
+Les contacts et la friction Box2D assurent son transport par la plateforme,
+sans parentage visuel ni correction de position propre au preset.
+
+Chaque moteur expose un état d'activation générique associé à sa source. Le
+passage inactif vers actif produit `begin`, le passage inverse produit `end`,
+et l'état courant reste consultable. La preview conserve un journal borné et
+ordonné par pas fixe pour les overlays ; reset reconstruit le monde, le
+personnage et le journal depuis leur configuration initiale.
+
 Le nœud événement distingue deux modes rétrocompatibles : `emit` consomme un
 signal booléen et publie l'événement map ; `listen` produit un signal booléen
 piloté par cet événement. Le port de sortie et la propriété de mode restent
@@ -61,6 +73,8 @@ inspectable sans exécuter de code arbitraire.
 ## Conséquences
 
 - `fabric_physics` reste propriétaire des objets Box2D éphémères.
+- Les formes de capteur, le personnage de test et les transitions de debug ne
+  modifient aucun document persistant.
 - Le graphe et la map restent les sources de vérité persistantes.
 - Preview Runtime instancie exactement le graphe validé par Map Studio.
 - Un prefab peut référencer une mécanique et exposer certains paramètres comme

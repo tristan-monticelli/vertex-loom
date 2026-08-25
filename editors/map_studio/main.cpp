@@ -141,6 +141,8 @@ struct MechanicEditorState {
     int platform_activation{};
     int platform_direction{};
     std::string platform_visual_entity;
+    fabric::physics::MechanicPreviewCharacterConfig preview_character;
+    float preview_character_speed{3.0F};
 };
 
 void draw_mechanic_value_editor(
@@ -462,21 +464,65 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                                          : "Simulation reset failed";
     ImGui::EndDisabled();
     ImGui::Text("Fixed steps: %zu", simulation.step_count());
+    ImGui::SeparatorText("Preview character");
+    ImGui::DragFloat2("Character position", &state.preview_character.position.x,
+                      0.1F);
+    ImGui::DragFloat2("Character size", &state.preview_character.size.x,
+                      0.05F, 0.05F, 16.0F);
+    ImGui::DragFloat("Character friction", &state.preview_character.friction,
+                     0.05F, 0.0F, 4.0F);
+    if (ImGui::Button("Place / reset character"))
+        status = session.place_preview_character(state.preview_character)
+            ? "Preview character placed" : "Preview character rejected";
+    ImGui::SameLine();
+    if (ImGui::Button("Move left"))
+        static_cast<void>(session.set_preview_character_velocity(
+            {-state.preview_character_speed, 0.0F}));
+    ImGui::SameLine();
+    if (ImGui::Button("Stop character"))
+        static_cast<void>(session.set_preview_character_velocity({0.0F, 0.0F}));
+    ImGui::SameLine();
+    if (ImGui::Button("Move right"))
+        static_cast<void>(session.set_preview_character_velocity(
+            {state.preview_character_speed, 0.0F}));
+    ImGui::DragFloat("Character speed", &state.preview_character_speed,
+                     0.1F, 0.0F, 20.0F);
+    if (const auto character = simulation.preview_character_state())
+        ImGui::BulletText("character  pos %.2f, %.2f  vel %.2f, %.2f",
+                          character->position.x, character->position.y,
+                          character->velocity.x, character->velocity.y);
+
+    ImGui::SeparatorText("Mechanic debug overlay");
     for (const auto& signal : simulation.signal_states()) {
-        bool active = signal.active;
+        bool manually_active = signal.manually_active;
         const auto label = signal.kind == fabric::physics::MechanicSignalKind::sensor
-            ? "Sensor: " + signal.node_id
-            : "Event: " + signal.event_id.value;
-        if (ImGui::Checkbox(label.c_str(), &active)) {
+            ? "Inject sensor: " + signal.node_id
+            : "Inject event: " + signal.event_id.value;
+        if (ImGui::Checkbox(label.c_str(), &manually_active)) {
             const auto applied = signal.kind ==
                     fabric::physics::MechanicSignalKind::sensor
                 ? session.set_preview_sensor_active(
-                      {.value = signal.node_id}, active)
-                : session.set_preview_event_active(signal.event_id, active);
+                      {.value = signal.node_id}, manually_active)
+                : session.set_preview_event_active(signal.event_id,
+                                                   manually_active);
             status = applied ? "Preview activation signal changed"
                              : "Preview activation signal rejected";
         }
+        ImGui::SameLine();
+        ImGui::TextDisabled("state: %s · physical overlaps: %zu",
+                            signal.active ? "active" : "inactive",
+                            signal.physical_overlap_count);
     }
+    for (const auto& activation : simulation.activation_states())
+        ImGui::BulletText("%s  %s  source %s", activation.node_id.c_str(),
+                          activation.active ? "active" : "inactive",
+                          activation.source_node_id
+                              ? activation.source_node_id->c_str() : "always");
+    for (const auto& event : simulation.debug_events())
+        ImGui::TextDisabled("step %zu  %s  %s", event.step,
+            event.node_id.c_str(),
+            event.transition == fabric::physics::MechanicActivationTransition::begin
+                ? "begin" : "end");
     for (const auto& body : simulation.body_states())
         ImGui::BulletText("%s  pos %.2f, %.2f  rot %.2f deg",
                           body.node_id.c_str(), body.position.x, body.position.y,
@@ -632,6 +678,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
                      MapPreviewRenderState& preview_render_state,
+                     const fabric::physics::MechanicSimulation& mechanic_preview,
                      std::string& status) {
     if (!session.map()) return;
     const auto& map = *session.map();
@@ -755,6 +802,45 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     };
     draw->AddCallback(render_map_preview_callback, &preview_render_state);
     draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
+    auto draw_mechanic_box = [&](const fabric::core::Vec2 position,
+                                 const fabric::core::Vec2 size,
+                                 const float rotation_degrees,
+                                 const ImU32 fill, const ImU32 outline) {
+        constexpr float degrees_to_radians = 0.01745329251994329577F;
+        const auto angle = rotation_degrees * degrees_to_radians;
+        const auto cosine = std::cos(angle);
+        const auto sine = std::sin(angle);
+        const fabric::core::Vec2 local[4] = {
+            {-size.x * 0.5F, -size.y * 0.5F},
+            {size.x * 0.5F, -size.y * 0.5F},
+            {size.x * 0.5F, size.y * 0.5F},
+            {-size.x * 0.5F, size.y * 0.5F}};
+        ImVec2 points[4];
+        for (std::size_t index = 0; index < 4; ++index)
+            points[index] = world_to_screen({
+                position.x + local[index].x * cosine - local[index].y * sine,
+                position.y + local[index].x * sine + local[index].y * cosine});
+        draw->AddQuadFilled(points[0], points[1], points[2], points[3], fill);
+        draw->AddQuad(points[0], points[1], points[2], points[3], outline, 2.0F);
+    };
+    if (mechanic_preview.valid()) {
+        for (const auto& body : mechanic_preview.body_states())
+            draw_mechanic_box(body.position, body.size, body.rotation_degrees,
+                              IM_COL32(75, 165, 180, 42),
+                              IM_COL32(90, 220, 235, 235));
+        for (const auto& sensor : mechanic_preview.sensor_states())
+            draw_mechanic_box(sensor.position, sensor.size,
+                              sensor.rotation_degrees,
+                              sensor.active ? IM_COL32(105, 235, 135, 58)
+                                            : IM_COL32(240, 190, 80, 35),
+                              sensor.active ? IM_COL32(105, 235, 135, 245)
+                                            : IM_COL32(240, 190, 80, 220));
+        if (const auto character = mechanic_preview.preview_character_state())
+            draw_mechanic_box(character->position, character->size,
+                              character->rotation_degrees,
+                              IM_COL32(225, 105, 190, 72),
+                              IM_COL32(255, 145, 220, 245));
+    }
     for (std::size_t collision_index = 0; collision_index < map.collisions.size();
          ++collision_index) {
         const auto& collision = map.collisions[collision_index];
@@ -1487,7 +1573,8 @@ int run(const std::filesystem::path& project_root,
                             selected_trigger_index, active_layer_id, selection_box,
                             placement_mode,
                             placement_id, placement_resource_id, placement_kind,
-                            canvas_snapping, preview_render_state, status);
+                            canvas_snapping, preview_render_state,
+                            mechanic_session.simulation(), status);
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             draw_transform_editor(session, selected_instances, transform_editor, status);

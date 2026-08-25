@@ -48,6 +48,14 @@ public:
         const core::ResourceId& event_id, bool active) noexcept {
         return simulation_.set_event_active(event_id, active);
     }
+    [[nodiscard]] bool place_preview_character(
+        physics::MechanicPreviewCharacterConfig config) {
+        return simulation_.place_preview_character(config);
+    }
+    [[nodiscard]] bool set_preview_character_velocity(
+        core::Vec2 velocity) noexcept {
+        return simulation_.set_preview_character_velocity(velocity);
+    }
     [[nodiscard]] bool update_preview(float frame_seconds) {
         return simulation_.update(frame_seconds);
     }
