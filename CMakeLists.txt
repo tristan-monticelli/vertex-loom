@@ -220,7 +220,8 @@ if(FABRIC_BUILD_EDITORS)
         nfd
     )
     add_executable(map_studio editors/map_studio/main.cpp)
-    target_link_libraries(map_studio PRIVATE fabric_project fabric_physics)
+    target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
+    target_link_libraries(map_studio PRIVATE fabric_editor fabric_imgui)
 endif()
 
 if(FABRIC_BUILD_RUNTIME)

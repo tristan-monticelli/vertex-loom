@@ -7,7 +7,7 @@ C4Container
     System_Boundary(fabric, "Vertex Loom") {
         Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet avant fenêtre, charge maps et ressources, exécute Box2D à pas fixe, cull et rend le Preview Runtime")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, fills, entités et animations")
-        Container(map, "Map Studio", "C++20 / CMake", "Édite les maps, événements et triggers via MapSession ; UI Dear ImGui à venir")
+        Container(map, "Map Studio", "C++20 / SDL2 / Dear ImGui", "Édite maps, événements et triggers via MapSession, avec inspection des calques et commandes réversibles")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique et exécute les pas fixes validés")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest, textures, documents vectoriels et graphe de ressources")
