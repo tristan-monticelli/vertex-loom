@@ -7,6 +7,7 @@
 #include "fabric/project/xpbd.hpp"
 #include "fabric/project/animation_ik.hpp"
 #include "fabric/project/animation_state_machine.hpp"
+#include "fabric/project/visual_component.hpp"
 #include "fabric/core/types.hpp"
 
 #include <filesystem>
@@ -17,15 +18,16 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_entity_schema_version = 1;
+inline constexpr std::uint32_t current_entity_schema_version = 2;
 
-enum class EntityDrawableKind { none, vector, texture };
+enum class EntityDrawableKind { none, vector, texture, visual_component };
 [[nodiscard]] std::string_view to_string(EntityDrawableKind) noexcept;
 
 struct EntityDrawable {
     EntityDrawableKind kind{EntityDrawableKind::none};
     std::optional<ResourceReference> resource;
     std::optional<ResourceReference> material;
+    std::optional<VisualComponentInstance> component_instance;
     friend bool operator==(const EntityDrawable&, const EntityDrawable&) = default;
 };
 

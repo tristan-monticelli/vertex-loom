@@ -20,7 +20,8 @@ fabric::project::ProjectManifest manifest() {
 
 fabric::project::MaterialDefinition material() {
     return {
-        .document = {.schema_version = 1,
+        .document = {.schema_version =
+                         fabric::project::current_material_schema_version,
                      .type = "material",
                      .id = {.value = "wool-material"},
                      .name = "Wool Material"},
@@ -38,7 +39,8 @@ fabric::project::MaterialDefinition material() {
 
 fabric::project::EntityDefinition entity() {
     return {
-        .document = {.schema_version = 1,
+        .document = {.schema_version =
+                         fabric::project::current_entity_schema_version,
                      .type = "entity",
                      .id = {.value = "wool-entity"},
                      .name = "Wool Entity"},
@@ -94,6 +96,48 @@ TEST_CASE("entity definition round trips and rejects parent cycles") {
     REQUIRE_FALSE(report.ok());
     REQUIRE(std::ranges::any_of(report.errors, [](const auto& error) {
         return error.code == fabric::project::ErrorCode::resource_cycle;
+    }));
+}
+
+TEST_CASE("entity v1 migrates to v2 without changing legacy drawables") {
+    auto legacy = entity();
+    legacy.document.schema_version = 1;
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(legacy));
+    REQUIRE(parsed.ok());
+    CHECK(parsed.entity->document.schema_version ==
+          fabric::project::current_entity_schema_version);
+    CHECK(parsed.entity->nodes == legacy.nodes);
+}
+
+TEST_CASE("entity visual component instances round-trip and expose resources") {
+    auto source = entity();
+    auto& drawable = source.nodes.front().drawable;
+    drawable.kind = fabric::project::EntityDrawableKind::visual_component;
+    drawable.resource = fabric::project::ResourceReference{
+        {.value = "button-eye"}, "visualComponent"};
+    drawable.material.reset();
+    drawable.component_instance = fabric::project::VisualComponentInstance{
+        .variant_id = "stitched",
+        .anchor_id = "center",
+        .overrides = {
+            {"scale", fabric::core::Vec2{1.5F, 0.75F}},
+            {"thread-texture", fabric::project::ResourceReference{
+                                   {.value = "blue-thread"}, "texture"}}}};
+
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.entity == source);
+
+    const auto references = fabric::project::entity_resource_references(source);
+    CHECK(std::ranges::any_of(references, [](const auto& reference) {
+        return reference.id.value == "button-eye" &&
+            reference.expected_type == "visualComponent";
+    }));
+    CHECK(std::ranges::any_of(references, [](const auto& reference) {
+        return reference.id.value == "blue-thread" &&
+            reference.expected_type == "texture";
     }));
 }
 

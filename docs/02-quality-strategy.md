@@ -137,9 +137,12 @@ La session éditeur couvre la conversion liée-vers-native, sa publication,
 undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 `fabric_asset_preview` est vérifié headless sur les mêmes draw packets que le
 renderer et refuse les documents liés ou invalides sans créer de fenêtre.
-Les contrats `MaterialDefinition v1` et `EntityDefinition v1` couvrent
-round-trip, publication atomique, références typées, transforms non finies,
-identifiants dupliqués et cycles de parentage.
+Les contrats `MaterialDefinition v1` et `EntityDefinition v2` couvrent
+round-trip, migration des entités v1, publication atomique, références typées,
+instances de composants visuels, transforms non finies, identifiants dupliqués
+et cycles de parentage. Le validateur headless résout aussi variantes, ancres et
+overrides des composants portés par les entités. Preview Runtime vérifie le
+parcours map → entité → composant jusqu'aux draw packets transformés.
 Le contrat `AnimationClip v1` couvre parseur strict, round-trip, publication
 atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
 interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.

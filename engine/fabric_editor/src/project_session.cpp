@@ -657,7 +657,12 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
             {.value = prompt.resource_id},
             prompt.drawable == project::EntityDrawableKind::texture
                 ? "texture"
-                : "vector"};
+                : prompt.drawable ==
+                      project::EntityDrawableKind::visual_component
+                ? "visualComponent" : "vector"};
+        if (prompt.drawable == project::EntityDrawableKind::visual_component)
+            node.drawable.component_instance =
+                project::VisualComponentInstance{};
     }
     if (!prompt.material_id.empty()) {
         node.drawable.material = project::ResourceReference{

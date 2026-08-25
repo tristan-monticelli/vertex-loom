@@ -140,6 +140,9 @@ C4Component
   composant, applique paramètres, transforms, opacité et ordre Z stable, refuse
   les cycles de composants et produit des `VectorDrawPacket` avec leurs bounds.
   Asset Studio et le runtime consomment ce même résultat.
+- Une entité v2 peut instancier un `VisualComponent` avec variante, ancre et
+  overrides typés. La session et le runtime appliquent ensuite le transform de
+  nœud aux paquets résolus, sans connaître le preset d'origine.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

@@ -92,9 +92,10 @@ C4Component
 - `MaterialDefinition v1` est stocké sous
   `assets/materials/<id>.material.json` et porte couleur, opacité, blend,
   transform UV, texture optionnelle et motif vectoriel optionnel.
-- `EntityDefinition v1` est stocké sous `entities/<id>.entity.json` et porte
-  des nœuds stables, parentage, transform, ordre Z, drawable vectoriel ou
-  texture, matériau optionnel et contraintes d’animation ordonnées. Les
+- `EntityDefinition v2` est stocké sous `entities/<id>.entity.json` et porte
+  des nœuds stables, parentage, transform, ordre Z, drawable vectoriel,
+  raster ou composant visuel paramétrique, matériau optionnel et contraintes
+  d’animation ordonnées. La v1 est migrée en mémoire. Les
   contraintes référencent uniquement des nœuds de la même entité et sont
   validées contre les cycles, doublons d’ordre et nœuds manquants.
 - `AnimationClip v1` est stocké sous

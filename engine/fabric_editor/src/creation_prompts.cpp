@@ -495,7 +495,14 @@ PromptValidation CreateEntityPrompt::validate(
         validate_resource(resource_id, "textures", ".texture.json", "resource");
     } else if (drawable == project::EntityDrawableKind::vector) {
         validate_resource(resource_id, "vectors", ".vector.json", "resource");
+    } else if (drawable == project::EntityDrawableKind::visual_component) {
+        validate_resource(resource_id, "components", ".component.json",
+                          "resource");
     }
+    if (drawable == project::EntityDrawableKind::visual_component &&
+        !material_id.empty())
+        add_error(validation, "material",
+                  "Visual components own their composed materials.");
     if (!material_id.empty()) {
         if (!core::ResourceId::is_valid(material_id)) {
             add_error(validation, "material", "Material id must be valid.");

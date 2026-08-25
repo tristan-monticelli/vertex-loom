@@ -5,6 +5,7 @@
 #include "fabric/project/material.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/project/visual_composition.hpp"
 #include "fabric/render/vector_geometry.hpp"
 
 #include <array>
@@ -15,6 +16,7 @@
 #include <iostream>
 #include <string>
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
@@ -159,6 +161,57 @@ fabric::project::EntityDefinition entity() {
                        .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
                                      .resource = fabric::project::ResourceReference{
                                          {.value = "runtime-vector"}, "vector"}}}}};
+}
+
+fabric::project::VisualComposition visual_composition() {
+    return {.document = {.schema_version = 1,
+                         .type = "visualComposition",
+                         .id = {.value = "runtime-composition"},
+                         .name = "Runtime Composition"},
+            .size = {2.0F, 2.0F},
+            .layers = {{.id = "artwork", .name = "Artwork",
+                        .kind = fabric::project::VisualLayerKind::vector,
+                        .resource = {{.value = "runtime-vector"}, "vector"}}}};
+}
+
+fabric::project::VisualComponent visual_component() {
+    return {.document = {.schema_version = 1,
+                         .type = "visualComponent",
+                         .id = {.value = "runtime-component"},
+                         .name = "Runtime Component"},
+            .composition = {{.value = "runtime-composition"},
+                            "visualComposition"},
+            .parameters = {{"scale", "Scale",
+                            fabric::project::VisualParameterType::vec2,
+                            fabric::core::Vec2{1.0F, 1.0F},
+                            {"artwork", "transform", "scale"}, true}}};
+}
+
+fabric::project::EntityDefinition component_entity() {
+    return {.document = {.schema_version =
+                             fabric::project::current_entity_schema_version,
+                         .type = "entity",
+                         .id = {.value = "runtime-component-entity"},
+                         .name = "Runtime Component Entity"},
+            .nodes = {{.id = "root", .name = "Root",
+                       .transform = {.position = {3.0F, 4.0F}},
+                       .drawable = {
+                           .kind = fabric::project::EntityDrawableKind::visual_component,
+                           .resource = fabric::project::ResourceReference{
+                               {.value = "runtime-component"}, "visualComponent"},
+                           .component_instance =
+                               fabric::project::VisualComponentInstance{
+                                   .overrides = {{"scale",
+                                       fabric::core::Vec2{2.0F, 2.0F}}}}}}}};
+}
+
+fabric::project::MapDocument map_with_component_entity() {
+    auto result = map();
+    result.instances.push_back({
+        "component", fabric::project::ResourceReference{
+            {.value = "runtime-component-entity"}, "entity"},
+        std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
 }
 
 fabric::project::EntityDefinition material_entity() {
@@ -1025,6 +1078,36 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
     CHECK(runtime.stats().culled_packets >= 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves visual component entity drawables") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-components-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_visual_composition(
+        root, manifest(), visual_composition()).ok());
+    REQUIRE(fabric::project::publish_visual_component(
+        root, manifest(), visual_component()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), component_entity()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_component_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    const auto& point = runtime.last_frame_packets().front().fill_vertices.front();
+    CHECK(point.x == Catch::Approx(1.0F));
+    CHECK(point.y == Catch::Approx(2.0F));
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

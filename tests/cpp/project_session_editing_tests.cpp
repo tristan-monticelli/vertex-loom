@@ -203,6 +203,19 @@ TEST_CASE("project session creates indexes and reloads a visual preset") {
                       fabric::editor::StudioResourceKind::textured_path;
               }) == 2);
 
+    fabric::editor::CreateEntityPrompt entity_prompt;
+    entity_prompt.name = "Zipper entity";
+    entity_prompt.drawable =
+        fabric::project::EntityDrawableKind::visual_component;
+    entity_prompt.resource_id = "coat-zipper";
+    REQUIRE(session.create_entity(entity_prompt));
+    REQUIRE(session.selected_entity().has_value());
+    const auto& drawable = session.selected_entity()->nodes.front().drawable;
+    CHECK(drawable.kind ==
+          fabric::project::EntityDrawableKind::visual_component);
+    REQUIRE(drawable.component_instance.has_value());
+    CHECK(drawable.resource->expected_type == "visualComponent");
+
     fabric::editor::ProjectSession reopened;
     REQUIRE(reopened.open(project.path()));
     REQUIRE(reopened.select_resource(

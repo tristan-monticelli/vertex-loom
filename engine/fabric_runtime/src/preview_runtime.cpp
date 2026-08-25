@@ -4,6 +4,7 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
 #include "fabric/render/vector_geometry.hpp"
+#include "fabric/render/visual_composition_renderer.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/animation_ik.hpp"
 #include "fabric/project/manifest.hpp"
@@ -851,6 +852,46 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                                 instance.transform)});
                     impl_->packet_sort_keys.emplace(
                         packet.node_id, Impl::PacketSortKey{layer_depth, node.z_order});
+                    impl_->packets.push_back(std::move(packet));
+                }
+            } else if (node.drawable.kind ==
+                           project::EntityDrawableKind::visual_component &&
+                       node.drawable.resource) {
+                auto component = project::load_visual_component(
+                    options_.project_root, *manifest_,
+                    project::visual_component_document_path(
+                        *manifest_, node.drawable.resource->id));
+                if (!component.ok()) {
+                    append_errors(errors_, component.errors);
+                    return false;
+                }
+                auto visual = render::resolve_visual_component(
+                    options_.project_root, *manifest_, *component.asset,
+                    node.drawable.component_instance.value_or(
+                        project::VisualComponentInstance{}));
+                if (!visual.ok()) {
+                    errors_.insert(errors_.end(), visual.errors.begin(),
+                                   visual.errors.end());
+                    return false;
+                }
+                for (auto& packet : visual.packets) {
+                    if (packet.image_fill &&
+                        !ensure_texture(packet.image_fill->texture)) return false;
+                    transform_packet(packet, resolved_entity, node_index,
+                                     instance.transform);
+                    packet.node_id = instance.id + ":" + node.id + ":" +
+                        packet.node_id;
+                    impl_->packet_base_transforms.emplace(
+                        packet.node_id, Impl::PacketBaseTransform{
+                            .local_position = node.transform.position,
+                            .rotation_degrees = node.transform.rotation_degrees,
+                            .scale = node.transform.scale,
+                            .world_origin = apply_node_transform(
+                                {0.0F, 0.0F}, resolved_entity, node_index,
+                                instance.transform)});
+                    impl_->packet_sort_keys.emplace(
+                        packet.node_id,
+                        Impl::PacketSortKey{layer_depth, node.z_order});
                     impl_->packets.push_back(std::move(packet));
                 }
             } else if (node.drawable.kind == project::EntityDrawableKind::texture) {

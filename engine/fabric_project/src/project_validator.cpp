@@ -461,6 +461,32 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
                     project_root, *loaded.manifest,
                     iterator->path().lexically_relative(project_root));
                 if (loaded_entity.ok()) {
+                    for (std::size_t node_index = 0;
+                         node_index < loaded_entity.entity->nodes.size();
+                         ++node_index) {
+                        const auto& node = loaded_entity.entity->nodes[node_index];
+                        if (node.drawable.kind !=
+                                EntityDrawableKind::visual_component ||
+                            !node.drawable.resource ||
+                            !node.drawable.component_instance) continue;
+                        const auto component = load_visual_component(
+                            project_root, *loaded.manifest,
+                            visual_component_document_path(
+                                *loaded.manifest,
+                                node.drawable.resource->id));
+                        if (!component.ok()) continue;
+                        const auto resolved = resolve_visual_component_instance(
+                            *component.asset,
+                            *node.drawable.component_instance);
+                        for (const auto& error : resolved.errors) {
+                            add_error(
+                                result.errors, error.code,
+                                loaded_entity.entity->document.id.value +
+                                    ".nodes[" + std::to_string(node_index) +
+                                    "].componentInstance." + error.field,
+                                error.message);
+                        }
+                    }
                     auto registration = registry.register_resource({
                         .document = loaded_entity.entity->document,
                         .document_path = iterator->path().lexically_relative(project_root),

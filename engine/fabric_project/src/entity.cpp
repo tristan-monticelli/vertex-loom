@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <type_traits>
 #include <utility>
 
 namespace fabric::project {
@@ -23,6 +24,10 @@ bool vec_read(const Json& o,const char* k,core::Vec2& v,std::vector<Error>& e){a
 bool transform_read(const Json& o,const char* k,core::Transform& t,std::vector<Error>& e){auto i=o.find(k);if(i==o.end()||!i->is_object()){error(e,ErrorCode::invalid_asset,k,"expected a transform");return false;}return vec_read(*i,"position",t.position,e)&&number(*i,"rotationDegrees",t.rotation_degrees,e)&&vec_read(*i,"scale",t.scale,e)&&vec_read(*i,"pivot",t.pivot,e);}
 Json ref_json(const ResourceReference& r){return {{"id",r.id.value},{"expectedType",r.expected_type}};}
 bool ref_read(const Json& o,const char* k,std::optional<ResourceReference>& out,std::vector<Error>& e){auto i=o.find(k);if(i==o.end()||i->is_null())return true;if(!i->is_object()){error(e,ErrorCode::invalid_asset,k,"expected a resource reference");return false;}ResourceReference r;if(!text(*i,"id",r.id.value,e)||!text(*i,"expectedType",r.expected_type,e))return false;out=std::move(r);return true;}
+Json visual_value_json(const VisualParameterValue& value){return std::visit([](const auto& item)->Json{using T=std::decay_t<decltype(item)>;if constexpr(std::is_same_v<T,float>)return {{"type","float"},{"value",item}};else if constexpr(std::is_same_v<T,std::int64_t>)return {{"type","integer"},{"value",item}};else if constexpr(std::is_same_v<T,bool>)return {{"type","boolean"},{"value",item}};else if constexpr(std::is_same_v<T,std::string>)return {{"type","text"},{"value",item}};else if constexpr(std::is_same_v<T,core::Vec2>)return {{"type","vec2"},{"value",vec(item)}};else if constexpr(std::is_same_v<T,core::Color>)return {{"type","color"},{"value",{{"red",item.red},{"green",item.green},{"blue",item.blue},{"alpha",item.alpha}}}};else return {{"type","resource"},{"value",ref_json(item)}};},value);}
+bool visual_value_read(const Json& o,VisualParameterValue& value,std::vector<Error>& e){if(!o.is_object()){error(e,ErrorCode::invalid_asset,"componentInstance.value","expected a typed value");return false;}std::string type;if(!text(o,"type",type,e))return false;auto found=o.find("value");if(found==o.end()){error(e,ErrorCode::invalid_asset,"componentInstance.value","value is required");return false;}if(type=="float"){float parsed{};if(!number(o,"value",parsed,e))return false;value=parsed;}else if(type=="integer"){if(!found->is_number_integer()){error(e,ErrorCode::invalid_asset,"componentInstance.value","expected an integer");return false;}value=found->get<std::int64_t>();}else if(type=="boolean"){if(!found->is_boolean()){error(e,ErrorCode::invalid_asset,"componentInstance.value","expected a boolean");return false;}value=found->get<bool>();}else if(type=="text"){if(!found->is_string()){error(e,ErrorCode::invalid_asset,"componentInstance.value","expected text");return false;}value=found->get<std::string>();}else if(type=="vec2"){core::Vec2 parsed;if(!vec_read(o,"value",parsed,e))return false;value=parsed;}else if(type=="color"){if(!found->is_object()){error(e,ErrorCode::invalid_asset,"componentInstance.value","expected a color");return false;}core::Color parsed;if(!number(*found,"red",parsed.red,e)||!number(*found,"green",parsed.green,e)||!number(*found,"blue",parsed.blue,e)||!number(*found,"alpha",parsed.alpha,e))return false;value=parsed;}else if(type=="resource"){std::optional<ResourceReference> parsed;if(!ref_read(o,"value",parsed,e)||!parsed)return false;value=*parsed;}else{error(e,ErrorCode::invalid_asset,"componentInstance.value","unsupported typed value");return false;}return true;}
+Json component_instance_json(const VisualComponentInstance& instance){Json result={{"overrides",Json::array()}};if(instance.variant_id)result["variantId"]=*instance.variant_id;if(instance.anchor_id)result["anchorId"]=*instance.anchor_id;for(const auto& item:instance.overrides)result["overrides"].push_back({{"parameterId",item.parameter_id},{"value",visual_value_json(item.value)}});return result;}
+bool component_instance_read(const Json& o,VisualComponentInstance& instance,std::vector<Error>& e){auto variant=o.find("variantId");if(variant!=o.end()){if(!variant->is_string())error(e,ErrorCode::invalid_asset,"componentInstance.variantId","expected a string");else instance.variant_id=variant->get<std::string>();}auto anchor=o.find("anchorId");if(anchor!=o.end()){if(!anchor->is_string())error(e,ErrorCode::invalid_asset,"componentInstance.anchorId","expected a string");else instance.anchor_id=anchor->get<std::string>();}auto overrides=o.find("overrides");if(overrides==o.end()||!overrides->is_array()){error(e,ErrorCode::invalid_asset,"componentInstance.overrides","expected an array");return false;}for(const auto& item:*overrides){if(!item.is_object()){error(e,ErrorCode::invalid_asset,"componentInstance.overrides","expected objects");continue;}VisualParameterOverride parsed;text(item,"parameterId",parsed.parameter_id,e);auto typed=item.find("value");if(typed==item.end())error(e,ErrorCode::invalid_asset,"componentInstance.value","value is required");else visual_value_read(*typed,parsed.value,e);instance.overrides.push_back(std::move(parsed));}return e.empty();}
 Json constraint_json(const AnimationConstraint& c){Json result={{"id",c.id},{"kind",c.kind==AnimationConstraintKind::copy_transform?"copyTransform":c.kind==AnimationConstraintKind::limits?"limits":"lookAt"},{"targetNode",c.target_node},{"sourceNode",c.source_node},{"order",c.order},{"constrainPosition",c.constrain_position},{"constrainRotation",c.constrain_rotation},{"constrainScale",c.constrain_scale}};if(c.min_position)result["minPosition"]=vec(*c.min_position);if(c.max_position)result["maxPosition"]=vec(*c.max_position);if(c.min_rotation_degrees)result["minRotationDegrees"]=*c.min_rotation_degrees;if(c.max_rotation_degrees)result["maxRotationDegrees"]=*c.max_rotation_degrees;if(c.min_scale)result["minScale"]=vec(*c.min_scale);if(c.max_scale)result["maxScale"]=vec(*c.max_scale);return result;}
 bool optional_number(const Json& o,const char* key,std::optional<float>& value,std::vector<Error>& e){auto i=o.find(key);if(i==o.end()||i->is_null())return true;if(!i->is_number()){error(e,ErrorCode::invalid_asset,key,"expected a finite number");return false;}float parsed=i->get<float>();if(!std::isfinite(parsed)){error(e,ErrorCode::invalid_asset,key,"must be finite");return false;}value=parsed;return true;}
 bool optional_vec(const Json& o,const char* key,std::optional<core::Vec2>& value,std::vector<Error>& e){auto i=o.find(key);if(i==o.end()||i->is_null())return true;if(!i->is_object()){error(e,ErrorCode::invalid_asset,key,"expected a Vec2");return false;}core::Vec2 parsed{};if(!vec_read(o,key,parsed,e))return false;value=parsed;return true;}
@@ -51,13 +56,13 @@ bool xpbd_read(const Json& o, XpbdSystem& system, std::vector<Error>& e){
 }
 ValidationReport parse_validation(const ProjectManifest& m,std::string_view s){auto r=parse_entity(m,s);return {.errors=std::move(r.errors)};}
 }
-std::string_view to_string(const EntityDrawableKind k) noexcept { switch(k){case EntityDrawableKind::none:return "none";case EntityDrawableKind::vector:return "vector";case EntityDrawableKind::texture:return "texture";}return "none"; }
+std::string_view to_string(const EntityDrawableKind k) noexcept { switch(k){case EntityDrawableKind::none:return "none";case EntityDrawableKind::vector:return "vector";case EntityDrawableKind::texture:return "texture";case EntityDrawableKind::visual_component:return "visualComponent";}return "none"; }
 std::filesystem::path entity_document_path(const ProjectManifest& m,const core::ResourceId& id){return m.directories.entities/(id.value+".entity.json");}
 ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition& a) {
     ValidationReport r;
     if (a.document.schema_version != current_entity_schema_version)
         error(r.errors, ErrorCode::unsupported_schema_version, "schemaVersion",
-              "only entity schema version 1 is supported");
+              "only entity schema version 2 is supported");
     if (a.document.type != "entity")
         error(r.errors, ErrorCode::invalid_asset, "type", "must be entity");
     if (!core::ResourceId::is_valid(a.document.id.value))
@@ -107,11 +112,34 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
                 error(r.errors, ErrorCode::missing_resource, prefix + ".drawable",
                       "texture drawable requires a resource");
             else valid_ref(node.drawable.resource, "resource", "texture");
+        } else if (node.drawable.kind == EntityDrawableKind::visual_component) {
+            if (!node.drawable.resource)
+                error(r.errors, ErrorCode::missing_resource, prefix + ".drawable",
+                      "visual component drawable requires a resource");
+            else valid_ref(node.drawable.resource, "resource", "visualComponent");
         } else if (node.drawable.resource) {
             error(r.errors, ErrorCode::invalid_asset, prefix + ".drawable",
                   "none drawable cannot reference a resource");
         }
         valid_ref(node.drawable.material, "material", "material");
+        if (node.drawable.kind == EntityDrawableKind::visual_component &&
+            node.drawable.material)
+            error(r.errors, ErrorCode::invalid_asset, prefix + ".material",
+                  "visual components own their composed materials");
+        if (node.drawable.kind != EntityDrawableKind::visual_component &&
+            node.drawable.component_instance)
+            error(r.errors, ErrorCode::invalid_asset,
+                  prefix + ".componentInstance",
+                  "only visual component drawables accept an instance");
+        if (node.drawable.component_instance) {
+            std::set<std::string> override_ids;
+            for (const auto& item : node.drawable.component_instance->overrides)
+                if (!core::ResourceId::is_valid(item.parameter_id) ||
+                    !override_ids.insert(item.parameter_id).second)
+                    error(r.errors, ErrorCode::duplicate_resource,
+                          prefix + ".componentInstance.overrides",
+                          "override ids must be valid and unique");
+        }
     }
     for (const auto& node : a.nodes) {
         if (!node.parent) continue;
@@ -196,8 +224,8 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
     }
     return r;
 }
-std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);}if(a.animation_state_machine)for(const auto& state:a.animation_state_machine->states)r.push_back(state.clip);return r;}
-std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)},{"ikChains",Json::array()},{"animationStateMachine",a.animation_state_machine?state_machine_json(*a.animation_state_machine):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));for(const auto& chain:a.ik_chains)j["ikChains"].push_back(ik_chain_json(chain));return j.dump(2)+"\n";}
+std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);if(n.drawable.component_instance)for(const auto& item:n.drawable.component_instance->overrides)if(const auto* ref=std::get_if<ResourceReference>(&item.value))r.push_back(*ref);}if(a.animation_state_machine)for(const auto& state:a.animation_state_machine->states)r.push_back(state.clip);return r;}
+std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)},{"ikChains",Json::array()},{"animationStateMachine",a.animation_state_machine?state_machine_json(*a.animation_state_machine):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);if(n.drawable.component_instance)d["componentInstance"]=component_instance_json(*n.drawable.component_instance);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));for(const auto& chain:a.ik_chains)j["ikChains"].push_back(ik_chain_json(chain));return j.dump(2)+"\n";}
 EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     EntityResult r;
     Json j;
@@ -205,9 +233,10 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     catch (...) { error(r.errors, ErrorCode::invalid_json, "entity", "cannot parse entity JSON"); return r; }
     if (!j.is_object()) { error(r.errors, ErrorCode::invalid_asset, "entity", "top-level value must be an object"); return r; }
     EntityDefinition a;
+    std::uint32_t source_schema{};
     auto schema = j.find("schemaVersion");
     if (schema == j.end() || !schema->is_number_unsigned()) error(r.errors, ErrorCode::invalid_asset, "schemaVersion", "expected an unsigned integer");
-    else a.document.schema_version = schema->get<std::uint32_t>();
+    else { source_schema = schema->get<std::uint32_t>(); a.document.schema_version = source_schema; }
     text(j, "type", a.document.type, r.errors);
     text(j, "id", a.document.id.value, r.errors);
     text(j, "name", a.document.name, r.errors);
@@ -227,9 +256,22 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
             if (k == "none") n.drawable.kind = EntityDrawableKind::none;
             else if (k == "vector") n.drawable.kind = EntityDrawableKind::vector;
             else if (k == "texture") n.drawable.kind = EntityDrawableKind::texture;
+            else if (k == "visualComponent" && source_schema >= 2)
+                n.drawable.kind = EntityDrawableKind::visual_component;
             else error(r.errors, ErrorCode::invalid_asset, "drawable.kind", "unsupported drawable kind");
             ref_read(*d, "resource", n.drawable.resource, r.errors);
             ref_read(*d, "material", n.drawable.material, r.errors);
+            auto instance = d->find("componentInstance");
+            if (instance != d->end()) {
+                if (!instance->is_object())
+                    error(r.errors, ErrorCode::invalid_asset,
+                          "componentInstance", "expected an object");
+                else {
+                    VisualComponentInstance parsed;
+                    if (component_instance_read(*instance, parsed, r.errors))
+                        n.drawable.component_instance = std::move(parsed);
+                }
+            }
         }
         a.nodes.push_back(std::move(n));
     }
@@ -272,6 +314,7 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
                 a.animation_state_machine = std::move(machine);
         }
     }
+    if (source_schema == 1) a.document.schema_version = 2;
     if (!r.errors.empty()) return r;
     auto v = validate_entity(m, a);
     if (!v.ok()) { r.errors = std::move(v.errors); return r; }
@@ -279,5 +322,5 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     return r;
 }
 EntityResult load_entity(const std::filesystem::path& root,const ProjectManifest& m,const std::filesystem::path& path){auto s=load_document(root,path,[&](std::string_view v){return parse_validation(m,v);});EntityResult r;r.errors=std::move(s.errors);if(s.contents)r=parse_entity(m,*s.contents);if(r.ok()&&path!=entity_document_path(m,r.entity->document.id)){r.entity.reset();error(r.errors,ErrorCode::invalid_path,"document","document filename does not match its id");}return r;}
-EntityResult publish_entity(const std::filesystem::path& root,const ProjectManifest& m,const EntityDefinition& a){EntityResult r;auto v=validate_entity(m,a);if(!v.ok()){r.errors=std::move(v.errors);return r;}auto p=entity_document_path(m,a.document.id);auto s=save_document_atomic(root,p,serialize_entity(a),[&](std::string_view x){return parse_validation(m,x);});if(!s.ok()){r.errors=std::move(s.errors);return r;}return load_entity(root,m,p);}
+EntityResult publish_entity(const std::filesystem::path& root,const ProjectManifest& m,const EntityDefinition& a){EntityResult r;auto migrated=a;if(migrated.document.schema_version==1)migrated.document.schema_version=current_entity_schema_version;auto v=validate_entity(m,migrated);if(!v.ok()){r.errors=std::move(v.errors);return r;}auto p=entity_document_path(m,migrated.document.id);auto s=save_document_atomic(root,p,serialize_entity(migrated),[&](std::string_view x){return parse_validation(m,x);});if(!s.ok()){r.errors=std::move(s.errors);return r;}return load_entity(root,m,p);}
 }

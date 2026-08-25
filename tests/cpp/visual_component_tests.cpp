@@ -1,3 +1,4 @@
+#include "fabric/project/entity.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/visual_component.hpp"
 #include "fabric/project/visual_composition.hpp"
@@ -95,6 +96,25 @@ fabric::project::VisualComposition parent_composition() {
                         .anchor_id = "center",
                         .overrides = {{"size", fabric::core::Vec2{1.4F, 0.7F}}}}}},
     };
+}
+
+fabric::project::EntityDefinition component_entity() {
+    return {
+        .document = {.schema_version =
+                         fabric::project::current_entity_schema_version,
+                     .type = "entity",
+                     .id = {.value = "button-eye-entity"},
+                     .name = "Button Eye Entity"},
+        .nodes = {{.id = "root",
+                   .name = "Root",
+                   .drawable = {
+                       .kind = fabric::project::EntityDrawableKind::visual_component,
+                       .resource = fabric::project::ResourceReference{
+                           {.value = "button-eye"}, "visualComponent"},
+                       .component_instance =
+                           fabric::project::VisualComponentInstance{
+                               .variant_id = "sleepy",
+                               .anchor_id = "center"}}}}};
 }
 
 std::filesystem::path temporary_root(const std::string& prefix) {
@@ -238,7 +258,16 @@ TEST_CASE("headless validation checks component bindings instances and cycles") 
     auto parent = parent_composition();
     REQUIRE(fabric::project::publish_visual_composition(
                 root, manifest(), parent).ok());
+    auto entity = component_entity();
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity).ok());
     CHECK(fabric::project::validate_project(root).ok());
+
+    entity.nodes.front().drawable.component_instance->variant_id = "missing";
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity).ok());
+    CHECK(has_error(fabric::project::validate_project(root),
+                    fabric::project::ErrorCode::missing_resource));
+    entity.nodes.front().drawable.component_instance->variant_id = "sleepy";
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity).ok());
 
     parent.layers.front().component_instance->variant_id = "missing";
     REQUIRE(fabric::project::publish_visual_composition(

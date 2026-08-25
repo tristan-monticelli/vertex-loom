@@ -356,6 +356,30 @@ EntityPreviewResult build_entity_preview(
                     packet.node_id;
                 result.packets.push_back(std::move(packet));
             }
+        } else if (node.drawable.kind ==
+                       fabric::project::EntityDrawableKind::visual_component &&
+                   node.drawable.resource) {
+            auto loaded = fabric::project::load_visual_component(
+                session.project_root(), *session.manifest(),
+                fabric::project::visual_component_document_path(
+                    *session.manifest(), node.drawable.resource->id));
+            if (!loaded.ok()) {
+                for (const auto& error : loaded.errors)
+                    result.errors.push_back(error.field + ": " + error.message);
+                continue;
+            }
+            auto visual = fabric::render::resolve_visual_component(
+                session.project_root(), *session.manifest(), *loaded.asset,
+                node.drawable.component_instance.value_or(
+                    fabric::project::VisualComponentInstance{}));
+            result.errors.insert(result.errors.end(), visual.errors.begin(),
+                                 visual.errors.end());
+            for (auto& packet : visual.packets) {
+                transform_entity_packet(packet, entity, node_index);
+                packet.node_id = entity.document.id.value + ":" + node.id + ":" +
+                    packet.node_id;
+                result.packets.push_back(std::move(packet));
+            }
         } else if (node.drawable.kind == fabric::project::EntityDrawableKind::texture &&
                    node.drawable.resource) {
             const auto loaded = fabric::project::load_texture_asset(
@@ -2661,7 +2685,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             for (const auto drawable : {
                      fabric::project::EntityDrawableKind::none,
                      fabric::project::EntityDrawableKind::vector,
-                     fabric::project::EntityDrawableKind::texture}) {
+                     fabric::project::EntityDrawableKind::texture,
+                     fabric::project::EntityDrawableKind::visual_component}) {
                 const bool selected = creation.entity.drawable == drawable;
                 const auto option = std::string(fabric::project::to_string(drawable));
                 if (ImGui::Selectable(option.c_str(), selected)) {
