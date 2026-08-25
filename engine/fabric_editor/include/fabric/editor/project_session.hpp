@@ -74,6 +74,10 @@ public:
         double pixels_per_unit,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_vector_node(
+        std::size_t node_index, project::VectorNode node,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -108,6 +112,12 @@ public:
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
 
 private:
+    enum class DirtyDocument {
+        none,
+        manifest,
+        vector,
+    };
+
     std::filesystem::path project_root_;
     std::optional<project::ProjectManifest> manifest_;
     std::optional<ImportedTexture> imported_texture_;
@@ -116,6 +126,9 @@ private:
     std::vector<StudioResource> resources_;
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;
+    std::optional<project::VectorAsset> recovery_vector_;
+    std::filesystem::path selected_vector_document_path_;
+    DirtyDocument dirty_document_{DirtyDocument::none};
     CommandStack commands_;
     AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;

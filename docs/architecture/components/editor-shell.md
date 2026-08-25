@@ -79,8 +79,16 @@ C4Component
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.
+- La tranche native intégrée rend rectangles et ellipses, cadre le document,
+  zoome sous le curseur et permet le pan. L'inspecteur sélectionne et édite un nœud :
+  nom, visibilité, verrouillage, transform, couleur et paramètres de fill image.
+- Un seul document porte des changements à la fois. Changer de ressource avec
+  un vecteur dirty est refusé jusqu'à Save ou Undo ; les historiques propres
+  sont neutralisés avant de changer de document.
 - La session expose undo, redo et dirty et ne marque clean qu’après une
   sauvegarde principale réussie.
+- Save et autosave ciblent le document actif : `project.json` pour les réglages
+  projet ou le document `VectorAsset` sélectionné pour l'édition native.
 - `CommandStack::execute` accepte une commande possédée par la pile ;
   `can_undo`, `can_redo`, `undo`, `redo`, `mark_clean` et `dirty` exposent son
   état sans dépendance à Dear ImGui.

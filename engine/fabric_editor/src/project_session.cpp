@@ -151,6 +151,9 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
+    recovery_vector_.reset();
+    selected_vector_document_path_.clear();
+    dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
     errors_.clear();
@@ -192,6 +195,9 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
+    recovery_vector_.reset();
+    selected_vector_document_path_.clear();
+    dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
     errors_ = std::move(recovery.errors);
@@ -204,6 +210,11 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
     if (!has_project()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "a project must be open before importing a texture"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before importing another resource"}};
         return false;
     }
 
@@ -252,6 +263,11 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
                     "a project must be open before importing a vector"}};
         return false;
     }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before importing another resource"}};
+        return false;
+    }
 
     auto decoded = render::load_svg_preview(source);
     if (!decoded.ok()) {
@@ -294,6 +310,11 @@ bool ProjectSession::create_vector_artwork(
     if (!has_project()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "a project must be open before creating an artwork"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before creating another resource"}};
         return false;
     }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
@@ -404,6 +425,7 @@ bool ProjectSession::refresh_resources() {
 
 bool ProjectSession::select_resource(const StudioResourceKind kind,
                                      const core::ResourceId& id) {
+    std::vector<project::Error> selection_warnings;
     const auto match = std::ranges::find_if(
         resources_, [&](const StudioResource& resource) {
             return resource.kind == kind && resource.id == id;
@@ -412,6 +434,24 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         errors_ = {{project::ErrorCode::missing_resource, "selection",
                     "the selected resource is not indexed"}};
         return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        const auto* selected = selected_resource();
+        if (selected == nullptr || selected->kind != kind || selected->id != id) {
+            errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                        "save or undo vector changes before changing selection"}};
+            return false;
+        }
+        return true;
+    }
+    if (!commands_.dirty()) {
+        if (dirty_document_ != DirtyDocument::none && autosave_.pending() &&
+            update_autosave() == AutosaveStatus::failed) {
+            return false;
+        }
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
     }
     const auto index = static_cast<std::size_t>(
         std::distance(resources_.begin(), match));
@@ -432,6 +472,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             .asset = std::move(*loaded.asset), .image = std::move(*image.image)};
         imported_vector_.reset();
         created_vector_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
     } else {
         auto loaded = project::load_vector_asset(
             project_root_, *manifest_, match->document_path);
@@ -451,13 +493,36 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                 .asset = std::move(*loaded.asset),
                 .preview = std::move(*image.image)};
             created_vector_.reset();
+            selected_vector_document_path_.clear();
+            recovery_vector_.reset();
         } else {
             created_vector_ = std::move(*loaded.asset);
             imported_vector_.reset();
+            selected_vector_document_path_ = match->document_path;
+            auto recovery = project::inspect_recovery(
+                project_root_, selected_vector_document_path_,
+                [this](const std::string_view contents) {
+                    auto parsed = project::parse_vector_asset(*manifest_, contents);
+                    return project::ValidationReport{
+                        .errors = std::move(parsed.errors)};
+                });
+            recovery_vector_.reset();
+            if (recovery.candidate) {
+                auto parsed = project::parse_vector_asset(
+                    *manifest_, recovery.candidate->contents);
+                if (parsed.ok()) {
+                    recovery_vector_ = std::move(parsed.asset);
+                } else {
+                    recovery.errors = std::move(parsed.errors);
+                }
+            }
+            if (!recovery.errors.empty()) {
+                selection_warnings = std::move(recovery.errors);
+            }
         }
     }
     selected_resource_index_ = index;
-    errors_.clear();
+    errors_ = std::move(selection_warnings);
     return true;
 }
 
@@ -467,6 +532,19 @@ bool ProjectSession::set_project_name(
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "a project must be open before editing its name"}};
         return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "project",
+                    "save vector changes before editing project settings"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
+            return false;
+        }
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
     }
     if (manifest_->name == name) {
         return true;
@@ -485,6 +563,7 @@ bool ProjectSession::set_project_name(
         return false;
     }
     autosave_.mark_changed(now);
+    dirty_document_ = DirtyDocument::manifest;
     errors_.clear();
     return true;
 }
@@ -496,6 +575,19 @@ bool ProjectSession::set_pixels_per_unit(
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "a project must be open before editing its units"}};
         return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "project",
+                    "save vector changes before editing project settings"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
+            return false;
+        }
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
     }
     if (manifest_->pixels_per_unit == pixels_per_unit) {
         return true;
@@ -513,6 +605,56 @@ bool ProjectSession::set_pixels_per_unit(
                     "cannot execute the unit modification"}};
         return false;
     }
+    autosave_.mark_changed(now);
+    dirty_document_ = DirtyDocument::manifest;
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_vector_node(
+    const std::size_t node_index, project::VectorNode node,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ ||
+        created_vector_->source_kind != project::VectorSourceKind::native ||
+        !created_vector_->native ||
+        node_index >= created_vector_->native->nodes.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a native vector node before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::manifest) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save project settings before editing a vector"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ == DirtyDocument::manifest) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
+            return false;
+        }
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    if (created_vector_->native->nodes[node_index].locked && node.locked) {
+        errors_ = {{project::ErrorCode::invalid_asset, "node",
+                    "locked vector nodes cannot be edited"}};
+        return false;
+    }
+    auto candidate = *created_vector_;
+    candidate.native->nodes[node_index] = node;
+    auto validation = project::validate_vector_asset(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<project::VectorNode>>(
+                created_vector_->native->nodes[node_index], std::move(node)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "node",
+                    "cannot execute the vector node modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::vector;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -542,13 +684,28 @@ bool ProjectSession::save() {
                     "a project must be open before saving"}};
         return false;
     }
-    auto report = project::save_manifest_atomic(project_root_, *manifest_);
-    if (!report.ok()) {
-        errors_ = std::move(report.errors);
-        return false;
+    if (dirty_document_ == DirtyDocument::vector) {
+        if (!created_vector_) {
+            errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                        "the edited vector is no longer selected"}};
+            return false;
+        }
+        auto saved = project::publish_native_vector_asset(
+            project_root_, *manifest_, *created_vector_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
+    } else {
+        auto report = project::save_manifest_atomic(project_root_, *manifest_);
+        if (!report.ok()) {
+            errors_ = std::move(report.errors);
+            return false;
+        }
     }
     commands_.mark_clean();
     autosave_.reset();
+    dirty_document_ = DirtyDocument::none;
     errors_.clear();
     return true;
 }
@@ -563,10 +720,21 @@ AutosaveStatus ProjectSession::update_autosave(
         if (!autosave_.pending()) {
             return AutosaveStatus::not_due;
         }
+        const bool vector_document = dirty_document_ == DirtyDocument::vector &&
+            created_vector_ && !selected_vector_document_path_.empty();
         auto report = project::save_autosave_atomic(
-            project_root_, "project.json",
-            project::serialize_manifest(*manifest_),
-            validate_serialized_manifest);
+            project_root_,
+            vector_document ? selected_vector_document_path_
+                            : std::filesystem::path{"project.json"},
+            vector_document ? project::serialize_vector_asset(*created_vector_)
+                            : project::serialize_manifest(*manifest_),
+            vector_document
+                ? project::DocumentValidator{[this](const std::string_view contents) {
+                      auto parsed = project::parse_vector_asset(*manifest_, contents);
+                      return project::ValidationReport{
+                          .errors = std::move(parsed.errors)};
+                  }}
+                : project::DocumentValidator{validate_serialized_manifest});
         if (!report.ok()) {
             errors_ = std::move(report.errors);
             return AutosaveStatus::failed;
@@ -578,9 +746,21 @@ AutosaveStatus ProjectSession::update_autosave(
     if (!autosave_.due(now)) {
         return AutosaveStatus::not_due;
     }
+    const bool vector_document = dirty_document_ == DirtyDocument::vector &&
+        created_vector_ && !selected_vector_document_path_.empty();
     auto report = project::save_autosave_atomic(
-        project_root_, "project.json", project::serialize_manifest(*manifest_),
-        validate_serialized_manifest);
+        project_root_,
+        vector_document ? selected_vector_document_path_
+                        : std::filesystem::path{"project.json"},
+        vector_document ? project::serialize_vector_asset(*created_vector_)
+                        : project::serialize_manifest(*manifest_),
+        vector_document
+            ? project::DocumentValidator{[this](const std::string_view contents) {
+                  auto parsed = project::parse_vector_asset(*manifest_, contents);
+                  return project::ValidationReport{
+                      .errors = std::move(parsed.errors)};
+              }}
+            : project::DocumentValidator{validate_serialized_manifest});
     if (!report.ok()) {
         errors_ = std::move(report.errors);
         return AutosaveStatus::failed;
@@ -592,6 +772,16 @@ AutosaveStatus ProjectSession::update_autosave(
 
 bool ProjectSession::accept_recovery(
     const AutosaveScheduler::Clock::time_point now) {
+    if (recovery_vector_) {
+        created_vector_ = std::move(recovery_vector_);
+        recovery_vector_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::vector;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (!recovery_manifest_.has_value()) {
         return false;
     }
@@ -599,6 +789,7 @@ bool ProjectSession::accept_recovery(
     recovery_manifest_.reset();
     commands_.clear();
     commands_.mark_dirty();
+    dirty_document_ = DirtyDocument::manifest;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -606,6 +797,7 @@ bool ProjectSession::accept_recovery(
 
 void ProjectSession::decline_recovery() noexcept {
     recovery_manifest_.reset();
+    recovery_vector_.reset();
     errors_.clear();
 }
 
@@ -626,7 +818,7 @@ bool ProjectSession::can_redo() const noexcept {
 }
 
 bool ProjectSession::has_recovery() const noexcept {
-    return recovery_manifest_.has_value();
+    return recovery_manifest_.has_value() || recovery_vector_.has_value();
 }
 
 const std::filesystem::path& ProjectSession::project_root() const noexcept {

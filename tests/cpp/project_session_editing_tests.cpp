@@ -186,6 +186,62 @@ TEST_CASE("undoing to clean neutralizes a previous autosave") {
     CHECK(reopened.manifest()->name == "Primary");
 }
 
+TEST_CASE("native vector edits use history save and recovery") {
+    using namespace std::chrono_literals;
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        fabric::editor::CreateVectorArtworkPrompt prompt;
+        prompt.name = "Editable panel";
+        REQUIRE(session.create_vector_artwork(prompt));
+        REQUIRE(session.created_vector()->native.has_value());
+
+        auto node = session.created_vector()->native->nodes.front();
+        node.name = "Moved panel";
+        node.transform.position = {3.0F, -2.0F};
+        node.fill.color = fabric::core::Color{0.9F, 0.2F, 0.1F, 1.0F};
+        REQUIRE(session.set_selected_vector_node(0, node, start));
+        CHECK(session.dirty());
+        CHECK(session.can_undo());
+        REQUIRE(session.undo(start + 1ms));
+        CHECK(session.created_vector()->native->nodes.front().name ==
+              "Rectangle");
+        REQUIRE(session.redo(start + 2ms));
+        CHECK(session.created_vector()->native->nodes.front().name ==
+              "Moved panel");
+        REQUIRE(session.update_autosave(start + 3s) ==
+                fabric::editor::AutosaveStatus::saved);
+    }
+
+    const auto document =
+        project.path() / "assets/vectors/editable-panel.vector.json";
+    std::filesystem::last_write_time(
+        document, std::filesystem::file_time_type::clock::now() - 5s);
+
+    fabric::editor::ProjectSession recovered;
+    REQUIRE(recovered.open(project.path()));
+    REQUIRE(recovered.select_resource(
+        fabric::editor::StudioResourceKind::vector,
+        {.value = "editable-panel"}));
+    REQUIRE(recovered.has_recovery());
+    REQUIRE(recovered.accept_recovery(start + 3s));
+    CHECK(recovered.created_vector()->native->nodes.front().name ==
+          "Moved panel");
+    CHECK(recovered.dirty());
+    REQUIRE(recovered.save());
+    CHECK_FALSE(recovered.dirty());
+
+    auto saved = fabric::project::load_vector_asset(
+        project.path(), *recovered.manifest(),
+        "assets/vectors/editable-panel.vector.json");
+    REQUIRE(saved.ok());
+    CHECK(saved.asset->native->nodes.front().transform.position ==
+          fabric::core::Vec2{3.0F, -2.0F});
+}
+
 TEST_CASE("autosave follows inactivity and leaves primary untouched") {
     using namespace std::chrono_literals;
     const TemporaryDirectory project;

@@ -143,6 +143,12 @@ sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
 ## Étape D — Personnalisateur intégré
 
+Tranche livrée : navigateur persistant, sélection d'un artwork natif,
+prévisualisation rectangles/ellipses, pan, zoom sous le curseur et édition des
+nœuds avec historique, sauvegarde, autosave et récupération. Les cases
+ci-dessous restent ouvertes jusqu'au support complet de tous les nœuds et des
+draw packets du renderer.
+
 - [ ] Ajouter canvas avec pan, zoom sous le curseur, cadrage, grille et unités.
 - [ ] Ajouter arbre de calques/nœuds, sélection multiple, verrouillage,
   visibilité, groupes et ordre Z.

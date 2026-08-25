@@ -18,6 +18,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <iostream>
+#include <numbers>
 #include <optional>
 #include <string>
 #include <utility>
@@ -92,6 +93,12 @@ struct ProjectSettingsUiState {
     std::string name;
     double pixels_per_unit{fabric::project::default_pixels_per_unit};
     bool request{};
+};
+
+struct CanvasUiState {
+    float zoom{1.0F};
+    ImVec2 pan{};
+    std::size_t selected_node{};
 };
 
 void upload_preview(AssetPreview& preview,
@@ -336,6 +343,130 @@ void draw_prompt_summary(const fabric::editor::PromptValidation& validation) {
     }
 }
 
+ImU32 color_to_u32(const fabric::core::Color& color) {
+    const auto channel = [](const float value) {
+        return static_cast<int>(std::clamp(value, 0.0F, 1.0F) * 255.0F);
+    };
+    return IM_COL32(channel(color.red), channel(color.green),
+                    channel(color.blue), channel(color.alpha));
+}
+
+void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
+                               CanvasUiState& canvas, const ImVec2 available) {
+    if (!asset.native || asset.native->size.x <= 0.0F ||
+        asset.native->size.y <= 0.0F) {
+        ImGui::TextDisabled("Native artwork has no drawable canvas.");
+        return;
+    }
+    ImGui::InvisibleButton("Native canvas", available,
+                           ImGuiButtonFlags_MouseButtonLeft |
+                               ImGuiButtonFlags_MouseButtonMiddle);
+    const ImVec2 origin = ImGui::GetItemRectMin();
+    const ImVec2 center{origin.x + available.x * 0.5F,
+                        origin.y + available.y * 0.5F};
+    const float fit = std::min((available.x - 80.0F) / asset.native->size.x,
+                               (available.y - 80.0F) / asset.native->size.y);
+    const bool hovered = ImGui::IsItemHovered();
+    auto& io = ImGui::GetIO();
+    if (hovered && io.MouseWheel != 0.0F) {
+        const float old_scale = fit * canvas.zoom;
+        const ImVec2 mouse = io.MousePos;
+        const ImVec2 world_under_cursor{
+            (mouse.x - center.x - canvas.pan.x) / old_scale,
+            -(mouse.y - center.y - canvas.pan.y) / old_scale};
+        canvas.zoom = std::clamp(
+            canvas.zoom * (io.MouseWheel > 0.0F ? 1.15F : 1.0F / 1.15F),
+            0.1F, 20.0F);
+        const float new_scale = fit * canvas.zoom;
+        canvas.pan.x = mouse.x - center.x - world_under_cursor.x * new_scale;
+        canvas.pan.y = mouse.y - center.y + world_under_cursor.y * new_scale;
+    }
+    if (hovered && ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+        const ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
+        canvas.pan.x += delta.x;
+        canvas.pan.y += delta.y;
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
+    }
+    const float pixels_per_unit = fit * canvas.zoom;
+    const auto to_screen = [&](const fabric::core::Vec2 point) {
+        return ImVec2{center.x + canvas.pan.x + point.x * pixels_per_unit,
+                      center.y + canvas.pan.y - point.y * pixels_per_unit};
+    };
+    auto* draw_list = ImGui::GetWindowDrawList();
+    for (std::size_t node_index = 0;
+         node_index < asset.native->nodes.size(); ++node_index) {
+        const auto& node = asset.native->nodes[node_index];
+        if (!node.visible) {
+            continue;
+        }
+        const auto transform_point = [&](const fabric::core::Vec2 point) {
+            const float x = (point.x - node.transform.pivot.x) *
+                node.transform.scale.x;
+            const float y = (point.y - node.transform.pivot.y) *
+                node.transform.scale.y;
+            const float angle = node.transform.rotation_degrees *
+                std::numbers::pi_v<float> / 180.0F;
+            const float cosine = std::cos(angle);
+            const float sine = std::sin(angle);
+            return fabric::core::Vec2{
+                node.transform.position.x + node.transform.pivot.x +
+                    x * cosine - y * sine,
+                node.transform.position.y + node.transform.pivot.y +
+                    x * sine + y * cosine};
+        };
+        const auto& bounds = node.shape.bounds;
+        std::vector<ImVec2> points;
+        if (node.shape.kind == fabric::project::VectorShapeKind::ellipse) {
+            constexpr int segments = 64;
+            points.reserve(segments);
+            const fabric::core::Vec2 ellipse_center{
+                bounds.origin.x + bounds.size.x * 0.5F,
+                bounds.origin.y + bounds.size.y * 0.5F};
+            for (int segment = 0; segment < segments; ++segment) {
+                const float angle = 2.0F * std::numbers::pi_v<float> *
+                    static_cast<float>(segment) / static_cast<float>(segments);
+                points.push_back(to_screen(transform_point({
+                    ellipse_center.x + std::cos(angle) * bounds.size.x * 0.5F,
+                    ellipse_center.y + std::sin(angle) * bounds.size.y * 0.5F})));
+            }
+        } else {
+            points = {
+                to_screen(transform_point(bounds.origin)),
+                to_screen(transform_point({bounds.origin.x + bounds.size.x,
+                                           bounds.origin.y})),
+                to_screen(transform_point({bounds.origin.x + bounds.size.x,
+                                           bounds.origin.y + bounds.size.y})),
+                to_screen(transform_point({bounds.origin.x,
+                                           bounds.origin.y + bounds.size.y})),
+            };
+        }
+        fabric::core::Color fill{0.35F, 0.55F, 0.58F, 1.0F};
+        if (node.fill.kind == fabric::project::VectorFillKind::solid &&
+            node.fill.color) {
+            fill = *node.fill.color;
+        } else if (node.fill.kind == fabric::project::VectorFillKind::none) {
+            fill.alpha = 0.0F;
+        } else if (node.fill.kind == fabric::project::VectorFillKind::image) {
+            fill = {0.89F, 0.68F, 0.34F, 0.8F};
+        }
+        if (fill.alpha > 0.0F) {
+            draw_list->AddConvexPolyFilled(points.data(),
+                                           static_cast<int>(points.size()),
+                                           color_to_u32(fill));
+        }
+        const bool selected = node_index == canvas.selected_node;
+        draw_list->AddPolyline(
+            points.data(), static_cast<int>(points.size()),
+            selected ? IM_COL32(236, 180, 75, 255)
+                     : IM_COL32(225, 230, 235, 255),
+            ImDrawFlags_Closed, selected ? 2.5F : 1.5F);
+    }
+    if (hovered) {
+        ImGui::SetTooltip("Middle drag: pan  |  Wheel: zoom %.0f%%",
+                          canvas.zoom * 100.0F);
+    }
+}
+
 void draw_workspace(fabric::editor::ProjectSession& session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
@@ -343,6 +474,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImportUiState& imports,
                     AssetPreview& preview,
                     AssetPreview& pending_import_preview,
+                    CanvasUiState& canvas,
                     ProjectSettingsUiState& project_settings,
                     bool& request_open,
                     bool& request_png,
@@ -361,9 +493,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
     draw_project_tree(session, preview, status);
-    ImGui::Spacing();
-    ImGui::SeparatorText("Create");
     if (!session.has_project()) {
+        ImGui::Spacing();
         if (ImGui::Button("Create project", {-1.0F, 0.0F})) {
             creation.request_project = true;
         }
@@ -372,29 +503,25 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             request_open = true;
         }
     } else {
-        if (ImGui::Button("Vector artwork...", {-1.0F, 0.0F})) {
-            creation.request_artwork = true;
+        ImGui::Spacing();
+        if (ImGui::Button("+ Add resource...", {-1.0F, 0.0F})) {
+            ImGui::OpenPopup("Add resource");
         }
-        ImGui::BeginDisabled();
-        ImGui::Button("Material / fill...", {-1.0F, 0.0F});
-        ImGui::Button("Entity...", {-1.0F, 0.0F});
-        ImGui::Button("Animation...", {-1.0F, 0.0F});
-        ImGui::EndDisabled();
-        ImGui::TextDisabled("Available when each document contract lands.");
-        ImGui::SeparatorText("Import");
-        if (ImGui::Button("PNG image source...", {-1.0F, 0.0F})) {
-            imports.png.attempted = false;
-            request_png = true;
+        if (ImGui::BeginPopup("Add resource")) {
+            if (ImGui::MenuItem("New vector artwork...")) {
+                creation.request_artwork = true;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem("Import PNG texture...")) {
+                imports.png.attempted = false;
+                request_png = true;
+            }
+            if (ImGui::MenuItem("Import linked SVG...")) {
+                imports.svg.attempted = false;
+                request_svg = true;
+            }
+            ImGui::EndPopup();
         }
-        if (ImGui::Button("Linked SVG source...", {-1.0F, 0.0F})) {
-            imports.svg.attempted = false;
-            request_svg = true;
-        }
-        ImGui::SeparatorText("Add existing");
-        ImGui::BeginDisabled();
-        ImGui::Button("Project resource...", {-1.0F, 0.0F});
-        ImGui::EndDisabled();
-        ImGui::TextDisabled("The resource picker arrives with native documents.");
     }
     ImGui::End();
 
@@ -417,7 +544,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
                            IM_COL32(43, 48, 58, 120));
     }
-    if (preview.texture != 0U) {
+    const bool native_selected = session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::vector &&
+        session.selected_resource()->native && session.created_vector();
+    if (native_selected) {
+        draw_native_vector_canvas(*session.created_vector(), canvas, available);
+    } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);
         const float scale = std::min((available.x - 40.0F) / image_width,
@@ -493,12 +626,142 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         creation.prepared_artwork->height);
             ImGui::TextDisabled("Published as VectorAsset v2 native.");
         }
+        if (selected != nullptr && selected->native && session.created_vector() &&
+            session.created_vector()->native &&
+            !session.created_vector()->native->nodes.empty()) {
+            ImGui::SeparatorText("Nodes");
+            const auto& nodes = session.created_vector()->native->nodes;
+            canvas.selected_node = std::min(canvas.selected_node,
+                                            nodes.size() - 1);
+            for (std::size_t node_index = 0; node_index < nodes.size();
+                 ++node_index) {
+                const std::string label = nodes[node_index].name + "##node-" +
+                    std::to_string(node_index);
+                if (ImGui::Selectable(label.c_str(),
+                                      canvas.selected_node == node_index)) {
+                    canvas.selected_node = node_index;
+                }
+            }
+            ImGui::SeparatorText("Node properties");
+            auto node = nodes[canvas.selected_node];
+            const auto commit_node = [&](fabric::project::VectorNode changed) {
+                if (session.set_selected_vector_node(
+                        canvas.selected_node, std::move(changed))) {
+                    status = "Vector node changed.";
+                } else {
+                    status = "Vector change rejected; inspect diagnostics.";
+                }
+            };
+            bool locked = node.locked;
+            if (ImGui::Checkbox("Locked", &locked)) {
+                node.locked = locked;
+                commit_node(node);
+            }
+            ImGui::BeginDisabled(node.locked);
+            std::string node_name = node.name;
+            if (ImGui::InputText("Name", &node_name)) {
+                node.name = std::move(node_name);
+                commit_node(node);
+            }
+            bool visible = node.visible;
+            if (ImGui::Checkbox("Visible", &visible)) {
+                node.visible = visible;
+                commit_node(node);
+            }
+            float position[]{node.transform.position.x,
+                             node.transform.position.y};
+            if (ImGui::InputFloat2("Position", position)) {
+                node.transform.position = {position[0], position[1]};
+                commit_node(node);
+            }
+            float scale[]{node.transform.scale.x, node.transform.scale.y};
+            if (ImGui::InputFloat2("Scale", scale)) {
+                node.transform.scale = {scale[0], scale[1]};
+                commit_node(node);
+            }
+            float rotation = node.transform.rotation_degrees;
+            if (ImGui::InputFloat("Rotation", &rotation, 1.0F, 10.0F,
+                                  "%.2f deg")) {
+                node.transform.rotation_degrees = rotation;
+                commit_node(node);
+            }
+            if (node.fill.kind == fabric::project::VectorFillKind::solid &&
+                node.fill.color) {
+                float color[]{node.fill.color->red, node.fill.color->green,
+                              node.fill.color->blue, node.fill.color->alpha};
+                if (ImGui::ColorEdit4("Fill", color)) {
+                    node.fill.color = fabric::core::Color{
+                        color[0], color[1], color[2], color[3]};
+                    commit_node(node);
+                }
+            } else if (node.fill.kind ==
+                           fabric::project::VectorFillKind::image &&
+                       node.fill.image) {
+                ImGui::Text("Image fill: %s",
+                            node.fill.image->texture.id.value.c_str());
+                auto fit = node.fill.image->fit;
+                const auto fit_label =
+                    std::string(fabric::project::to_string(fit));
+                if (ImGui::BeginCombo("Fit", fit_label.c_str())) {
+                    for (const auto option : {
+                             fabric::project::VectorImageFit::contain,
+                             fabric::project::VectorImageFit::cover,
+                             fabric::project::VectorImageFit::stretch,
+                             fabric::project::VectorImageFit::free}) {
+                        const bool selected_fit = option == fit;
+                        const auto label =
+                            std::string(fabric::project::to_string(option));
+                        if (ImGui::Selectable(label.c_str(), selected_fit)) {
+                            node.fill.image->fit = option;
+                            commit_node(node);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                float image_offset[]{
+                    node.fill.image->transform.position.x,
+                    node.fill.image->transform.position.y};
+                if (ImGui::InputFloat2("Image offset", image_offset)) {
+                    node.fill.image->transform.position = {
+                        image_offset[0], image_offset[1]};
+                    commit_node(node);
+                }
+                float image_scale[]{node.fill.image->transform.scale.x,
+                                    node.fill.image->transform.scale.y};
+                if (ImGui::InputFloat2("Image scale", image_scale)) {
+                    node.fill.image->transform.scale = {
+                        image_scale[0], image_scale[1]};
+                    commit_node(node);
+                }
+                float image_rotation =
+                    node.fill.image->transform.rotation_degrees;
+                if (ImGui::InputFloat("Image rotation", &image_rotation,
+                                      1.0F, 10.0F, "%.2f deg")) {
+                    node.fill.image->transform.rotation_degrees = image_rotation;
+                    commit_node(node);
+                }
+                float opacity = node.fill.image->opacity;
+                if (ImGui::SliderFloat("Image opacity", &opacity, 0.0F, 1.0F,
+                                       "%.2f")) {
+                    node.fill.image->opacity = opacity;
+                    commit_node(node);
+                }
+                bool deform = node.fill.image->deform_with_shape;
+                if (ImGui::Checkbox("Deform with shape", &deform)) {
+                    node.fill.image->deform_with_shape = deform;
+                    commit_node(node);
+                }
+            }
+            ImGui::EndDisabled();
+        }
     } else {
         ImGui::TextDisabled("No selection");
     }
-    ImGui::Spacing();
-    ImGui::SeparatorText("Diagnostics");
-    draw_diagnostics(session);
+    if (!session.errors().empty()) {
+        ImGui::Spacing();
+        ImGui::SeparatorText("Diagnostics");
+        draw_diagnostics(session);
+    }
     ImGui::End();
 
     if (project_settings.request && session.has_project()) {
@@ -517,8 +780,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                            "%.2f");
         ImGui::TextDisabled("%s", session.project_root().string().c_str());
         const bool valid = !project_settings.name.empty() &&
+            project_settings.name.size() <= 255 &&
             std::isfinite(project_settings.pixels_per_unit) &&
-            project_settings.pixels_per_unit > 0.0;
+            project_settings.pixels_per_unit > 0.0 &&
+            project_settings.pixels_per_unit <= 1'000'000.0;
         ImGui::BeginDisabled(!valid);
         if (ImGui::Button("Apply", {110.0F, 0.0F})) {
             const bool name_updated =
@@ -778,6 +1043,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
+    ImGui::SetNextWindowSizeConstraints({640.0F, 300.0F},
+                                        {700.0F, viewport->Size.y - 80.0F});
     if (ImGui::BeginPopupModal("Create vector artwork", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a native, editable vector artwork");
@@ -935,6 +1202,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::Button("Create artwork", {140.0F, 0.0F})) {
             if (session.create_vector_artwork(creation.artwork)) {
                 creation.prepared_artwork = creation.artwork;
+                clear_asset_preview(preview);
+                canvas = {};
                 status = "Native artwork created and saved.";
                 ImGui::CloseCurrentPopup();
             } else {
@@ -1109,6 +1378,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     ImportUiState imports;
     AssetPreview preview;
     AssetPreview pending_import_preview;
+    CanvasUiState canvas;
     ProjectSettingsUiState project_settings;
     bool request_open = false;
     bool request_png = false;
@@ -1166,11 +1436,6 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     if (ImGui::MenuItem("Vector artwork...")) {
                         creation.request_artwork = true;
                     }
-                    ImGui::BeginDisabled();
-                    ImGui::MenuItem("Material / fill...");
-                    ImGui::MenuItem("Entity...");
-                    ImGui::MenuItem("Animation...");
-                    ImGui::EndDisabled();
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("Import", session.has_project())) {
@@ -1183,9 +1448,6 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     }
                     ImGui::EndMenu();
                 }
-                ImGui::BeginDisabled();
-                ImGui::MenuItem("Add existing...");
-                ImGui::EndDisabled();
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", quit_shortcut)) {
                     pending_session_action = PendingSessionAction::quit;
@@ -1205,7 +1467,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 }
                 ImGui::EndMenu();
             }
-            ImGui::TextDisabled("Native vector authoring - creation hub");
+            ImGui::TextDisabled("Native vector resource workspace");
             ImGui::EndMainMenuBar();
         }
         const auto& io = ImGui::GetIO();
@@ -1255,7 +1517,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         }
 
         draw_workspace(session, window, path_buffer, creation, imports, preview,
-                       pending_import_preview, project_settings,
+                       pending_import_preview, canvas, project_settings,
                        request_open, request_png, request_svg,
                        pending_session_action, running, status);
 
