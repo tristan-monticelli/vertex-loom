@@ -279,6 +279,8 @@ références de triggers vérifiables dans l’éditeur.
   Les poignées du canvas permettent aussi de translater, faire pivoter et
   mettre à l’échelle directement une instance ; le geste est enregistré en
   une seule commande à son relâchement.
+  La translation dispose maintenant d’un snapping activable avec taille de
+  grille et origine configurables ; rotation et échelle restent continues.
 - [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
   et validation headless, puis instancier les formes/capteurs map validés.
 - [ ] Appliquer commandes, autosave, récupération et validation headless à

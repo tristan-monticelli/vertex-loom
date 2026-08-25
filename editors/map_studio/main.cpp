@@ -179,10 +179,18 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      ImVec2& pan,
                      float& zoom,
                      CanvasGizmoState& gizmo,
+                     fabric::editor::MapSnapSettings& snapping,
                      std::string& status) {
     if (!session.map()) return;
     const auto& map = *session.map();
     ImGui::SeparatorText("Canvas");
+    ImGui::Checkbox("Snap translation", &snapping.enabled);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(100.0F);
+    ImGui::DragFloat("Grid size", &snapping.grid_size, 0.1F, 0.01F, 1024.0F);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(150.0F);
+    ImGui::DragFloat2("Origin", &snapping.origin.x, 0.1F);
     const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
     const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton("##map-canvas", canvas_size);
@@ -360,7 +368,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             } else {
                 const auto committed = session.set_instance_transform(
                     {.value = gizmo.instance_id}, gizmo.preview_transform,
-                    {.enabled = false});
+                    gizmo.mode == CanvasGizmoMode::translate
+                        ? snapping : fabric::editor::MapSnapSettings{.enabled = false});
                 status = committed ? "Canvas transform committed"
                                    : "Canvas transform rejected (layer locked or invalid)";
                 gizmo.active = false;
@@ -464,6 +473,7 @@ int run(const std::filesystem::path& project_root,
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
     CanvasGizmoState canvas_gizmo;
+    fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
     bool running = true;
     while (running) {
@@ -569,7 +579,7 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndDisabled();
             draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
-                            status);
+                            canvas_snapping, status);
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
