@@ -87,6 +87,10 @@ L'export de map couvrira fermeture transitive des dépendances, ordre
 déterministe, chemins portables, absence de ressources externes et chargement
 du paquet par Preview Runtime. Une comparaison de scène vérifiera le même
 résultat visible avant sauvegarde, après reload et depuis le paquet publié.
+Le contrat `MapPackageManifest v1` est testé séparément par round-trip strict,
+version de schéma, compatibilité SemVer minimale, ordre des ressources,
+collisions de chemins et refus des chemins absolus, traversants ou à séparateur
+Windows avant l'ajout du copieur de fermeture transitive.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime

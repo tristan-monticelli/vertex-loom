@@ -192,8 +192,17 @@ plateforme tournante pilotée par la présence du personnage.
 
 ## Tranche 4 — Publication centrée sur la map
 
-- [ ] Définir le manifeste du paquet portable, sa version et la version
+- [x] Définir le manifeste du paquet portable, sa version et la version
   minimale de runtime.
+
+  Preuve : `MapPackageManifest v1` décrit `map-package.json`, sa map racine,
+  sa version minimale SemVer et ses ressources ordonnées avec chemins de
+  document et payloads relatifs. Le parseur strict et le validateur refusent
+  schéma inconnu, champs inconnus, racine absente, ordre instable, doublons,
+  collisions et chemins absolus, traversants ou Windows. Le contrôle de
+  compatibilité compare la version minimale à la version réelle de
+  `fabric_core`. Le round-trip déterministe et ces refus sont couverts par la
+  suite `fabric_map_package_tests`.
 - [ ] Calculer la fermeture transitive déterministe des ressources référencées
   par une map, ses prefabs, compositions et mécaniques.
 - [ ] Refuser chemins absolus, fichiers externes, références manquantes, cycles

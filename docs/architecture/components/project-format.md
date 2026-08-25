@@ -8,6 +8,7 @@ C4Component
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
+        Component(packages, "Map package manifest", "C++20", "Décrit la map racine, la compatibilité runtime et les chemins portables ordonnés du paquet")
         Component(storage, "Atomic document storage", "C++20 / filesystem", "Remplace les documents éditables validés et publie les imports sans remplacement")
         Component(autosave, "Autosave storage", "C++20 / filesystem", "Écrit un miroir validé sous .vertex-loom/autosave et sélectionne les récupérations récentes")
         Component(validator, "Project validator", "C++20", "Valide versions, chemins, documents puis le graphe complet des ressources")
@@ -21,6 +22,8 @@ C4Component
     Rel(serializer, contracts, "Construit")
     Rel(validator, registry, "Enregistre et valide")
     Rel(registry, contracts, "Résout les références typées")
+    Rel(packages, contracts, "Référence les documents publiés")
+    Rel(validator, packages, "Vérifie version, ordre et chemins")
     Rel(storage, serializer, "Sérialise")
     Rel(storage, validator, "Valide avant écriture")
     Rel(validator, files, "Inspecte")
@@ -39,6 +42,11 @@ C4Component
   deux extrémités.
 - `ProjectManifest` version 2 contient le nom du projet, `pixelsPerUnit` et ses
   répertoires relatifs d’assets, d’entités, de maps, de scènes et de schémas.
+- `MapPackageManifest v1` est stocké sous `map-package.json` à la racine d'un
+  paquet. Il déclare la map racine, une version minimale de runtime SemVer et
+  une liste déterministe de ressources. Chaque ressource possède un chemin de
+  document et des payloads relatifs au paquet ; doublons, collisions de chemins
+  et chemins non portables sont refusés.
 - `DocumentHeader` porte la version, le type, l’identifiant et le nom communs.
   `AssetDocument` reste son alias de compatibilité.
   `InputDocument v1` est stocké sous `assets/input/<id>.input.json` et porte

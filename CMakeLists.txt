@@ -61,6 +61,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/input.cpp
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/map.cpp
+    engine/fabric_project/src/map_package.cpp
     engine/fabric_project/src/map_chunk_index.cpp
     engine/fabric_project/src/mechanic_graph.cpp
     engine/fabric_project/src/mesh_deformation.cpp
@@ -405,6 +406,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_map_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_map_tests COMMAND fabric_map_tests)
+
+    add_executable(fabric_map_package_tests tests/cpp/map_package_tests.cpp)
+    target_link_libraries(fabric_map_package_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_map_package_tests COMMAND fabric_map_package_tests)
 
     add_executable(fabric_scene_tests tests/cpp/scene_tests.cpp)
     target_link_libraries(fabric_scene_tests PRIVATE
