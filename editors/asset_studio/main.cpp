@@ -647,6 +647,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     session.imported_vector()->asset.document.id.value.c_str());
                 ImGui::TextWrapped("%s",
                     session.imported_vector()->asset.source.generic_string().c_str());
+                ImGui::SeparatorText("Authoring");
+                ImGui::TextWrapped(
+                    "Convert the linked SVG into editable native paths. The original SVG remains unchanged.");
+                if (ImGui::Button("Convert to native artwork")) {
+                    if (session.convert_selected_linked_svg_to_native()) {
+                        status = "SVG converted to native artwork.";
+                    } else {
+                        status = "SVG conversion failed; inspect the diagnostics.";
+                    }
+                }
             }
         }
         if (creation.prepared_artwork && selected != nullptr &&

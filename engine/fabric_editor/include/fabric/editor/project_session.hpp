@@ -66,6 +66,9 @@ public:
                                   const std::string& name);
     [[nodiscard]] bool create_vector_artwork(
         const CreateVectorArtworkPrompt& prompt);
+    [[nodiscard]] bool convert_selected_linked_svg_to_native(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_project_name(
         std::string name,
         AutosaveScheduler::Clock::time_point now =
@@ -109,6 +112,7 @@ public:
     [[nodiscard]] const std::optional<project::VectorAsset>&
     created_vector() const noexcept;
     [[nodiscard]] const std::vector<StudioResource>& resources() const noexcept;
+    [[nodiscard]] StudioResource* selected_resource() noexcept;
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
 
 private:

@@ -16,13 +16,16 @@ C4Component
         Component(gpu_preview, "OpenGL preview texture", "OpenGL", "Téléverse temporairement l'aperçu rasterisé")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(importer, "Vector importer", "C++20", "Orchestre validation, copie et publication du document VectorAsset")
+    Component(importer, "Vector importer", "C++20", "Orchestre validation, copie et publication du document VectorAsset")
+    Component(conversion_command, "SVG conversion command", "C++20 / CommandStack", "Publie la conversion native avec undo/redo et conserve le SVG lié lors de l’annulation")
     }
     Container(project, "fabric_project", "C++20 / JSON", "Valide et publie le contrat VectorAsset")
     ContainerDb(files, "Local Files", "SVG", "Source vectorielle choisie par l'utilisateur")
     Rel(import_ui, importer, "Demande l'import")
     Rel(importer, loader, "Valide et rasterise")
     Rel(importer, converter, "Convertit sur action explicite")
+    Rel(import_ui, conversion_command, "Confirme la conversion")
+    Rel(conversion_command, project, "Publie le document natif")
     Rel(importer, project, "Publie source et document")
     Rel(loader, files, "Lit")
     Rel(loader, image, "Produit")
@@ -50,6 +53,9 @@ C4Component
   couvre les chemins cubiques, fills couleur et contours simples ; gradients et
   autres paints non supportés produisent un diagnostic et ne sont jamais
   supprimés silencieusement.
+- Asset Studio expose la conversion dans l’inspecteur du SVG lié. La commande
+  est réversible, sauvegarde le `VectorAsset v2 native` au même emplacement
+  JSON et ne modifie jamais le fichier SVG source.
 - Le fichier source ne dépasse pas 8 Mio et l'aperçu rasterisé tient dans un
   carré de 2048 pixels de côté sans dépasser 4194304 pixels.
 - L'import refuse tout identifiant ou SVG invalide et ne remplace jamais un

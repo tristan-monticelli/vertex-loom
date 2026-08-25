@@ -259,6 +259,45 @@ void session_imports_a_valid_svg_persistently() {
             "project validator rejected an imported vector");
 }
 
+void session_converts_linked_svg_with_undo_and_save() {
+    const TemporaryDirectory valid{"svg-conversion"};
+    write_valid_project(valid.path());
+    const auto source = valid.path() / "source.svg";
+    write_valid_svg(source);
+
+    fabric::editor::ProjectSession session;
+    require(session.open(valid.path()), "project for SVG conversion did not open");
+    require(session.import_svg(source, {.value = "native-panel"}, "Native Panel"),
+            "SVG import for conversion failed");
+    require(session.convert_selected_linked_svg_to_native(),
+            "linked SVG conversion failed");
+    require(session.created_vector().has_value() &&
+                session.created_vector()->source_kind ==
+                    fabric::project::VectorSourceKind::native &&
+                session.created_vector()->native->nodes.size() == 1U &&
+                session.selected_resource()->native,
+            "conversion did not activate native authoring");
+    require(session.undo(), "SVG conversion could not be undone");
+    require(session.imported_vector().has_value() &&
+                !session.created_vector().has_value() &&
+                !session.selected_resource()->native,
+            "undo did not restore the linked SVG state");
+    require(session.save(), "undoing SVG conversion could not be saved cleanly");
+    require(session.convert_selected_linked_svg_to_native(),
+            "linked SVG could not be converted after undo");
+    require(session.save(), "converted native SVG could not be saved");
+
+    fabric::editor::ProjectSession reopened;
+    require(reopened.open(valid.path()), "converted project could not reopen");
+    require(reopened.select_resource(
+                fabric::editor::StudioResourceKind::vector,
+                {.value = "native-panel"}),
+            "converted vector could not be selected after reopen");
+    require(reopened.created_vector()->source_kind ==
+                fabric::project::VectorSourceKind::native,
+            "reopened conversion did not remain native");
+}
+
 void failed_svg_import_preserves_the_previous_vector() {
     const TemporaryDirectory valid{"failed-svg-import"};
     write_valid_project(valid.path());
@@ -311,6 +350,9 @@ int main() {
     std::cerr << "[ RUN      ] session_imports_a_valid_svg_persistently\n" << std::flush;
     session_imports_a_valid_svg_persistently();
     std::cerr << "[       OK ] session_imports_a_valid_svg_persistently\n" << std::flush;
+    std::cerr << "[ RUN      ] session_converts_linked_svg_with_undo_and_save\n" << std::flush;
+    session_converts_linked_svg_with_undo_and_save();
+    std::cerr << "[       OK ] session_converts_linked_svg_with_undo_and_save\n" << std::flush;
     std::cerr << "[ RUN      ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;
     failed_svg_import_preserves_the_previous_vector();
     std::cerr << "[       OK ] failed_svg_import_preserves_the_previous_vector\n" << std::flush;

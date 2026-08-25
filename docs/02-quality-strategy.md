@@ -70,6 +70,8 @@ image couvre round-trip du cadrage et du transform, opacité, liaison à la
 déformation, résolution de texture et refus d’une référence manquante. Les
 SVG liés couvrent aussi la conversion NanoSVG explicite vers chemins cubiques,
 fills couleur et contours, ainsi que le diagnostic des gradients non supportés.
+La session éditeur couvre la conversion liée-vers-native, sa publication,
+undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

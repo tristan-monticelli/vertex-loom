@@ -2,6 +2,7 @@
 
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/project/document_storage.hpp"
+#include "fabric/render/svg_vector.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -131,6 +132,39 @@ private:
     Value& target_;
     Value before_;
     Value after_;
+};
+
+class ConvertLinkedSvgCommand final : public Command {
+public:
+    ConvertLinkedSvgCommand(std::optional<project::VectorAsset>& target,
+                            std::optional<ImportedVector>& imported,
+                            StudioResource& resource,
+                            project::VectorAsset converted)
+        : target_(target), imported_(imported), resource_(resource),
+          before_imported_(imported), converted_(std::move(converted)),
+          before_native_(resource.native) {}
+
+    bool execute() override {
+        target_ = converted_;
+        imported_.reset();
+        resource_.native = true;
+        return true;
+    }
+
+    bool undo() override {
+        target_.reset();
+        imported_ = before_imported_;
+        resource_.native = before_native_;
+        return true;
+    }
+
+private:
+    std::optional<project::VectorAsset>& target_;
+    std::optional<ImportedVector>& imported_;
+    StudioResource& resource_;
+    std::optional<ImportedVector> before_imported_;
+    project::VectorAsset converted_;
+    bool before_native_{};
 };
 
 } // namespace
@@ -391,6 +425,47 @@ bool ProjectSession::create_vector_artwork(
     return select_resource(StudioResourceKind::vector, created_id);
 }
 
+bool ProjectSession::convert_selected_linked_svg_to_native(
+    const AutosaveScheduler::Clock::time_point now) {
+    auto* selected = selected_resource();
+    if (selected == nullptr || selected->kind != StudioResourceKind::vector ||
+        selected->native || !imported_vector_ || !manifest_ ||
+        selected_vector_document_path_.empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a linked SVG before converting it"}};
+        return false;
+    }
+    if (commands_.dirty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current change before converting an SVG"}};
+        return false;
+    }
+    const auto converted = render::convert_svg_to_native(
+        project_root_ / imported_vector_->asset.source,
+        imported_vector_->asset.document.id,
+        imported_vector_->asset.document.name);
+    if (!converted.ok()) {
+        errors_ = std::move(converted.errors);
+        return false;
+    }
+    auto validation = project::validate_vector_asset(*manifest_, *converted.asset);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ConvertLinkedSvgCommand>(
+            created_vector_, imported_vector_, *selected,
+            std::move(*converted.asset)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "cannot execute SVG native conversion"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::vector;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::refresh_resources() {
     if (!has_project()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
@@ -493,7 +568,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                 .asset = std::move(*loaded.asset),
                 .preview = std::move(*image.image)};
             created_vector_.reset();
-            selected_vector_document_path_.clear();
+            selected_vector_document_path_ = match->document_path;
             recovery_vector_.reset();
         } else {
             created_vector_ = std::move(*loaded.asset);
@@ -686,9 +761,11 @@ bool ProjectSession::save() {
     }
     if (dirty_document_ == DirtyDocument::vector) {
         if (!created_vector_) {
-            errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                        "the edited vector is no longer selected"}};
-            return false;
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
         }
         auto saved = project::publish_native_vector_asset(
             project_root_, *manifest_, *created_vector_);
@@ -849,6 +926,13 @@ ProjectSession::created_vector() const noexcept {
 const std::vector<StudioResource>&
 ProjectSession::resources() const noexcept {
     return resources_;
+}
+
+StudioResource* ProjectSession::selected_resource() noexcept {
+    if (!selected_resource_index_ || *selected_resource_index_ >= resources_.size()) {
+        return nullptr;
+    }
+    return &resources_[*selected_resource_index_];
 }
 
 const StudioResource* ProjectSession::selected_resource() const noexcept {

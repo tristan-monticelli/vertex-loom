@@ -144,7 +144,9 @@ sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
 
 Le convertisseur NanoSVG produit désormais un `VectorAsset v2 native` pour les
 chemins cubiques, fills couleur et contours simples ; les pertes sont
-diagnostiquées avant publication. Le payload headless de fill image et la triangulation de sa silhouette sont
+diagnostiquées avant publication. Asset Studio expose cette conversion comme
+commande undoable, avec retour au SVG lié et publication native atomique. Le
+payload headless de fill image et la triangulation de sa silhouette sont
 désormais disponibles. Les draw packets appliquent les transforms locales et
 parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
 initialise et dessine les triangles de fills couleur dans le canvas Asset
