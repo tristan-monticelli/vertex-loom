@@ -62,4 +62,27 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map session snaps placement on a configurable grid") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-map-snap-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    fabric::editor::MapSession session;
+    REQUIRE(session.create(root, map()));
+    REQUIRE(session.place_instance(instance("hero", 6.2F),
+                                   {.enabled = true, .grid_size = 4.0F,
+                                    .origin = {1.0F, -1.0F}}));
+    CHECK(session.map()->instances.front().transform.position == fabric::core::Vec2{5.0F, -1.0F});
+    CHECK(session.map()->instances.front().chunk_x == 0);
+    REQUIRE(session.set_instance_transform(
+        {.value = "hero"}, {.position = {-3.1F, -6.1F}, .rotation_degrees = 17.0F},
+        {.enabled = false, .grid_size = 4.0F}));
+    CHECK(session.map()->instances.front().transform.position == fabric::core::Vec2{-3.1F, -6.1F});
+    CHECK(session.map()->instances.front().transform.rotation_degrees == 17.0F);
+    CHECK(fabric::editor::MapSession::snap_position({5.0F, 5.0F}, {.grid_size = 0.0F}) ==
+          fabric::core::Vec2{5.0F, 5.0F});
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 } // namespace

@@ -9,6 +9,12 @@
 
 namespace fabric::editor {
 
+struct MapSnapSettings {
+    bool enabled{true};
+    float grid_size{1.0F};
+    core::Vec2 origin{};
+};
+
 class MapSession {
 public:
     [[nodiscard]] bool create(const std::filesystem::path& project_root,
@@ -16,10 +22,14 @@ public:
     [[nodiscard]] bool open(const std::filesystem::path& project_root,
                             const core::ResourceId& map_id);
     [[nodiscard]] bool save();
-    [[nodiscard]] bool place_instance(project::MapInstance instance);
+    [[nodiscard]] bool place_instance(project::MapInstance instance,
+                                       MapSnapSettings snapping = {});
     [[nodiscard]] bool remove_instance(const core::ResourceId& instance_id);
     [[nodiscard]] bool set_instance_transform(const core::ResourceId& instance_id,
-                                               core::Transform transform);
+                                               core::Transform transform,
+                                               MapSnapSettings snapping = {});
+    [[nodiscard]] static core::Vec2 snap_position(core::Vec2 position,
+                                                  MapSnapSettings snapping = {}) noexcept;
     [[nodiscard]] bool declare_event(project::MapEventDefinition event);
     [[nodiscard]] bool remove_event(const core::ResourceId& event_id);
     [[nodiscard]] bool add_trigger(project::TriggerDefinition trigger);

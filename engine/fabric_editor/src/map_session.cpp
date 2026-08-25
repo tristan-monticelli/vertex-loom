@@ -60,6 +60,17 @@ void set_chunk(project::MapInstance& instance) {
 
 } // namespace
 
+core::Vec2 MapSession::snap_position(const core::Vec2 position,
+                                     const MapSnapSettings snapping) noexcept {
+    if (!snapping.enabled || !std::isfinite(snapping.grid_size) ||
+        snapping.grid_size <= 0.0F || !std::isfinite(snapping.origin.x) ||
+        !std::isfinite(snapping.origin.y)) return position;
+    return {snapping.origin.x + std::round((position.x - snapping.origin.x) /
+                                               snapping.grid_size) * snapping.grid_size,
+            snapping.origin.y + std::round((position.y - snapping.origin.y) /
+                                               snapping.grid_size) * snapping.grid_size};
+}
+
 bool MapSession::create(const std::filesystem::path& project_root,
                         const project::MapDocument& map) {
     project_root_ = project_root;
@@ -98,8 +109,10 @@ bool MapSession::save() {
     return true;
 }
 
-bool MapSession::place_instance(project::MapInstance instance) {
+bool MapSession::place_instance(project::MapInstance instance,
+                                const MapSnapSettings snapping) {
     if (!map_ || find_instance(*map_, {.value = instance.id})) return false;
+    instance.transform.position = snap_position(instance.transform.position, snapping);
     set_chunk(instance);
     auto next = *map_;
     next.instances.push_back(std::move(instance));
@@ -118,11 +131,13 @@ bool MapSession::remove_instance(const core::ResourceId& instance_id) {
 }
 
 bool MapSession::set_instance_transform(const core::ResourceId& instance_id,
-                                         core::Transform transform) {
+                                         core::Transform transform,
+                                         const MapSnapSettings snapping) {
     if (!map_) return false;
     const auto found = find_instance(*map_, instance_id);
     if (!found) return false;
     auto next = *map_;
+    transform.position = snap_position(transform.position, snapping);
     next.instances[*found].transform = transform;
     set_chunk(next.instances[*found]);
     auto before = *map_;
