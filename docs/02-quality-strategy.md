@@ -113,6 +113,11 @@ borné et reproductible, les fermetures avec couture UV, l'interpolation de
 largeur, les modes repeat/stretch, les raccords miter/bevel/round et les caps
 butt/square/round. Le smoke OpenGL vérifie aussi la teinte des textures et la
 répétition longitudinale réellement échantillonnée.
+La factory de presets visuels couvre des sorties déterministes pour œil,
+bouton, couture et fermeture. Les tests inspectent les primitives natives, les
+deux rails texturés, le nombre borné de dents, le curseur et les paramètres
+animables, puis publient les quatre bundles dans un même projet et valident le
+graphe headless complet. Une destination existante est refusée avant écriture.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

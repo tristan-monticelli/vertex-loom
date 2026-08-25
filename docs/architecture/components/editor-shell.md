@@ -14,6 +14,7 @@ C4Component
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
+        Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
         Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer une session dirty")
@@ -29,7 +30,9 @@ C4Component
     Rel(browser, session, "Charge et sélectionne une ressource")
     Rel(project_ui, session, "Demande la création ou l'ouverture")
     Rel(project_ui, prompts, "Construit le prompt du type choisi")
+    Rel(project_ui, presets, "Choisit et paramètre un preset")
     Rel(prompts, session, "Publie une intention validée")
+    Rel(presets, session, "Publie les ressources du bundle")
     Rel(project_ui, dialogs, "Sélectionne dossiers et fichiers")
     Rel(imports, session, "Publie les imports validés")
     Rel(session, project, "Crée ou charge")
@@ -124,6 +127,11 @@ C4Component
   instances de composants paramétriques ancrées à la composition. Leur rendu,
   leurs propriétés animables et leur ordre de profondeur sont prévisualisés
   avec les mêmes draw packets que le runtime.
+- La factory de presets ne produit aucun type de rendu dédié. Elle assemble
+  uniquement `VectorAsset`, `TexturedPath`, `VisualComposition` et
+  `VisualComponent`. Une fermeture possède deux rails, des instances de dent
+  et un curseur transformable ; son futur suivi de rail restera une contrainte
+  générique de composition.
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.

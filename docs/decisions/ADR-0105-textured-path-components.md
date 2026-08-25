@@ -77,6 +77,13 @@ Le premier exemple est un Beam à deux attaches, courbe optionnelle, largeur,
 texture animée, couleur et opacité. Une collision peut le référencer mais n'est
 jamais créée implicitement.
 
+La bibliothèque initiale de presets est une factory d'authoring déterministe.
+Œil et bouton assemblent des formes vectorielles natives. Couture assemble un
+rail `TexturedPath`. Fermeture assemble deux rails, des calques répétés d'une
+même dent vectorielle et un curseur vectoriel. La position du curseur est un
+paramètre `Vec2` de transform ; le suivi scalaire d'un rail ne sera ajouté que
+par une contrainte de composition générique et non dans le renderer.
+
 ## Alternatives
 
 Un mesh persisté dupliquerait une donnée dérivable et compliquerait l'édition

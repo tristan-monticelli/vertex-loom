@@ -195,6 +195,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/map_session.cpp
     engine/fabric_editor/src/project_session.cpp
     engine/fabric_editor/src/session_transition.cpp
+    engine/fabric_editor/src/visual_presets.cpp
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)
@@ -508,6 +509,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_creation_prompts_tests
              COMMAND fabric_creation_prompts_tests)
+
+    add_executable(fabric_visual_presets_tests
+        tests/cpp/visual_presets_tests.cpp
+    )
+    target_link_libraries(fabric_visual_presets_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_visual_presets_tests
+             COMMAND fabric_visual_presets_tests)
 
     add_executable(fabric_project_session_editing_tests
         tests/cpp/project_session_editing_tests.cpp
