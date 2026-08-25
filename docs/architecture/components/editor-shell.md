@@ -8,7 +8,7 @@ C4Component
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
         Component(browser, "Resource browser", "Dear ImGui", "Indexe, filtre et sélectionne les documents du projet")
-        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, hiérarchie et propriétés animables")
+        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
     }
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics")
@@ -93,6 +93,8 @@ C4Component
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.
+- Un nœud peut conserver un contour avec couleur, largeur, jointure et
+  extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
 - Un seul document porte des changements à la fois. Changer de ressource avec
   un vecteur dirty est refusé jusqu'à Save ou Undo ; les historiques propres
   sont neutralisés avant de changer de document.

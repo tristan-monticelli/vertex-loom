@@ -246,6 +246,59 @@ bool read_fill_kind(const Json& object, VectorFillKind& destination,
     return false;
 }
 
+bool read_color(const Json& object, core::Color& destination,
+                std::vector<Error>& errors, const std::string& field);
+
+bool read_stroke_join(const Json& object, VectorStrokeJoin& destination,
+                      std::vector<Error>& errors, const std::string& field) {
+    std::string value;
+    if (!read_string(object, "join", value, errors)) return false;
+    if (value == "miter") destination = VectorStrokeJoin::miter;
+    else if (value == "round") destination = VectorStrokeJoin::round;
+    else if (value == "bevel") destination = VectorStrokeJoin::bevel;
+    else {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "must be miter, round or bevel");
+        return false;
+    }
+    return true;
+}
+
+bool read_stroke_cap(const Json& object, VectorStrokeCap& destination,
+                     std::vector<Error>& errors, const std::string& field) {
+    std::string value;
+    if (!read_string(object, "cap", value, errors)) return false;
+    if (value == "butt") destination = VectorStrokeCap::butt;
+    else if (value == "round") destination = VectorStrokeCap::round;
+    else if (value == "square") destination = VectorStrokeCap::square;
+    else {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "must be butt, round or square");
+        return false;
+    }
+    return true;
+}
+
+std::optional<VectorStroke> read_stroke(const Json& object,
+                                        std::vector<Error>& errors,
+                                        const std::string& field) {
+    if (!object.is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, field,
+                  "expected a stroke object");
+        return std::nullopt;
+    }
+    VectorStroke stroke;
+    const auto color = object.find("color");
+    if (color == object.end() ||
+        !read_color(*color, stroke.color, errors, field + ".color")) {
+        return std::nullopt;
+    }
+    read_float(object, "width", stroke.width, errors, field + ".width");
+    read_stroke_join(object, stroke.join, errors, field + ".join");
+    read_stroke_cap(object, stroke.cap, errors, field + ".cap");
+    return stroke;
+}
+
 bool read_image_fit(const Json& object, VectorImageFit& destination,
                     std::vector<Error>& errors, const std::string& field) {
     std::string value;
@@ -473,6 +526,10 @@ std::optional<NativeVectorDefinition> read_native(
                           "none fills must not declare color or image data");
             }
         }
+        const auto stroke = node_json.find("stroke");
+        if (stroke != node_json.end()) {
+            node.stroke = read_stroke(*stroke, errors, prefix + ".stroke");
+        }
         native.nodes.push_back(std::move(node));
     }
     return native;
@@ -523,6 +580,24 @@ std::string_view to_string(const VectorFillKind kind) noexcept {
     case VectorFillKind::none: return "none";
     }
     return "none";
+}
+
+std::string_view to_string(const VectorStrokeJoin join) noexcept {
+    switch (join) {
+    case VectorStrokeJoin::miter: return "miter";
+    case VectorStrokeJoin::round: return "round";
+    case VectorStrokeJoin::bevel: return "bevel";
+    }
+    return "miter";
+}
+
+std::string_view to_string(const VectorStrokeCap cap) noexcept {
+    switch (cap) {
+    case VectorStrokeCap::butt: return "butt";
+    case VectorStrokeCap::round: return "round";
+    case VectorStrokeCap::square: return "square";
+    }
+    return "butt";
 }
 
 std::string_view to_string(const VectorImageFit fit) noexcept {
@@ -699,6 +774,27 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                           prefix + ".shape.path",
                           "only path shapes may declare commands");
             }
+            if (node.stroke.has_value()) {
+                const auto& stroke = *node.stroke;
+                const auto valid_channel = [&finite](const float channel) {
+                    return finite(channel) && channel >= 0.0F &&
+                           channel <= 1.0F;
+                };
+                if (!valid_channel(stroke.color.red) ||
+                    !valid_channel(stroke.color.green) ||
+                    !valid_channel(stroke.color.blue) ||
+                    !valid_channel(stroke.color.alpha)) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".stroke.color",
+                              "channels must be finite values from 0 to 1");
+                }
+                if (!finite(stroke.width) || stroke.width <= 0.0F ||
+                    stroke.width > 100'000.0F) {
+                    add_error(report.errors, ErrorCode::invalid_asset,
+                              prefix + ".stroke.width",
+                              "must be finite, positive and bounded");
+                }
+            }
             if (node.fill.kind == VectorFillKind::solid) {
                 if (!node.fill.color.has_value()) {
                     add_error(report.errors, ErrorCode::invalid_asset,
@@ -852,7 +948,7 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     shape["path"].push_back(std::move(command_json));
                 }
             }
-            nodes.push_back({
+            Json node_json = {
                 {"id", node.id},
                 {"name", node.name},
                 {"visible", node.visible},
@@ -860,7 +956,21 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                 {"transform", serialize_transform(node.transform)},
                 {"shape", std::move(shape)},
                 {"fill", std::move(fill)},
-            });
+            };
+            if (node.stroke.has_value()) {
+                const auto& stroke = *node.stroke;
+                node_json["stroke"] = {
+                    {"color",
+                     {{"red", stroke.color.red},
+                      {"green", stroke.color.green},
+                      {"blue", stroke.color.blue},
+                      {"alpha", stroke.color.alpha}}},
+                    {"width", stroke.width},
+                    {"join", std::string(to_string(stroke.join))},
+                    {"cap", std::string(to_string(stroke.cap))},
+                };
+            }
+            nodes.push_back(std::move(node_json));
         }
         document["native"] = {
             {"size", serialize_vec2(asset.native->size)},

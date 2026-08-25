@@ -123,7 +123,7 @@ lorsqu’elles contiennent encore des variantes non livrées.
 - [x] Définir des identifiants stables pour document, nœuds, formes et
   ressources de fill.
 - [x] Stocker rectangle, ellipse, ligne et chemin `move/line/cubic/close`.
-- [ ] Stocker fill couleur, fill image, transform du fill, opacité, contour,
+- [x] Stocker fill couleur, fill image, transform du fill, opacité, contour,
   largeur, jointure, extrémité et ordre de dessin.
 - [x] Autoriser une image locale comme contenu d’une forme sans transformer la
   forme en sprite ou en bitmap autonome.

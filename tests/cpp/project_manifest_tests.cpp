@@ -569,6 +569,26 @@ void path_shape_round_trips_and_rejects_invalid_sequences() {
     require(!validation.ok(), "path without an initial move was accepted");
 }
 
+void stroke_round_trips_and_rejects_invalid_width() {
+    auto expected = native_rectangle_asset();
+    expected.native->nodes.front().stroke = fabric::project::VectorStroke{
+        .color = {0.8F, 0.2F, 0.1F, 1.0F},
+        .width = 2.5F,
+        .join = fabric::project::VectorStrokeJoin::round,
+        .cap = fabric::project::VectorStrokeCap::square,
+    };
+    const auto parsed = fabric::project::parse_vector_asset(
+        example_manifest(), fabric::project::serialize_vector_asset(expected));
+    require(parsed.ok(), "stroke vector did not round-trip");
+    require(*parsed.asset == expected, "stroke changed during round-trip");
+
+    auto invalid = expected;
+    invalid.native->nodes.front().stroke->width = 0.0F;
+    const auto validation = fabric::project::validate_vector_asset(
+        example_manifest(), invalid);
+    require(!validation.ok(), "zero-width stroke was accepted");
+}
+
 void invalid_vector_paths_are_rejected() {
     auto asset = fabric::project::VectorAsset{
         .document = {
@@ -642,6 +662,7 @@ int main() {
     image_fill_round_trips_with_adjustable_shape_mapping();
     line_shape_round_trips_and_rejects_invalid_endpoints();
     path_shape_round_trips_and_rejects_invalid_sequences();
+    stroke_round_trips_and_rejects_invalid_width();
     invalid_vector_paths_are_rejected();
     project_validation_rejects_a_missing_vector_source();
     return 0;

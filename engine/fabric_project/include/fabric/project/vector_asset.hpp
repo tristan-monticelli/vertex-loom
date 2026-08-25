@@ -47,6 +47,18 @@ enum class VectorFillKind {
     none,
 };
 
+enum class VectorStrokeJoin {
+    miter,
+    round,
+    bevel,
+};
+
+enum class VectorStrokeCap {
+    butt,
+    round,
+    square,
+};
+
 enum class VectorImageFit {
     contain,
     cover,
@@ -58,6 +70,8 @@ enum class VectorImageFit {
 [[nodiscard]] std::string_view to_string(VectorShapeKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(VectorPathCommandKind kind) noexcept;
 [[nodiscard]] std::string_view to_string(VectorFillKind kind) noexcept;
+[[nodiscard]] std::string_view to_string(VectorStrokeJoin join) noexcept;
+[[nodiscard]] std::string_view to_string(VectorStrokeCap cap) noexcept;
 [[nodiscard]] std::string_view to_string(VectorImageFit fit) noexcept;
 
 struct VectorImageFill {
@@ -77,6 +91,15 @@ struct VectorFill {
     std::optional<VectorImageFill> image;
 
     friend bool operator==(const VectorFill&, const VectorFill&) = default;
+};
+
+struct VectorStroke {
+    core::Color color{0.9F, 0.9F, 0.9F, 1.0F};
+    float width{1.0F};
+    VectorStrokeJoin join{VectorStrokeJoin::miter};
+    VectorStrokeCap cap{VectorStrokeCap::butt};
+
+    friend bool operator==(const VectorStroke&, const VectorStroke&) = default;
 };
 
 struct VectorShape {
@@ -106,6 +129,7 @@ struct VectorNode {
     core::Transform transform;
     VectorShape shape;
     VectorFill fill;
+    std::optional<VectorStroke> stroke;
 
     friend bool operator==(const VectorNode&, const VectorNode&) = default;
 };

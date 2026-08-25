@@ -412,6 +412,14 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                                            color_to_u32(fill));
         }
         const bool selected = node_index == canvas.selected_node;
+        const auto stroke_color = selected
+            ? IM_COL32(236, 180, 75, 255)
+            : (node.stroke.has_value()
+                   ? color_to_u32(node.stroke->color)
+                   : IM_COL32(225, 230, 235, 255));
+        const float stroke_width = node.stroke.has_value()
+            ? std::max(1.0F, node.stroke->width * pixels_per_unit)
+            : (selected ? 2.5F : 1.5F);
         const bool closed_path =
             node.shape.kind == fabric::project::VectorShapeKind::path &&
             !node.shape.path.empty() &&
@@ -419,14 +427,13 @@ void draw_native_vector_canvas(const fabric::project::VectorAsset& asset,
                 fabric::project::VectorPathCommandKind::close;
         draw_list->AddPolyline(
             points.data(), static_cast<int>(points.size()),
-            selected ? IM_COL32(236, 180, 75, 255)
-                     : IM_COL32(225, 230, 235, 255),
+            stroke_color,
             node.shape.kind == fabric::project::VectorShapeKind::line ||
                     (node.shape.kind == fabric::project::VectorShapeKind::path &&
                      !closed_path)
                 ? ImDrawFlags_None
                 : ImDrawFlags_Closed,
-            selected ? 2.5F : 1.5F);
+            stroke_width);
     }
     if (hovered) {
         ImGui::SetTooltip("Middle drag: pan  |  Wheel: zoom %.0f%%",
