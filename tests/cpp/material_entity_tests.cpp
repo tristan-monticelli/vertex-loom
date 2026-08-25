@@ -130,4 +130,27 @@ TEST_CASE("entity constraints round-trip and require existing nodes") {
     REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
 }
 
+TEST_CASE("entity deformation mesh round-trips and requires valid nodes") {
+    auto source = entity();
+    source.deformation_mesh = fabric::project::DeformationMesh{};
+    source.deformation_mesh->vertices.push_back({
+        .rest_position = {-1.0F, -1.0F},
+        .influences = {{.node_id = "root", .weight = 1.0F}}});
+    source.deformation_mesh->vertices.push_back({
+        .rest_position = {1.0F, -1.0F},
+        .influences = {{.node_id = "root", .weight = 1.0F}}});
+    source.deformation_mesh->vertices.push_back({
+        .rest_position = {0.0F, 1.0F},
+        .influences = {{.node_id = "child", .weight = 1.0F}}});
+    source.deformation_mesh->triangles.push_back({.first = 0, .second = 1, .third = 2});
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), fabric::project::serialize_entity(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.entity == source);
+
+    auto invalid = source;
+    invalid.deformation_mesh->vertices.front().influences.front().node_id = "missing";
+    REQUIRE_FALSE(fabric::project::validate_entity(manifest(), invalid).ok());
+}
+
 } // namespace

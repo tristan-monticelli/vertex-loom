@@ -3,6 +3,7 @@
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/animation_constraints.hpp"
+#include "fabric/project/mesh_deformation.hpp"
 #include "fabric/core/types.hpp"
 
 #include <filesystem>
@@ -42,6 +43,7 @@ struct EntityDefinition {
     };
     std::vector<EntityNode> nodes;
     std::vector<AnimationConstraint> constraints;
+    std::optional<DeformationMesh> deformation_mesh;
     friend bool operator==(const EntityDefinition&, const EntityDefinition&) = default;
 };
 

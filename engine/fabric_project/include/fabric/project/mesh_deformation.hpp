@@ -12,22 +12,26 @@ namespace fabric::project {
 struct MeshInfluence {
     std::string node_id;
     float weight{};
+    friend bool operator==(const MeshInfluence&, const MeshInfluence&) = default;
 };
 
 struct MeshVertex {
     core::Vec2 rest_position;
     std::vector<MeshInfluence> influences;
+    friend bool operator==(const MeshVertex&, const MeshVertex&) = default;
 };
 
 struct MeshTriangle {
     std::size_t first{};
     std::size_t second{};
     std::size_t third{};
+    friend bool operator==(const MeshTriangle&, const MeshTriangle&) = default;
 };
 
 struct DeformationMesh {
     std::vector<MeshVertex> vertices;
     std::vector<MeshTriangle> triangles;
+    friend bool operator==(const DeformationMesh&, const DeformationMesh&) = default;
 };
 
 struct DeformationPose {

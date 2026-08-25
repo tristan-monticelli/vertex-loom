@@ -25,6 +25,8 @@ Json ref_json(const ResourceReference& r){return {{"id",r.id.value},{"expectedTy
 bool ref_read(const Json& o,const char* k,std::optional<ResourceReference>& out,std::vector<Error>& e){auto i=o.find(k);if(i==o.end()||i->is_null())return true;if(!i->is_object()){error(e,ErrorCode::invalid_asset,k,"expected a resource reference");return false;}ResourceReference r;if(!text(*i,"id",r.id.value,e)||!text(*i,"expectedType",r.expected_type,e))return false;out=std::move(r);return true;}
 Json constraint_json(const AnimationConstraint& c){return {{"id",c.id},{"kind",c.kind==AnimationConstraintKind::copy_transform?"copyTransform":c.kind==AnimationConstraintKind::limits?"limits":"lookAt"},{"targetNode",c.target_node},{"sourceNode",c.source_node},{"order",c.order},{"constrainPosition",c.constrain_position},{"constrainRotation",c.constrain_rotation},{"constrainScale",c.constrain_scale}};}
 bool constraint_read(const Json& o, AnimationConstraint& c, std::vector<Error>& e){text(o,"id",c.id,e);std::string kind;text(o,"kind",kind,e);if(kind=="copyTransform")c.kind=AnimationConstraintKind::copy_transform;else if(kind=="limits")c.kind=AnimationConstraintKind::limits;else if(kind=="lookAt")c.kind=AnimationConstraintKind::look_at;else error(e,ErrorCode::invalid_asset,"constraints.kind","unsupported constraint kind");text(o,"targetNode",c.target_node,e);text(o,"sourceNode",c.source_node,e);std::int64_t order{};auto i=o.find("order");if(i==o.end()||!i->is_number_integer())error(e,ErrorCode::invalid_asset,"constraints.order","expected an integer");else{order=i->get<std::int64_t>();c.order=static_cast<int>(order);}boolean(o,"constrainPosition",c.constrain_position,e);boolean(o,"constrainRotation",c.constrain_rotation,e);boolean(o,"constrainScale",c.constrain_scale,e);return e.empty();}
+Json deformation_mesh_json(const DeformationMesh& mesh){Json result={{"vertices",Json::array()},{"triangles",Json::array()}};for(const auto& vertex:mesh.vertices){Json influences=Json::array();for(const auto& influence:vertex.influences)influences.push_back({{"node",influence.node_id},{"weight",influence.weight}});result["vertices"].push_back({{"restPosition",vec(vertex.rest_position)},{"influences",std::move(influences)}});}for(const auto& triangle:mesh.triangles)result["triangles"].push_back({{"first",triangle.first},{"second",triangle.second},{"third",triangle.third}});return result;}
+bool deformation_mesh_read(const Json& o, DeformationMesh& mesh, std::vector<Error>& e){const auto vertices=o.find("vertices");if(vertices==o.end()||!vertices->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.vertices","expected an array");else for(const auto& item:*vertices){if(!item.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.vertices","expected objects");continue;}MeshVertex vertex;vec_read(item,"restPosition",vertex.rest_position,e);const auto influences=item.find("influences");if(influences==item.end()||!influences->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.influences","expected an array");else for(const auto& value:*influences){if(!value.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.influences","expected objects");continue;}MeshInfluence influence;text(value,"node",influence.node_id,e);number(value,"weight",influence.weight,e);vertex.influences.push_back(std::move(influence));}mesh.vertices.push_back(std::move(vertex));}const auto triangles=o.find("triangles");if(triangles==o.end()||!triangles->is_array())error(e,ErrorCode::invalid_asset,"deformationMesh.triangles","expected an array");else for(const auto& item:*triangles){if(!item.is_object()){error(e,ErrorCode::invalid_asset,"deformationMesh.triangles","expected objects");continue;}MeshTriangle triangle;const auto read_index=[&](const char* key,std::size_t& output){auto value=item.find(key);if(value==item.end()||!value->is_number_unsigned()){error(e,ErrorCode::invalid_asset,std::string("deformationMesh.triangles.")+key,"expected an unsigned integer");return;}output=value->get<std::size_t>();};read_index("first",triangle.first);read_index("second",triangle.second);read_index("third",triangle.third);mesh.triangles.push_back(triangle);}return e.empty();}
 ValidationReport parse_validation(const ProjectManifest& m,std::string_view s){auto r=parse_entity(m,s);return {.errors=std::move(r.errors)};}
 }
 std::string_view to_string(const EntityDrawableKind k) noexcept { switch(k){case EntityDrawableKind::none:return "none";case EntityDrawableKind::vector:return "vector";case EntityDrawableKind::texture:return "texture";}return "none"; }
@@ -123,10 +125,21 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
             error(r.errors, ErrorCode::missing_resource, "constraints.nodes",
                   "constraint source and target nodes must exist");
     }
+    if (a.deformation_mesh) {
+        const auto mesh = validate_deformation_mesh(*a.deformation_mesh);
+        r.errors.insert(r.errors.end(), mesh.errors.begin(), mesh.errors.end());
+        for (const auto& vertex : a.deformation_mesh->vertices)
+            for (const auto& influence : vertex.influences)
+                if (std::none_of(a.nodes.begin(), a.nodes.end(), [&](const auto& node) {
+                        return node.id == influence.node_id;
+                    }))
+                    error(r.errors, ErrorCode::missing_resource,
+                          "deformationMesh.influences", "influence node is missing");
+    }
     return r;
 }
 std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);}return r;}
-std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));return j.dump(2)+"\n";}
+std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));return j.dump(2)+"\n";}
 EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     EntityResult r;
     Json j;
@@ -170,6 +183,11 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
             if (x.is_object() && constraint_read(x, constraint, r.errors)) a.constraints.push_back(std::move(constraint));
             else if (!x.is_object()) error(r.errors, ErrorCode::invalid_asset, "constraints", "expected objects");
         }
+    }
+    const auto dm = j.find("deformationMesh");
+    if (dm != j.end() && !dm->is_null()) {
+        if (!dm->is_object()) error(r.errors, ErrorCode::invalid_asset, "deformationMesh", "expected an object or null");
+        else { DeformationMesh mesh; if (deformation_mesh_read(*dm, mesh, r.errors)) a.deformation_mesh = std::move(mesh); }
     }
     if (!r.errors.empty()) return r;
     auto v = validate_entity(m, a);

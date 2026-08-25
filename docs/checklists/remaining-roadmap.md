@@ -251,6 +251,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   drawables vectoriels et références d’artworks.
 - [x] Persister les contraintes `copy-transform`, `limits` et `look-at` dans
   l’entité, avec ordre déterministe, cycles et nœuds absents refusés.
+- [x] Persister un maillage de déformation optionnel avec positions de repos,
+  influences de nœuds et triangles validés headless.
 - [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
   `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
