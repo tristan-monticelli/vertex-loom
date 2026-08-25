@@ -10,4 +10,5 @@ Accepté.
 maps composant une scène, son `entryMap` et des transitions vers d’autres
 scènes avec un point d’entrée textuel. Les références de maps et de scènes
 entrent dans le registre global afin que le runtime refuse les scènes
-incomplètes avant d’ouvrir une fenêtre.
+incomplètes avant d’ouvrir une fenêtre. `game_runtime --scene <id>` résout
+l’`entryMap` avant de déléguer le chargement graphique au Preview Runtime.

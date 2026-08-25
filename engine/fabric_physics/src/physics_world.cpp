@@ -12,6 +12,7 @@ namespace fabric::physics {
 struct PhysicsWorld::Impl {
     b2WorldId id = b2_nullWorldId;
     b2BodyId collision_body = b2_nullBodyId;
+    b2BodyId character_body = b2_nullBodyId;
 };
 
 PhysicsWorld::~PhysicsWorld() { destroy(); }
@@ -44,6 +45,7 @@ bool PhysicsWorld::create(const float gravity_x, const float gravity_y) noexcept
 
 void PhysicsWorld::destroy() noexcept {
     if (!impl_) return;
+    if (b2Body_IsValid(impl_->character_body)) b2DestroyBody(impl_->character_body);
     if (b2Body_IsValid(impl_->collision_body)) b2DestroyBody(impl_->collision_body);
     if (b2World_IsValid(impl_->id)) b2DestroyWorld(impl_->id);
     delete impl_;
@@ -109,6 +111,48 @@ bool PhysicsWorld::load_map_collisions(const project::MapDocument& map) noexcept
         }
     }
     return true;
+}
+
+bool PhysicsWorld::create_character(const core::Vec2 position,
+                                    const core::Vec2 half_extents) noexcept {
+    if (!valid() || half_extents.x <= 0.0F || half_extents.y <= 0.0F) return false;
+    if (b2Body_IsValid(impl_->character_body)) {
+        b2DestroyBody(impl_->character_body);
+        impl_->character_body = b2_nullBodyId;
+    }
+    auto body_definition = b2DefaultBodyDef();
+    body_definition.type = b2_dynamicBody;
+    body_definition.position = {position.x, position.y};
+    body_definition.fixedRotation = true;
+    body_definition.enableSleep = false;
+    impl_->character_body = b2CreateBody(impl_->id, &body_definition);
+    if (!b2Body_IsValid(impl_->character_body)) return false;
+    auto shape_definition = b2DefaultShapeDef();
+    shape_definition.density = 1.0F;
+    shape_definition.material.friction = 0.8F;
+    const auto box = b2MakeBox(half_extents.x, half_extents.y);
+    if (!b2Shape_IsValid(b2CreatePolygonShape(impl_->character_body,
+                                               &shape_definition, &box))) {
+        b2DestroyBody(impl_->character_body);
+        impl_->character_body = b2_nullBodyId;
+        return false;
+    }
+    return true;
+}
+
+void PhysicsWorld::set_character_velocity(const core::Vec2 velocity) noexcept {
+    if (character_valid()) b2Body_SetLinearVelocity(impl_->character_body,
+                                                     {velocity.x, velocity.y});
+}
+
+core::Vec2 PhysicsWorld::character_position() const noexcept {
+    if (!character_valid()) return {};
+    const auto position = b2Body_GetPosition(impl_->character_body);
+    return {position.x, position.y};
+}
+
+bool PhysicsWorld::character_valid() const noexcept {
+    return valid() && b2Body_IsValid(impl_->character_body);
 }
 
 } // namespace fabric::physics

@@ -35,3 +35,13 @@ TEST_CASE("Box2D physics world loads map collision shapes and sensors") {
     REQUIRE(world.load_map_collisions(map));
     REQUIRE(world.step(1.0F / 60.0F));
 }
+
+TEST_CASE("Box2D physics world exposes a dynamic character body") {
+    fabric::physics::PhysicsWorld world;
+    REQUIRE(world.create(0.0F, 0.0F));
+    REQUIRE(world.create_character({0.0F, 0.0F}));
+    REQUIRE(world.character_valid());
+    world.set_character_velocity({3.0F, 0.0F});
+    REQUIRE(world.step(1.0F / 60.0F));
+    CHECK(world.character_position().x > 0.0F);
+}
