@@ -428,6 +428,8 @@ déclencher une transition de scène via un hand-off propre ; les autres
 options CLI validées.
 Les bindings d’actions peuvent être fournis par `--bind` sans modifier le
 programme.
+Les bindings peuvent maintenant être publiés dans `assets/input/<id>.input.json`
+et chargés automatiquement par `PreviewRuntime` via `default` ou `--input <id>`.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement

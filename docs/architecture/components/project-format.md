@@ -4,7 +4,7 @@
 C4Component
     title Vertex Loom — composants du format projet
     Container_Boundary(project_library, "fabric_project") {
-        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, MaterialDefinition v1, EntityDefinition v1 avec maillage de déformation et état XPBD optionnels, AnimationClip v1, SceneDocument v1, ReplayDocument v1, ProgressSave v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1, map events, fabric_physics shapes et VectorAsset v1/v2")
+        Component(contracts, "Project contracts", "C++20", "ProjectManifest v2, DocumentHeader, ResourceReference, TextureAsset, InputDocument v1, MaterialDefinition v1, EntityDefinition v1 avec maillage de déformation et état XPBD optionnels, AnimationClip v1, SceneDocument v1, ReplayDocument v1, ProgressSave v1, PropertyDescriptorRegistry, AnimationStateMachine, AnimationConstraint, FABRIK IK, XPBD, mesh deformation, MapDocument v1, map events, fabric_physics shapes et VectorAsset v1/v2")
         Component(migrations, "Migration registry", "C++20", "Applique chaque conversion de schéma dans l'ordre")
         Component(serializer, "JSON serializer", "C++20 / nlohmann-json", "Convertit les contrats sans exposer la bibliothèque JSON")
         Component(registry, "ResourceRegistry", "C++20", "Indexe les documents et détecte doublons, absences, types incompatibles et cycles")
@@ -38,9 +38,13 @@ C4Component
   chiffres, tirets, points ou underscores, avec un caractère alphanumérique aux
   deux extrémités.
 - `ProjectManifest` version 2 contient le nom du projet, `pixelsPerUnit` et ses
-  répertoires relatifs d'assets, d'entités, de maps, de scènes et de schémas.
-- `DocumentHeader` porte la version, le type, l'identifiant et le nom communs.
+  répertoires relatifs d’assets, d’entités, de maps, de scènes et de schémas.
+- `DocumentHeader` porte la version, le type, l’identifiant et le nom communs.
   `AssetDocument` reste son alias de compatibilité.
+  `InputDocument v1` est stocké sous `assets/input/<id>.input.json` et porte
+  une table d’actions nommées, chacune pouvant déclarer plusieurs bindings
+  clavier ou manette. Les codes sont des entiers positifs ou nuls ; les
+  identifiants, périphériques et doublons sont validés avant publication.
   `TextureAsset` version 1 ajoute un chemin PNG relatif, ses dimensions et le
   format de pixels `rgba8`.
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source

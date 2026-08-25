@@ -1,5 +1,6 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/input.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map.hpp"
@@ -137,6 +138,51 @@ void register_map_prefabs(const std::filesystem::path& project_root,
     }
 }
 
+void inspect_input_documents(const std::filesystem::path& project_root,
+                             const ProjectManifest& manifest,
+                             const std::filesystem::path& canonical_root,
+                             ResourceRegistry& registry,
+                             std::vector<Error>& errors) {
+    const auto input_directory = project_root / manifest.directories.assets / "input";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(input_directory, filesystem_error)) {
+        if (filesystem_error)
+            add_error(errors, ErrorCode::io_error, "assets.input",
+                      "cannot inspect input directory");
+        return;
+    }
+    const auto canonical_directory = std::filesystem::weakly_canonical(
+        input_directory, filesystem_error);
+    if (filesystem_error || !is_within_project(canonical_root, canonical_directory)) {
+        add_error(errors, ErrorCode::invalid_path, "assets.input",
+                  "input directory must remain inside the project root");
+        return;
+    }
+    for (std::filesystem::directory_iterator iterator(
+             input_directory, filesystem_error), end;
+         !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto& entry = *iterator;
+        const auto filename = entry.path().filename().string();
+        if (!entry.is_regular_file(filesystem_error) ||
+            !filename.ends_with(".input.json")) continue;
+        const auto loaded = load_input(
+            project_root, manifest, entry.path().lexically_relative(project_root));
+        if (loaded.ok()) {
+            auto registration = registry.register_resource({
+                .document = loaded.input->document,
+                .document_path = entry.path().lexically_relative(project_root),
+                .references = {}});
+            errors.insert(errors.end(), registration.errors.begin(),
+                          registration.errors.end());
+        }
+        errors.insert(errors.end(), loaded.errors.begin(), loaded.errors.end());
+    }
+    if (filesystem_error)
+        add_error(errors, ErrorCode::io_error, "assets.input",
+                  "cannot inspect input documents");
+}
+
 } // namespace
 
 ManifestResult load_manifest(const std::filesystem::path& project_root) {
@@ -236,6 +282,8 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "replays",
         ".replay.json", "assets.replays", load_replay, replay_resource_references,
         registry, result.errors);
+    inspect_input_documents(project_root, *loaded.manifest, canonical_root,
+                            registry, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.maps, "",
         ".map.json", "maps", load_map, map_resource_references,

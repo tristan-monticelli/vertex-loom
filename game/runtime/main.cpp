@@ -20,6 +20,7 @@ void usage() {
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
                  "[--character] "
+                 "[--input <id>] "
                  "[--follow-character] "
                  "[--camera-limits <x> <y> <width> <height>] "
                  "[--bind <action> <keyboard|gamepad> <code>]... "
@@ -73,6 +74,8 @@ int main(int argc, char** argv) {
             scene_id = fabric::core::ResourceId{argv[++index]};
         } else if (argument == "--replay" && index + 1 < argc) {
             options.replay_id = fabric::core::ResourceId{argv[++index]};
+        } else if (argument == "--input" && index + 1 < argc) {
+            options.input_id = fabric::core::ResourceId{argv[++index]};
         } else if (argument == "--save-slot" && index + 1 < argc) {
             save_slot = argv[++index];
         } else if (argument == "--character") {

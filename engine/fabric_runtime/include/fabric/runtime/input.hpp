@@ -1,27 +1,18 @@
 #pragma once
 
+#include "fabric/project/input.hpp"
+
 #include <string>
 #include <string_view>
 #include <span>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 namespace fabric::runtime {
 
-enum class InputDevice { keyboard, gamepad };
-
-struct InputBinding {
-    InputDevice device{InputDevice::keyboard};
-    int code{};
-    friend bool operator==(const InputBinding&, const InputBinding&) = default;
-};
-
-struct InputActionDefinition {
-    std::string id;
-    std::vector<InputBinding> bindings;
-    friend bool operator==(const InputActionDefinition&, const InputActionDefinition&) = default;
-};
+using InputDevice = project::InputDevice;
+using InputBinding = project::InputBinding;
+using InputActionDefinition = project::InputActionDefinition;
 
 class InputActionMap {
 public:

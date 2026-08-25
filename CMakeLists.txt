@@ -58,6 +58,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/animation_state_machine.cpp
     engine/fabric_project/src/document_storage.cpp
     engine/fabric_project/src/entity.cpp
+    engine/fabric_project/src/input.cpp
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/map.cpp
     engine/fabric_project/src/map_chunk_index.cpp
@@ -357,6 +358,12 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_input_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_input_tests COMMAND fabric_input_tests)
+
+    add_executable(fabric_input_document_tests
+        tests/cpp/input_document_tests.cpp)
+    target_link_libraries(fabric_input_document_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_input_document_tests COMMAND fabric_input_document_tests)
 
     add_executable(fabric_replay_player_tests tests/cpp/replay_player_tests.cpp)
     target_link_libraries(fabric_replay_player_tests PRIVATE

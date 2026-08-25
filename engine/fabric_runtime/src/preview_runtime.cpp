@@ -487,6 +487,32 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         return false;
     }
 
+    std::optional<project::InputDocument> loaded_input;
+    if (options_.enable_character && options_.input_actions.empty()) {
+        const auto input_id = options_.input_id.value_or(core::ResourceId{.value = "default"});
+        if (!core::ResourceId::is_valid(input_id.value)) {
+            errors_.push_back("input id is invalid");
+            return false;
+        }
+        const auto input_path = project::input_document_path(*loaded_project.manifest, input_id);
+        std::error_code input_error;
+        const bool input_exists = std::filesystem::exists(
+            options_.project_root / input_path, input_error);
+        if (input_error) {
+            errors_.push_back("input: could not inspect input document");
+            return false;
+        }
+        if (options_.input_id || input_exists) {
+            auto input = project::load_input(options_.project_root,
+                                             *loaded_project.manifest, input_path);
+            if (!input.ok()) {
+                append_errors(errors_, input.errors);
+                return false;
+            }
+            loaded_input = std::move(input.input);
+        }
+    }
+
     if (options_.replay_id) {
         auto loaded_replay = project::load_replay(
             options_.project_root, *loaded_project.manifest,
@@ -616,6 +642,11 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         if (!options_.input_actions.empty()) {
             if (!input_.configure(options_.input_actions)) {
                 errors_.push_back("could not configure character input actions");
+                return false;
+            }
+        } else if (loaded_input) {
+            if (!input_.configure(loaded_input->actions)) {
+                errors_.push_back("could not configure persisted character input actions");
                 return false;
             }
         } else {

@@ -459,6 +459,36 @@ TEST_CASE("preview runtime accepts a custom locomotion binding table") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime loads the default persisted locomotion bindings") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-persisted-input-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+    const fabric::project::InputDocument input{
+        .document = {.schema_version = fabric::project::current_input_schema_version,
+                     .type = "input",
+                     .id = {.value = "default"},
+                     .name = "Default Input"},
+        .actions = {
+            {"move_left", {{fabric::project::InputDevice::keyboard, 74}}},
+            {"move_right", {{fabric::project::InputDevice::keyboard, 76}}},
+            {"jump", {{fabric::project::InputDevice::gamepad, 1}}}}};
+    REQUIRE(fabric::project::publish_input(root, project_manifest, input).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .enable_character = true,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().physics_steps == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-runtime-scene-handoff-" + std::to_string(

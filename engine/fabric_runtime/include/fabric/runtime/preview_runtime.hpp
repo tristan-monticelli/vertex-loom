@@ -34,6 +34,7 @@ struct PreviewRuntimeOptions {
     core::ResourceId map_id;
     std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;
+    std::optional<core::ResourceId> input_id;
     GameplayEventHandler gameplay_event_handler;
     std::vector<InputActionDefinition> input_actions;
     bool enable_character{};
