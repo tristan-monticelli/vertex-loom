@@ -82,8 +82,13 @@ Preview Runtime.
   modes UV, raccords et valeurs finies.
 - [x] Générer un ruban triangulé déterministe avec UV continus pour chemins
   ouverts, fermés et Bézier.
-- [ ] Ajouter dans Asset Studio plume, attaches, largeur, répétition, offset,
+- [x] Ajouter dans Asset Studio plume, attaches, largeur, répétition, offset,
   couleur, opacité et animation de texture.
+
+  Preuve : l'inspecteur édite points de départ/fin, lignes, Bézier et poignées,
+  style et UV via `ProjectSession`. La preview reconstruit le packet depuis le
+  document en mémoire et propose un défilement UV temporaire ; les tests
+  couvrent packet, undo/redo, autosave, récupération, sauvegarde et reload.
 - [ ] Réutiliser le registre de propriétés pour animer le Beam sans type de
   piste spécialisé.
 - [ ] Afficher le même Beam dans Asset Studio, Map Studio et Preview Runtime.

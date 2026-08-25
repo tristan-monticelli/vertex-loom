@@ -123,6 +123,10 @@ chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule
 dépendance texture, la résolution headless des références et l'absence de
 collision ou de maillage persisté dans le document d'auteur.
+La session d'édition couvre aussi déplacement des attaches et poignées, ajout
+de segments, largeur, répétition, offset, couleur et opacité avec undo/redo,
+autosave, récupération, sauvegarde et reload. Le packet dérivé depuis l'état
+en mémoire vérifie immédiatement UV, teinte et opacité avant écriture disque.
 La géométrie dérivée couvre le ruban exact d'une ligne, l'aplatissement Bézier
 borné et reproductible, les fermetures avec couture UV, l'interpolation de
 largeur, les modes repeat/stretch, les raccords miter/bevel/round et les caps

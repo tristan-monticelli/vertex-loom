@@ -299,6 +299,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_textured_path_.reset();
     recovery_visual_composition_.reset();
     recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
@@ -306,6 +307,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
+    selected_textured_path_document_path_.clear();
     selected_visual_composition_document_path_.clear();
     selected_visual_component_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
@@ -361,6 +363,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_textured_path_.reset();
     recovery_visual_composition_.reset();
     recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
@@ -368,6 +371,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
+    selected_textured_path_document_path_.clear();
     selected_visual_composition_document_path_.clear();
     selected_visual_component_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
@@ -997,12 +1001,14 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
     selected_input_.reset();
     selected_input_document_path_.clear();
     selected_textured_path_.reset();
+    selected_textured_path_document_path_.clear();
     selected_visual_composition_.reset();
     selected_visual_component_.reset();
     selected_visual_composition_document_path_.clear();
     selected_visual_component_document_path_.clear();
     recovery_visual_composition_.reset();
     recovery_visual_component_.reset();
+    recovery_textured_path_.reset();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -1179,6 +1185,23 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_document_path_.clear();
         recovery_animation_.reset();
         selected_textured_path_ = std::move(*loaded.asset);
+        selected_textured_path_document_path_ = match->document_path;
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_textured_path_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_textured_path(*manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_textured_path(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok())
+                recovery_textured_path_ = std::move(parsed.asset);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty())
+            selection_warnings = std::move(recovery.errors);
     } else if (kind == StudioResourceKind::visual_composition) {
         auto loaded = project::load_visual_composition(
             project_root_, *manifest_, match->document_path);
@@ -1333,6 +1356,7 @@ bool ProjectSession::set_project_name(
                               dirty_document_ == DirtyDocument::vector ||
                               dirty_document_ == DirtyDocument::entity ||
                               dirty_document_ == DirtyDocument::animation ||
+                              dirty_document_ == DirtyDocument::textured_path ||
                               dirty_document_ == DirtyDocument::visual_composition ||
                               dirty_document_ == DirtyDocument::visual_component)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
@@ -1381,6 +1405,7 @@ bool ProjectSession::set_pixels_per_unit(
                               dirty_document_ == DirtyDocument::vector ||
                               dirty_document_ == DirtyDocument::entity ||
                               dirty_document_ == DirtyDocument::animation ||
+                              dirty_document_ == DirtyDocument::textured_path ||
                               dirty_document_ == DirtyDocument::visual_composition ||
                               dirty_document_ == DirtyDocument::visual_component)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
@@ -1595,6 +1620,45 @@ bool ProjectSession::set_selected_visual_composition(
         return false;
     }
     dirty_document_ = DirtyDocument::visual_composition;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_textured_path(
+    project::TexturedPath path,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_textured_path_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a textured path before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() &&
+        dirty_document_ != DirtyDocument::textured_path) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing a textured path"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() &&
+            update_autosave(now) == AutosaveStatus::failed) return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto validation = project::validate_textured_path(*manifest_, path);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<project::TexturedPath>>(
+                *selected_textured_path_, std::move(path)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "texturedPath",
+                    "cannot execute the textured path modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::textured_path;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -2185,6 +2249,20 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::textured_path) {
+        if (!selected_textured_path_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_textured_path(
+            project_root_, *manifest_, *selected_textured_path_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else if (dirty_document_ == DirtyDocument::visual_composition) {
         if (!selected_visual_composition_) {
             commands_.mark_clean();
@@ -2304,6 +2382,17 @@ AutosaveStatus ProjectSession::update_autosave(
             return project::ValidationReport{.errors = std::move(parsed.errors)};
         };
         break;
+    case DirtyDocument::textured_path:
+        if (!require_document(selected_textured_path_.has_value() &&
+                !selected_textured_path_document_path_.empty(),
+                "textured path")) return AutosaveStatus::failed;
+        path = selected_textured_path_document_path_;
+        contents = project::serialize_textured_path(*selected_textured_path_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_textured_path(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
     case DirtyDocument::visual_composition:
         if (!require_document(selected_visual_composition_.has_value() &&
                 !selected_visual_composition_document_path_.empty(),
@@ -2385,6 +2474,16 @@ bool ProjectSession::accept_recovery(
         errors_.clear();
         return true;
     }
+    if (recovery_textured_path_) {
+        selected_textured_path_ = std::move(recovery_textured_path_);
+        recovery_textured_path_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::textured_path;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (recovery_visual_composition_) {
         selected_visual_composition_ =
             std::move(recovery_visual_composition_);
@@ -2425,6 +2524,7 @@ void ProjectSession::decline_recovery() noexcept {
     recovery_vector_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
+    recovery_textured_path_.reset();
     recovery_visual_composition_.reset();
     recovery_visual_component_.reset();
     errors_.clear();
@@ -2450,6 +2550,7 @@ bool ProjectSession::has_recovery() const noexcept {
     return recovery_manifest_.has_value() || recovery_texture_.has_value() ||
         recovery_vector_.has_value() ||
         recovery_entity_.has_value() || recovery_animation_.has_value() ||
+        recovery_textured_path_.has_value() ||
         recovery_visual_composition_.has_value() ||
         recovery_visual_component_.has_value();
 }

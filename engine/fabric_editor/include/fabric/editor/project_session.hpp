@@ -121,6 +121,10 @@ public:
         project::VisualComposition composition,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_textured_path(
+        project::TexturedPath path,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_visual_component(
         project::VisualComponent component,
         AutosaveScheduler::Clock::time_point now =
@@ -257,6 +261,7 @@ private:
         entity,
         animation,
         input,
+        textured_path,
         visual_composition,
         visual_component,
     };
@@ -280,6 +285,7 @@ private:
     std::optional<project::VectorAsset> recovery_vector_;
     std::optional<project::EntityDefinition> recovery_entity_;
     std::optional<project::AnimationClip> recovery_animation_;
+    std::optional<project::TexturedPath> recovery_textured_path_;
     std::optional<project::VisualComposition> recovery_visual_composition_;
     std::optional<project::VisualComponent> recovery_visual_component_;
     std::filesystem::path selected_vector_document_path_;
@@ -287,6 +293,7 @@ private:
     std::filesystem::path selected_entity_document_path_;
     std::filesystem::path selected_animation_document_path_;
     std::filesystem::path selected_input_document_path_;
+    std::filesystem::path selected_textured_path_document_path_;
     std::filesystem::path selected_visual_composition_document_path_;
     std::filesystem::path selected_visual_component_document_path_;
     DirtyDocument dirty_document_{DirtyDocument::none};

@@ -153,6 +153,12 @@ C4Component
 - Un chemin texturé conserve sa courbe et ses paramètres de répétition. Sa
   géométrie de ruban est dérivée pour le rendu et n'est ni la source de la
   texture, ni une collision implicite.
+- `ProjectSession` édite aussi le document `TexturedPath` complet par commande
+  réversible et lui applique autosave, récupération et sauvegarde atomique.
+  L'inspecteur expose points d'attache, segments ligne/Bézier, poignées,
+  largeur, UV, teinte et opacité. La preview dérive le ruban depuis l'état en
+  mémoire et peut faire défiler l'offset UV sans persister une animation
+  spéciale.
 - Toute mutation d’un document éditable passe par `CommandStack`. Les imports,
   qui créent des ressources immuables sans remplacement, restent hors de cet
   historique de document.

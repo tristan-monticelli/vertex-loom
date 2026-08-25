@@ -2,6 +2,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
+#include "fabric/render/textured_path_geometry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -324,6 +325,87 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
         {.value = "editable-eye"}));
     CHECK(reloaded.selected_visual_component()->parameters.front().name ==
           "Eye scale");
+}
+
+TEST_CASE("textured path edits undo autosave recover and reload") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    const auto thread_source = project.path() / "thread.png";
+    std::ofstream{thread_source, std::ios::binary} << "thread-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), manifest,
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "cotton-thread"},
+                      .name = "Cotton Thread"},
+         .source = "assets/textures/cotton-thread.png",
+         .width = 8U,
+         .height = 8U},
+        thread_source).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.create_visual_preset({
+        .kind = fabric::editor::VisualPresetKind::seam,
+        .id = {.value = "editable-seam"},
+        .name = "Editable seam",
+        .thread_texture = fabric::project::ResourceReference{
+            {.value = "cotton-thread"}, "texture"}}));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::textured_path,
+        {.value = "editable-seam-rail"}));
+
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    auto path = *session.selected_textured_path();
+    path.commands.front().point = {-3.0F, -1.0F};
+    path.commands.back().control1 = {-1.0F, 1.0F};
+    path.commands.back().control2 = {1.0F, -1.0F};
+    path.commands.push_back({
+        .kind = fabric::project::TexturedPathCommandKind::line,
+        .point = {3.0F, 1.0F}});
+    path.width = 0.25F;
+    path.uv_scale = {8.0F, 1.5F};
+    path.uv_offset = {0.2F, 0.1F};
+    path.color = {0.8F, 0.4F, 0.2F, 1.0F};
+    path.opacity = 0.75F;
+    REQUIRE(session.set_selected_textured_path(path, start));
+    const auto preview = fabric::render::build_textured_path_draw_packets(
+        *session.selected_textured_path());
+    REQUIRE(preview.ok());
+    REQUIRE(preview.packets.size() == 1U);
+    CHECK(preview.packets.front().fill_uv.front().x == 0.2F);
+    CHECK(preview.packets.front().fill_color == path.color);
+    REQUIRE(preview.packets.front().image_fill.has_value());
+    CHECK(preview.packets.front().image_fill->opacity == 0.75F);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_textured_path()->commands.size() == 2U);
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_textured_path()->commands.size() == 3U);
+    CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
+          fabric::editor::AutosaveStatus::saved);
+
+    fabric::editor::ProjectSession recovered;
+    REQUIRE(recovered.open(project.path()));
+    REQUIRE(recovered.select_resource(
+        fabric::editor::StudioResourceKind::textured_path,
+        {.value = "editable-seam-rail"}));
+    REQUIRE(recovered.has_recovery());
+    REQUIRE(recovered.accept_recovery(start + std::chrono::seconds{3}));
+    CHECK(recovered.selected_textured_path()->commands.back().point ==
+          fabric::core::Vec2{3.0F, 1.0F});
+    CHECK(recovered.selected_textured_path()->uv_scale ==
+          fabric::core::Vec2{8.0F, 1.5F});
+    REQUIRE(recovered.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::textured_path,
+        {.value = "editable-seam-rail"}));
+    CHECK(reloaded.selected_textured_path()->commands.size() == 3U);
+    CHECK(reloaded.selected_textured_path()->width == 0.25F);
+    CHECK(reloaded.selected_textured_path()->opacity == 0.75F);
 }
 
 TEST_CASE("material prompt publishes and indexes a material document") {

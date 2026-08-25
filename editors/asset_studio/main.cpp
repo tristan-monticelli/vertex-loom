@@ -5,6 +5,7 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/render/svg_vector.hpp"
+#include "fabric/render/textured_path_geometry.hpp"
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "import_workflow.hpp"
@@ -148,6 +149,12 @@ struct AnimationUiState {
         fabric::project::AnimationInterpolation::linear};
     fabric::project::AnimationComposition composition{
         fabric::project::AnimationComposition::replace};
+};
+
+struct TexturedPathUiState {
+    bool animate_texture{};
+    float scroll_speed{1.0F};
+    float preview_offset{};
 };
 
 struct EntityPreviewResult {
@@ -449,7 +456,8 @@ EntityPreviewResult build_entity_preview(
 }
 
 fabric::render::VisualCompositionDrawResult build_visual_preview(
-    const fabric::editor::ProjectSession& session) {
+    const fabric::editor::ProjectSession& session,
+    const TexturedPathUiState& path_ui) {
     if (!session.manifest() || session.selected_resource() == nullptr) return {};
     using Kind = fabric::editor::StudioResourceKind;
     const auto kind = session.selected_resource()->kind;
@@ -465,19 +473,29 @@ fabric::render::VisualCompositionDrawResult build_visual_preview(
             *session.selected_visual_composition());
     }
     if (kind == Kind::textured_path && session.selected_textured_path()) {
-        const auto& path = *session.selected_textured_path();
-        const fabric::project::VisualComposition composition{
-            .document = {.schema_version =
-                             fabric::project::current_visual_composition_schema_version,
-                         .type = "visualComposition",
-                         .id = {.value = "studio-path-preview"},
-                         .name = "Studio path preview"},
-            .layers = {{.id = "path",
-                        .name = path.document.name,
-                        .kind = fabric::project::VisualLayerKind::textured_path,
-                        .resource = {path.document.id, "texturedPath"}}}};
-        return fabric::render::resolve_visual_composition(
-            session.project_root(), *session.manifest(), composition);
+        auto path = *session.selected_textured_path();
+        path.uv_offset.x += path_ui.preview_offset;
+        auto geometry = fabric::render::build_textured_path_draw_packets(path);
+        fabric::render::VisualCompositionDrawResult result{
+            .packets = std::move(geometry.packets),
+            .errors = std::move(geometry.errors)};
+        if (!result.packets.empty()) {
+            const auto& points = result.packets.front().fill_vertices;
+            auto min_x = std::ranges::min_element(points, {},
+                &fabric::core::Vec2::x)->x;
+            auto min_y = std::ranges::min_element(points, {},
+                &fabric::core::Vec2::y)->y;
+            auto max_x = std::ranges::max_element(points, {},
+                &fabric::core::Vec2::x)->x;
+            auto max_y = std::ranges::max_element(points, {},
+                &fabric::core::Vec2::y)->y;
+            const float margin = std::max(
+                1.0F, std::max(max_x - min_x, max_y - min_y) * 0.1F);
+            result.bounds = {{min_x - margin, min_y - margin},
+                {max_x - min_x + 2.0F * margin,
+                 max_y - min_y + 2.0F * margin}};
+        }
+        return result;
     }
     return {};
 }
@@ -1136,6 +1154,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const fabric::render::VisualCompositionDrawResult&
                         visual_preview,
                     AnimationUiState& animation_ui,
+                    TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
                     bool& request_open,
                     bool& request_png,
@@ -1347,10 +1366,119 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::Text("Bounds %.2f x %.2f", visual_preview.bounds.size.x,
                         visual_preview.bounds.size.y);
             if (session.selected_textured_path()) {
-                const auto& path = *session.selected_textured_path();
+                const auto path = *session.selected_textured_path();
+                static std::string selected_path_id;
+                static std::size_t selected_path_command{};
+                if (selected_path_id != path.document.id.value) {
+                    selected_path_id = path.document.id.value;
+                    selected_path_command = 0U;
+                }
                 ImGui::Text("%zu path command(s)", path.commands.size());
-                ImGui::Text("Width %.3f", path.width);
                 ImGui::Text("Texture %s", path.texture.id.value.c_str());
+                ImGui::SeparatorText("Pen and attachments");
+                for (std::size_t index = 0; index < path.commands.size();
+                     ++index) {
+                    const auto& command = path.commands[index];
+                    const char* kind = index == 0U ? "Start attachment" :
+                        command.kind ==
+                                fabric::project::TexturedPathCommandKind::line
+                            ? "Line point" : "Bezier point";
+                    ImGui::PushID(static_cast<int>(index));
+                    if (ImGui::Selectable(kind,
+                                          selected_path_command == index))
+                        selected_path_command = index;
+                    ImGui::PopID();
+                }
+                if (!path.commands.empty() &&
+                    selected_path_command < path.commands.size()) {
+                    auto command = path.commands[selected_path_command];
+                    bool command_changed = ImGui::DragFloat2(
+                        selected_path_command == 0U ? "Start" : "Endpoint",
+                        &command.point.x, 0.05F);
+                    if (command.kind ==
+                        fabric::project::TexturedPathCommandKind::cubic) {
+                        command_changed |= ImGui::DragFloat2(
+                            "Handle in", &command.control1.x, 0.05F);
+                        command_changed |= ImGui::DragFloat2(
+                            "Handle out", &command.control2.x, 0.05F);
+                    }
+                    if (command_changed) {
+                        auto candidate = path;
+                        candidate.commands[selected_path_command] = command;
+                        (void)session.set_selected_textured_path(
+                            std::move(candidate));
+                    }
+                }
+                if (ImGui::Button("Pen: add line")) {
+                    auto candidate = path;
+                    const auto endpoint = candidate.commands.back().point;
+                    candidate.commands.push_back({
+                        .kind = fabric::project::TexturedPathCommandKind::line,
+                        .point = {endpoint.x + 1.0F, endpoint.y}});
+                    if (session.set_selected_textured_path(
+                            std::move(candidate)))
+                        selected_path_command =
+                            session.selected_textured_path()->commands.size() - 1U;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Pen: add Bezier")) {
+                    auto candidate = path;
+                    const auto endpoint = candidate.commands.back().point;
+                    candidate.commands.push_back({
+                        .kind = fabric::project::TexturedPathCommandKind::cubic,
+                        .point = {endpoint.x + 1.0F, endpoint.y},
+                        .control1 = {endpoint.x + 0.33F, endpoint.y},
+                        .control2 = {endpoint.x + 0.67F, endpoint.y}});
+                    if (session.set_selected_textured_path(
+                            std::move(candidate)))
+                        selected_path_command =
+                            session.selected_textured_path()->commands.size() - 1U;
+                }
+                ImGui::BeginDisabled(path.commands.size() <=
+                    (path.closed ? 3U : 2U));
+                if (ImGui::Button("Remove last point")) {
+                    auto candidate = path;
+                    candidate.commands.pop_back();
+                    if (session.set_selected_textured_path(
+                            std::move(candidate)))
+                        selected_path_command = std::min(
+                            selected_path_command,
+                            session.selected_textured_path()->commands.size() - 1U);
+                }
+                ImGui::EndDisabled();
+
+                auto style = *session.selected_textured_path();
+                bool style_changed = false;
+                ImGui::SeparatorText("Ribbon and texture");
+                style_changed |= ImGui::Checkbox("Closed", &style.closed);
+                style_changed |= ImGui::DragFloat(
+                    "Width", &style.width, 0.01F, 0.001F, 1000.0F);
+                style_changed |= ImGui::DragFloat2(
+                    "Texture repeat", &style.uv_scale.x, 0.05F,
+                    0.001F, 1000.0F);
+                style_changed |= ImGui::DragFloat2(
+                    "Texture offset", &style.uv_offset.x, 0.01F);
+                style_changed |= ImGui::ColorEdit4(
+                    "Color", &style.color.red);
+                style_changed |= ImGui::SliderFloat(
+                    "Opacity", &style.opacity, 0.0F, 1.0F);
+                int uv_mode = style.uv_mode ==
+                        fabric::project::TexturedPathUvMode::repeat ? 0 : 1;
+                if (ImGui::Combo("UV mode", &uv_mode,
+                                 "Repeat\0Stretch\0")) {
+                    style.uv_mode = uv_mode == 0
+                        ? fabric::project::TexturedPathUvMode::repeat
+                        : fabric::project::TexturedPathUvMode::stretch;
+                    style_changed = true;
+                }
+                if (style_changed)
+                    (void)session.set_selected_textured_path(std::move(style));
+                ImGui::SeparatorText("Texture animation preview");
+                ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
+                ImGui::DragFloat("Scroll speed", &path_ui.scroll_speed,
+                                 0.05F, -100.0F, 100.0F);
+                if (ImGui::Button("Reset preview offset"))
+                    path_ui.preview_offset = 0.0F;
             } else if (session.selected_visual_composition()) {
                 const auto& composition =
                     *session.selected_visual_composition();
@@ -3483,6 +3611,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     AssetPreview pending_import_preview;
     CanvasUiState canvas;
     AnimationUiState animation_ui;
+    TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     bool request_open = false;
     bool request_png = false;
@@ -3648,7 +3777,13 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 session, animation, animation_ui.scrub_time);
             canvas.entity_world_bounds = entity_preview.bounds;
         }
-        const auto visual_preview = build_visual_preview(session);
+        if (textured_path_ui.animate_texture &&
+            session.selected_textured_path()) {
+            textured_path_ui.preview_offset +=
+                ImGui::GetIO().DeltaTime * textured_path_ui.scroll_speed;
+        }
+        const auto visual_preview = build_visual_preview(
+            session, textured_path_ui);
         const bool visual_selection = session.selected_resource() != nullptr &&
             (session.selected_resource()->kind ==
                  fabric::editor::StudioResourceKind::textured_path ||
@@ -3663,7 +3798,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         draw_workspace(session, window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, entity_preview,
                        visual_preview,
-                       animation_ui,
+                       animation_ui, textured_path_ui,
                        project_settings,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);
