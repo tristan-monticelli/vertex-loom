@@ -49,6 +49,25 @@ UV, une couleur, une opacité et des raccords. Le renderer dérive un ruban
 triangulé et des UV continus depuis le chemin ; cette géométrie est un cache de
 rendu et ne remplace pas le contrat éditable.
 
+Le document est stocké sous
+`assets/paths/<id>.textured-path.json`. Son chemin commence par un unique
+`move`, suivi de commandes `line` ou `cubic`; la fermeture est un booléen du
+document. La largeur de base est positive. Un profil optionnel contient des
+clés strictement croissantes sur la distance normalisée `[0,1]`, avec une clé
+aux deux extrémités et des largeurs positives.
+
+Les modes UV sont `repeat` et `stretch`. Échelle UV, offset, couleur, opacité,
+limite de miter, raccord `miter|round|bevel` et terminaison
+`butt|round|square` sont persistés et validés. La seule dépendance visuelle
+obligatoire est un `TextureAsset`. Aucun champ de collision ni aucun mesh
+triangulé n'est persisté dans `TexturedPath v1`.
+
+La tessellation aplatit les cubiques avec une tolérance explicite, calcule la
+distance cumulée sur la ligne centrale, interpole le profil de largeur et émet
+deux sommets par échantillon. Les UV en répétition utilisent cette distance ;
+les UV en étirement utilisent sa normalisation globale. Pour un chemin fermé,
+la couture UV reste continue jusqu'à une paire de sommets dupliquée à la fin.
+
 Le premier exemple est un Beam à deux attaches, courbe optionnelle, largeur,
 texture animée, couleur et opacité. Une collision peut le référencer mais n'est
 jamais créée implicitement.

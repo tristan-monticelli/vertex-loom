@@ -8,6 +8,7 @@
 #include "fabric/project/replay.hpp"
 #include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
+#include "fabric/project/textured_path.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/project/visual_component.hpp"
 #include "fabric/project/visual_composition.hpp"
@@ -409,6 +410,11 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         loaded.manifest->directories.assets, "compositions",
         ".composition.json", "assets.compositions", load_visual_composition,
         visual_composition_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root,
+        loaded.manifest->directories.assets, "paths",
+        ".textured-path.json", "assets.paths", load_textured_path,
+        textured_path_resource_references, registry, result.errors);
     validate_composition_raster_views(
         project_root, *loaded.manifest, result.errors);
     validate_visual_component_bindings(

@@ -72,6 +72,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/replay.cpp
     engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp
+    engine/fabric_project/src/textured_path.cpp
     engine/fabric_project/src/vector_asset.cpp
     engine/fabric_project/src/visual_component.cpp
     engine/fabric_project/src/visual_composition.cpp
@@ -301,6 +302,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_visual_component_tests
              COMMAND fabric_visual_component_tests)
+
+    add_executable(fabric_textured_path_tests
+        tests/cpp/textured_path_tests.cpp
+    )
+    target_link_libraries(fabric_textured_path_tests PRIVATE
+        fabric_project
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_textured_path_tests
+             COMMAND fabric_textured_path_tests)
 
     add_executable(fabric_animation_tests
         tests/cpp/animation_tests.cpp

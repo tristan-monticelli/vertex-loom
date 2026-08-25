@@ -54,7 +54,7 @@ sauvegarde, reload et chargement runtime.
 
 ## Tranche 2 — Bordure texturée et Beam
 
-- [ ] Ajouter `TexturedPath v1`, validation des courbes, largeurs, références,
+- [x] Ajouter `TexturedPath v1`, validation des courbes, largeurs, références,
   modes UV, raccords et valeurs finies.
 - [ ] Générer un ruban triangulé déterministe avec UV continus pour chemins
   ouverts, fermés et Bézier.

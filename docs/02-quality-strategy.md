@@ -103,6 +103,11 @@ bounds, ancrages, bindings, variantes et instances. Les tests vérifient la
 priorité défaut → variante → instance, la découverte des propriétés animables,
 la publication atomique, les types incompatibles, les cibles absentes et les
 cycles composant/composition dans le validateur headless.
+`TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
+chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
+raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule
+dépendance texture, la résolution headless des références et l'absence de
+collision ou de maillage persisté dans le document d'auteur.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,

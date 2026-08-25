@@ -71,9 +71,12 @@ C4Component
   variante, ancrage et overrides ; les valeurs se résolvent dans l'ordre
   défaut, variante, instance. Les paramètres compatibles avec
   `AnimationValue` sont découvrables via `PropertyDescriptorRegistry`.
-- `TexturedPath v1` conservera un chemin, une largeur éventuellement variable,
-  une référence texture, répétition ou étirement, offset, couleur, opacité et
-  raccords. La collision restera une référence optionnelle et séparée.
+- `TexturedPath v1` est stocké sous
+  `assets/paths/<id>.textured-path.json`. Il conserve commandes line/cubic,
+  fermeture, largeur et profil optionnel, texture, répétition ou étirement,
+  échelle/offset UV, couleur, opacité, raccords et terminaisons. Le ruban et
+  ses UV sont dérivés à l'exécution ; aucune collision ni géométrie
+  triangulée n'est persistée par ce document.
 - `MechanicGraph v1` composera corps, pivots, joints, moteurs, capteurs,
   contraintes et liaisons événementielles. Ses instances exposeront des
   paramètres typés et seront simulables dans Map Studio avant le runtime.
