@@ -149,6 +149,7 @@ target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
 )
 
 add_library(fabric_runtime STATIC
+    engine/fabric_runtime/src/input.cpp
     engine/fabric_runtime/src/preview_runtime.cpp
 )
 target_include_directories(fabric_runtime PUBLIC engine/fabric_runtime/include
@@ -328,6 +329,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     target_link_libraries(fabric_scene_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_scene_tests COMMAND fabric_scene_tests)
+
+    add_executable(fabric_input_tests tests/cpp/input_tests.cpp)
+    target_link_libraries(fabric_input_tests PRIVATE
+        fabric_runtime Catch2::Catch2WithMain)
+    add_test(NAME fabric_input_tests COMMAND fabric_input_tests)
 
     add_executable(fabric_map_chunk_index_tests
         tests/cpp/map_chunk_index_tests.cpp
