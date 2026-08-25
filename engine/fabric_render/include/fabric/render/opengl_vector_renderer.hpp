@@ -57,6 +57,13 @@ public:
         const OpenGLTextureResolver& texture_resolver = {});
 
 private:
+    struct Vertex {
+        float x;
+        float y;
+        float u;
+        float v;
+    };
+
     std::uint32_t program_{};
     std::uint32_t vertex_array_{};
     std::uint32_t vertex_buffer_{};
@@ -68,6 +75,9 @@ private:
     std::int32_t opacity_uniform_{-1};
     std::size_t vertex_buffer_capacity_{};
     std::size_t index_buffer_capacity_{};
+    std::vector<Vertex> vertex_scratch_;
+    std::vector<std::uint32_t> index_scratch_;
+    std::vector<const VectorDrawPacket*> batch_scratch_;
 };
 
 } // namespace fabric::render

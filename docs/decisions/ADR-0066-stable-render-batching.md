@@ -23,3 +23,9 @@ réutilise la capacité des VBO/IBO avec `glBufferSubData` et évite la table
 d’indexation des packets lorsqu’aucun clip n’est présent. Ces optimisations
 réduisent les allocations et recherches répétées par frame sans changer l’ordre
 ou le résultat des draw packets.
+
+Les vecteurs CPU de construction des batches et des contours sont conservés
+dans le renderer et réutilisés entre frames. Sur macOS, le benchmark synthétique
+de 10 000 packets passe de `120,704 ms` à `5,238 ms` p95, avec 600 draw calls
+sur 600 frames ; cette mesure valide l’incrément synthétique, mais ne remplace
+pas encore la mesure de la scène de référence multiplateforme.

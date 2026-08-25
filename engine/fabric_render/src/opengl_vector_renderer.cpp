@@ -198,13 +198,6 @@ std::array<float, 16> world_to_clip(const OpenGLVectorViewport& viewport) {
             -(2.0F * bottom + height) / height, 0.0F, 1.0F};
 }
 
-struct Vertex {
-    float x;
-    float y;
-    float u;
-    float v;
-};
-
 } // namespace
 
 OpenGLVectorRenderer::~OpenGLVectorRenderer() { shutdown(); }
@@ -322,6 +315,9 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     opacity_uniform_ = -1;
     vertex_buffer_capacity_ = 0U;
     index_buffer_capacity_ = 0U;
+    vertex_scratch_.clear();
+    index_scratch_.clear();
+    batch_scratch_.clear();
 }
 
 OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
@@ -412,15 +408,15 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             (stencil_only || packet.fill_color.has_value() ||
              (resolved_image && has_uv));
         if (!can_draw_fill) return false;
-        std::vector<Vertex> vertices;
-        vertices.reserve(packet.fill_vertices.size());
+        vertex_scratch_.clear();
+        vertex_scratch_.reserve(packet.fill_vertices.size());
         for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index) {
             const auto point = packet.fill_vertices[index];
             const auto uv = has_uv ? packet.fill_uv[index] : core::Vec2{};
-            vertices.push_back({point.x, point.y, uv.x, uv.y});
+            vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
         }
-        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
-                      vertices.data(), vertex_buffer_capacity_);
+        upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),
+                      vertex_scratch_.data(), vertex_buffer_capacity_);
         upload_buffer(GL_ELEMENT_ARRAY_BUFFER,
                       packet.fill_indices.size() * sizeof(std::uint32_t),
                       packet.fill_indices.data(), index_buffer_capacity_);
@@ -453,20 +449,20 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
 
     const auto draw_stroke = [&](const VectorDrawPacket& packet) {
         if (!packet.stroke.has_value() || packet.outline.size() < 2U) return false;
-        std::vector<Vertex> vertices;
-        vertices.reserve(packet.outline.size());
+        vertex_scratch_.clear();
+        vertex_scratch_.reserve(packet.outline.size());
         for (const auto point : packet.outline) {
-            vertices.push_back({point.x, point.y, 0.0F, 0.0F});
+            vertex_scratch_.push_back({point.x, point.y, 0.0F, 0.0F});
         }
-        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
-                      vertices.data(), vertex_buffer_capacity_);
+        upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),
+                      vertex_scratch_.data(), vertex_buffer_capacity_);
         const auto& color = packet.stroke->color;
         functions.uniform_4f(color_uniform_, color.red, color.green,
                              color.blue, color.alpha);
         functions.uniform_1i(textured_uniform_, 0);
         functions.uniform_1f(opacity_uniform_, 1.0F);
         functions.draw_arrays(packet.closed_outline ? GL_LINE_LOOP : GL_LINE_STRIP,
-                              0, static_cast<GLsizei>(vertices.size()));
+                              0, static_cast<GLsizei>(vertex_scratch_.size()));
         ++stats.draw_calls;
         return true;
     };
@@ -507,8 +503,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             return false;
         }
 
-        std::vector<Vertex> vertices;
-        std::vector<std::uint32_t> indices;
+        vertex_scratch_.clear();
+        index_scratch_.clear();
         for (const auto* packet : batch) {
             if (packet == nullptr || packet->fill_vertices.empty() ||
                 packet->fill_indices.empty() || !same_fill_material(first, *packet))
@@ -521,22 +517,22 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                     return false;
                 }
             }
-            const auto base = static_cast<std::uint32_t>(vertices.size());
-            vertices.reserve(vertices.size() + packet->fill_vertices.size());
+            const auto base = static_cast<std::uint32_t>(vertex_scratch_.size());
+            vertex_scratch_.reserve(vertex_scratch_.size() + packet->fill_vertices.size());
             for (std::size_t index = 0; index < packet->fill_vertices.size(); ++index) {
                 const auto point = packet->fill_vertices[index];
                 const auto uv = packet->fill_uv.size() == packet->fill_vertices.size()
                     ? packet->fill_uv[index] : core::Vec2{};
-                vertices.push_back({point.x, point.y, uv.x, uv.y});
+                vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
             }
-            indices.reserve(indices.size() + packet->fill_indices.size());
-            for (const auto index : packet->fill_indices) indices.push_back(base + index);
+            index_scratch_.reserve(index_scratch_.size() + packet->fill_indices.size());
+            for (const auto index : packet->fill_indices) index_scratch_.push_back(base + index);
         }
 
-        upload_buffer(GL_ARRAY_BUFFER, vertices.size() * sizeof(Vertex),
-                      vertices.data(), vertex_buffer_capacity_);
-        upload_buffer(GL_ELEMENT_ARRAY_BUFFER,
-                      indices.size() * sizeof(std::uint32_t), indices.data(),
+        upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),
+                      vertex_scratch_.data(), vertex_buffer_capacity_);
+        upload_buffer(GL_ELEMENT_ARRAY_BUFFER, index_scratch_.size() * sizeof(std::uint32_t),
+                      index_scratch_.data(),
                       index_buffer_capacity_);
         if (texture) {
             functions.uniform_4f(color_uniform_, 1.0F, 1.0F, 1.0F, 1.0F);
@@ -551,27 +547,29 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
-        functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()),
+        functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(index_scratch_.size()),
                                 GL_UNSIGNED_INT, nullptr);
         ++stats.draw_calls;
         stats.packets_drawn += static_cast<std::uint32_t>(batch.size());
-        stats.triangles_drawn += static_cast<std::uint32_t>(indices.size() / 3U);
+        stats.triangles_drawn += static_cast<std::uint32_t>(index_scratch_.size() / 3U);
         return true;
     };
 
     for (std::size_t packet_index = 0; packet_index < packets.size();) {
         const auto& packet = packets[packet_index];
         if (!packet.clip_node_id && !packet.stroke && !packet.fill_indices.empty()) {
-            std::vector<const VectorDrawPacket*> batch{&packet};
+            batch_scratch_.clear();
+            batch_scratch_.push_back(&packet);
             std::size_t next = packet_index + 1U;
             while (next < packets.size()) {
                 const auto& candidate = packets[next];
                 if (candidate.clip_node_id || candidate.stroke || candidate.fill_indices.empty() ||
                     !same_fill_material(packet, candidate)) break;
-                batch.push_back(&candidate);
+                batch_scratch_.push_back(&candidate);
                 ++next;
             }
-            if (batch.size() > 1U && draw_fill_batch(batch)) {
+            if (batch_scratch_.size() > 1U &&
+                draw_fill_batch(std::span<const VectorDrawPacket* const>(batch_scratch_))) {
                 packet_index = next;
                 continue;
             }

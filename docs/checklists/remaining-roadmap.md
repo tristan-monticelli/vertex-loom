@@ -390,7 +390,7 @@ inspectable avec collisions et événements.
   partagée entre instances.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
-- [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
+- [x] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
   stable et caméra interpolée.
 - [x] Appliquer le tri stable couche → profondeur → Z → identifiant aux packets
   du Preview Runtime.
