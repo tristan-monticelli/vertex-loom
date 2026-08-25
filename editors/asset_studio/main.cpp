@@ -1053,6 +1053,84 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::EndDisabled();
         }
+        if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::entity &&
+            session.selected_entity() &&
+            !session.selected_entity()->nodes.empty()) {
+            const auto& entity = *session.selected_entity();
+            ImGui::SeparatorText("Entity hierarchy");
+            canvas.selected_node = std::min(canvas.selected_node,
+                                            entity.nodes.size() - 1);
+            for (std::size_t node_index = 0; node_index < entity.nodes.size();
+                 ++node_index) {
+                const auto label = entity.nodes[node_index].name + "##entity-node-" +
+                    std::to_string(node_index);
+                if (ImGui::Selectable(label.c_str(),
+                                      canvas.selected_node == node_index)) {
+                    canvas.selected_node = node_index;
+                }
+            }
+            auto node = entity.nodes[canvas.selected_node];
+            const auto commit_entity_node =
+                [&](fabric::project::EntityNode changed) {
+                    if (session.set_selected_entity_node(
+                            canvas.selected_node, std::move(changed))) {
+                        status = "Entity node changed.";
+                    } else {
+                        status = "Entity change rejected; inspect diagnostics.";
+                    }
+                };
+            ImGui::SeparatorText("Entity node properties");
+            std::string node_name = node.name;
+            if (ImGui::InputText("Node name", &node_name)) {
+                node.name = std::move(node_name);
+                commit_entity_node(node);
+            }
+            const auto parent_label = [&](const std::optional<std::string>& parent) {
+                if (!parent) return std::string{"None"};
+                for (const auto& candidate : entity.nodes) {
+                    if (candidate.id == *parent) return candidate.name;
+                }
+                return std::string{"Missing: "} + *parent;
+            };
+            if (ImGui::BeginCombo("Parent", parent_label(node.parent).c_str())) {
+                if (ImGui::Selectable("None", !node.parent.has_value())) {
+                    node.parent.reset();
+                    commit_entity_node(node);
+                }
+                for (const auto& candidate : entity.nodes) {
+                    if (candidate.id == node.id) continue;
+                    const bool selected_parent = node.parent.has_value() &&
+                        *node.parent == candidate.id;
+                    if (ImGui::Selectable(candidate.name.c_str(), selected_parent)) {
+                        node.parent = candidate.id;
+                        commit_entity_node(node);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            float position[]{node.transform.position.x, node.transform.position.y};
+            if (ImGui::InputFloat2("Entity position", position)) {
+                node.transform.position = {position[0], position[1]};
+                commit_entity_node(node);
+            }
+            float scale[]{node.transform.scale.x, node.transform.scale.y};
+            if (ImGui::InputFloat2("Entity scale", scale)) {
+                node.transform.scale = {scale[0], scale[1]};
+                commit_entity_node(node);
+            }
+            float rotation = node.transform.rotation_degrees;
+            if (ImGui::InputFloat("Entity rotation", &rotation, 1.0F, 10.0F,
+                                  "%.2f deg")) {
+                node.transform.rotation_degrees = rotation;
+                commit_entity_node(node);
+            }
+            float z_order = node.z_order;
+            if (ImGui::InputFloat("Z order", &z_order, 0.1F, 1.0F, "%.2f")) {
+                node.z_order = z_order;
+                commit_entity_node(node);
+            }
+        }
     } else {
         ImGui::TextDisabled("No selection");
     }

@@ -87,6 +87,10 @@ public:
         std::size_t node_index, project::VectorNode node,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_entity_node(
+        std::size_t node_index, project::EntityNode node,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool undo(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
@@ -132,6 +136,7 @@ private:
         none,
         manifest,
         vector,
+        entity,
     };
 
     std::filesystem::path project_root_;
@@ -146,7 +151,9 @@ private:
     std::optional<std::size_t> selected_resource_index_;
     std::optional<project::ProjectManifest> recovery_manifest_;
     std::optional<project::VectorAsset> recovery_vector_;
+    std::optional<project::EntityDefinition> recovery_entity_;
     std::filesystem::path selected_vector_document_path_;
+    std::filesystem::path selected_entity_document_path_;
     DirtyDocument dirty_document_{DirtyDocument::none};
     CommandStack commands_;
     AutosaveScheduler autosave_;

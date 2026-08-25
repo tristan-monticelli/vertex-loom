@@ -206,6 +206,32 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     CHECK(session.selected_entity()->nodes.front().name == "Body");
     CHECK(session.selected_entity()->nodes.front().drawable.kind ==
           fabric::project::EntityDrawableKind::none);
+    auto node = session.selected_entity()->nodes.front();
+    node.name = "Body edited";
+    node.transform.position = {2.0F, -1.0F};
+    node.transform.rotation_degrees = 15.0F;
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.set_selected_entity_node(0, node, start));
+    CHECK(session.dirty());
+    REQUIRE(session.undo());
+    CHECK(session.selected_entity()->nodes.front().name == "Body");
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_entity()->nodes.front().transform.position ==
+          fabric::core::Vec2{2.0F, -1.0F});
+    CHECK(session.update_autosave(start) ==
+          fabric::editor::AutosaveStatus::not_due);
+    CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
+          fabric::editor::AutosaveStatus::saved);
+    fabric::editor::ProjectSession recovered;
+    REQUIRE(recovered.open(project.path()));
+    REQUIRE(recovered.select_resource(
+        fabric::editor::StudioResourceKind::entity, {.value = "hero-entity"}));
+    REQUIRE(recovered.has_recovery());
+    REQUIRE(recovered.accept_recovery(start + std::chrono::seconds{3}));
+    CHECK(recovered.selected_entity()->nodes.front().name == "Body edited");
+    REQUIRE(recovered.save());
+    REQUIRE(session.save());
+    CHECK_FALSE(session.dirty());
     const auto loaded = fabric::project::load_entity(
         project.path(), *session.manifest(),
         fabric::project::entity_document_path(

@@ -223,7 +223,9 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     selected_resource_index_.reset();
     recovery_manifest_.reset();
     recovery_vector_.reset();
+    recovery_entity_.reset();
     selected_vector_document_path_.clear();
+    selected_entity_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -270,7 +272,9 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
     recovery_vector_.reset();
+    recovery_entity_.reset();
     selected_vector_document_path_.clear();
+    selected_entity_document_path_.clear();
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
@@ -286,7 +290,7 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
                     "a project must be open before importing a texture"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before importing another resource"}};
         return false;
@@ -337,7 +341,7 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
                     "a project must be open before importing a vector"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before importing another resource"}};
         return false;
@@ -386,7 +390,7 @@ bool ProjectSession::create_vector_artwork(
                     "a project must be open before creating an artwork"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before creating another resource"}};
         return false;
@@ -474,7 +478,7 @@ bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
                     "a project must be open before creating a material"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before creating another resource"}};
         return false;
@@ -532,7 +536,7 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
                     "a project must be open before creating an entity"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before creating another resource"}};
         return false;
@@ -597,7 +601,7 @@ bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
                     "a project must be open before creating an animation"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
                     "save vector changes before creating another resource"}};
         return false;
@@ -728,7 +732,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                     "the selected resource is not indexed"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::none) {
         const auto* selected = selected_resource();
         if (selected == nullptr || selected->kind != kind || selected->id != id) {
             errors_ = {{project::ErrorCode::invalid_asset, "selection",
@@ -770,6 +774,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         created_vector_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
     } else if (kind == StudioResourceKind::vector) {
         auto loaded = project::load_vector_asset(
             project_root_, *manifest_, match->document_path);
@@ -819,6 +825,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                 selection_warnings = std::move(recovery.errors);
             }
         }
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
     } else if (kind == StudioResourceKind::material) {
         auto loaded = project::load_material(
             project_root_, *manifest_, match->document_path);
@@ -834,6 +842,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
     } else if (kind == StudioResourceKind::entity) {
         auto loaded = project::load_entity(
             project_root_, *manifest_, match->document_path);
@@ -849,6 +859,24 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
+        selected_entity_document_path_ = match->document_path;
+        recovery_entity_.reset();
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_entity_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_entity(*manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_entity(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok()) recovery_entity_ = std::move(parsed.entity);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty()) {
+            selection_warnings = std::move(recovery.errors);
+        }
     } else {
         auto loaded = project::load_animation(
             project_root_, *manifest_, match->document_path);
@@ -864,6 +892,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         selected_animation_ = std::move(*loaded.asset);
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
     }
     selected_resource_index_ = index;
     errors_ = std::move(selection_warnings);
@@ -877,12 +907,13 @@ bool ProjectSession::set_project_name(
                     "a project must be open before editing its name"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty() && (dirty_document_ == DirtyDocument::vector ||
+                              dirty_document_ == DirtyDocument::entity)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "save vector changes before editing project settings"}};
         return false;
     }
-    if (!commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
         if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
             return false;
         }
@@ -920,12 +951,13 @@ bool ProjectSession::set_pixels_per_unit(
                     "a project must be open before editing its units"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (commands_.dirty() && (dirty_document_ == DirtyDocument::vector ||
+                              dirty_document_ == DirtyDocument::entity)) {
         errors_ = {{project::ErrorCode::invalid_manifest, "project",
                     "save vector changes before editing project settings"}};
         return false;
     }
-    if (!commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
         if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
             return false;
         }
@@ -966,12 +998,12 @@ bool ProjectSession::set_selected_vector_node(
                     "select a native vector node before editing it"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ == DirtyDocument::manifest) {
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::vector) {
         errors_ = {{project::ErrorCode::invalid_asset, "selection",
                     "save project settings before editing a vector"}};
         return false;
     }
-    if (!commands_.dirty() && dirty_document_ == DirtyDocument::manifest) {
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
         if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
             return false;
         }
@@ -999,6 +1031,46 @@ bool ProjectSession::set_selected_vector_node(
         return false;
     }
     dirty_document_ = DirtyDocument::vector;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_entity_node(
+    const std::size_t node_index, project::EntityNode node,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || node_index >= selected_entity_->nodes.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an entity node before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing an entity"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
+            return false;
+        }
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto candidate = *selected_entity_;
+    candidate.nodes[node_index] = node;
+    auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<SetValueCommand<project::EntityNode>>(
+            selected_entity_->nodes[node_index], std::move(node)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "node",
+                    "cannot execute the entity node modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::entity;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -1042,6 +1114,20 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::entity) {
+        if (!selected_entity_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_entity(
+            project_root_, *manifest_, *selected_entity_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else {
         auto report = project::save_manifest_atomic(project_root_, *manifest_);
         if (!report.ok()) {
@@ -1068,15 +1154,25 @@ AutosaveStatus ProjectSession::update_autosave(
         }
         const bool vector_document = dirty_document_ == DirtyDocument::vector &&
             created_vector_ && !selected_vector_document_path_.empty();
+        const bool entity_document = dirty_document_ == DirtyDocument::entity &&
+            selected_entity_ && !selected_entity_document_path_.empty();
         auto report = project::save_autosave_atomic(
             project_root_,
             vector_document ? selected_vector_document_path_
+            : entity_document ? selected_entity_document_path_
                             : std::filesystem::path{"project.json"},
             vector_document ? project::serialize_vector_asset(*created_vector_)
+            : entity_document ? project::serialize_entity(*selected_entity_)
                             : project::serialize_manifest(*manifest_),
             vector_document
                 ? project::DocumentValidator{[this](const std::string_view contents) {
                       auto parsed = project::parse_vector_asset(*manifest_, contents);
+                      return project::ValidationReport{
+                          .errors = std::move(parsed.errors)};
+                  }}
+                : entity_document
+                ? project::DocumentValidator{[this](const std::string_view contents) {
+                      auto parsed = project::parse_entity(*manifest_, contents);
                       return project::ValidationReport{
                           .errors = std::move(parsed.errors)};
                   }}
@@ -1094,15 +1190,25 @@ AutosaveStatus ProjectSession::update_autosave(
     }
     const bool vector_document = dirty_document_ == DirtyDocument::vector &&
         created_vector_ && !selected_vector_document_path_.empty();
+    const bool entity_document = dirty_document_ == DirtyDocument::entity &&
+        selected_entity_ && !selected_entity_document_path_.empty();
     auto report = project::save_autosave_atomic(
         project_root_,
         vector_document ? selected_vector_document_path_
+        : entity_document ? selected_entity_document_path_
                         : std::filesystem::path{"project.json"},
         vector_document ? project::serialize_vector_asset(*created_vector_)
+        : entity_document ? project::serialize_entity(*selected_entity_)
                         : project::serialize_manifest(*manifest_),
         vector_document
             ? project::DocumentValidator{[this](const std::string_view contents) {
                   auto parsed = project::parse_vector_asset(*manifest_, contents);
+                  return project::ValidationReport{
+                      .errors = std::move(parsed.errors)};
+              }}
+            : entity_document
+            ? project::DocumentValidator{[this](const std::string_view contents) {
+                  auto parsed = project::parse_entity(*manifest_, contents);
                   return project::ValidationReport{
                       .errors = std::move(parsed.errors)};
               }}
@@ -1128,6 +1234,16 @@ bool ProjectSession::accept_recovery(
         errors_.clear();
         return true;
     }
+    if (recovery_entity_) {
+        selected_entity_ = std::move(recovery_entity_);
+        recovery_entity_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::entity;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (!recovery_manifest_.has_value()) {
         return false;
     }
@@ -1144,6 +1260,7 @@ bool ProjectSession::accept_recovery(
 void ProjectSession::decline_recovery() noexcept {
     recovery_manifest_.reset();
     recovery_vector_.reset();
+    recovery_entity_.reset();
     errors_.clear();
 }
 
@@ -1164,7 +1281,8 @@ bool ProjectSession::can_redo() const noexcept {
 }
 
 bool ProjectSession::has_recovery() const noexcept {
-    return recovery_manifest_.has_value() || recovery_vector_.has_value();
+    return recovery_manifest_.has_value() || recovery_vector_.has_value() ||
+        recovery_entity_.has_value();
 }
 
 const std::filesystem::path& ProjectSession::project_root() const noexcept {

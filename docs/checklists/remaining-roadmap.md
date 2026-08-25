@@ -247,6 +247,8 @@ transformation d’image de A vers B sans ajouter de code spécifique à ces cas
   dépendance sprite.
 - [x] Définir `EntityDefinition v1` avec nœuds stables, parentage, transforms,
   drawables vectoriels et références d’artworks.
+- [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
+  `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
 - [ ] Refuser cycles, références invalides et valeurs non finies.
 - [ ] Ajouter contraintes copy-transform, limites, look-at et ordre explicite.
 - [ ] Ajouter maillage triangulé, poids, FABRIK 2D et solveur XPBD unifié.

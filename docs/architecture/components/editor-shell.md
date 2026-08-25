@@ -54,8 +54,8 @@ C4Component
 - Le hub affiche séparément `Create`, `Import` et `Add existing`. Projet,
   artwork et chaque source d’import possèdent un état isolé. `Add existing`
   ouvre un sélecteur des ressources déjà indexées et ne publie aucun document.
-  Les actions matériau et entité restent désactivées jusqu’à
-  l’arrivée de leur contrat.
+  Les actions matériau, entité et animation utilisent leurs prompts typés et
+  publient des documents validés avant réindexation.
 - Le panneau gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
   L'index est reconstruit à l'ouverture et après publication ; sélectionner
@@ -70,6 +70,10 @@ C4Component
 - Le hub propose `New animation...`. Le prompt crée un `AnimationClip v1`
   avec durée, boucle et marker optionnel, le publie atomiquement dans
   `assets/animations`, puis le réindexe sans imposer de piste métier.
+- L’inspecteur d’entité liste les nœuds dans leur ordre stable et permet de
+  modifier nom, parent et transform. Chaque mutation passe par
+  `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de
+  transform non fini.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,
@@ -127,7 +131,8 @@ C4Component
 - La session expose undo, redo et dirty et ne marque clean qu’après une
   sauvegarde principale réussie.
 - Save et autosave ciblent le document actif : `project.json` pour les réglages
-  projet ou le document `VectorAsset` sélectionné pour l'édition native.
+  projet, le document `VectorAsset` ou le document `EntityDefinition` sélectionné
+  pour l'édition.
 - `CommandStack::execute` accepte une commande possédée par la pile ;
   `can_undo`, `can_redo`, `undo`, `redo`, `mark_clean` et `dirty` exposent son
   état sans dépendance à Dear ImGui.
@@ -138,3 +143,5 @@ C4Component
 - Le manifeste constitue le premier document éditable intégré : son nom et ses
   unités passent par commandes, Save remplace `project.json`, et son autosave
   sert de preuve headless du flux commun avant les futurs documents d’asset.
+- Les entités sélectionnées utilisent le même flux headless : édition de nœud,
+  undo/redo, sauvegarde atomique, autosave miroir et récupération validée.
