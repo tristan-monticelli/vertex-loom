@@ -7,9 +7,11 @@ demande un contexte OpenGL 2.1 de compatibilité afin de fonctionner sur les
 environnements qui n’exposent pas OpenGL 3.x.
 
 `OpenGLVectorRenderer` sélectionne GLSL 1.20 et un chemin VBO sans VAO pour un
-contexte antérieur à OpenGL 3. Les contextes OpenGL 3+ conservent GLSL 1.30 ou
-1.50 selon la plateforme et le chemin VAO existant. Le benchmark désactive la
-VSync après création du contexte afin de mesurer le coût de rendu réel.
+contexte OpenGL 2. Les contextes OpenGL 3+ conservent GLSL 1.30 ou 1.50 selon
+la plateforme et le chemin VAO existant. Si le pilote Windows ne fournit que
+OpenGL 1.1, le renderer utilise les tableaux de sommets et le batching du
+pipeline fixe. Les deux benchmarks désactivent la VSync après création du
+contexte afin de mesurer le coût de rendu réel.
 
 ## Conséquences
 
