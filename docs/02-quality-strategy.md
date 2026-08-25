@@ -99,6 +99,8 @@ poids nuls, poses dupliquées et références de poses manquantes.
 `MapDocument v1` couvre round-trip, publication atomique, chunks 64 × 64,
 calques, prefabs, instances, formes de collision, capteurs, triggers,
 événements et propriétés custom strictement typées.
+L’index de chunks couvre 100 000 instances, coordonnées négatives, ordre
+déterministe et extraction par viewport.
 formes et fills futurs devront ajouter les tests de chemins, contours, clips,
 images remplissantes, tessellation déterministe et draw packets headless. Les
 modèles de prompts

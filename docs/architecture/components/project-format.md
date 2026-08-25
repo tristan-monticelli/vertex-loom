@@ -86,6 +86,8 @@ C4Component
   prefabs, instances, collisions et triggers. Les instances sont indexées par
   chunks de `64 × 64` unités et les propriétés custom ont un ensemble de types
   fermé.
+- `MapChunkIndex` maintient un ordre déterministe par chunk et identifiant et
+  extrait les instances visibles d’un viewport sans accès disque.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
