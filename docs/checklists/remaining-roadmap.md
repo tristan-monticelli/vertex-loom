@@ -383,6 +383,7 @@ inspectable avec collisions et événements.
   des sommets animés.
 - [x] Réévaluer l’ordre pistes → contraintes → IK → poses de déformation à
   chaque instant headless ou frame runtime.
+- [x] Partager les nœuds résolus avec les draw packets visuels des instances.
 - [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
   maps, contraintes et solveurs sans conversion manuelle.
 - [ ] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri

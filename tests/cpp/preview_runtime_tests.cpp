@@ -5,6 +5,7 @@
 #include "fabric/project/vector_asset.hpp"
 
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -554,6 +555,12 @@ TEST_CASE("preview runtime evaluates animation before entity constraints") {
     REQUIRE(deformation->ok());
     REQUIRE(deformation->positions.size() == 1U);
     CHECK(deformation->positions.front() == fabric::core::Vec2{1.0F, 2.0F});
+    const auto nodes = runtime.evaluate_instance_nodes("constrained", 0.5F);
+    REQUIRE(nodes.has_value());
+    const auto target = std::find_if(nodes->begin(), nodes->end(),
+        [](const auto& node) { return node.id == "target"; });
+    REQUIRE(target != nodes->end());
+    CHECK(target->transform.position == fabric::core::Vec2{1.0F, 2.0F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

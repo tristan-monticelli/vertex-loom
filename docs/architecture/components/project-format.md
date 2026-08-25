@@ -89,6 +89,8 @@ C4Component
   sont refusés avant résolution ; les bornes optionnelles de `limits` doivent
   être finies et ordonnées. Preview Runtime résout à chaque évaluation les
   pistes, puis ces contraintes et les chaînes IK avant les poses de déformation.
+  Les mêmes nœuds résolus pilotent les draw packets visuels, y compris pour les
+  entités sans maillage de déformation.
 - Les entités peuvent persister des chaînes FABRIK 2D (`ikChains`) ciblant des
   nœuds par identifiant ; le runtime les résout dans l'ordre déclaré avant de
   produire les poses et draw packets. Le solveur conserve la racine, borne ses itérations, vérifie les

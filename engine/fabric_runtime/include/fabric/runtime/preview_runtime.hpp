@@ -3,6 +3,7 @@
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
+#include "fabric/project/entity.hpp"
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/replay.hpp"
@@ -85,6 +86,8 @@ public:
     evaluate_instance_deformation(const std::string& instance_id) const;
     [[nodiscard]] std::optional<project::MeshDeformationResult>
     evaluate_instance_deformation(const std::string& instance_id, float time) const;
+    [[nodiscard]] std::optional<std::vector<project::EntityNode>>
+    evaluate_instance_nodes(const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::XpbdSystem>
     instance_xpbd_state(const std::string& instance_id) const;
 

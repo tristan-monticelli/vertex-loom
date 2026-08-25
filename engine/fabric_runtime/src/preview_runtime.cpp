@@ -592,20 +592,18 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             impl_->animation_state_machines.emplace(
                 instance.id, *resolved_entity.animation_state_machine);
         }
-        if (resolved_entity.deformation_mesh || resolved_entity.xpbd) {
-            Impl::EntitySimulation simulation{
-                .mesh = resolved_entity.deformation_mesh,
-                .xpbd = resolved_entity.xpbd,
-                .nodes = resolved_entity.nodes,
-                .constraints = resolved_entity.constraints,
-                .ik_chains = resolved_entity.ik_chains,
-                .instance_transform = instance.transform};
-            simulation.poses.reserve(resolved_entity.nodes.size());
-            for (const auto& node : resolved_entity.nodes)
-                simulation.poses.push_back({.node_id = node.id,
-                                            .transform = node.transform});
-            impl_->entity_simulations.emplace(instance.id, std::move(simulation));
-        }
+        Impl::EntitySimulation simulation{
+            .mesh = resolved_entity.deformation_mesh,
+            .xpbd = resolved_entity.xpbd,
+            .nodes = resolved_entity.nodes,
+            .constraints = resolved_entity.constraints,
+            .ik_chains = resolved_entity.ik_chains,
+            .instance_transform = instance.transform};
+        simulation.poses.reserve(resolved_entity.nodes.size());
+        for (const auto& node : resolved_entity.nodes)
+            simulation.poses.push_back({.node_id = node.id,
+                                        .transform = node.transform});
+        impl_->entity_simulations.emplace(instance.id, std::move(simulation));
         for (std::size_t node_index = 0; node_index < resolved_entity.nodes.size(); ++node_index) {
             const auto& node = resolved_entity.nodes[node_index];
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
@@ -715,7 +713,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             }
         }
     }
-    stats_.deformation_instances = impl_->entity_simulations.size();
+    stats_.deformation_instances = static_cast<std::size_t>(std::ranges::count_if(
+        impl_->entity_simulations, [](const auto& item) {
+            return item.second.mesh.has_value();
+        }));
     std::stable_sort(impl_->packets.begin(), impl_->packets.end(),
                      [](const auto& left, const auto& right) {
                          return left.node_id < right.node_id;
@@ -908,6 +909,7 @@ bool PreviewRuntime::run() {
         const auto bounds = impl_->camera.world_bounds();
         const auto animation_time = static_cast<float>(stats_.physics_steps) *
             static_cast<float>(fixed_time_step);
+        std::unordered_map<std::string, std::vector<project::EntityNode>> evaluated_nodes;
         const auto animate_packet = [&](render::VectorDrawPacket packet) {
             const auto separator = packet.node_id.find(':');
             if (separator == std::string::npos) return packet;
@@ -932,15 +934,27 @@ bool PreviewRuntime::run() {
                     ++stats_.deformed_packets;
                 }
             }
-            const auto evaluation = evaluate_instance_animation(
-                instance_id, animation_time);
-            if (!evaluation || !evaluation->ok()) return packet;
             const auto second_separator = packet.node_id.find(':', separator + 1U);
             const auto node_id = packet.node_id.substr(
                 separator + 1U,
                 second_separator == std::string::npos
                     ? std::string::npos
                     : second_separator - separator - 1U);
+            const auto nodes_entry = evaluated_nodes.find(instance_id);
+            if (nodes_entry == evaluated_nodes.end()) {
+                const auto nodes = evaluate_instance_nodes(instance_id, animation_time);
+                if (nodes) evaluated_nodes.emplace(instance_id, *nodes);
+            }
+            const auto resolved_nodes = evaluated_nodes.find(instance_id);
+            const project::EntityNode* resolved_node = nullptr;
+            if (resolved_nodes != evaluated_nodes.end()) {
+                const auto found_node = std::find_if(
+                    resolved_nodes->second.begin(), resolved_nodes->second.end(),
+                    [&](const auto& candidate) { return candidate.id == node_id; });
+                if (found_node != resolved_nodes->second.end()) resolved_node = &*found_node;
+            }
+            const auto evaluation = evaluate_instance_animation(
+                instance_id, animation_time);
             const auto base_transform = impl_->packet_base_transforms.find(packet.node_id);
             if (base_transform == impl_->packet_base_transforms.end()) return packet;
             std::optional<core::Vec2> position;
@@ -948,7 +962,7 @@ bool PreviewRuntime::run() {
             std::optional<core::Vec2> scale;
             std::optional<core::Color> color;
             std::optional<float> opacity;
-            for (const auto& property : evaluation->properties) {
+            if (evaluation && evaluation->ok()) for (const auto& property : evaluation->properties) {
                 if (property.binding.node_id != node_id) continue;
                 if (property.binding.component_id == "transform" &&
                     property.binding.property_id == "position") {
@@ -971,6 +985,11 @@ bool PreviewRuntime::run() {
                     if (const auto* value = std::get_if<float>(&property.value))
                         opacity = *value;
                 }
+            }
+            if (resolved_node) {
+                position = resolved_node->transform.position;
+                rotation_degrees = resolved_node->transform.rotation_degrees;
+                scale = resolved_node->transform.scale;
             }
             if (!position && !rotation_degrees && !scale && !color && !opacity)
                 return packet;
@@ -1105,6 +1124,21 @@ PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id) co
     return evaluate_instance_deformation(instance_id, 0.0F);
 }
 
+std::optional<std::vector<project::EntityNode>>
+PreviewRuntime::evaluate_instance_nodes(const std::string& instance_id,
+                                        const float time) const {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->entity_simulations.find(instance_id);
+    if (found == impl_->entity_simulations.end()) return std::nullopt;
+    auto nodes = found->second.nodes;
+    const auto animation = evaluate_instance_animation(instance_id, time);
+    if (animation && animation->ok()) apply_animation_to_nodes(nodes, *animation);
+    if (!resolve_constraints(nodes, found->second.constraints) ||
+        !resolve_ik_chains(nodes, found->second.ik_chains))
+        return std::nullopt;
+    return nodes;
+}
+
 std::optional<project::MeshDeformationResult>
 PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id,
                                               const float time) const {
@@ -1119,15 +1153,11 @@ PreviewRuntime::evaluate_instance_deformation(const std::string& instance_id,
             result.positions.push_back(particle.position);
         return result;
     }
-    auto nodes = found->second.nodes;
-    const auto animation = evaluate_instance_animation(instance_id, time);
-    if (animation && animation->ok()) apply_animation_to_nodes(nodes, *animation);
-    if (!resolve_constraints(nodes, found->second.constraints) ||
-        !resolve_ik_chains(nodes, found->second.ik_chains))
-        return std::nullopt;
+    const auto nodes = evaluate_instance_nodes(instance_id, time);
+    if (!nodes) return std::nullopt;
     std::vector<project::DeformationPose> poses;
-    poses.reserve(nodes.size());
-    for (const auto& node : nodes)
+    poses.reserve(nodes->size());
+    for (const auto& node : *nodes)
         poses.push_back({.node_id = node.id, .transform = node.transform});
     return project::deform_mesh(*found->second.mesh, poses);
 }
