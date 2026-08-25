@@ -189,6 +189,31 @@ TEST_CASE("material prompt publishes and indexes a material document") {
     CHECK(loaded.asset->color == fabric::core::Color{0.8F, 0.7F, 0.5F, 1.0F});
 }
 
+TEST_CASE("entity prompt publishes and indexes a one-node entity") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Hero entity";
+    prompt.node_name = "Body";
+    REQUIRE(session.create_entity(prompt));
+    REQUIRE(session.selected_resource() != nullptr);
+    CHECK(session.selected_resource()->kind ==
+          fabric::editor::StudioResourceKind::entity);
+    REQUIRE(session.selected_entity().has_value());
+    REQUIRE(session.selected_entity()->nodes.size() == 1U);
+    CHECK(session.selected_entity()->nodes.front().name == "Body");
+    CHECK(session.selected_entity()->nodes.front().drawable.kind ==
+          fabric::project::EntityDrawableKind::none);
+    const auto loaded = fabric::project::load_entity(
+        project.path(), *session.manifest(),
+        fabric::project::entity_document_path(
+            *session.manifest(), session.selected_entity()->document.id));
+    REQUIRE(loaded.ok());
+    CHECK(*loaded.entity == *session.selected_entity());
+}
+
 TEST_CASE("undoing to clean neutralizes a previous autosave") {
     using namespace std::chrono_literals;
     const TemporaryDirectory project;

@@ -73,7 +73,7 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                     kind, loaded.asset->document.id, loaded.asset->document.name,
                     relative,
                     loaded.asset->source_kind == project::VectorSourceKind::native});
-            } else {
+            } else if (kind == StudioResourceKind::material) {
                 auto loaded = project::load_material(
                     project_root, manifest, relative);
                 if (!loaded.ok()) {
@@ -82,6 +82,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
+            } else {
+                auto loaded = project::load_entity(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.entity->document.id,
+                                   loaded.entity->document.name, relative, false});
             }
         }
         if (error) {
@@ -98,7 +107,10 @@ std::optional<std::vector<StudioResource>> index_project_resources(
         !inspect(StudioResourceKind::vector, assets / "vectors",
                  ".vector.json") ||
         !inspect(StudioResourceKind::material, assets / "materials",
-                 ".material.json")) {
+                 ".material.json") ||
+        !inspect(StudioResourceKind::entity,
+                 project_root / manifest.directories.entities,
+                 ".entity.json")) {
         return std::nullopt;
     }
     std::ranges::sort(indexed, [](const StudioResource& left,
@@ -194,6 +206,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     imported_vector_.reset();
     created_vector_.reset();
     selected_material_.reset();
+    selected_entity_.reset();
     resources_.clear();
     selected_resource_index_.reset();
     recovery_manifest_.reset();
@@ -239,6 +252,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     imported_vector_.reset();
     created_vector_.reset();
     selected_material_.reset();
+    selected_entity_.reset();
     resources_ = std::move(*indexed);
     selected_resource_index_.reset();
     recovery_manifest_ = std::move(recovery_manifest);
@@ -432,6 +446,7 @@ bool ProjectSession::create_vector_artwork(
     created_vector_ = std::move(*published.asset);
     imported_vector_.reset();
     selected_material_.reset();
+    selected_entity_.reset();
     const auto created_id = created_vector_->document.id;
     if (!refresh_resources()) {
         return false;
@@ -489,10 +504,75 @@ bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
     imported_texture_.reset();
     imported_vector_.reset();
     created_vector_.reset();
+    selected_entity_.reset();
     selected_vector_document_path_.clear();
     const auto created_id = selected_material_->document.id;
     if (!refresh_resources()) return false;
     return select_resource(StudioResourceKind::material, created_id);
+}
+
+bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "a project must be open before creating an entity"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ == DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "project",
+                    "save vector changes before creating another resource"}};
+        return false;
+    }
+    const auto prompt_validation = prompt.validate(project_root_, *manifest_);
+    if (!prompt_validation.ok()) {
+        errors_.clear();
+        for (const auto& error : prompt_validation.errors) {
+            errors_.push_back({project::ErrorCode::invalid_asset,
+                               error.field, error.message});
+        }
+        return false;
+    }
+    project::EntityDefinition entity{
+        .document = {
+            .schema_version = project::current_entity_schema_version,
+            .type = "entity",
+            .id = prompt.resource_id_for_document(project_root_, *manifest_),
+            .name = prompt.name,
+        },
+    };
+    project::EntityNode node{
+        .id = "root",
+        .name = prompt.node_name,
+        .transform = prompt.transform,
+        .z_order = prompt.z_order,
+        .drawable = {.kind = prompt.drawable},
+    };
+    if (!prompt.resource_id.empty()) {
+        node.drawable.resource = project::ResourceReference{
+            {.value = prompt.resource_id},
+            prompt.drawable == project::EntityDrawableKind::texture
+                ? "texture"
+                : "vector"};
+    }
+    if (!prompt.material_id.empty()) {
+        node.drawable.material = project::ResourceReference{
+            {.value = prompt.material_id}, "material"};
+    }
+    entity.nodes.push_back(std::move(node));
+    const auto published = project::publish_entity(
+        project_root_, *manifest_, entity);
+    if (!published.ok()) {
+        errors_ = std::move(published.errors);
+        return false;
+    }
+    selected_entity_ = std::move(*published.entity);
+    imported_texture_.reset();
+    imported_vector_.reset();
+    created_vector_.reset();
+    selected_material_.reset();
+    selected_vector_document_path_.clear();
+    const auto created_id = selected_entity_->document.id;
+    if (!refresh_resources()) return false;
+    return select_resource(StudioResourceKind::entity, created_id);
 }
 
 bool ProjectSession::convert_selected_linked_svg_to_native(
@@ -617,6 +697,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             .asset = std::move(*loaded.asset), .image = std::move(*image.image)};
         imported_vector_.reset();
         selected_material_.reset();
+        selected_entity_.reset();
         created_vector_.reset();
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
@@ -629,6 +710,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         }
         imported_texture_.reset();
         selected_material_.reset();
+        selected_entity_.reset();
         if (loaded.asset->source_kind == project::VectorSourceKind::linked_svg) {
             auto image = render::load_svg_preview(project_root_ / loaded.asset->source);
             if (!image.ok()) {
@@ -667,7 +749,7 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                 selection_warnings = std::move(recovery.errors);
             }
         }
-    } else {
+    } else if (kind == StudioResourceKind::material) {
         auto loaded = project::load_material(
             project_root_, *manifest_, match->document_path);
         if (!loaded.ok()) {
@@ -678,6 +760,21 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_vector_.reset();
         created_vector_.reset();
         selected_material_ = std::move(*loaded.asset);
+        selected_entity_.reset();
+        selected_vector_document_path_.clear();
+        recovery_vector_.reset();
+    } else {
+        auto loaded = project::load_entity(
+            project_root_, *manifest_, match->document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_ = std::move(*loaded.entity);
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
     }
@@ -1011,6 +1108,11 @@ ProjectSession::created_vector() const noexcept {
 const std::optional<project::MaterialDefinition>&
 ProjectSession::selected_material() const noexcept {
     return selected_material_;
+}
+
+const std::optional<project::EntityDefinition>&
+ProjectSession::selected_entity() const noexcept {
+    return selected_entity_;
 }
 
 const std::vector<StudioResource>&

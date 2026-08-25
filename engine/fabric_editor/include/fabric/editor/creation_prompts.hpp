@@ -2,6 +2,7 @@
 
 #include "fabric/core/resource_id.hpp"
 #include "fabric/core/types.hpp"
+#include "fabric/project/entity.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/vector_asset.hpp"
@@ -134,6 +135,24 @@ struct CreateMaterialPrompt {
         const std::filesystem::path& project_root,
         const project::ProjectManifest& manifest) const;
     [[nodiscard]] core::ResourceId resource_id(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+};
+
+struct CreateEntityPrompt {
+    std::string name;
+    std::string node_name{"Root"};
+    project::EntityDrawableKind drawable{project::EntityDrawableKind::none};
+    std::string resource_id;
+    std::string material_id;
+    core::Transform transform;
+    float z_order{};
+
+    void reset() noexcept;
+    [[nodiscard]] PromptValidation validate(
+        const std::filesystem::path& project_root,
+        const project::ProjectManifest& manifest) const;
+    [[nodiscard]] core::ResourceId resource_id_for_document(
         const std::filesystem::path& project_root,
         const project::ProjectManifest& manifest) const;
 };

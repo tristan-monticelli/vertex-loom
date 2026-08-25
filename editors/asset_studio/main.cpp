@@ -47,10 +47,12 @@ struct CreationUiState {
     fabric::editor::CreateProjectPrompt project;
     fabric::editor::CreateVectorArtworkPrompt artwork;
     fabric::editor::CreateMaterialPrompt material;
+    fabric::editor::CreateEntityPrompt entity;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     bool request_project{};
     bool request_artwork{};
     bool request_material{};
+    bool request_entity{};
     bool project_publish_attempted{};
 };
 
@@ -213,6 +215,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Textures", fabric::editor::StudioResourceKind::texture);
     draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector);
     draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material);
+    draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -715,6 +718,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::MenuItem("New material / fill...")) {
                 creation.request_material = true;
             }
+            if (ImGui::MenuItem("New entity...")) {
+                creation.request_entity = true;
+            }
             if (ImGui::MenuItem("Add existing resource...")) {
                 ImGui::OpenPopup("Add existing resource");
             }
@@ -1120,6 +1126,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::OpenPopup("Create material / fill");
         creation.request_material = false;
     }
+    if (creation.request_entity && session.has_project()) {
+        creation.entity.reset();
+        ImGui::OpenPopup("Create entity");
+        creation.request_entity = false;
+    }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
             if (session.open(path_buffer.data())) {
@@ -1469,6 +1480,81 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.material.reset();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
+    if (ImGui::BeginPopupModal("Create entity", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted("Create a reusable EntityDefinition v1");
+        ImGui::TextDisabled(
+            "The validated entity is published atomically in the open project.");
+        ImGui::SetNextItemWidth(560.0F);
+        ImGui::InputText("Name", &creation.entity.name);
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Root node name", &creation.entity.node_name);
+        const auto drawable_label = std::string(
+            fabric::project::to_string(creation.entity.drawable));
+        if (ImGui::BeginCombo("Drawable", drawable_label.c_str())) {
+            for (const auto drawable : {
+                     fabric::project::EntityDrawableKind::none,
+                     fabric::project::EntityDrawableKind::vector,
+                     fabric::project::EntityDrawableKind::texture}) {
+                const bool selected = creation.entity.drawable == drawable;
+                const auto option = std::string(fabric::project::to_string(drawable));
+                if (ImGui::Selectable(option.c_str(), selected)) {
+                    creation.entity.drawable = drawable;
+                }
+                if (selected) ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+        if (creation.entity.drawable !=
+            fabric::project::EntityDrawableKind::none) {
+            ImGui::SetNextItemWidth(360.0F);
+            ImGui::InputText("Drawable resource id", &creation.entity.resource_id);
+        }
+        ImGui::SetNextItemWidth(360.0F);
+        ImGui::InputText("Material id (optional)", &creation.entity.material_id);
+        float position[] = {creation.entity.transform.position.x,
+                            creation.entity.transform.position.y};
+        if (ImGui::InputFloat2("Position", position)) {
+            creation.entity.transform.position = {position[0], position[1]};
+        }
+        float scale[] = {creation.entity.transform.scale.x,
+                         creation.entity.transform.scale.y};
+        if (ImGui::InputFloat2("Scale", scale)) {
+            creation.entity.transform.scale = {scale[0], scale[1]};
+        }
+        ImGui::InputFloat("Rotation",
+                          &creation.entity.transform.rotation_degrees,
+                          1.0F, 10.0F, "%.2f deg");
+        ImGui::InputFloat("Z order", &creation.entity.z_order, 0.1F, 1.0F,
+                          "%.2f");
+        const auto validation = creation.entity.validate(
+            session.project_root(), *session.manifest());
+        draw_prompt_error(validation, "name");
+        draw_prompt_error(validation, "node_name");
+        draw_prompt_error(validation, "id");
+        draw_prompt_error(validation, "resource");
+        draw_prompt_error(validation, "material");
+        draw_prompt_error(validation, "transform");
+        draw_prompt_summary(validation);
+        ImGui::BeginDisabled(!validation.ok());
+        if (ImGui::Button("Create entity", {140.0F, 0.0F})) {
+            if (session.create_entity(creation.entity)) {
+                clear_asset_preview(preview);
+                status = "Entity created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Entity creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
+            creation.entity.reset();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

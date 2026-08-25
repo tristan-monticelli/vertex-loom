@@ -211,6 +211,31 @@ TEST_CASE("material prompt validates channels and exposes atomic destination") {
     CHECK(prompt.opacity == 1.0);
 }
 
+TEST_CASE("entity prompt validates drawable and material references") {
+    TemporaryDirectory project;
+    std::filesystem::create_directories(project.path() / "assets/textures");
+    std::filesystem::create_directories(project.path() / "assets/materials");
+    std::ofstream{project.path() / "assets/textures/hero.texture.json"} << "{}";
+    std::ofstream{project.path() / "assets/materials/paper.material.json"} << "{}";
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Hero entity";
+    prompt.node_name = "Body";
+    prompt.drawable = fabric::project::EntityDrawableKind::texture;
+    prompt.resource_id = "hero";
+    prompt.material_id = "paper";
+    const auto valid = prompt.validate(project.path(), manifest());
+    REQUIRE(valid.ok());
+    CHECK(valid.destination ==
+          project.path() / "entities/hero-entity.entity.json");
+
+    prompt.resource_id = "missing";
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("resource").has_value());
+    prompt.reset();
+    CHECK(prompt.node_name == "Root");
+    CHECK(prompt.drawable == fabric::project::EntityDrawableKind::none);
+}
+
 TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     fabric::editor::CreateProjectPrompt project_prompt;
     fabric::editor::CreateVectorArtworkPrompt artwork_prompt;

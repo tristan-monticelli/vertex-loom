@@ -71,16 +71,13 @@ bool identifier_conflicts(const std::filesystem::path& project_root,
 bool resource_document_exists(const std::filesystem::path& project_root,
                               const project::ProjectManifest& manifest,
                               const std::string_view id,
+                              const std::filesystem::path& directory,
                               const std::string_view suffix) {
     if (id.empty()) return false;
     std::error_code error;
     const auto root = project_root / manifest.directories.assets;
-    for (const auto& directory : {root / "textures", root / "vectors"}) {
-        const auto candidate = directory / (std::string{id} + std::string{suffix});
-        if (std::filesystem::is_regular_file(candidate, error)) return true;
-        error.clear();
-    }
-    return false;
+    const auto candidate = root / directory / (std::string{id} + std::string{suffix});
+    return std::filesystem::is_regular_file(candidate, error);
 }
 
 core::ResourceId available_resource_id(
@@ -421,6 +418,7 @@ PromptValidation CreateMaterialPrompt::validate(
         add_error(validation, "texture", "Texture id must be a valid resource id.");
     } else if (!texture_id.empty() &&
                !resource_document_exists(project_root, manifest, texture_id,
+                                          "textures",
                                           ".texture.json")) {
         add_error(validation, "texture", "Texture id is not registered in the project.");
     }
@@ -430,7 +428,8 @@ PromptValidation CreateMaterialPrompt::validate(
                   "Vector pattern id must be a valid resource id.");
     } else if (!vector_pattern_id.empty() &&
                !resource_document_exists(project_root, manifest,
-                                         vector_pattern_id, ".vector.json")) {
+                                         vector_pattern_id, "vectors",
+                                         ".vector.json")) {
         add_error(validation, "vectorPattern",
                   "Vector pattern id is not registered in the project.");
     }
@@ -450,6 +449,78 @@ core::ResourceId CreateMaterialPrompt::resource_id(
     const project::ProjectManifest& manifest) const {
     return available_resource_id(project_root, manifest,
                                  generated_resource_id(name, "material"));
+}
+
+void CreateEntityPrompt::reset() noexcept {
+    *this = CreateEntityPrompt{};
+}
+
+PromptValidation CreateEntityPrompt::validate(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    PromptValidation validation;
+    validate_name(validation, name);
+    validate_name(validation, node_name);
+    const auto id = resource_id_for_document(project_root, manifest);
+    if (!core::ResourceId::is_valid(id.value)) {
+        add_error(validation, "id", "Generated resource id is invalid.");
+    }
+    const auto finite = std::isfinite(z_order) &&
+        std::isfinite(transform.position.x) &&
+        std::isfinite(transform.position.y) &&
+        std::isfinite(transform.rotation_degrees) &&
+        std::isfinite(transform.scale.x) && std::isfinite(transform.scale.y) &&
+        std::isfinite(transform.pivot.x) && std::isfinite(transform.pivot.y);
+    if (!finite) {
+        add_error(validation, "transform", "Transform and z-order must be finite.");
+    }
+    const auto validate_resource = [&](const std::string& reference,
+                                       const std::filesystem::path& directory,
+                                       const std::string_view suffix,
+                                       const std::string_view field) {
+        if (!core::ResourceId::is_valid(reference)) {
+            add_error(validation, std::string{field},
+                      "Drawable resource id must be valid.");
+        } else if (!resource_document_exists(project_root, manifest, reference,
+                                              directory, suffix)) {
+            add_error(validation, std::string{field},
+                      "Drawable resource is not registered in the project.");
+        }
+    };
+    if (drawable == project::EntityDrawableKind::none) {
+        if (!resource_id.empty()) {
+            add_error(validation, "resource", "None drawable cannot reference a resource.");
+        }
+    } else if (drawable == project::EntityDrawableKind::texture) {
+        validate_resource(resource_id, "textures", ".texture.json", "resource");
+    } else if (drawable == project::EntityDrawableKind::vector) {
+        validate_resource(resource_id, "vectors", ".vector.json", "resource");
+    }
+    if (!material_id.empty()) {
+        if (!core::ResourceId::is_valid(material_id)) {
+            add_error(validation, "material", "Material id must be valid.");
+        } else if (!resource_document_exists(project_root, manifest, material_id,
+                                              "materials", ".material.json")) {
+            add_error(validation, "material",
+                      "Material is not registered in the project.");
+        }
+    }
+    validation.destination = project_root /
+        project::entity_document_path(manifest, id);
+    validation.summary = {
+        "Create EntityDefinition v1: " + name,
+        "Id: " + id.value,
+        "Destination: " + validation.destination.generic_string(),
+        "Root node: " + node_name,
+    };
+    return validation;
+}
+
+core::ResourceId CreateEntityPrompt::resource_id_for_document(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest) const {
+    return available_resource_id(project_root, manifest,
+                                 generated_resource_id(name, "entity"));
 }
 
 PromptValidation CreateVectorArtworkPrompt::validate(
