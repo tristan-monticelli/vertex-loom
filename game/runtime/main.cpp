@@ -1,8 +1,10 @@
 #include "fabric/runtime/preview_runtime.hpp"
 #include "fabric/runtime/progress_store.hpp"
+#include "fabric/runtime/scene_session.hpp"
 
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -76,39 +78,61 @@ int main(int argc, char** argv) {
         }
     }
 
-    options.scene_id = scene_id;
-
-    fabric::runtime::PreviewRuntime runtime;
-    if (!runtime.load(options) || !runtime.run()) {
-        for (const auto& error : runtime.errors()) std::cerr << "error: " << error << '\n';
+    fabric::runtime::SceneRuntimeSession scene_session;
+    if (scene_id && !scene_session.load(options.project_root, *scene_id)) {
+        for (const auto& error : scene_session.errors())
+            std::cerr << "error: " << error << '\n';
         return 1;
     }
+
+    std::unique_ptr<fabric::runtime::PreviewRuntime> runtime;
+    bool scene_changed = false;
+    do {
+        scene_changed = false;
+        if (scene_id) options.map_id = {};
+        options.scene_id = scene_id
+            ? std::optional<fabric::core::ResourceId>{scene_session.scene()->document.id}
+            : std::nullopt;
+        options.gameplay_event_handler = scene_id
+            ? fabric::runtime::GameplayEventHandler([&](const auto& event) {
+                if (!scene_session.transition_for_event(event.id)) return true;
+                scene_changed = true;
+                return false;
+            })
+            : fabric::runtime::GameplayEventHandler{};
+        runtime = std::make_unique<fabric::runtime::PreviewRuntime>();
+        if (!runtime->load(options) || !runtime->run()) {
+            for (const auto& error : runtime->errors())
+                std::cerr << "error: " << error << '\n';
+            return 1;
+        }
+    } while (scene_id && scene_changed);
     if (save_slot) {
         const fabric::project::ProgressSave progress{
             .schema_version = fabric::project::current_progress_save_schema_version,
             .build = "vertex-loom-runtime",
-            .scene = {*scene_id, "scene"}};
+            .scene = {scene_session.scene()->document.id, "scene"}};
         if (!progress_store.save(progress)) {
             for (const auto& error : progress_store.errors()) std::cerr << "error: " << error << '\n';
             return 1;
         }
     }
     if (options.mode != fabric::runtime::RuntimeMode::interactive) {
-        std::cout << "frames=" << runtime.stats().frames
-                  << " physics_steps=" << runtime.stats().physics_steps
-                  << " visible=" << runtime.stats().visible_instances
-                  << " culling_candidates=" << runtime.stats().culling_candidates
-                  << " culled_packets=" << runtime.stats().culled_packets
-                  << " direct_render_frames=" << runtime.stats().direct_render_frames
-                  << " draw_calls=" << runtime.stats().draw_calls
-                  << " triangles=" << runtime.stats().triangles
-                  << " elapsed_ms=" << runtime.stats().elapsed_ms
-                  << " p95_frame_ms=" << runtime.stats().p95_frame_ms
-                  << " replay_events=" << runtime.stats().replay_events
-                  << " replay_checkpoints=" << runtime.stats().replay_checkpoints
-                  << " gameplay_events=" << runtime.stats().gameplay_events
-                  << " character_x=" << runtime.stats().character_x
-                  << " character_y=" << runtime.stats().character_y << '\n';
+        std::cout << "frames=" << runtime->stats().frames
+                  << " physics_steps=" << runtime->stats().physics_steps
+                  << " visible=" << runtime->stats().visible_instances
+                  << " culling_candidates=" << runtime->stats().culling_candidates
+                  << " culled_packets=" << runtime->stats().culled_packets
+                  << " direct_render_frames=" << runtime->stats().direct_render_frames
+                  << " draw_calls=" << runtime->stats().draw_calls
+                  << " triangles=" << runtime->stats().triangles
+                  << " elapsed_ms=" << runtime->stats().elapsed_ms
+                  << " p95_frame_ms=" << runtime->stats().p95_frame_ms
+                  << " replay_events=" << runtime->stats().replay_events
+                  << " replay_checkpoints=" << runtime->stats().replay_checkpoints
+                  << " gameplay_events=" << runtime->stats().gameplay_events
+                  << " character_x=" << runtime->stats().character_x
+                  << " character_y=" << runtime->stats().character_y << '\n';
     }
     return 0;
 }

@@ -22,3 +22,8 @@ les expose avec leur identifiant de trigger et leur payload. Le compteur
 global reste disponible dans `PreviewRuntimeStats`, tandis que le flux courant
 permet aux transitions du runtime jouable de consommer les données sans
 réinterroger la géométrie des triggers.
+
+`PreviewRuntimeOptions::gameplay_event_handler` peut consommer chaque événement
+dans le pas fixe. Un retour `false` demande une sortie propre de la boucle après
+le rendu courant ; `game_runtime` utilise ce point de hand-off pour appliquer une
+transition de scène atomique puis reprendre avec la scène cible.

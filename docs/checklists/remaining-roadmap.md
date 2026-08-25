@@ -420,8 +420,9 @@ Le runtime accepte désormais `--audio <wav>`, `--save-slot <slot>`,
 validés dans `npm run validate`.
 
 Les actions clavier/manette, les scènes, les transitions headless, la caméra et
-le contrôleur SDL sont implémentés ; les zones et les événements gameplay
-restent ouverts.
+le contrôleur SDL sont implémentés. Les événements de zones peuvent maintenant
+déclencher une transition de scène via un hand-off propre ; les autres
+événements gameplay restent ouverts.
 - [ ] Créer uniquement des niveaux, personnages et artworks originaux.
 
 Gate final : prototype original jouable, déterministe et construit uniquement

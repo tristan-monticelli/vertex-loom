@@ -969,7 +969,8 @@ bool PreviewRuntime::run() {
     std::vector<double> frame_times_ms;
     frame_times_ms.reserve(limit == 0U ? 256U : limit);
     bool running = true;
-    while (running && (limit == 0U || stats_.frames < limit)) {
+    bool stop_requested = false;
+    while (running && !stop_requested && (limit == 0U || stats_.frames < limit)) {
         const auto frame_start = SDL_GetPerformanceCounter();
         SDL_Event event{};
         if (options_.enable_character && !replay_player_) input_.begin_frame();
@@ -1037,12 +1038,20 @@ bool PreviewRuntime::run() {
                 if (triggers_) {
                     impl_->gameplay_events = triggers_->update(position);
                     stats_.gameplay_events += impl_->gameplay_events.size();
+                    if (options_.gameplay_event_handler) {
+                        for (const auto& event : impl_->gameplay_events) {
+                            if (!options_.gameplay_event_handler(event)) {
+                                stop_requested = true;
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             return true;
         };
         if (options_.mode == RuntimeMode::interactive) {
-            while (accumulator >= fixed_time_step) {
+            while (!stop_requested && accumulator >= fixed_time_step) {
                 if (!step_physics()) return false;
                 accumulator -= fixed_time_step;
             }

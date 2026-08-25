@@ -17,6 +17,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -26,11 +27,14 @@ namespace fabric::runtime {
 
 enum class RuntimeMode { interactive, smoke_test, benchmark };
 
+using GameplayEventHandler = std::function<bool(const GameplayEvent&)>;
+
 struct PreviewRuntimeOptions {
     std::filesystem::path project_root;
     core::ResourceId map_id;
     std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;
+    GameplayEventHandler gameplay_event_handler;
     bool enable_character{};
     std::optional<std::filesystem::path> audio_wav;
     RuntimeMode mode{RuntimeMode::interactive};

@@ -40,6 +40,23 @@ fabric::project::SceneDocument scene() {
             .entry_map = fabric::project::ResourceReference{{.value = "preview"}, "map"}};
 }
 
+fabric::project::MapDocument map_with_gameplay_trigger() {
+    auto result = map();
+    result.layers.push_back({"collision", "Collision",
+                             fabric::project::MapLayerKind::collision, true, false, 0.0F});
+    result.layers.push_back({"triggers", "Triggers",
+                             fabric::project::MapLayerKind::triggers, true, false, 0.0F});
+    result.collisions.push_back({.kind = fabric::project::CollisionShapeKind::circle,
+                                 .layer_id = "collision",
+                                 .sensor = true,
+                                 .center = {0.0F, 0.0F},
+                                 .radius = 8.0F});
+    result.events.push_back({{.value = "open-door"}, {}});
+    result.triggers.push_back({"spawn-zone", "triggers", 0,
+                               {.value = "open-door"}, {}});
+    return result;
+}
+
 fabric::project::AnimationClip animation() {
     return {.document = {.schema_version = 1,
                          .type = "animation",
@@ -383,6 +400,35 @@ TEST_CASE("preview runtime rejects ambiguous map and scene selection") {
                                 .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE_FALSE(runtime.errors().empty());
     CHECK(runtime.errors().front().find("exactly one") != std::string::npos);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime handler can stop after a gameplay event") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-event-handler-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest,
+                                         map_with_gameplay_trigger()).ok());
+
+    bool handled = false;
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .gameplay_event_handler = [&](const auto& event) {
+                              handled = event.id.value == "open-door" &&
+                                  event.trigger_id == "spawn-zone";
+                              return false;
+                          },
+                          .enable_character = true,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    CHECK(handled);
+    CHECK(runtime.stats().gameplay_events == 1U);
+    CHECK(runtime.stats().frames == 1U);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
