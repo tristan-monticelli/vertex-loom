@@ -140,6 +140,10 @@ graphe headless complet. Une destination existante est refusée avant écriture.
 Le Beam réutilise le preset couture : son paramètre d'offset est découvert par
 le registre de propriétés, sélectionné comme binding de timeline et interpolé
 par `AnimationClip v1` sans piste ni valeur spécialisée.
+Le resolver animé compose ensuite ces valeurs avec l'instance de composant et
+reconstruit ses packets. Les tests vérifient largeur, offset UV et couleur du
+Beam dans le resolver partagé, puis le remplacement d'une échelle de composant
+sur une frame réellement produite par Preview Runtime.
 Le test de session crée aussi une fermeture depuis le même point d'entrée que
 le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
 resélectionne son composant.

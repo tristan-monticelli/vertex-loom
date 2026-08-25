@@ -67,6 +67,16 @@ struct PreviewRuntime::Impl {
         core::Transform instance_transform;
     };
 
+    struct AnimatedVisualComponent {
+        project::VisualComponent component;
+        project::VisualComponentInstance instance;
+        project::EntityDefinition entity;
+        std::size_t node_index{};
+        core::Transform instance_transform;
+        std::string instance_id;
+        std::string node_id;
+    };
+
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
@@ -96,6 +106,8 @@ struct PreviewRuntime::Impl {
     std::vector<RuntimePacketBounds> packet_bounds;
     std::vector<bool> packet_bounds_dynamic;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
+    std::unordered_map<std::string, AnimatedVisualComponent>
+        animated_visual_components;
     std::vector<GameplayEvent> gameplay_events;
     std::vector<AnimationMarkerEvent> animation_marker_events;
     project::MapChunkIndex chunk_index;
@@ -465,6 +477,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_bounds.clear();
     impl_->packet_bounds_dynamic.clear();
     impl_->entity_simulations.clear();
+    impl_->animated_visual_components.clear();
     impl_->gameplay_events.clear();
     impl_->animation_marker_events.clear();
     impl_->packet_indices_by_instance.clear();
@@ -865,10 +878,22 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     append_errors(errors_, component.errors);
                     return false;
                 }
+                const auto component_instance =
+                    node.drawable.component_instance.value_or(
+                        project::VisualComponentInstance{});
+                impl_->animated_visual_components.emplace(
+                    instance.id + ":" + node.id,
+                    Impl::AnimatedVisualComponent{
+                        .component = *component.asset,
+                        .instance = component_instance,
+                        .entity = resolved_entity,
+                        .node_index = node_index,
+                        .instance_transform = instance.transform,
+                        .instance_id = instance.id,
+                        .node_id = node.id});
                 auto visual = render::resolve_visual_component(
                     options_.project_root, *manifest_, *component.asset,
-                    node.drawable.component_instance.value_or(
-                        project::VisualComponentInstance{}));
+                    component_instance);
                 if (!visual.ok()) {
                     errors_.insert(errors_.end(), visual.errors.begin(),
                                    visual.errors.end());
@@ -1253,7 +1278,46 @@ bool PreviewRuntime::run() {
         }
         stats_.animation_marker_events = impl_->animation_marker_events.size();
         std::unordered_map<std::string, std::vector<project::EntityNode>> evaluated_nodes;
+        std::unordered_map<std::string, render::VectorDrawPacket>
+            animated_visual_packets;
+        for (const auto& [key, visual_component] :
+             impl_->animated_visual_components) {
+            (void)key;
+            const auto evaluation = evaluate_instance_animation(
+                visual_component.instance_id, animation_time);
+            if (!evaluation || !evaluation->ok() ||
+                !std::ranges::any_of(
+                    evaluation->properties, [&](const auto& property) {
+                        return property.binding.node_id ==
+                                visual_component.node_id &&
+                            property.binding.component_id ==
+                                visual_component.component.document.id.value;
+                    }))
+                continue;
+            auto resolved = render::resolve_animated_visual_component(
+                options_.project_root, *manifest_, visual_component.component,
+                visual_component.instance, visual_component.node_id,
+                *evaluation);
+            if (!resolved.ok()) {
+                errors_.insert(errors_.end(), resolved.errors.begin(),
+                               resolved.errors.end());
+                return false;
+            }
+            for (auto& packet : resolved.packets) {
+                transform_packet(packet, visual_component.entity,
+                                 visual_component.node_index,
+                                 visual_component.instance_transform);
+                packet.node_id = visual_component.instance_id + ":" +
+                    visual_component.node_id + ":" + packet.node_id;
+                animated_visual_packets.emplace(packet.node_id,
+                                                 std::move(packet));
+            }
+        }
         const auto animate_packet = [&](render::VectorDrawPacket packet) {
+            const auto animated_visual =
+                animated_visual_packets.find(packet.node_id);
+            if (animated_visual != animated_visual_packets.end())
+                packet = animated_visual->second;
             const auto separator = packet.node_id.find(':');
             if (separator == std::string::npos) return packet;
             const auto instance_id = packet.node_id.substr(0, separator);

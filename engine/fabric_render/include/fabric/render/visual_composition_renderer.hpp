@@ -7,6 +7,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fabric::render {
@@ -29,5 +30,13 @@ struct VisualCompositionDrawResult {
     const project::ProjectManifest& manifest,
     const project::VisualComponent& component,
     const project::VisualComponentInstance& instance = {});
+
+[[nodiscard]] VisualCompositionDrawResult resolve_animated_visual_component(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest,
+    const project::VisualComponent& component,
+    const project::VisualComponentInstance& instance,
+    std::string_view node_id,
+    const project::EvaluationResult& evaluation);
 
 } // namespace fabric::render

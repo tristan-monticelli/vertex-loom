@@ -114,6 +114,21 @@ fabric::project::AnimationClip material_animation() {
     return result;
 }
 
+fabric::project::AnimationClip component_animation() {
+    return {.document = {.schema_version = 1,
+                         .type = "animation",
+                         .id = {.value = "runtime-animation"},
+                         .name = "Runtime Component Animation"},
+            .duration = 1.0F,
+            .loop = true,
+            .tracks = {{{.node_id = "root",
+                         .component_id = "runtime-component",
+                         .property_id = "scale"},
+                        fabric::project::AnimationInterpolation::linear,
+                        {{0.0F, fabric::core::Vec2{4.0F, 4.0F}},
+                         {1.0F, fabric::core::Vec2{4.0F, 4.0F}}}}}};
+}
+
 fabric::project::MaterialDefinition material() {
     return {.document = {.schema_version = 1,
                          .type = "material",
@@ -211,6 +226,14 @@ fabric::project::MapDocument map_with_component_entity() {
         "component", fabric::project::ResourceReference{
             {.value = "runtime-component-entity"}, "entity"},
         std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
+fabric::project::MapDocument map_with_animated_component_entity() {
+    auto result = map_with_component_entity();
+    result.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-animation"}, "animation"}});
     return result;
 }
 
@@ -1108,6 +1131,39 @@ TEST_CASE("preview runtime resolves visual component entity drawables") {
     const auto& point = runtime.last_frame_packets().front().fill_vertices.front();
     CHECK(point.x == Catch::Approx(1.0F));
     CHECK(point.y == Catch::Approx(2.0F));
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime rebuilds generically animated visual components") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-animated-component-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_visual_composition(
+        root, manifest(), visual_composition()).ok());
+    REQUIRE(fabric::project::publish_visual_component(
+        root, manifest(), visual_component()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, manifest(), component_entity()).ok());
+    REQUIRE(fabric::project::publish_animation(
+        root, manifest(), component_animation()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_animated_component_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    const auto& point =
+        runtime.last_frame_packets().front().fill_vertices.front();
+    CHECK(point.x == Catch::Approx(-1.0F));
+    CHECK(point.y == Catch::Approx(0.0F));
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

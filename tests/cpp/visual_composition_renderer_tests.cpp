@@ -185,6 +185,37 @@ TEST_CASE("textured layer opacity is applied exactly once") {
     CHECK(resolved.packets.front().fill_color->alpha == Catch::Approx(1.0F));
 }
 
+TEST_CASE("animated component parameters rebuild Beam packets generically") {
+    const TemporaryProject project{"fabric-animated-beam"};
+    publish_thread_texture(project.root());
+    REQUIRE(fabric::editor::publish_visual_preset(
+        project.root(), TemporaryProject::manifest(),
+        request(fabric::editor::VisualPresetKind::seam, "beam")).ok());
+    const auto component = load_component(project, "beam");
+    const auto base = fabric::render::resolve_visual_component(
+        project.root(), TemporaryProject::manifest(), component);
+    const fabric::project::EvaluationResult evaluation{
+        .properties = {
+            {{"beam-node", "beam", "width"}, 0.5F},
+            {{"beam-node", "beam", "offset"}, 2.0F},
+            {{"beam-node", "beam", "color"},
+             fabric::core::Color{0.2F, 0.4F, 0.8F, 1.0F}},
+            {{"other-node", "beam", "offset"}, 9.0F}}};
+    const auto animated = fabric::render::resolve_animated_visual_component(
+        project.root(), TemporaryProject::manifest(), component, {},
+        "beam-node", evaluation);
+    REQUIRE(base.ok());
+    REQUIRE(animated.ok());
+    REQUIRE(base.packets.size() == 1U);
+    REQUIRE(animated.packets.size() == 1U);
+    REQUIRE_FALSE(base.packets.front().fill_uv.empty());
+    REQUIRE_FALSE(animated.packets.front().fill_uv.empty());
+    CHECK(animated.packets.front().fill_uv.front().x == Catch::Approx(2.0F));
+    CHECK(animated.packets.front().fill_color ==
+          fabric::core::Color{0.2F, 0.4F, 0.8F, 1.0F});
+    CHECK(animated.bounds.size.y > base.bounds.size.y);
+}
+
 TEST_CASE("visual resolver reports missing textures and component cycles") {
     const TemporaryProject missing{"fabric-composition-missing-texture"};
     REQUIRE(fabric::editor::publish_visual_preset(

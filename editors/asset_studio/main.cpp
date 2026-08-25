@@ -389,10 +389,17 @@ EntityPreviewResult build_entity_preview(
                     result.errors.push_back(error.field + ": " + error.message);
                 continue;
             }
-            auto visual = fabric::render::resolve_visual_component(
-                session.project_root(), *session.manifest(), *loaded.asset,
+            const auto component_instance =
                 node.drawable.component_instance.value_or(
-                    fabric::project::VisualComponentInstance{}));
+                    fabric::project::VisualComponentInstance{});
+            auto visual = evaluated_animation && evaluated_animation->ok()
+                ? fabric::render::resolve_animated_visual_component(
+                      session.project_root(), *session.manifest(),
+                      *loaded.asset, component_instance, node.id,
+                      *evaluated_animation)
+                : fabric::render::resolve_visual_component(
+                      session.project_root(), *session.manifest(),
+                      *loaded.asset, component_instance);
             result.errors.insert(result.errors.end(), visual.errors.begin(),
                                  visual.errors.end());
             for (auto& packet : visual.packets) {

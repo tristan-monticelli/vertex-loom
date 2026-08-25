@@ -372,4 +372,87 @@ VisualCompositionDrawResult resolve_visual_component(
                                       instance, active_components);
 }
 
+VisualCompositionDrawResult resolve_animated_visual_component(
+    const std::filesystem::path& project_root,
+    const project::ProjectManifest& manifest,
+    const project::VisualComponent& component,
+    const project::VisualComponentInstance& instance,
+    const std::string_view node_id,
+    const project::EvaluationResult& evaluation) {
+    VisualCompositionDrawResult result;
+    if (!evaluation.ok()) {
+        append_errors(result, evaluation.errors);
+        return result;
+    }
+    const auto base = project::resolve_visual_component_instance(
+        component, instance);
+    if (!base.ok()) {
+        append_errors(result, base.errors);
+        return result;
+    }
+    auto animated = instance;
+    for (const auto& property : evaluation.properties) {
+        if (property.binding.node_id != node_id ||
+            property.binding.component_id != component.document.id.value)
+            continue;
+        const auto parameter = std::ranges::find_if(
+            base.parameters, [&](const auto& candidate) {
+                return candidate.id == property.binding.property_id &&
+                    candidate.animatable;
+            });
+        if (parameter == base.parameters.end()) {
+            result.errors.push_back("animation targets an unknown or static visual parameter: " +
+                                    property.binding.property_id);
+            continue;
+        }
+        auto value = std::visit(
+            [](const auto& source) -> project::VisualParameterValue {
+                return source;
+            }, property.value);
+        if (property.composition ==
+            project::AnimationComposition::additive) {
+            bool composed = false;
+            if (auto* target = std::get_if<float>(&value)) {
+                if (const auto* initial =
+                        std::get_if<float>(&parameter->value)) {
+                    *target += *initial;
+                    composed = true;
+                }
+            } else if (auto* target = std::get_if<core::Vec2>(&value)) {
+                if (const auto* initial =
+                        std::get_if<core::Vec2>(&parameter->value)) {
+                    target->x += initial->x;
+                    target->y += initial->y;
+                    composed = true;
+                }
+            } else if (auto* target = std::get_if<core::Color>(&value)) {
+                if (const auto* initial =
+                        std::get_if<core::Color>(&parameter->value)) {
+                    target->red += initial->red;
+                    target->green += initial->green;
+                    target->blue += initial->blue;
+                    target->alpha += initial->alpha;
+                    composed = true;
+                }
+            }
+            if (!composed) {
+                result.errors.push_back(
+                    "visual parameter does not support additive animation: " +
+                    property.binding.property_id);
+                continue;
+            }
+        }
+        const auto existing = std::ranges::find_if(
+            animated.overrides, [&](const auto& candidate) {
+                return candidate.parameter_id == parameter->id;
+            });
+        if (existing == animated.overrides.end())
+            animated.overrides.push_back({parameter->id, std::move(value)});
+        else existing->value = std::move(value);
+    }
+    if (!result.errors.empty()) return result;
+    return resolve_visual_component(
+        project_root, manifest, component, animated);
+}
+
 } // namespace fabric::render

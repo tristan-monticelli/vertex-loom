@@ -140,6 +140,10 @@ C4Component
   composant, applique paramètres, transforms, opacité et ordre Z stable, refuse
   les cycles de composants et produit des `VectorDrawPacket` avec leurs bounds.
   Asset Studio et le runtime consomment ce même résultat.
+- Lorsqu'une timeline cible un paramètre de composant, le resolver partagé
+  compose l'évaluation générique avec les valeurs défaut, variante et instance
+  avant de reconstruire les mêmes packets. Asset Studio, Map Studio et Preview
+  Runtime ne traduisent donc pas eux-mêmes les paramètres visuels animés.
 - Une entité v2 peut instancier un `VisualComponent` avec variante, ancre et
   overrides typés. La session et le runtime appliquent ensuite le transform de
   nœud aux paquets résolus, sans connaître le preset d'origine.
