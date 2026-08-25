@@ -56,9 +56,12 @@ C4Component
   conserve la vue complète des textures historiques. `fabric_render` traduit
   cette vue en un quad, des UV et un filtre par un constructeur de draw packet
   unique consommé par Asset Studio et Preview Runtime.
-- `VisualComposition v1` ordonnera une vue raster, des drawables vectoriels,
-  des instances de `VisualComponent v1` et des `TexturedPath v1`. Chaque calque
-  conservera son ancrage, son transform, sa visibilité, son opacité et son Z.
+- `VisualComposition v1` est stocké sous
+  `assets/compositions/<id>.composition.json`. Il possède une taille monde et
+  ordonne des calques raster, vectoriels, `VisualComponent` et `TexturedPath`.
+  Chaque calque conserve un identifiant stable, une référence typée, un
+  ancrage normalisé, son transform, sa visibilité, son opacité et son Z. Un
+  calque raster peut surcharger localement la `RasterView` de sa texture.
   Les anciennes références directes à une texture resteront valides et seront
   interprétées comme une composition à un seul calque non recadré.
 - `TexturedPath v1` conservera un chemin, une largeur éventuellement variable,

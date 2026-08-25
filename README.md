@@ -28,6 +28,8 @@ first native Asset Studio workspace.
 - Persistent PNG and SVG imports with versioned asset documents and OpenGL previews.
 - Non-destructive raster views with source-pixel crop, pivot, transform and
   Asset Studio preview controls, shared draw packets, and runtime pixel parity.
+- Strict VisualComposition v1 documents with ordered raster, vector,
+  component, and textured-path layers.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test

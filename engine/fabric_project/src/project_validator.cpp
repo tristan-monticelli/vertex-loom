@@ -9,6 +9,7 @@
 #include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
+#include "fabric/project/visual_composition.hpp"
 
 #include <array>
 #include <fstream>
@@ -183,6 +184,48 @@ void inspect_input_documents(const std::filesystem::path& project_root,
                   "cannot inspect input documents");
 }
 
+void validate_composition_raster_views(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest, std::vector<Error>& errors) {
+    const auto directory = project_root / manifest.directories.assets /
+        "compositions";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(directory, filesystem_error) ||
+        filesystem_error) return;
+    for (std::filesystem::directory_iterator iterator(directory, filesystem_error),
+         end; !filesystem_error && iterator != end;
+         iterator.increment(filesystem_error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(filesystem_error) ||
+            !filename.ends_with(".composition.json")) continue;
+        const auto composition = load_visual_composition(
+            project_root, manifest,
+            iterator->path().lexically_relative(project_root));
+        if (!composition.ok()) continue;
+        for (std::size_t index = 0; index < composition.asset->layers.size();
+             ++index) {
+            const auto& layer = composition.asset->layers[index];
+            if (layer.kind != VisualLayerKind::raster || !layer.raster_view) {
+                continue;
+            }
+            const auto texture = load_texture_asset(
+                project_root, manifest,
+                texture_document_path(manifest, layer.resource.id));
+            if (!texture.ok()) continue;
+            const auto validation = validate_raster_view(
+                *layer.raster_view, texture.asset->width,
+                texture.asset->height);
+            for (const auto& error : validation.errors) {
+                add_error(errors, error.code,
+                          composition.asset->document.id.value + ".layers[" +
+                              std::to_string(index) + "].rasterView." +
+                              error.field,
+                          error.message);
+            }
+        }
+    }
+}
+
 } // namespace
 
 ManifestResult load_manifest(const std::filesystem::path& project_root) {
@@ -274,6 +317,13 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "materials",
         ".material.json", "assets.materials", load_material,
         material_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root,
+        loaded.manifest->directories.assets, "compositions",
+        ".composition.json", "assets.compositions", load_visual_composition,
+        visual_composition_resource_references, registry, result.errors);
+    validate_composition_raster_views(
+        project_root, *loaded.manifest, result.errors);
     inspect_asset_documents(
         project_root, *loaded.manifest, canonical_root, loaded.manifest->directories.assets, "animations",
         ".animation.json", "assets.animations", load_animation,

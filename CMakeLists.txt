@@ -73,6 +73,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp
     engine/fabric_project/src/vector_asset.cpp
+    engine/fabric_project/src/visual_composition.cpp
     engine/fabric_project/src/xpbd.cpp
 )
 target_include_directories(fabric_project PUBLIC engine/fabric_project/include)
@@ -279,6 +280,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_material_entity_tests
              COMMAND fabric_material_entity_tests)
+
+    add_executable(fabric_visual_composition_tests
+        tests/cpp/visual_composition_tests.cpp
+    )
+    target_link_libraries(fabric_visual_composition_tests PRIVATE
+        fabric_project
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_visual_composition_tests
+             COMMAND fabric_visual_composition_tests)
 
     add_executable(fabric_animation_tests
         tests/cpp/animation_tests.cpp

@@ -36,7 +36,7 @@ PNG après sauvegarde, autosave et récupération.
 
 ## Tranche 1 — Composition et composants visuels
 
-- [ ] Ajouter `VisualComposition v1` et ses calques raster, vectoriels,
+- [x] Ajouter `VisualComposition v1` et ses calques raster, vectoriels,
   composants et chemins texturés.
 - [ ] Ajouter `VisualComponent v1`, instances, variantes, ancrages, paramètres
   typés, bounds et propriétés animables.

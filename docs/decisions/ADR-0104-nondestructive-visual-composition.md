@@ -24,6 +24,19 @@ visibilité, opacité et ordre Z. Les anciennes références directes à une tex
 gardent leur rendu en devenant une composition implicite à un seul calque sans
 crop.
 
+Le document est stocké sous
+`assets/compositions/<id>.composition.json`. Il possède une taille positive en
+unités monde et une liste ordonnée de calques à identifiants stables. L'ancrage
+de calque est normalisé dans `[0,1]²`. La référence est typée selon le genre de
+calque : `texture`, `vector`, `visualComponent` ou `texturedPath`.
+
+Un calque raster peut surcharger la vue portée par son `TextureAsset` avec une
+`RasterView` locale. Cette vue locale gagne uniquement pour cette instance ;
+son absence conserve la vue de l'asset, puis la source complète si l'asset
+n'en déclare aucune. Les dimensions de crop sont vérifiées contre la texture
+référencée pendant la validation du projet. Les autres genres refusent une vue
+raster.
+
 Une vectorisation ou un masque est une action explicite. La géométrie de rendu,
 la source raster et la collision restent trois responsabilités séparées.
 

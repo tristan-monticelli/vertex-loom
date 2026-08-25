@@ -93,6 +93,11 @@ conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
 utilisent le même constructeur de packet raster ; un test d'intégration compare
 le packet runtime au packet studio attendu et le smoke OpenGL vérifie le pixel
 de référence réellement échantillonné après crop.
+`VisualComposition v1` couvre le round-trip strict des quatre genres de
+calques, les références typées, identifiants stables, ancrages, transforms,
+opacité, Z, publication atomique et refus des champs inconnus. Le validateur
+headless résout ses dépendances et vérifie chaque crop local contre les
+dimensions de la texture référencée.
 `VectorAsset v2` couvre la lecture de v1
 comme `linkedSvg`, le maintien du chemin source et la sérialisation sans le
 champ `format`. Le socle natif couvre round-trip, dimensions, origine,
