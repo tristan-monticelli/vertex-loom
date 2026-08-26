@@ -20,6 +20,7 @@ void usage() {
                  "--package <path>) "
                  "[--replay <id>] "
                  "[--save-slot <slot>] "
+                 "[--save-path <file>] "
                  "[--character] "
                  "[--input <id>] "
                  "[--follow-character] "
@@ -64,6 +65,7 @@ int main(int argc, char** argv) {
     fabric::runtime::PreviewRuntimeOptions options;
     std::optional<fabric::core::ResourceId> scene_id;
     std::optional<std::string> save_slot;
+    std::optional<std::filesystem::path> save_path;
     std::vector<fabric::runtime::InputActionDefinition> configured_actions;
     for (int index = 1; index < argc; ++index) {
         const std::string_view argument(argv[index]);
@@ -81,6 +83,8 @@ int main(int argc, char** argv) {
             options.input_id = fabric::core::ResourceId{argv[++index]};
         } else if (argument == "--save-slot" && index + 1 < argc) {
             save_slot = argv[++index];
+        } else if (argument == "--save-path" && index + 1 < argc) {
+            save_path = std::filesystem::path(argv[++index]);
         } else if (argument == "--character") {
             options.enable_character = true;
         } else if (argument == "--follow-character") {
@@ -137,13 +141,22 @@ int main(int argc, char** argv) {
 
     if (!configured_actions.empty()) options.input_actions = std::move(configured_actions);
 
+    if (save_slot && save_path) {
+        std::cerr << "error: --save-slot and --save-path are mutually exclusive\n";
+        return 2;
+    }
+
     fabric::runtime::ProgressStore progress_store;
-    if (save_slot) {
-        if (!scene_id) {
-            std::cerr << "error: --save-slot requires --scene\n";
+    std::optional<fabric::project::ProgressSave> progress;
+    if (save_slot || save_path) {
+        if (options.package_root || options.project_root.empty()) {
+            std::cerr << "error: progress resume requires --project\n";
             return 2;
         }
-        if (!progress_store.configure_user_path("VertexLoom", "VertexLoom", *save_slot)) {
+        const bool configured = save_slot
+            ? progress_store.configure_user_path("VertexLoom", "VertexLoom", *save_slot)
+            : progress_store.configure_path(*save_path);
+        if (!configured) {
             for (const auto& error : progress_store.errors()) std::cerr << "error: " << error << '\n';
             return 1;
         }
@@ -153,7 +166,19 @@ int main(int argc, char** argv) {
                 for (const auto& error : progress_store.errors()) std::cerr << "error: " << error << '\n';
                 return 1;
             }
+            progress = std::move(existing);
+            scene_id = progress->scene.id;
+        } else {
+            if (!scene_id) {
+                std::cerr << "error: an absent progress save requires --scene\n";
+                return 2;
+            }
+            progress = fabric::project::ProgressSave{
+                .schema_version = fabric::project::current_progress_save_schema_version,
+                .build = "vertex-loom-runtime",
+                .scene = {*scene_id, "scene"}};
         }
+        options.progress_properties = progress->properties;
     }
 
     fabric::runtime::SceneRuntimeSession scene_session;
@@ -186,12 +211,11 @@ int main(int argc, char** argv) {
             return 1;
         }
     } while (scene_id && scene_changed);
-    if (save_slot) {
-        const fabric::project::ProgressSave progress{
-            .schema_version = fabric::project::current_progress_save_schema_version,
-            .build = "vertex-loom-runtime",
-            .scene = {scene_session.scene()->document.id, "scene"}};
-        if (!progress_store.save(progress)) {
+    if (progress) {
+        progress->build = "vertex-loom-runtime";
+        progress->scene = {scene_session.scene()->document.id, "scene"};
+        progress->properties = runtime->progress_properties();
+        if (!progress_store.save(*progress)) {
             for (const auto& error : progress_store.errors()) std::cerr << "error: " << error << '\n';
             return 1;
         }

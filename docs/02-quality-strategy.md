@@ -94,6 +94,11 @@ Le contrat `MapPackageManifest v1` est testé séparément par round-trip strict
 version de schéma, compatibilité SemVer minimale, ordre des ressources,
 collisions de chemins et refus des chemins absolus, traversants ou à séparateur
 Windows avant l'ajout du copieur de fermeture transitive.
+Le test CTest `game_runtime_progress_resume` lance le binaire en smoke test avec
+un chemin de progression injecté. Il vérifie qu'un slot existant impose sa scène
+malgré une scène CLI différente, conserve toutes ses propriétés, refuse un slot
+invalide sans le remplacer, exige une scène pour un slot absent et amorce
+correctement un nouveau slot.
 La planification de paquet est testée sur les maps Studio de plateforme et de
 tête textile, qui traversent prefab, entité, composition, composant, chemin
 texturé, mécanique, vectoriel et texture. L'ordre du parcours ne doit pas

@@ -20,15 +20,14 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
 
-- [ ] **Empêcher l'écrasement destructif des sauvegardes de progression.**
-  `game/runtime/main.cpp` charge un slot existant sans appliquer son contenu,
-  puis sauvegarde un nouvel objet sans recopier `properties`. Un simple
-  lancement suivi d'une fermeture efface donc les propriétés persistées.
-- [ ] Restaurer la scène enregistrée et les propriétés du slot avant de lancer
+- [x] **Empêcher l'écrasement destructif des sauvegardes de progression.**
+  `game/runtime/main.cpp` conserve désormais l'objet chargé et ses `properties`
+  jusqu'au remplacement atomique final.
+- [x] Restaurer la scène enregistrée et les propriétés du slot avant de lancer
   le runtime.
-- [ ] Permettre de reprendre avec `--save-slot` sans imposer une seconde fois
+- [x] Permettre de reprendre avec `--save-slot` sans imposer une seconde fois
   `--scene`.
-- [ ] Ajouter un test d'intégration du binaire : slot existant → lancement →
+- [x] Ajouter un test d'intégration du binaire : slot existant → lancement →
   fermeture → contenu identique hors mutations explicites.
 - [ ] **Instancier les `MechanicGraph` dans Preview Runtime.** Map Studio les
   édite et les simule, les paquets les publient, mais `PreviewRuntime` ne charge
@@ -143,7 +142,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | CONFORME | Défenses de chemins et fermeture transitive des paquets | tests traversal, symlink et `map_package_tests.cpp` |
 | CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession` et tests headless |
 | MANQUE | End-to-end graphique | `docs/02-quality-strategy.md` indique « Plus tard » et aucune commande réelle |
-| MANQUE | Intégration progression dans `game_runtime` | les tests couvrent seulement `ProgressStore` isolé |
+| CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | MANQUE | Intégration mécanique dans Preview Runtime | aucune utilisation de `MechanicSimulation` dans `fabric_runtime` |
 | MANQUE | Fidélité du modèle Scene au runtime | `maps`, `layer_id` et `entry_point` ne sont pas appliqués |
 | MANQUE | Architecture fidèle au code | le C4 et l'ADR-0106 présentent la mécanique runtime comme livrée |
@@ -152,7 +151,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 ### Ordre de correction issu du nouvel audit
 
-- [ ] Lot A : non-régression des slots et reprise réelle.
+- [x] Lot A : non-régression des slots et reprise réelle.
 - [ ] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
 - [ ] Lot C : exécution runtime des mécaniques publiées.
 - [ ] Lot D : scènes multi-maps, entry points et paquet de scènes.

@@ -29,6 +29,6 @@ exactement la même politique de reprise.
 
 Après une exécution réussie, le runtime remplace uniquement le build et la scène
 active de l'état chargé, puis publie le document atomiquement. Les propriétés
-inconnues restent byte-for-byte équivalentes après parse et sérialisation tant
+inconnues restent sémantiquement identiques après parse et sérialisation tant
 qu'aucun système gameplay ne les modifie explicitement. Une erreur avant ou
 pendant l'exécution ne remplace jamais le slot.

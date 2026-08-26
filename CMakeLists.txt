@@ -457,6 +457,17 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_progress_store_tests COMMAND fabric_progress_store_tests)
 
+    if(FABRIC_BUILD_RUNTIME)
+        add_test(
+            NAME game_runtime_progress_resume
+            COMMAND ${CMAKE_COMMAND}
+                -DGAME_RUNTIME=$<TARGET_FILE:game_runtime>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/game-runtime-progress-resume
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/game_runtime_progress_resume.cmake
+        )
+    endif()
+
     add_executable(fabric_audio_mixer_tests tests/cpp/audio_mixer_tests.cpp)
     target_link_libraries(fabric_audio_mixer_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)

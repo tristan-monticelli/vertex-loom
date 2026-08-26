@@ -517,13 +517,17 @@ TEST_CASE("preview runtime resolves a scene entry map before graphics") {
     REQUIRE(fabric::project::publish_scene(root, project_manifest, scene()).ok());
 
     fabric::runtime::PreviewRuntime runtime;
+    const std::map<std::string, fabric::project::ProgressValue> progress{
+        {"has-key", true}, {"coins", std::int64_t{12}}};
     REQUIRE(runtime.load({.project_root = root,
                           .scene_id = fabric::core::ResourceId{.value = "preview-scene"},
+                          .progress_properties = progress,
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.scene().has_value());
     REQUIRE(runtime.map().has_value());
     CHECK(runtime.scene()->document.id.value == "preview-scene");
     CHECK(runtime.map()->document.id.value == "preview");
+    CHECK(runtime.progress_properties() == progress);
     CHECK(runtime.errors().empty());
     REQUIRE(runtime.run());
 

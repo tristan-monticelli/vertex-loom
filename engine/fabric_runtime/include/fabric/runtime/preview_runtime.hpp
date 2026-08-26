@@ -4,6 +4,7 @@
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/map_package.hpp"
+#include "fabric/project/progress_save.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
@@ -20,6 +21,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <memory>
 #include <optional>
 #include <string>
@@ -44,6 +46,7 @@ struct PreviewRuntimeOptions {
     bool follow_character{};
     std::optional<core::Rect> camera_limits;
     std::optional<std::filesystem::path> audio_wav;
+    std::map<std::string, project::ProgressValue> progress_properties;
     RuntimeMode mode{RuntimeMode::interactive};
     std::int32_t width{1440};
     std::int32_t height{900};
@@ -114,6 +117,10 @@ public:
         return errors_;
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
+    [[nodiscard]] const std::map<std::string, project::ProgressValue>&
+    progress_properties() const noexcept {
+        return options_.progress_properties;
+    }
     [[nodiscard]] const std::vector<GameplayEvent>& gameplay_events() const noexcept;
     [[nodiscard]] const std::vector<AnimationMarkerEvent>&
     animation_marker_events() const noexcept;
