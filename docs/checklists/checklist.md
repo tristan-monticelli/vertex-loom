@@ -237,8 +237,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   avec diagnostics d'id/nom sur les créations carte et scène. Vérifié par le
   build `map_studio` et les E2E `map_studio_close_e2e`, `map_studio_scene_e2e`,
   `map_studio_transformation_e2e`, ainsi que `fabric_map_session_tests`.
-- [ ] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
-  hiérarchisés, redimensionnables et focalisés sur la sélection courante.
+- [x] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
+  hiérarchisés, redimensionnables et focalisés sur la sélection courante. Les
+  panneaux `map-layers-pane` et `map-selection-pane` sont séparés par un
+  splitter borné ; les E2E Map Studio ciblés passent.
 
 ### Qualité, architecture et maintenabilité
 

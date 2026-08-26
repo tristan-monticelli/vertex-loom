@@ -2203,6 +2203,7 @@ int run(const std::filesystem::path& project_root,
     TransformEditorState transform_editor;
     float preview_time = 0.0F;
     bool preview_playing = true;
+    float layers_pane_width = 360.0F;
     fabric::render::MapPreviewResult map_preview;
     MapPreviewRenderState preview_render_state{
         .renderer = &map_renderer,
@@ -2361,7 +2362,12 @@ int run(const std::filesystem::path& project_root,
             draw_disabled_reason(!session.can_redo(),
                                  "No undone map changes are available to redo.");
             ImGui::Separator();
-            ImGui::BeginChild("map-layers-pane", ImVec2{360.0F, 0.0F}, true,
+            const auto available_width = ImGui::GetContentRegionAvail().x;
+            layers_pane_width = std::clamp(
+                layers_pane_width, 220.0F,
+                std::max(220.0F, available_width - 260.0F));
+            ImGui::BeginChild("map-layers-pane",
+                              ImVec2{layers_pane_width, 0.0F}, true,
                               ImGuiWindowFlags_HorizontalScrollbar);
             ImGui::Text("Layers (%zu)", map.layers.size());
             ImGui::SetNextItemWidth(120.0F);
@@ -2701,7 +2707,15 @@ int run(const std::filesystem::path& project_root,
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
             ImGui::EndChild();
-            ImGui::SameLine();
+            ImGui::SameLine(0.0F, 2.0F);
+            ImGui::Button("##map-pane-splitter", ImVec2{6.0F, -1.0F});
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                if (ImGui::IsItemActive())
+                    layers_pane_width = ImGui::GetMousePos().x -
+                        ImGui::GetWindowPos().x - 8.0F;
+            }
+            ImGui::SameLine(0.0F, 2.0F);
             ImGui::BeginChild("map-selection-pane", ImVec2{0.0F, 0.0F}, true,
                               ImGuiWindowFlags_HorizontalScrollbar);
             ImGui::SeparatorText("Events");
