@@ -11,8 +11,38 @@ C4Context
     Rel(creator, fabric, "Crée assets, comportements et transformations, puis teste")
     Rel(mapmaker, fabric, "Compose et prévisualise avec le même noyau d'authoring")
     Rel(fabric, files, "Lit et écrit les projets et ressources")
-    Rel(fabric, catalog, "Publie et charge des maps validées")
+Rel(fabric, catalog, "Publie et charge des maps validées")
 ```
+
+## Parcours utilisateur de référence
+
+Le premier écran doit répondre à une seule question : « que puis-je faire
+maintenant et sur quelle ressource ? ». Le créateur ouvre ou crée un projet,
+parcourt une ressource dans le rail droit, l'édite dans l'inspecteur, la
+prévisualise immédiatement, puis compose une map avant validation et
+publication. Toute transition conserve le document actif jusqu'à `Save`,
+`Discard` ou `Cancel`.
+
+```mermaid
+flowchart LR
+    Start[Ouvrir ou créer un projet] --> Explore[Explorer les ressources]
+    Explore --> Create{Créer ou ouvrir}
+    Create --> Asset[Éditer asset / entité / comportement]
+    Asset --> Preview[Prévisualiser et corriger]
+    Preview --> Map[Composer map / scène]
+    Map --> Validate[Valider les références et paramètres]
+    Validate -->|erreurs| Asset
+    Validate --> Publish[Publier un paquet]
+    Publish --> Runtime[Tester dans Preview Runtime]
+    Runtime --> Iterate[Revenir à la ressource concernée]
+    Iterate --> Explore
+```
+
+Les paramètres suivent le même cycle dans chaque surface : `Create` expose les
+valeurs initiales, `Inspector` expose toutes les valeurs persistées, `Preview`
+montre leur effet, et `Validate` explique l'erreur au champ concerné. Un
+paramètre disponible à la création ne peut donc pas devenir immuable après
+publication.
 
 ## Scope and assumptions
 

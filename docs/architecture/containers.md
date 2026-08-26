@@ -6,8 +6,8 @@ C4Container
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
         Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre et applique actuellement mouvement et propriétés ; les transformations atomiques restent une tranche suivante")
-        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise assets, entités, AudioDocument, InputDocument physiques, BehaviorGraph génériques et politiques de transformation ; prévisualise signaux et actions pas à pas")
-        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps, leurs prefabs et graphes mécaniques ; édite les paramètres de mécanique par overrides typés et inspecte leur simulation avant publication portable")
+        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Explorateur de ressources et rail droit : crée, édite, prévisualise et valide textures, vectoriels, matériaux, entités, AudioDocument, InputDocument, BehaviorGraph, animations et transformations")
+        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre une map ou scène, choisit les références par pickers typés, compose instances/prefabs/collisions/triggers, édite les paramètres par overrides et publie après preview")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
