@@ -227,6 +227,29 @@ ValidationReport validate_behavior_graph(const ProjectManifest&,
             if (found == node.properties.end() || !std::holds_alternative<std::string>(found->value) || std::get<std::string>(found->value).empty())
                 error(report.errors, ErrorCode::invalid_asset, prefix + ".properties.semantic_id", "source requires a non-empty semantic id");
         }
+        const auto node_property = [&](std::string_view id) -> const BehaviorValue* {
+            const auto found = std::ranges::find_if(node.properties,
+                [&](const auto& property) { return property.id == id; });
+            return found == node.properties.end() ? nullptr : &found->value;
+        };
+        const auto require_resource = [&](std::string_view id,
+                                          std::string_view expected) {
+            const auto* value = node_property(id);
+            const auto* reference = value ? std::get_if<ResourceReference>(value) : nullptr;
+            if (!reference || reference->expected_type != expected ||
+                !core::ResourceId::is_valid(reference->id.value))
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      prefix + ".properties." + std::string(id),
+                      "requires a " + std::string(expected) + " resource");
+        };
+        if (node.type == "move" &&
+            (!node_property("vector") ||
+             !std::holds_alternative<core::Vec2>(*node_property("vector"))))
+            error(report.errors, ErrorCode::resource_type_mismatch,
+                  prefix + ".properties.vector", "move requires a Vec2");
+        if (node.type == "play_animation") require_resource("animation", "animation");
+        if (node.type == "activate_mechanic") require_resource("mechanic", "mechanic");
+        if (node.type == "transform_entity") require_resource("transformation", "transformation");
     }
 
     std::set<std::string> connection_ids;

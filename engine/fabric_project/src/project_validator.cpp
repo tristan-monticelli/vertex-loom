@@ -1,5 +1,6 @@
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/input.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/behavior_graph.hpp"
@@ -166,6 +167,39 @@ void register_map_prefabs(const std::filesystem::path& project_root,
             errors.insert(errors.end(),
                           std::make_move_iterator(registration.errors.begin()),
                           std::make_move_iterator(registration.errors.end()));
+        }
+    }
+}
+
+void validate_transformation_entities(
+    const std::filesystem::path& project_root,
+    const ProjectManifest& manifest, std::vector<Error>& errors) {
+    const auto directory = project_root / manifest.directories.assets /
+        "transformations";
+    std::error_code filesystem_error;
+    if (!std::filesystem::exists(directory, filesystem_error) || filesystem_error)
+        return;
+    for (std::filesystem::directory_iterator iterator{directory, filesystem_error};
+         !filesystem_error && iterator != std::filesystem::directory_iterator{};
+         iterator.increment(filesystem_error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(filesystem_error) ||
+            !filename.ends_with(".transformation.json")) continue;
+        const auto loaded = load_entity_transformation(
+            project_root, manifest,
+            iterator->path().lexically_relative(project_root));
+        if (!loaded.ok()) continue;
+        for (const auto& [field, reference] : {
+                 std::pair{"sourceEntity", loaded.asset->source_entity},
+                 std::pair{"destinationEntity", loaded.asset->destination_entity}}) {
+            const auto entity = load_entity(
+                project_root, manifest,
+                entity_document_path(manifest, reference.id));
+            if (!entity.ok())
+                add_error(errors, ErrorCode::missing_resource,
+                          loaded.asset->document.id.value + "." + field,
+                          "referenced entity is missing or invalid: " +
+                              reference.id.value);
         }
     }
 }
@@ -453,6 +487,14 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         loaded.manifest->directories.assets, "behaviors",
         ".behavior.json", "assets.behaviors", load_behavior_graph,
         behavior_graph_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root,
+        loaded.manifest->directories.assets, "transformations",
+        ".transformation.json", "assets.transformations",
+        load_entity_transformation,
+        entity_transformation_resource_references, registry, result.errors);
+    validate_transformation_entities(
+        project_root, *loaded.manifest, result.errors);
     validate_composition_raster_views(
         project_root, *loaded.manifest, result.errors);
     validate_visual_component_bindings(

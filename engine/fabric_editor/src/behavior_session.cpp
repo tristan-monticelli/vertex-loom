@@ -55,6 +55,12 @@ project::BehaviorNodeDefinition make_node(std::string type, std::string id) {
     }
     if (node.type == "emit_event") node.properties.push_back({"event_id", std::string{"event"}});
     if (node.type == "move") node.properties.push_back({"vector", core::Vec2{1.0F, 0.0F}});
+    if (node.type == "play_animation")
+        node.properties.push_back({"animation", project::ResourceReference{{.value = "animation"}, "animation"}});
+    if (node.type == "activate_mechanic")
+        node.properties.push_back({"mechanic", project::ResourceReference{{.value = "mechanic"}, "mechanic"}});
+    if (node.type == "transform_entity")
+        node.properties.push_back({"transformation", project::ResourceReference{{.value = "transformation"}, "transformation"}});
     return node;
 }
 

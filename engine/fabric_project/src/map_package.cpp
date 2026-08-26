@@ -3,6 +3,7 @@
 #include "fabric/project/animation.hpp"
 #include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/input.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/material.hpp"
@@ -211,6 +212,13 @@ std::optional<ResolvedPackageResource> resolve_package_resource(
         if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
         return result(loaded.asset->document, path,
                       behavior_graph_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "transformation") {
+        const auto path = entity_transformation_document_path(manifest, reference.id);
+        const auto loaded = load_entity_transformation(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      entity_transformation_resource_references(*loaded.asset));
     }
     if (reference.expected_type == "animation") {
         const auto path = animation_document_path(manifest, reference.id);

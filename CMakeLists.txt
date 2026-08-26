@@ -59,6 +59,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/behavior_graph.cpp
     engine/fabric_project/src/document_storage.cpp
     engine/fabric_project/src/entity.cpp
+    engine/fabric_project/src/entity_transformation.cpp
     engine/fabric_project/src/input.cpp
     engine/fabric_project/src/manifest.cpp
     engine/fabric_project/src/map.cpp
@@ -350,6 +351,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_behavior_graph_tests
              COMMAND fabric_behavior_graph_tests)
+
+    add_executable(fabric_entity_transformation_tests
+        tests/cpp/entity_transformation_tests.cpp
+    )
+    target_link_libraries(fabric_entity_transformation_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_entity_transformation_tests
+             COMMAND fabric_entity_transformation_tests)
 
     add_executable(fabric_behavior_evaluator_tests
         tests/cpp/behavior_evaluator_tests.cpp

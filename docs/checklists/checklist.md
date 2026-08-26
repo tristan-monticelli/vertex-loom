@@ -261,21 +261,21 @@ Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
 
 ## 2 — Transformation d'une entité vers une autre
 
-- [ ] Écrire un ADR pour `EntityTransformation v1`.
-- [ ] Choisir si la transformation est une action du BehaviorGraph ou une
+- [x] Écrire un ADR pour `EntityTransformation v1`.
+- [x] Choisir si la transformation est une action du BehaviorGraph ou une
   ressource réutilisable référencée par cette action.
-- [ ] Définir explicitement l'entité source et l'entité destination.
-- [ ] Définir une politique de transfert pour :
-  - [ ] transform monde ;
-  - [ ] identifiant d'instance ;
-  - [ ] couche et ordre Z ;
-  - [ ] vitesse et état physique ;
-  - [ ] propriétés d'instance compatibles ;
-  - [ ] paramètres de comportement ;
-  - [ ] animation et temps courant ;
-  - [ ] cooldowns et timers ;
-  - [ ] caméra et suivi éventuel.
-- [ ] Définir les propriétés incompatibles comme reset, mapping explicite ou
+- [x] Définir explicitement l'entité source et l'entité destination.
+- [x] Définir une politique de transfert pour :
+  - [x] transform monde ;
+  - [x] identifiant d'instance ;
+  - [x] couche et ordre Z ;
+  - [x] vitesse et état physique ;
+  - [x] propriétés d'instance compatibles ;
+  - [x] paramètres de comportement ;
+  - [x] animation et temps courant ;
+  - [x] cooldowns et timers ;
+  - [x] caméra et suivi éventuel.
+- [x] Définir les propriétés incompatibles comme reset, mapping explicite ou
   erreur de validation.
 - [ ] Rendre l'opération atomique dans le runtime.
 - [ ] Empêcher une frame intermédiaire sans entité valide.
