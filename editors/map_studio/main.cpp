@@ -471,6 +471,10 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::InputText("Entry point", &state.entry_point);
     ImGui::SetNextItemWidth(160.0F);
     ImGui::InputText("Event (optional)", &state.event_id);
+    if (session.scene()) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear event")) state.event_id.clear();
+    }
     const auto transition_from_state = [&] {
         return fabric::project::SceneTransition{
             state.transition_id,
