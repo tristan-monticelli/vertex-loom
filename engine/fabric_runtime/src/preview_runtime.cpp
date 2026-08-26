@@ -521,6 +521,7 @@ bool PreviewRuntime::Impl::transform_entity_instance(
     for (std::size_t node_index = 0; node_index < destination.nodes.size();
          ++node_index) {
         const auto& node = destination.nodes[node_index];
+        if (!node.visible) continue;
         if (node.drawable.kind == project::EntityDrawableKind::vector &&
             node.drawable.resource) {
             const auto vector_id = node.drawable.resource->id.value;
@@ -1490,6 +1491,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         impl_->entity_simulations.emplace(instance.id, std::move(simulation));
         for (std::size_t node_index = 0; node_index < resolved_entity.nodes.size(); ++node_index) {
             const auto& node = resolved_entity.nodes[node_index];
+            if (!node.visible) continue;
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
                 node.drawable.resource) {
                 const auto vector_id = node.drawable.resource->id.value;

@@ -110,6 +110,32 @@ TEST_CASE("entity v1 migrates to v2 without changing legacy drawables") {
     CHECK(parsed.entity->nodes == legacy.nodes);
 }
 
+TEST_CASE("entity v3 migrates visible unlocked nodes to v4") {
+    auto legacy = entity();
+    legacy.document.schema_version = 3;
+    auto serialized = fabric::project::serialize_entity(legacy);
+    const auto remove_lines = [&](const std::string_view field) {
+        std::size_t position{};
+        while ((position = serialized.find(field, position)) !=
+               std::string::npos) {
+            const auto start = serialized.rfind('\n', position) + 1U;
+            const auto end = serialized.find('\n', position);
+            serialized.erase(start, end - start + 1U);
+            position = start;
+        }
+    };
+    remove_lines("\"visible\"");
+    remove_lines("\"locked\"");
+    const auto parsed = fabric::project::parse_entity(
+        manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.entity->document.schema_version ==
+          fabric::project::current_entity_schema_version);
+    CHECK(std::ranges::all_of(parsed.entity->nodes, [](const auto& node) {
+        return node.visible && !node.locked;
+    }));
+}
+
 TEST_CASE("entity visual component instances round-trip and expose resources") {
     auto source = entity();
     auto& drawable = source.nodes.front().drawable;

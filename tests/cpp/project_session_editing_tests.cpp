@@ -566,6 +566,14 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     node.name = "Body edited";
     node.transform.position = {2.0F, -1.0F};
     node.transform.rotation_degrees = 15.0F;
+    node.visible = false;
+    node.locked = true;
+    node.drawable = {
+        .kind = fabric::project::EntityDrawableKind::vector,
+        .resource = fabric::project::ResourceReference{
+            {.value = "body-artwork"}, "vector"},
+        .material = fabric::project::ResourceReference{
+            {.value = "body-material"}, "material"}};
     const fabric::editor::AutosaveScheduler::Clock::time_point start{};
     REQUIRE(session.set_selected_entity_node(0, node, start));
     CHECK(session.dirty());
@@ -574,6 +582,10 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     REQUIRE(session.redo(start));
     CHECK(session.selected_entity()->nodes.front().transform.position ==
           fabric::core::Vec2{2.0F, -1.0F});
+    CHECK_FALSE(session.selected_entity()->nodes.front().visible);
+    CHECK(session.selected_entity()->nodes.front().locked);
+    CHECK(session.selected_entity()->nodes.front().drawable.kind ==
+          fabric::project::EntityDrawableKind::vector);
     fabric::project::EntityNode child{
         .id = "child", .name = "Child", .parent = "root"};
     REQUIRE(session.add_selected_entity_node(child, start));
@@ -581,10 +593,12 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     CHECK_FALSE(session.remove_selected_entity_node(0, start));
     REQUIRE(session.duplicate_selected_entity_node(0, start));
     REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    REQUIRE(session.move_selected_entity_node(2U, 1U, start));
+    CHECK(session.selected_entity()->nodes[1].id == "root-copy");
     REQUIRE(session.undo(start));
-    CHECK(session.selected_entity()->nodes.size() == 2U);
+    CHECK(session.selected_entity()->nodes[2].id == "root-copy");
     REQUIRE(session.redo(start));
-    REQUIRE(session.remove_selected_entity_node(2, start));
+    REQUIRE(session.remove_selected_entity_node(1, start));
     REQUIRE(session.remove_selected_entity_node(1, start));
     CHECK(session.selected_entity()->nodes.size() == 1U);
     CHECK(session.update_autosave(start) ==

@@ -148,6 +148,10 @@ public:
         std::size_t node_index,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool move_selected_entity_node(
+        std::size_t node_index, std::size_t destination_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool remove_selected_entity_node(
         std::size_t node_index,
         AutosaveScheduler::Clock::time_point now =

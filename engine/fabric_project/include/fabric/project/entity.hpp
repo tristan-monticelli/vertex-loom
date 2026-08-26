@@ -18,7 +18,7 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_entity_schema_version = 3;
+inline constexpr std::uint32_t current_entity_schema_version = 4;
 
 enum class EntityDrawableKind { none, vector, texture, visual_component };
 [[nodiscard]] std::string_view to_string(EntityDrawableKind) noexcept;
@@ -37,6 +37,8 @@ struct EntityNode {
     std::optional<std::string> parent;
     core::Transform transform;
     float z_order{};
+    bool visible{true};
+    bool locked{};
     EntityDrawable drawable;
     friend bool operator==(const EntityNode&, const EntityNode&) = default;
 };

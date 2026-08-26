@@ -121,7 +121,9 @@ C4Component
   bindings, puis de sauvegarder avec `CommandStack`, undo/redo et autosave
   validé.
 - L’inspecteur d’entité liste les nœuds dans leur ordre stable et permet de
-  modifier nom, parent et transform. Chaque mutation passe par
+  modifier nom, parent, ordre, transform, visibilité, verrouillage et drawable
+  complet. Kind, artwork, matériau, variante, ancre et overrides utilisent les
+  ressources indexées plutôt que des identifiants implicites. Chaque mutation passe par
   `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de
   transform non fini.
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et

@@ -91,7 +91,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Rendre le matériau sélectionné modifiable. Il est chargeable et
   créable, mais absent de `DirtyDocument`, de `save`, de l'autosave et de
   l'inspecteur d'édition.
-- [ ] Rendre le drawable d'un nœud d'entité modifiable après création : kind,
+- [x] Rendre le drawable d'un nœud d'entité modifiable après création : kind,
   ressource, matériau, composant, variante, overrides, visibilité et verrou.
 - [ ] Ajouter explicitement une entité cible lors de la création d'une
   animation et permettre de changer cette cible depuis l'inspecteur.
@@ -405,17 +405,17 @@ publication.
 ## 7 — Entités et artworks dans le rail droit
 
 - [ ] Remplacer la liste plate par un véritable arbre de nœuds d'entité.
-- [ ] Ajouter les actions de nœud : Add, Duplicate, Reparent, Reorder et Delete.
-- [ ] Demander confirmation avant suppression d'un nœud et afficher ses enfants.
-- [ ] Exposer un inspecteur complet du drawable de chaque nœud.
-- [ ] Permettre après création les kinds `none`, `texture`, `vector` et
+- [x] Ajouter les actions de nœud : Add, Duplicate, Reparent, Reorder et Delete.
+- [x] Demander confirmation avant suppression d'un nœud et afficher ses enfants.
+- [x] Exposer un inspecteur complet du drawable de chaque nœud.
+- [x] Permettre après création les kinds `none`, `texture`, `vector` et
   `visualComponent`.
-- [ ] Permettre `Add`, `Replace`, `Clear` et `Open` sur la ressource visuelle.
-- [ ] Permettre d'ajouter, remplacer ou retirer un matériau compatible.
-- [ ] Exposer variante, ancre et overrides d'un composant visuel.
-- [ ] Préserver les références compatibles lors d'un changement de kind.
+- [x] Permettre `Add`, `Replace`, `Clear` et `Open` sur la ressource visuelle.
+- [x] Permettre d'ajouter, remplacer ou retirer un matériau compatible.
+- [x] Exposer variante, ancre et overrides d'un composant visuel.
+- [x] Préserver les références compatibles lors d'un changement de kind.
 - [ ] Demander confirmation avant d'effacer des overrides incompatibles.
-- [ ] Exposer transform, pivot, Z, visibilité et verrouillage du nœud.
+- [x] Exposer transform, pivot, Z, visibilité et verrouillage du nœud.
 - [ ] Ajouter sélection et gizmos de nœud dans le canvas d'entité.
 - [ ] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
   - [ ] un nœud existant ;
@@ -424,8 +424,8 @@ publication.
 - [ ] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
   sections avancées éditables plutôt que seulement dans le contrat JSON.
 - [x] Attacher explicitement un BehaviorGraph à l'entité.
-- [ ] Tester une entité multi-nœuds combinant texture, vectoriel et composant.
-- [ ] Tester duplication, reparentage, changement d'artwork et reload.
+- [x] Tester une entité multi-nœuds combinant texture, vectoriel et composant.
+- [x] Tester duplication, reparentage, changement d'artwork et reload.
 
 Gate : une entité vide peut être entièrement assemblée et modifiée depuis le
 rail droit sans recréation ni édition JSON.

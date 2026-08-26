@@ -187,6 +187,7 @@ MapPreviewResult resolve_map_preview(
         for (std::size_t node_index = 0; node_index < entity.nodes.size();
              ++node_index) {
             const auto& node = entity.nodes[node_index];
+            if (!node.visible) continue;
             VectorGeometryResult geometry;
             if (node.drawable.kind == project::EntityDrawableKind::vector &&
                 node.drawable.resource) {

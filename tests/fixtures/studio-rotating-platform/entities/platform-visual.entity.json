@@ -19,6 +19,7 @@
         }
       },
       "id": "root",
+      "locked": false,
       "name": "Textile strip",
       "transform": {
         "pivot": {
@@ -35,10 +36,11 @@
           "y": 1.0
         }
       },
+      "visible": true,
       "zOrder": 0.0
     }
   ],
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "type": "entity",
   "xpbd": null
 }

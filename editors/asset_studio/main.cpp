@@ -329,6 +329,7 @@ EntityPreviewResult build_entity_preview(
     for (std::size_t node_index = 0; node_index < entity.nodes.size();
          ++node_index) {
         const auto& node = entity.nodes[node_index];
+        if (!node.visible) continue;
         std::optional<fabric::project::MaterialDefinition> material;
         if (node.drawable.material) {
             const auto loaded = fabric::project::load_material(
@@ -3031,7 +3032,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
-            const auto& entity = *session.selected_entity();
+            const auto entity = *session.selected_entity();
             ImGui::SeparatorText("Entity behavior");
             std::string behavior_id = entity.behavior
                 ? entity.behavior->id.value : std::string{};
@@ -3095,11 +3096,46 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::SameLine();
-            if (ImGui::Button("Delete") &&
-                session.remove_selected_entity_node(canvas.selected_node)) {
-                canvas.selected_node = canvas.selected_node == 0U
-                    ? 0U : canvas.selected_node - 1U;
-                status = "Entity node deleted.";
+            if (ImGui::Button("Move up") && canvas.selected_node > 0U &&
+                session.move_selected_entity_node(
+                    canvas.selected_node, canvas.selected_node - 1U)) {
+                --canvas.selected_node;
+                status = "Entity node moved.";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Move down") &&
+                canvas.selected_node + 1U < entity.nodes.size() &&
+                session.move_selected_entity_node(
+                    canvas.selected_node, canvas.selected_node + 1U)) {
+                ++canvas.selected_node;
+                status = "Entity node moved.";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Delete..."))
+                ImGui::OpenPopup("Delete entity node?");
+            if (ImGui::BeginPopupModal("Delete entity node?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto& pending = entity.nodes[canvas.selected_node];
+                const auto child_count = std::ranges::count_if(
+                    entity.nodes, [&](const auto& candidate) {
+                        return candidate.parent && *candidate.parent == pending.id;
+                    });
+                ImGui::Text("Delete '%s'?", pending.name.c_str());
+                ImGui::TextWrapped("This node has %zu direct child(ren). Nodes with children are protected until they are reparented.",
+                                   child_count);
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0.62F, 0.16F, 0.14F, 1.0F});
+                if (ImGui::Button("Delete node") &&
+                    session.remove_selected_entity_node(canvas.selected_node)) {
+                    canvas.selected_node = canvas.selected_node == 0U
+                        ? 0U : canvas.selected_node - 1U;
+                    status = "Entity node deleted.";
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopStyleColor();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
             }
             for (std::size_t node_index = 0; node_index < entity.nodes.size();
                  ++node_index) {
@@ -3121,6 +3157,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 };
             ImGui::SeparatorText("Entity node properties");
+            bool locked = node.locked;
+            if (ImGui::Checkbox("Locked", &locked)) {
+                node.locked = locked;
+                commit_entity_node(node);
+            }
+            ImGui::BeginDisabled(node.locked);
+            bool visible = node.visible;
+            if (ImGui::Checkbox("Visible", &visible)) {
+                node.visible = visible;
+                commit_entity_node(node);
+            }
             std::string node_name = node.name;
             if (ImGui::InputText("Node name", &node_name)) {
                 node.name = std::move(node_name);
@@ -3159,6 +3206,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.transform.scale = {scale[0], scale[1]};
                 commit_entity_node(node);
             }
+            float pivot[]{node.transform.pivot.x, node.transform.pivot.y};
+            if (ImGui::InputFloat2("Entity pivot", pivot)) {
+                node.transform.pivot = {pivot[0], pivot[1]};
+                commit_entity_node(node);
+            }
             float rotation = node.transform.rotation_degrees;
             if (ImGui::InputFloat("Entity rotation", &rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
@@ -3170,6 +3222,267 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.z_order = z_order;
                 commit_entity_node(node);
             }
+            ImGui::SeparatorText("Drawable");
+            const auto drawable_label = std::string(
+                fabric::project::to_string(node.drawable.kind));
+            if (ImGui::BeginCombo("Kind", drawable_label.c_str())) {
+                for (const auto kind : {
+                         fabric::project::EntityDrawableKind::none,
+                         fabric::project::EntityDrawableKind::texture,
+                         fabric::project::EntityDrawableKind::vector,
+                         fabric::project::EntityDrawableKind::visual_component}) {
+                    const auto label = std::string(fabric::project::to_string(kind));
+                    const auto resource_kind = kind ==
+                            fabric::project::EntityDrawableKind::texture
+                        ? fabric::editor::StudioResourceKind::texture
+                        : kind == fabric::project::EntityDrawableKind::vector
+                        ? fabric::editor::StudioResourceKind::vector
+                        : fabric::editor::StudioResourceKind::visual_component;
+                    const auto first = std::ranges::find_if(
+                        session.resources(), [&](const auto& resource) {
+                            return resource.kind == resource_kind;
+                        });
+                    const bool available = kind ==
+                            fabric::project::EntityDrawableKind::none ||
+                        first != session.resources().end();
+                    ImGui::BeginDisabled(!available);
+                    if (ImGui::Selectable(label.c_str(),
+                                          node.drawable.kind == kind)) {
+                        node.drawable.kind = kind;
+                        if (kind == fabric::project::EntityDrawableKind::none) {
+                            node.drawable.resource.reset();
+                            node.drawable.material.reset();
+                            node.drawable.component_instance.reset();
+                        } else {
+                            const char* expected = kind ==
+                                    fabric::project::EntityDrawableKind::texture
+                                ? "texture"
+                                : kind == fabric::project::EntityDrawableKind::vector
+                                ? "vector" : "visualComponent";
+                            if (!node.drawable.resource ||
+                                node.drawable.resource->expected_type != expected)
+                                node.drawable.resource =
+                                    fabric::project::ResourceReference{
+                                        first->id, expected};
+                            if (kind == fabric::project::EntityDrawableKind::visual_component) {
+                                node.drawable.material.reset();
+                                if (!node.drawable.component_instance)
+                                    node.drawable.component_instance =
+                                        fabric::project::VisualComponentInstance{};
+                            } else {
+                                node.drawable.component_instance.reset();
+                            }
+                        }
+                        commit_entity_node(node);
+                    }
+                    ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
+            if (node.drawable.kind !=
+                fabric::project::EntityDrawableKind::none) {
+                const auto resource_kind = node.drawable.kind ==
+                        fabric::project::EntityDrawableKind::texture
+                    ? fabric::editor::StudioResourceKind::texture
+                    : node.drawable.kind ==
+                            fabric::project::EntityDrawableKind::vector
+                    ? fabric::editor::StudioResourceKind::vector
+                    : fabric::editor::StudioResourceKind::visual_component;
+                const char* expected = node.drawable.kind ==
+                        fabric::project::EntityDrawableKind::texture
+                    ? "texture"
+                    : node.drawable.kind ==
+                            fabric::project::EntityDrawableKind::vector
+                    ? "vector" : "visualComponent";
+                std::string artwork_id = node.drawable.resource
+                    ? node.drawable.resource->id.value : std::string{};
+                if (draw_project_resource_picker(
+                        "Artwork", session.resources(), resource_kind,
+                        artwork_id, false)) {
+                    node.drawable.resource = fabric::project::ResourceReference{
+                        {.value = artwork_id}, expected};
+                    if (node.drawable.kind ==
+                        fabric::project::EntityDrawableKind::visual_component)
+                        node.drawable.component_instance =
+                            fabric::project::VisualComponentInstance{};
+                    commit_entity_node(node);
+                }
+                const auto artwork = std::ranges::find_if(
+                    session.resources(), [&](const auto& resource) {
+                        return resource.kind == resource_kind &&
+                            resource.id.value == artwork_id;
+                    });
+                ImGui::BeginDisabled(artwork == session.resources().end());
+                if (ImGui::Button("Open artwork") &&
+                    artwork != session.resources().end())
+                    select_and_preview_resource(
+                        session, *artwork, preview, status, "Opened artwork: ");
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Clear drawable")) {
+                    node.drawable = {};
+                    commit_entity_node(node);
+                }
+            }
+            if (node.drawable.kind ==
+                    fabric::project::EntityDrawableKind::texture ||
+                node.drawable.kind ==
+                    fabric::project::EntityDrawableKind::vector) {
+                std::string material_id = node.drawable.material
+                    ? node.drawable.material->id.value : std::string{};
+                if (draw_project_resource_picker(
+                        "Material", session.resources(),
+                        fabric::editor::StudioResourceKind::material,
+                        material_id, true)) {
+                    node.drawable.material = material_id.empty()
+                        ? std::optional<fabric::project::ResourceReference>{}
+                        : std::optional<fabric::project::ResourceReference>{
+                            fabric::project::ResourceReference{
+                                {.value = material_id}, "material"}};
+                    commit_entity_node(node);
+                }
+            }
+            if (node.drawable.kind ==
+                    fabric::project::EntityDrawableKind::visual_component &&
+                node.drawable.resource) {
+                const auto component = fabric::project::load_visual_component(
+                    session.project_root(), *session.manifest(),
+                    fabric::project::visual_component_document_path(
+                        *session.manifest(), node.drawable.resource->id));
+                if (component.ok()) {
+                    auto instance = node.drawable.component_instance.value_or(
+                        fabric::project::VisualComponentInstance{});
+                    const auto variant_name = [&] {
+                        if (!instance.variant_id) return std::string{"Default"};
+                        const auto found = std::ranges::find(
+                            component.asset->variants, *instance.variant_id,
+                            &fabric::project::VisualComponentVariant::id);
+                        return found == component.asset->variants.end()
+                            ? std::string{"Missing: "} + *instance.variant_id
+                            : found->name;
+                    }();
+                    if (ImGui::BeginCombo("Variant", variant_name.c_str())) {
+                        if (ImGui::Selectable("Default", !instance.variant_id)) {
+                            instance.variant_id.reset();
+                            node.drawable.component_instance = instance;
+                            commit_entity_node(node);
+                        }
+                        for (const auto& variant : component.asset->variants) {
+                            if (ImGui::Selectable(variant.name.c_str(),
+                                    instance.variant_id == variant.id)) {
+                                instance.variant_id = variant.id;
+                                node.drawable.component_instance = instance;
+                                commit_entity_node(node);
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    const auto anchor_name = [&] {
+                        if (!instance.anchor_id) return std::string{"Default"};
+                        const auto found = std::ranges::find(
+                            component.asset->anchors, *instance.anchor_id,
+                            &fabric::project::VisualComponentAnchor::id);
+                        return found == component.asset->anchors.end()
+                            ? std::string{"Missing: "} + *instance.anchor_id
+                            : found->name;
+                    }();
+                    if (ImGui::BeginCombo("Anchor", anchor_name.c_str())) {
+                        if (ImGui::Selectable("Default", !instance.anchor_id)) {
+                            instance.anchor_id.reset();
+                            node.drawable.component_instance = instance;
+                            commit_entity_node(node);
+                        }
+                        for (const auto& anchor : component.asset->anchors) {
+                            if (ImGui::Selectable(anchor.name.c_str(),
+                                    instance.anchor_id == anchor.id)) {
+                                instance.anchor_id = anchor.id;
+                                node.drawable.component_instance = instance;
+                                commit_entity_node(node);
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::Text("%zu override(s)", instance.overrides.size());
+                    for (std::size_t override_index = 0;
+                         override_index < instance.overrides.size();
+                         ++override_index) {
+                        ImGui::PushID(static_cast<int>(override_index));
+                        ImGui::TextUnformatted(
+                            instance.overrides[override_index].parameter_id.c_str());
+                        auto override = instance.overrides[override_index];
+                        bool override_changed = false;
+                        if (auto* value = std::get_if<float>(&override.value))
+                            override_changed = ImGui::InputFloat("Value", value);
+                        else if (auto* value = std::get_if<std::int64_t>(
+                                     &override.value))
+                            override_changed = ImGui::InputScalar(
+                                "Value", ImGuiDataType_S64, value);
+                        else if (auto* value = std::get_if<bool>(&override.value))
+                            override_changed = ImGui::Checkbox("Value", value);
+                        else if (auto* value = std::get_if<std::string>(
+                                     &override.value))
+                            override_changed = ImGui::InputText("Value", value);
+                        else if (auto* value = std::get_if<fabric::core::Vec2>(
+                                     &override.value))
+                            override_changed = ImGui::InputFloat2(
+                                "Value", &value->x);
+                        else if (auto* value = std::get_if<fabric::core::Color>(
+                                     &override.value))
+                            override_changed = ImGui::ColorEdit4(
+                                "Value", &value->red);
+                        else if (auto* value = std::get_if<
+                                     fabric::project::ResourceReference>(
+                                     &override.value)) {
+                            auto kind = fabric::editor::StudioResourceKind::texture;
+                            if (value->expected_type == "vector")
+                                kind = fabric::editor::StudioResourceKind::vector;
+                            else if (value->expected_type == "material")
+                                kind = fabric::editor::StudioResourceKind::material;
+                            else if (value->expected_type == "visualComponent")
+                                kind = fabric::editor::StudioResourceKind::visual_component;
+                            auto id = value->id.value;
+                            if (draw_project_resource_picker(
+                                    "Value", session.resources(), kind, id, false)) {
+                                value->id = {.value = id};
+                                override_changed = true;
+                            }
+                        }
+                        if (override_changed) {
+                            instance.overrides[override_index] = std::move(override);
+                            node.drawable.component_instance = instance;
+                            commit_entity_node(node);
+                        }
+                        if (ImGui::SmallButton("Remove override")) {
+                            instance.overrides.erase(
+                                instance.overrides.begin() +
+                                static_cast<std::ptrdiff_t>(override_index));
+                            node.drawable.component_instance = instance;
+                            commit_entity_node(node);
+                            ImGui::PopID();
+                            break;
+                        }
+                        ImGui::PopID();
+                    }
+                    if (ImGui::BeginCombo("Add override", "Choose parameter...")) {
+                        for (const auto& parameter : component.asset->parameters) {
+                            const bool exists = std::ranges::any_of(
+                                instance.overrides, [&](const auto& value) {
+                                    return value.parameter_id == parameter.id;
+                                });
+                            ImGui::BeginDisabled(exists);
+                            if (ImGui::Selectable(parameter.name.c_str())) {
+                                instance.overrides.push_back(
+                                    {parameter.id, parameter.default_value});
+                                node.drawable.component_instance = instance;
+                                commit_entity_node(node);
+                            }
+                            ImGui::EndDisabled();
+                        }
+                        ImGui::EndCombo();
+                    }
+                }
+            }
+            ImGui::EndDisabled();
             }
         }
         if (selected != nullptr &&
@@ -4244,7 +4557,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create entity", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create a reusable EntityDefinition v2");
+        ImGui::TextUnformatted("Create a reusable EntityDefinition v4");
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);
@@ -4534,7 +4847,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
 int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool behavior_e2e = false,
-                     const bool transformation_e2e = false) {
+                     const bool transformation_e2e = false,
+                     const bool entity_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -4561,7 +4875,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
-            ((behavior_e2e || transformation_e2e) ? SDL_WINDOW_HIDDEN : 0U));
+            ((behavior_e2e || transformation_e2e || entity_e2e)
+                 ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
         SDL_Quit();
@@ -4708,6 +5023,67 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             reloaded.transformation()->policy == policy;
         if (!transformation_e2e_complete)
             std::cerr << "Asset Studio Transformation E2E failed\n";
+    }
+
+    bool entity_e2e_complete = false;
+    if (entity_e2e && session.has_project()) {
+        const fabric::core::ResourceId entity_id{.value =
+            "rotating-platform-entity"};
+        const bool selected = session.select_resource(
+            fabric::editor::StudioResourceKind::entity, entity_id);
+        auto node = selected ? session.selected_entity()->nodes.front()
+                             : fabric::project::EntityNode{};
+        node.visible = false;
+        node.locked = true;
+        node.drawable = {
+            .kind = fabric::project::EntityDrawableKind::texture,
+            .resource = fabric::project::ResourceReference{
+                {.value = "head-face"}, "texture"}};
+        bool authored = selected && session.set_selected_entity_node(0U, node) &&
+            session.add_selected_entity_node({
+                .id = "studio-child", .name = "Studio Child",
+                .parent = node.id});
+        if (authored) {
+            auto child = session.selected_entity()->nodes[1];
+            child.drawable = {
+                .kind = fabric::project::EntityDrawableKind::vector,
+                .resource = fabric::project::ResourceReference{
+                    {.value = "head-button-artwork"}, "vector"}};
+            authored = session.set_selected_entity_node(1U, child) &&
+                session.duplicate_selected_entity_node(1U);
+        }
+        if (authored) {
+            auto component = session.selected_entity()->nodes[2];
+            component.drawable = {
+                .kind = fabric::project::EntityDrawableKind::visual_component,
+                .resource = fabric::project::ResourceReference{
+                    {.value = "beam"}, "visualComponent"},
+                .component_instance =
+                    fabric::project::VisualComponentInstance{}};
+            authored = session.set_selected_entity_node(2U, component) &&
+                session.move_selected_entity_node(2U, 1U) && session.save();
+        }
+        fabric::editor::ProjectSession reloaded;
+        const bool reopened = authored && reloaded.open(initial_project) &&
+            reloaded.select_resource(
+                fabric::editor::StudioResourceKind::entity, entity_id);
+        const auto visual = reopened
+            ? build_entity_preview(initial_project, *reloaded.manifest(),
+                                   *reloaded.selected_entity())
+            : EntityPreviewResult{};
+        entity_e2e_complete = reopened &&
+            reloaded.selected_entity()->nodes.size() == 3U &&
+            reloaded.selected_entity()->nodes.front().locked &&
+            !reloaded.selected_entity()->nodes.front().visible &&
+            reloaded.selected_entity()->nodes.front().drawable.kind ==
+                fabric::project::EntityDrawableKind::texture &&
+            reloaded.selected_entity()->nodes[1].drawable.kind ==
+                fabric::project::EntityDrawableKind::visual_component &&
+            reloaded.selected_entity()->nodes[2].drawable.kind ==
+                fabric::project::EntityDrawableKind::vector &&
+            !visual.packets.empty();
+        if (!entity_e2e_complete)
+            std::cerr << "Asset Studio Entity E2E failed\n";
     }
 
     bool running = true;
@@ -5025,7 +5401,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
-        if (behavior_e2e || transformation_e2e) running = false;
+        if (behavior_e2e || transformation_e2e || entity_e2e) running = false;
     }
 
     if (preview.texture != 0U) {
@@ -5046,7 +5422,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_DestroyWindow(window);
     SDL_Quit();
     return (behavior_e2e && !behavior_e2e_complete) ||
-            (transformation_e2e && !transformation_e2e_complete)
+            (transformation_e2e && !transformation_e2e_complete) ||
+            (entity_e2e && !entity_e2e_complete)
         ? 1 : 0;
 }
 
@@ -5057,16 +5434,21 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-behavior";
     const bool transformation_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-transformation";
-    if (argument_count > 2 && !behavior_e2e && !transformation_e2e) {
+    const bool entity_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-entity";
+    if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
+        !entity_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
-                     "       asset_studio --e2e-transformation project-directory\n";
+                     "       asset_studio --e2e-transformation project-directory\n"
+                     "       asset_studio --e2e-entity project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
-        (behavior_e2e || transformation_e2e)
+        (behavior_e2e || transformation_e2e || entity_e2e)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
-    return run_asset_studio(initial_project, behavior_e2e, transformation_e2e);
+    return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
+                            entity_e2e);
 }

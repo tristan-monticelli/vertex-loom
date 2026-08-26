@@ -1169,6 +1169,28 @@ TEST_CASE("preview runtime applies animated material tracks to submitted packets
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime omits hidden entity nodes") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-hidden-node-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_entity()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    auto hidden = entity();
+    hidden.nodes.front().visible = false;
+    REQUIRE(fabric::project::publish_entity(root, manifest(), hidden).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.last_frame_packets().empty());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime loads per-instance deformation and XPBD state headlessly") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-simulation-" + std::to_string(

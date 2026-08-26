@@ -1864,6 +1864,42 @@ bool ProjectSession::duplicate_selected_entity_node(
     return add_selected_entity_node(std::move(node), now);
 }
 
+bool ProjectSession::move_selected_entity_node(
+    const std::size_t node_index, const std::size_t destination_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || node_index >= selected_entity_->nodes.size() ||
+        destination_index >= selected_entity_->nodes.size()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a valid destination for the entity node"}};
+        return false;
+    }
+    if (node_index == destination_index) return true;
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing an entity"}};
+        return false;
+    }
+    auto nodes = selected_entity_->nodes;
+    auto moved = std::move(nodes[node_index]);
+    nodes.erase(nodes.begin() + static_cast<std::ptrdiff_t>(node_index));
+    nodes.insert(nodes.begin() + static_cast<std::ptrdiff_t>(destination_index),
+                 std::move(moved));
+    auto candidate = *selected_entity_;
+    candidate.nodes = nodes;
+    const auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::EntityNode>>>(
+            selected_entity_->nodes, std::move(nodes)))) return false;
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::remove_selected_entity_node(
     const std::size_t node_index,
     const AutosaveScheduler::Clock::time_point now) {
