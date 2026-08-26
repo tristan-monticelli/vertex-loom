@@ -572,21 +572,21 @@ automatiquement sur les trois plateformes.
 
 - [x] Mettre à jour `docs/00-project-brief.md` si le périmètre BehaviorGraph et
   transformations change les critères de succès.
-- [ ] Mettre à jour C4 Context et Container avant chaque changement structurel.
+- [x] Mettre à jour C4 Context et Container avant chaque changement structurel.
 - [ ] Ajouter ou mettre à jour les diagrammes de composants concernés.
-- [ ] Ajouter un ADR par nouveau contrat ou politique persistante.
+- [x] Ajouter un ADR par nouveau contrat ou politique persistante.
 - [ ] Supprimer les affirmations de gate validé qui ne disposent pas d'une
   preuve UX reproductible.
 - [ ] Réconcilier cette checklist avec `remaining-roadmap.md`.
 - [ ] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
-- [ ] Exécuter `npm run validate` après chaque étape fonctionnelle.
+- [x] Exécuter `npm run validate` après chaque étape fonctionnelle.
 - [ ] Exécuter le smoke OpenGL après toute modification du renderer.
 - [ ] Exécuter les benchmarks après toute modification significative du rendu
   ou du runtime.
-- [ ] Auditer le diff, les voisins, les régressions et les effets de bord.
-- [ ] Vérifier `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json` et les hooks modifiés.
-- [ ] Vérifier qu'aucune suppression n'a été réalisée sans confirmation.
-- [ ] Faire un commit conventionnel par étape fonctionnelle vérifiée.
+- [x] Auditer le diff, les voisins, les régressions et les effets de bord.
+- [x] Vérifier `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json` et les hooks modifiés.
+- [x] Vérifier qu'aucune suppression n'a été réalisée sans confirmation.
+- [x] Faire un commit conventionnel par étape fonctionnelle vérifiée.
 - [ ] Confirmer le résultat visuel et fonctionnel avant de déclarer le chantier
   terminé.
 
