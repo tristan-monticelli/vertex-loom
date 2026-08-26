@@ -229,7 +229,10 @@ C4Component
 - `ProgressSave v1` est séparé du projet d’authoring. Il conserve le build, la
   scène active et des propriétés typées (`bool`, entier, réel, texte, `Vec2`
   ou référence de ressource), puis les écrit par remplacement atomique dans
-  le chemin utilisateur fourni par le runtime.
+  le chemin utilisateur fourni par le runtime. Un slot existant est chargé
+  avant la scène et devient l'état de reprise autoritaire. Le runtime conserve
+  toutes ses propriétés, applique sa scène, puis ne remplace le slot qu'après
+  une exécution réussie.
 - Les chemins absolus, vides, traversants ou extérieurs au dossier projet sont
   refusés avant tout accès aux ressources, y compris après résolution des liens
   symboliques.
