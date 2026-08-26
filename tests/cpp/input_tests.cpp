@@ -61,3 +61,15 @@ TEST_CASE("input action map configures a complete binding table atomically") {
     CHECK(input.actions() == definitions);
     CHECK(input.held("move_left"));
 }
+
+TEST_CASE("input action map evaluates axis dead zones and thresholds") {
+    fabric::runtime::InputActionMap input;
+    REQUIRE(input.define_action("move"));
+    REQUIRE(input.bind("move", {fabric::runtime::InputDevice::gamepad, 0,
+                                 fabric::project::InputBindingKind::axis,
+                                 0.6F, 0.2F}));
+    input.set_axis(fabric::runtime::InputDevice::gamepad, 0, 0.4F);
+    CHECK_FALSE(input.held("move"));
+    input.set_axis(fabric::runtime::InputDevice::gamepad, 0, 0.8F);
+    CHECK(input.held("move"));
+}

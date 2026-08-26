@@ -1,6 +1,8 @@
 #include "fabric/runtime/input.hpp"
 
 #include <string_view>
+#include <cmath>
+#include <algorithm>
 #include <utility>
 
 namespace fabric::runtime {
@@ -70,6 +72,12 @@ void InputActionMap::release(const InputDevice device, const int code) noexcept 
     if (held_bindings_.erase(binding) != 0U) released_bindings_.insert(binding);
 }
 
+void InputActionMap::set_axis(const InputDevice device, const int code,
+                              const float value) noexcept {
+    if (!std::isfinite(value)) return;
+    axis_values_[key(device, code)] = std::clamp(value, -1.0F, 1.0F);
+}
+
 void InputActionMap::press_action(const std::string_view action) noexcept {
     if (action.empty()) return;
     const std::string value(action);
@@ -91,6 +99,21 @@ bool InputActionMap::held(const std::string_view action) const noexcept {
         const auto device = static_cast<InputDevice>(std::stoi(binding.substr(0, separator)));
         const auto code = std::stoi(binding.substr(separator + 1));
         if (matches(action, device, code)) return true;
+    }
+    for (const auto& [encoded, value] : axis_values_) {
+        const auto separator = encoded.find(':');
+        if (separator == std::string::npos) continue;
+        const auto device = static_cast<InputDevice>(std::stoi(encoded.substr(0, separator)));
+        const auto code = std::stoi(encoded.substr(separator + 1));
+        for (const auto& definition : actions_) {
+            if (definition.id != action) continue;
+            for (const auto& binding : definition.bindings) {
+                if (binding.kind == project::InputBindingKind::axis &&
+                    binding.device == device && binding.code == code &&
+                    std::abs(value) >= binding.dead_zone &&
+                    std::abs(value) >= binding.threshold) return true;
+            }
+        }
     }
     return false;
 }

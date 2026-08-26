@@ -1884,6 +1884,9 @@ bool PreviewRuntime::run() {
                 input_.press(InputDevice::gamepad, event.cbutton.button);
             else if (event.type == SDL_CONTROLLERBUTTONUP)
                 input_.release(InputDevice::gamepad, event.cbutton.button);
+            else if (event.type == SDL_CONTROLLERAXISMOTION)
+                input_.set_axis(InputDevice::gamepad, event.caxis.axis,
+                                static_cast<float>(event.caxis.value) / 32767.0F);
         }
         const auto current_counter = SDL_GetPerformanceCounter();
         const auto elapsed = options_.mode == RuntimeMode::interactive
