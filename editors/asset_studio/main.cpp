@@ -6334,6 +6334,33 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
     bool behavior_e2e_complete = false;
     if (behavior_e2e && session.has_project()) {
+        fabric::editor::CreateInputPrompt input_prompt;
+        input_prompt.name = "Player and Monster Controls";
+        input_prompt.actions = {
+            {"move", {{fabric::project::InputDevice::keyboard, 65}}},
+            {"attack", {{fabric::project::InputDevice::gamepad, 0}}}};
+        bool input_authored = session.create_input(input_prompt) &&
+            session.add_selected_input_binding(
+                0U, {fabric::project::InputDevice::keyboard, 68}) &&
+            session.add_selected_input_action(
+                {"jump", {{fabric::project::InputDevice::keyboard, 32}}}) &&
+            session.save();
+        const auto input_resource = std::ranges::find_if(
+            session.resources(), [](const auto& resource) {
+                return resource.kind == fabric::editor::StudioResourceKind::input &&
+                    resource.name == "Player and Monster Controls";
+            });
+        fabric::editor::ProjectSession input_reloaded;
+        const bool input_reloaded_ok = input_authored &&
+            input_resource != session.resources().end() &&
+            input_reloaded.open(initial_project) &&
+            input_reloaded.select_resource(
+                fabric::editor::StudioResourceKind::input,
+                input_resource->id);
+        input_authored = input_reloaded_ok && input_reloaded.selected_input() &&
+            input_reloaded.selected_input()->actions.size() == 3U &&
+            input_reloaded.selected_input()->actions.front().bindings.size() == 2U;
+
         fabric::project::BehaviorGraph graph;
         graph.document.id = {.value = "behavior-studio-e2e"};
         graph.document.name = "Behavior Studio E2E";
@@ -6364,7 +6391,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 fabric::project::ResourceReference{
                     {.value = "behavior-studio-e2e"}, "behavior"}) &&
             session.save();
-        behavior_e2e_complete = reloaded_ok && attached && actions.size() == 1U;
+        behavior_e2e_complete = input_authored && reloaded_ok && attached &&
+            actions.size() == 1U;
         if (!behavior_e2e_complete)
             std::cerr << "Asset Studio Behavior E2E failed\n";
     }

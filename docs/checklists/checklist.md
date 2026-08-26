@@ -661,9 +661,9 @@ utilisées pour tous les types de ressources.
   - [x] analyser puis annuler une suppression ;
   - [x] ajouter un artwork à une entité existante ;
   - [x] créer une animation ciblant cette entité ;
-  - [ ] créer plusieurs actions et plusieurs bindings ;
-  - [ ] programmer un comportement de joueur ;
-  - [ ] programmer un comportement de monstre ;
+  - [x] créer plusieurs actions et plusieurs bindings ;
+  - [x] programmer un comportement de joueur ;
+  - [x] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
   - [x] créer et éditer un path Bézier ;
   - [x] changer fill, texture et stroke après création.

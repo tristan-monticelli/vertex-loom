@@ -29,6 +29,18 @@ if(NOT NODE_COUNT EQUAL 2 OR NOT CONNECTION_COUNT EQUAL 1)
     message(FATAL_ERROR "Behavior graph did not reload with authored content")
 endif()
 
+set(INPUT
+    "${TEST_ROOT}/project/assets/input/player-and-monster-controls.input.json")
+if(NOT EXISTS "${INPUT}")
+    message(FATAL_ERROR "Input document was not saved")
+endif()
+file(READ "${INPUT}" INPUT_JSON)
+string(JSON ACTION_COUNT LENGTH "${INPUT_JSON}" actions)
+string(JSON MOVE_BINDING_COUNT LENGTH "${INPUT_JSON}" actions 0 bindings)
+if(NOT ACTION_COUNT EQUAL 3 OR NOT MOVE_BINDING_COUNT EQUAL 2)
+    message(FATAL_ERROR "Input document did not reload with multiple actions and bindings")
+endif()
+
 file(READ
     "${TEST_ROOT}/project/entities/rotating-platform-entity.entity.json"
     ENTITY_JSON)
