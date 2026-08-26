@@ -73,6 +73,13 @@ Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
 
+Une scène monte toutes ses maps dans un `MapDocument` runtime éphémère. Le
+`layer_id` de chaque référence sert de namespace aux identifiants locaux ; les
+ressources projet et les événements compatibles restent partagés. Les points
+d'entrée sont des instances marquées par `sceneEntryPoint`, résolues
+atomiquement avec la scène cible avant qu'un nouveau Preview Runtime place le
+personnage.
+
 `fabric_physics` compile les sept nœuds intégrés de `MechanicGraph` en un plan
 headless ordonné de corps, pivots, joints, moteurs, capteurs, contraintes et
 liaisons vers les événements déclarés par la map. Ce plan ne contient aucun
