@@ -250,6 +250,17 @@ std::optional<fabric::project::MechanicValue> parse_mechanic_override_value(
     return std::nullopt;
 }
 
+void draw_value_parse_error(
+    const std::optional<fabric::project::MapPropertyValue>& value,
+    const std::string_view field,
+    const std::string_view correction) {
+    if (value.has_value()) return;
+    ImGui::PushStyleColor(ImGuiCol_Text, {0.98F, 0.48F, 0.42F, 1.0F});
+    ImGui::TextWrapped("%s: value has the wrong format", std::string(field).c_str());
+    ImGui::PopStyleColor();
+    ImGui::TextDisabled("Correction: %s", std::string(correction).c_str());
+}
+
 std::string property_value_text(const fabric::project::MapPropertyValue& value) {
     return std::visit([](const auto& item) -> std::string {
         using Value = std::decay_t<decltype(item)>;
@@ -2642,6 +2653,11 @@ int run(const std::filesystem::path& project_root,
                                  "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                     ImGui::SetNextItemWidth(180.0F);
                     ImGui::InputText("Payload value", &event_property_value);
+                    if (!event_property_value.empty())
+                        draw_value_parse_error(
+                            parse_override_value(event_property_kind,
+                                                 event_property_value),
+                            "Payload value", "Use true/false, a number, x,y, or a resource id.");
                     ImGui::BeginDisabled(event_property_id.empty() ||
                                          event_property_value.empty());
                     if (ImGui::Button("Apply payload property")) {
@@ -2797,6 +2813,12 @@ int run(const std::filesystem::path& project_root,
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::InputText("Trigger property value",
                                  &trigger_property_value);
+                if (!trigger_property_value.empty())
+                    draw_value_parse_error(
+                        parse_override_value(trigger_property_kind,
+                                             trigger_property_value),
+                        "Trigger property value",
+                        "Use true/false, a number, x,y, or a resource id.");
                 ImGui::BeginDisabled(trigger_property_id.empty() ||
                                      trigger_property_value.empty());
                 if (ImGui::Button("Set trigger override")) {
@@ -2918,6 +2940,11 @@ int run(const std::filesystem::path& project_root,
                              "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::InputText("Instance value", &instance_property_value);
+                if (!instance_property_value.empty())
+                    draw_value_parse_error(
+                        parse_override_value(instance_property_kind,
+                                             instance_property_value),
+                        "Instance value", "Use true/false, a number, x,y, or a resource id.");
                 ImGui::BeginDisabled(instance_property_id.empty() || instance_property_value.empty());
                 if (ImGui::Button("Apply instance property")) {
                     const auto value = parse_override_value(instance_property_kind,
@@ -3038,6 +3065,19 @@ int run(const std::filesystem::path& project_root,
                             ImGui::SetNextItemWidth(180.0F);
                             ImGui::InputText("Mechanic value",
                                              &mechanic_override_value);
+                            if (!mechanic_override_value.empty()) {
+                                const auto parsed = parse_mechanic_override_value(
+                                    *parameter, mechanic_override_value);
+                                if (!parsed.has_value()) {
+                                    ImGui::PushStyleColor(
+                                        ImGuiCol_Text, {0.98F, 0.48F, 0.42F, 1.0F});
+                                    ImGui::TextWrapped(
+                                        "Mechanic value: value has the wrong format");
+                                    ImGui::PopStyleColor();
+                                    ImGui::TextDisabled(
+                                        "Correction: match the selected mechanic parameter type.");
+                                }
+                            }
                             if (ImGui::Button("Apply mechanic override")) {
                                 const auto value = parse_mechanic_override_value(
                                     *parameter, mechanic_override_value);
@@ -3081,6 +3121,10 @@ int run(const std::filesystem::path& project_root,
                              "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::InputText("Value", &override_value);
+                if (!override_value.empty())
+                    draw_value_parse_error(
+                        parse_override_value(override_kind, override_value),
+                        "Value", "Use true/false, a number, x,y, or a resource id.");
                 ImGui::BeginDisabled(override_id.empty() || override_value.empty());
                 if (ImGui::Button("Apply override")) {
                     const auto value = parse_override_value(override_kind, override_value);
