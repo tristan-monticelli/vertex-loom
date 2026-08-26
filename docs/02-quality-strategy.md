@@ -197,6 +197,10 @@ invalide, avec vérification qu'aucune nouvelle ressource n'est publiée après
 un échec de sauvegarde.
 Les opérations de plume testent aussi l'ouverture et la fermeture idempotentes
 des contours, sans perdre le dernier segment.
+Le contrat vectoriel teste la transformation groupée d'ancres autour du
+centroïde et rejette les sélections contenant des index dupliqués ; Asset
+Studio expose cette sélection par Shift, le déplacement canvas et les actions
+groupées de rotation/échelle.
 La sélection d'une autre ressource vérifie également la conservation du
 document courant lorsqu'une sauvegarde devient impossible ; avec le parcours
 de fermeture Map Studio (`clean`, `save`, `cancel`, `discard`, échec), les

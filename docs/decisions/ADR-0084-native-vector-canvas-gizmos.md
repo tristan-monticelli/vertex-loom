@@ -31,6 +31,10 @@ Le domaine peut aussi fermer un contour par une commande `close` vers le
 premier point, ou retirer cette commande pour le rouvrir ; ces opérations
 refusent les paths sans tête `move` valide ou les états déjà dans la cible.
 
+Une sélection multiple d’ancres applique translation, rotation et échelle
+autour de son centroïde. Les poignées des segments cubic sélectionnés suivent
+la même transformation afin de conserver la forme locale du segment.
+
 ## Conséquences
 
 - Le canvas et l’inspecteur partagent le même contrat `Transform`.

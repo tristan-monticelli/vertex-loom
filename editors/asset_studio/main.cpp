@@ -172,6 +172,7 @@ struct CanvasUiState {
         scale,
         pivot,
         path_point,
+        path_selection,
         bezier_handle1,
         bezier_handle2,
     };
@@ -187,6 +188,7 @@ struct CanvasUiState {
     fabric::core::Transform drag_start_transform;
     fabric::project::VectorNode drag_start_node;
     std::size_t path_command_index{};
+    std::vector<std::size_t> selected_path_points;
     ImVec2 native_origin{};
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
@@ -1840,6 +1842,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     return std::hypot(left.x - right.x, left.y - right.y);
                 };
                 float closest = 10.0F;
+                std::optional<std::size_t> hit_anchor;
                 for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
                     const auto& command = selected_node->shape.path[index];
                     if (command.kind == fabric::project::VectorPathCommandKind::move ||
@@ -1850,8 +1853,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                         const float hit = distance(mouse, candidate);
                         if (hit <= closest) {
                             closest = hit;
-                            operation = CanvasUiState::DragOperation::path_point;
-                            canvas.path_command_index = index;
+                            hit_anchor = index;
                         }
                     }
                     if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
@@ -1869,6 +1871,23 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                                 canvas.path_command_index = index;
                             }
                         }
+                    }
+                }
+                if (operation == CanvasUiState::DragOperation::none && hit_anchor) {
+                    const auto selected = std::ranges::find(
+                        canvas.selected_path_points, *hit_anchor);
+                    if (io.KeyShift) {
+                        if (selected == canvas.selected_path_points.end())
+                            canvas.selected_path_points.push_back(*hit_anchor);
+                        else
+                            canvas.selected_path_points.erase(selected);
+                    } else {
+                        if (selected == canvas.selected_path_points.end())
+                            canvas.selected_path_points = {*hit_anchor};
+                        operation = canvas.selected_path_points.size() > 1U
+                            ? CanvasUiState::DragOperation::path_selection
+                            : CanvasUiState::DragOperation::path_point;
+                        canvas.path_command_index = *hit_anchor;
                     }
                 }
             }
@@ -1896,6 +1915,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     canvas.tool == CanvasUiState::Tool::move) {
                     operation = CanvasUiState::DragOperation::move;
                 } else {
+                    canvas.selected_path_points.clear();
                     canvas.selected_node = *hit_node;
                 }
             }
@@ -1937,7 +1957,15 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     std::max(std::abs(transform.scale.y), 0.0001F) +
                     transform.pivot.y};
         };
-        if (canvas.drag_operation == CanvasUiState::DragOperation::path_point &&
+        if (canvas.drag_operation == CanvasUiState::DragOperation::path_selection) {
+            changed = canvas.drag_start_node;
+            const fabric::core::Vec2 delta{
+                current_mouse.x - start_mouse.x,
+                current_mouse.y - start_mouse.y};
+            static_cast<void>(fabric::project::transform_path_points(
+                changed.shape, canvas.selected_path_points, delta, 0.0F,
+                {1.0F, 1.0F}));
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::path_point &&
             canvas.path_command_index < changed.shape.path.size()) {
             changed.shape.path[canvas.path_command_index].point =
                 world_to_local(current_mouse);
@@ -2184,9 +2212,14 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 if (command.kind == fabric::project::VectorPathCommandKind::move ||
                     command.kind == fabric::project::VectorPathCommandKind::line ||
                     command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                    const auto point_selected = std::ranges::find(
+                        canvas.selected_path_points, index) !=
+                        canvas.selected_path_points.end();
                     draw_list->AddCircleFilled(
                         to_screen(transform_point(*selected_node, command.point)),
-                        4.0F, IM_COL32(236, 180, 75, 255));
+                        5.0F, point_selected
+                            ? IM_COL32(100, 210, 255, 255)
+                            : IM_COL32(236, 180, 75, 255));
                 }
                 if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
                     const auto anchor = to_screen(
@@ -3675,6 +3708,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
                 ImGui::TextDisabled("Path commands: %zu", node.shape.path.size());
+                if (canvas.selected_path_points.size() > 1U) {
+                    ImGui::TextDisabled("Selected points: %zu",
+                                       canvas.selected_path_points.size());
+                    if (ImGui::Button("Move selection +1")) {
+                        if (fabric::project::transform_path_points(
+                                node.shape, canvas.selected_path_points,
+                                {1.0F, 1.0F}, 0.0F, {1.0F, 1.0F}))
+                            commit_node(node);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Rotate selection +15")) {
+                        if (fabric::project::transform_path_points(
+                                node.shape, canvas.selected_path_points,
+                                {}, 15.0F, {1.0F, 1.0F}))
+                            commit_node(node);
+                    }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Scale selection 110%")) {
+                        if (fabric::project::transform_path_points(
+                                node.shape, canvas.selected_path_points,
+                                {}, 0.0F, {1.1F, 1.1F}))
+                            commit_node(node);
+                    }
+                }
                 if (ImGui::Button("Add line command")) {
                     const auto point = node.shape.path.empty()
                         ? node.shape.bounds.origin

@@ -156,6 +156,9 @@ path_commands_from_shape(const VectorShape& shape);
 // collinear handles at one-third and two-thirds of the segment.
 [[nodiscard]] bool convert_path_command(
     VectorShape& shape, std::size_t index, VectorPathCommandKind kind);
+[[nodiscard]] bool transform_path_points(
+    VectorShape& shape, const std::vector<std::size_t>& indices,
+    core::Vec2 translation, float rotation_degrees, core::Vec2 scale);
 [[nodiscard]] bool open_path(VectorShape& shape);
 [[nodiscard]] bool close_path(VectorShape& shape);
 

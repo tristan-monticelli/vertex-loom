@@ -6,6 +6,7 @@
 #include "fabric/project/vector_asset.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <chrono>
 #include <filesystem>
@@ -477,4 +478,19 @@ TEST_CASE("vector primitives convert to editable path commands") {
     REQUIRE(fabric::project::open_path(editable_path));
     CHECK(editable_path.path.back().kind == Kind::line);
     CHECK_FALSE(fabric::project::open_path(editable_path));
+    REQUIRE(fabric::project::insert_path_command(
+        editable_path, 2U,
+        {.kind = Kind::line, .point = {2.0F, 1.0F}}));
+    REQUIRE(fabric::project::transform_path_points(
+        editable_path, {1U, 2U}, {1.0F, 2.0F}, 0.0F, {2.0F, 2.0F}));
+    CHECK(editable_path.path[1].point == fabric::core::Vec2{1.5F, 1.5F});
+    CHECK(editable_path.path[2].point == fabric::core::Vec2{3.5F, 3.5F});
+    REQUIRE(fabric::project::transform_path_points(
+        editable_path, {1U, 2U}, {}, 90.0F, {1.0F, 1.0F}));
+    CHECK(editable_path.path[1].point.x == Catch::Approx(3.5F));
+    CHECK(editable_path.path[1].point.y == Catch::Approx(1.5F));
+    CHECK(editable_path.path[2].point.x == Catch::Approx(1.5F));
+    CHECK(editable_path.path[2].point.y == Catch::Approx(3.5F));
+    CHECK_FALSE(fabric::project::transform_path_points(
+        editable_path, {1U, 1U}, {}, 0.0F, {1.0F, 1.0F}));
 }

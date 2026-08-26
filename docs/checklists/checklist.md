@@ -594,8 +594,8 @@ sur un comportement sans modifier le runtime.
   - [x] fermer un contour.
 - [ ] Afficher et modifier les poignées Bézier directement sur le canvas.
 - [ ] Supporter poignées liées, symétriques et libres.
-- [ ] Ajouter sélection simple et multiple de points.
-- [ ] Ajouter déplacement, rotation et échelle d'une sélection de points.
+- [x] Ajouter sélection simple et multiple de points.
+- [x] Ajouter déplacement, rotation et échelle d'une sélection de points.
 - [x] Exposer les bounds des primitives.
 - [x] Exposer le type de fill après création.
 - [x] Permettre fill `none`, couleur et image à tout moment.

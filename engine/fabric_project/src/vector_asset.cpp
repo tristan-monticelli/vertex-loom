@@ -835,6 +835,51 @@ bool convert_path_command(VectorShape& shape, const std::size_t index,
     return true;
 }
 
+bool transform_path_points(VectorShape& shape,
+                           const std::vector<std::size_t>& indices,
+                           const core::Vec2 translation,
+                           const float rotation_degrees,
+                           const core::Vec2 scale) {
+    using Kind = VectorPathCommandKind;
+    if (shape.kind != VectorShapeKind::path || indices.empty() ||
+        !std::isfinite(rotation_degrees) || !std::isfinite(scale.x) ||
+        !std::isfinite(scale.y) || std::abs(scale.x) < 0.0001F ||
+        std::abs(scale.y) < 0.0001F)
+        return false;
+    core::Vec2 center{};
+    for (const auto index : indices) {
+        if (index == 0U || index >= shape.path.size() ||
+            (shape.path[index].kind != Kind::line &&
+             shape.path[index].kind != Kind::cubic) ||
+            std::ranges::count(indices, index) != 1U)
+            return false;
+        center.x += shape.path[index].point.x;
+        center.y += shape.path[index].point.y;
+    }
+    center.x /= static_cast<float>(indices.size());
+    center.y /= static_cast<float>(indices.size());
+    constexpr float pi = 3.14159265358979323846F;
+    const float radians = rotation_degrees * pi / 180.0F;
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    const auto transform = [&](const core::Vec2 point) {
+        const float x = (point.x - center.x) * scale.x;
+        const float y = (point.y - center.y) * scale.y;
+        return core::Vec2{
+            center.x + cosine * x - sine * y + translation.x,
+            center.y + sine * x + cosine * y + translation.y};
+    };
+    for (const auto index : indices) {
+        auto& command = shape.path[index];
+        command.point = transform(command.point);
+        if (command.kind == Kind::cubic) {
+            command.control1 = transform(command.control1);
+            command.control2 = transform(command.control2);
+        }
+    }
+    return true;
+}
+
 bool open_path(VectorShape& shape) {
     if (shape.kind != VectorShapeKind::path || shape.path.size() < 3U ||
         shape.path.front().kind != VectorPathCommandKind::move ||
