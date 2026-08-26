@@ -481,6 +481,70 @@ TEST_CASE("material prompt publishes and indexes a material document") {
     CHECK(loaded.asset->color == fabric::core::Color{0.8F, 0.7F, 0.5F, 1.0F});
 }
 
+TEST_CASE("material edits undo autosave recover and reload every property") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    const auto texture_source = project.path() / "cloth-texture.png";
+    std::ofstream{texture_source, std::ios::binary} << "texture-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), *session.manifest(),
+        {.document = {.type = "texture",
+                      .id = {.value = "cloth-texture"},
+                      .name = "Cloth texture"},
+         .source = "assets/textures/cloth-texture.png",
+         .width = 1U,
+         .height = 1U},
+        texture_source).ok());
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Weave pattern";
+    REQUIRE(session.create_vector_artwork(artwork));
+    fabric::editor::CreateMaterialPrompt prompt;
+    prompt.name = "Editable fill";
+    REQUIRE(session.create_material(prompt));
+
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    auto material = *session.selected_material();
+    material.document.name = "Edited fill";
+    material.color = {0.1F, 0.2F, 0.3F, 0.8F};
+    material.opacity = 0.65F;
+    material.blend = fabric::project::MaterialBlendMode::screen;
+    material.texture = fabric::project::ResourceReference{
+        {.value = "cloth-texture"}, "texture"};
+    material.vector_pattern = fabric::project::ResourceReference{
+        {.value = "weave-pattern"}, "vector"};
+    material.uv_transform.position = {0.2F, -0.4F};
+    material.uv_transform.scale = {1.5F, 0.75F};
+    material.uv_transform.rotation_degrees = 32.0F;
+    material.uv_transform.pivot = {0.25F, 0.6F};
+    REQUIRE(session.set_selected_material(material, start));
+    REQUIRE(session.dirty());
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_material()->document.name == "Editable fill");
+    REQUIRE(session.redo(start));
+    CHECK(*session.selected_material() == material);
+    CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
+          fabric::editor::AutosaveStatus::saved);
+
+    fabric::editor::ProjectSession recovered;
+    REQUIRE(recovered.open(project.path()));
+    REQUIRE(recovered.select_resource(
+        fabric::editor::StudioResourceKind::material,
+        {.value = "editable-fill"}));
+    REQUIRE(recovered.has_recovery());
+    REQUIRE(recovered.accept_recovery(start + std::chrono::seconds{3}));
+    CHECK(*recovered.selected_material() == material);
+    REQUIRE(recovered.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::material,
+        {.value = "editable-fill"}));
+    CHECK(*reloaded.selected_material() == material);
+}
+
 TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     const TemporaryDirectory project;
     write_project(project.path());

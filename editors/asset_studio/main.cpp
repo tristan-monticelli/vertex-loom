@@ -2106,6 +2106,132 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         } else {
             ImGui::TextDisabled("Select a resource to inspect it.");
         }
+        if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::material &&
+            session.selected_material()) {
+            const auto& current = *session.selected_material();
+            const auto commit_material = [&](fabric::project::MaterialDefinition value) {
+                status = session.set_selected_material(std::move(value))
+                    ? "Material changed."
+                    : "Material change rejected; inspect diagnostics.";
+            };
+            ImGui::SeparatorText("Material properties");
+            auto material = current;
+            std::string name = material.document.name;
+            if (ImGui::InputText("Name", &name)) {
+                material.document.name = std::move(name);
+                commit_material(std::move(material));
+            }
+            material = current;
+            float color[]{material.color.red, material.color.green,
+                          material.color.blue, material.color.alpha};
+            if (ImGui::ColorEdit4("Color", color)) {
+                material.color = {color[0], color[1], color[2], color[3]};
+                commit_material(std::move(material));
+            }
+            material = current;
+            float opacity = material.opacity;
+            if (ImGui::SliderFloat("Opacity", &opacity, 0.0F, 1.0F, "%.2f")) {
+                material.opacity = opacity;
+                commit_material(std::move(material));
+            }
+            material = current;
+            const auto blend_label = std::string(
+                fabric::project::to_string(material.blend));
+            if (ImGui::BeginCombo("Blend mode", blend_label.c_str())) {
+                for (const auto blend : {
+                         fabric::project::MaterialBlendMode::normal,
+                         fabric::project::MaterialBlendMode::additive,
+                         fabric::project::MaterialBlendMode::multiply,
+                         fabric::project::MaterialBlendMode::screen}) {
+                    const auto label = std::string(fabric::project::to_string(blend));
+                    if (ImGui::Selectable(label.c_str(), material.blend == blend)) {
+                        material.blend = blend;
+                        commit_material(std::move(material));
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            std::string texture_id = current.texture
+                ? current.texture->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Texture", session.resources(),
+                    fabric::editor::StudioResourceKind::texture,
+                    texture_id, true)) {
+                material = current;
+                material.texture = texture_id.empty()
+                    ? std::optional<fabric::project::ResourceReference>{}
+                    : std::optional<fabric::project::ResourceReference>{
+                        fabric::project::ResourceReference{
+                            {.value = texture_id}, "texture"}};
+                commit_material(std::move(material));
+            }
+            std::string vector_id = current.vector_pattern
+                ? current.vector_pattern->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Vector pattern", session.resources(),
+                    fabric::editor::StudioResourceKind::vector,
+                    vector_id, true)) {
+                material = current;
+                material.vector_pattern = vector_id.empty()
+                    ? std::optional<fabric::project::ResourceReference>{}
+                    : std::optional<fabric::project::ResourceReference>{
+                        fabric::project::ResourceReference{
+                            {.value = vector_id}, "vector"}};
+                commit_material(std::move(material));
+            }
+            material = current;
+            float uv_offset[]{material.uv_transform.position.x,
+                              material.uv_transform.position.y};
+            if (ImGui::InputFloat2("UV offset", uv_offset)) {
+                material.uv_transform.position = {uv_offset[0], uv_offset[1]};
+                commit_material(std::move(material));
+            }
+            material = current;
+            float uv_scale[]{material.uv_transform.scale.x,
+                             material.uv_transform.scale.y};
+            if (ImGui::InputFloat2("UV scale", uv_scale)) {
+                material.uv_transform.scale = {uv_scale[0], uv_scale[1]};
+                commit_material(std::move(material));
+            }
+            material = current;
+            float uv_rotation = material.uv_transform.rotation_degrees;
+            if (ImGui::InputFloat("UV rotation", &uv_rotation, 1.0F, 10.0F,
+                                  "%.2f deg")) {
+                material.uv_transform.rotation_degrees = uv_rotation;
+                commit_material(std::move(material));
+            }
+            material = current;
+            float uv_pivot[]{material.uv_transform.pivot.x,
+                             material.uv_transform.pivot.y};
+            if (ImGui::InputFloat2("UV pivot", uv_pivot)) {
+                material.uv_transform.pivot = {uv_pivot[0], uv_pivot[1]};
+                commit_material(std::move(material));
+            }
+            const ImVec4 swatch{current.color.red, current.color.green,
+                                current.color.blue,
+                                current.color.alpha * current.opacity};
+            ImGui::ColorButton("##material-preview", swatch,
+                               ImGuiColorEditFlags_NoTooltip,
+                               {ImGui::GetContentRegionAvail().x, 72.0F});
+            ImGui::SeparatorText("Used by");
+            bool used = false;
+            for (const auto& resource : session.resources()) {
+                if (resource.kind != fabric::editor::StudioResourceKind::entity)
+                    continue;
+                const auto loaded = fabric::project::load_entity(
+                    session.project_root(), *session.manifest(),
+                    resource.document_path);
+                if (!loaded.ok() || !std::ranges::any_of(
+                        loaded.entity->nodes, [&](const auto& node) {
+                            return node.drawable.material &&
+                                node.drawable.material->id == current.document.id;
+                        })) continue;
+                used = true;
+                ImGui::BulletText("%s", resource.name.c_str());
+            }
+            if (!used) ImGui::TextDisabled("No entity reference.");
+        }
         if (visual_selected) {
             ImGui::SeparatorText("Resolved visual");
             ImGui::Text("%zu draw packet(s)", visual_preview.packets.size());

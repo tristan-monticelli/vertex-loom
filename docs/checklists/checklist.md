@@ -88,7 +88,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   document est dirty par la transition commune avec sauvegarde automatique.
 - [x] Appliquer la même transition aux créations et imports ; la session
   sauvegarde désormais automatiquement le document valide avant de continuer.
-- [ ] Rendre le matériau sélectionné modifiable. Il est chargeable et
+- [x] Rendre le matériau sélectionné modifiable. Il est chargeable et
   créable, mais absent de `DirtyDocument`, de `save`, de l'autosave et de
   l'inspecteur d'édition.
 - [ ] Rendre le drawable d'un nœud d'entité modifiable après création : kind,
@@ -379,25 +379,25 @@ depuis chaque contexte sans saisir son identifiant.
 
 ## 6 — Matériaux entièrement éditables
 
-- [ ] Ajouter `material` aux documents dirty supportés par ProjectSession.
-- [ ] Ajouter le chemin courant, autosave et récupération des matériaux.
-- [ ] Ajouter une commande de mutation validée du matériau sélectionné.
-- [ ] Exposer après création :
-  - [ ] nom ;
-  - [ ] couleur ;
-  - [ ] opacité ;
-  - [ ] blend mode ;
-  - [ ] texture ;
-  - [ ] motif vectoriel ;
-  - [ ] offset UV ;
-  - [ ] échelle UV ;
-  - [ ] rotation UV ;
-  - [ ] pivot UV si le contrat le conserve.
-- [ ] Prévisualiser chaque changement immédiatement.
-- [ ] Afficher les entités et composants qui utilisent le matériau.
-- [ ] Ajouter undo, redo, dirty, autosave, récupération et sauvegarde atomique.
-- [ ] Tester chaque propriété individuellement et en combinaison.
-- [ ] Tester le matériau dans Asset Studio, Map Studio et Preview Runtime.
+- [x] Ajouter `material` aux documents dirty supportés par ProjectSession.
+- [x] Ajouter le chemin courant, autosave et récupération des matériaux.
+- [x] Ajouter une commande de mutation validée du matériau sélectionné.
+- [x] Exposer après création :
+  - [x] nom ;
+  - [x] couleur ;
+  - [x] opacité ;
+  - [x] blend mode ;
+  - [x] texture ;
+  - [x] motif vectoriel ;
+  - [x] offset UV ;
+  - [x] échelle UV ;
+  - [x] rotation UV ;
+  - [x] pivot UV si le contrat le conserve.
+- [x] Prévisualiser chaque changement immédiatement.
+- [x] Afficher les entités et composants qui utilisent le matériau.
+- [x] Ajouter undo, redo, dirty, autosave, récupération et sauvegarde atomique.
+- [x] Tester chaque propriété individuellement et en combinaison.
+- [x] Tester le matériau dans Asset Studio, Map Studio et Preview Runtime.
 
 Gate : aucun paramètre disponible à la création ne devient immuable après
 publication.

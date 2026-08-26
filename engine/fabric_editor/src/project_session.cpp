@@ -320,6 +320,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     recovery_manifest_.reset();
     recovery_texture_.reset();
     recovery_vector_.reset();
+    recovery_material_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
     recovery_textured_path_.reset();
@@ -327,6 +328,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
     selected_texture_document_path_.clear();
+    selected_material_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
@@ -384,6 +386,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     recovery_manifest_ = std::move(recovery_manifest);
     recovery_texture_.reset();
     recovery_vector_.reset();
+    recovery_material_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
     recovery_textured_path_.reset();
@@ -391,6 +394,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     recovery_visual_component_.reset();
     selected_vector_document_path_.clear();
     selected_texture_document_path_.clear();
+    selected_material_document_path_.clear();
     selected_entity_document_path_.clear();
     selected_animation_document_path_.clear();
     selected_input_document_path_.clear();
@@ -1001,6 +1005,9 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
     recovery_visual_composition_.reset();
     recovery_visual_component_.reset();
     recovery_textured_path_.reset();
+    selected_material_.reset();
+    selected_material_document_path_.clear();
+    recovery_material_.reset();
     if (kind == StudioResourceKind::texture) {
         auto loaded = project::load_texture_asset(
             project_root_, *manifest_, match->document_path);
@@ -1113,6 +1120,22 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         imported_vector_.reset();
         created_vector_.reset();
         selected_material_ = std::move(*loaded.asset);
+        selected_material_document_path_ = match->document_path;
+        auto recovery = project::inspect_recovery(
+            project_root_, selected_material_document_path_,
+            [this](const std::string_view contents) {
+                auto parsed = project::parse_material(*manifest_, contents);
+                return project::ValidationReport{
+                    .errors = std::move(parsed.errors)};
+            });
+        if (recovery.candidate) {
+            auto parsed = project::parse_material(
+                *manifest_, recovery.candidate->contents);
+            if (parsed.ok()) recovery_material_ = std::move(parsed.asset);
+            else recovery.errors = std::move(parsed.errors);
+        }
+        if (!recovery.errors.empty())
+            selection_warnings = std::move(recovery.errors);
         selected_entity_.reset();
         selected_animation_.reset();
         selected_vector_document_path_.clear();
@@ -1363,6 +1386,7 @@ bool ProjectSession::set_project_name(
     }
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
                               dirty_document_ == DirtyDocument::vector ||
+                              dirty_document_ == DirtyDocument::material ||
                               dirty_document_ == DirtyDocument::entity ||
                               dirty_document_ == DirtyDocument::animation ||
                               dirty_document_ == DirtyDocument::textured_path ||
@@ -1412,6 +1436,7 @@ bool ProjectSession::set_pixels_per_unit(
     }
     if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
                               dirty_document_ == DirtyDocument::vector ||
+                              dirty_document_ == DirtyDocument::material ||
                               dirty_document_ == DirtyDocument::entity ||
                               dirty_document_ == DirtyDocument::animation ||
                               dirty_document_ == DirtyDocument::textured_path ||
@@ -1503,6 +1528,48 @@ bool ProjectSession::set_selected_texture_view(
 bool ProjectSession::reset_selected_texture_view(
     const AutosaveScheduler::Clock::time_point now) {
     return set_selected_texture_view(std::nullopt, now);
+}
+
+bool ProjectSession::set_selected_material(
+    project::MaterialDefinition material,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_material_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a material before editing it"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::material) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing a material"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() &&
+            update_autosave(now) == AutosaveStatus::failed) return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    material.document.id = selected_material_->document.id;
+    material.document.type = "material";
+    material.document.schema_version = project::current_material_schema_version;
+    const auto validation = project::validate_material(*manifest_, material);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (*selected_material_ == material) return true;
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<project::MaterialDefinition>>(
+                *selected_material_, std::move(material)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "material",
+                    "cannot execute the material modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::material;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
 }
 
 bool ProjectSession::set_selected_vector_node(
@@ -2240,6 +2307,20 @@ bool ProjectSession::save() {
             errors_ = std::move(saved.errors);
             return false;
         }
+    } else if (dirty_document_ == DirtyDocument::material) {
+        if (!selected_material_) {
+            commands_.mark_clean();
+            autosave_.reset();
+            dirty_document_ = DirtyDocument::none;
+            errors_.clear();
+            return true;
+        }
+        auto saved = project::publish_material(
+            project_root_, *manifest_, *selected_material_);
+        if (!saved.ok()) {
+            errors_ = std::move(saved.errors);
+            return false;
+        }
     } else if (dirty_document_ == DirtyDocument::entity) {
         if (!selected_entity_) {
             commands_.mark_clean();
@@ -2382,6 +2463,17 @@ AutosaveStatus ProjectSession::update_autosave(
             return project::ValidationReport{.errors = std::move(parsed.errors)};
         };
         break;
+    case DirtyDocument::material:
+        if (!require_document(selected_material_.has_value() &&
+                !selected_material_document_path_.empty(), "material"))
+            return AutosaveStatus::failed;
+        path = selected_material_document_path_;
+        contents = project::serialize_material(*selected_material_);
+        validator = [this](const std::string_view value) {
+            auto parsed = project::parse_material(*manifest_, value);
+            return project::ValidationReport{.errors = std::move(parsed.errors)};
+        };
+        break;
     case DirtyDocument::entity:
         if (!require_document(selected_entity_.has_value() &&
                 !selected_entity_document_path_.empty(), "entity"))
@@ -2487,6 +2579,16 @@ bool ProjectSession::accept_recovery(
         errors_.clear();
         return true;
     }
+    if (recovery_material_) {
+        selected_material_ = std::move(recovery_material_);
+        recovery_material_.reset();
+        commands_.clear();
+        commands_.mark_dirty();
+        dirty_document_ = DirtyDocument::material;
+        autosave_.mark_changed(now);
+        errors_.clear();
+        return true;
+    }
     if (recovery_entity_) {
         selected_entity_ = std::move(recovery_entity_);
         recovery_entity_.reset();
@@ -2555,6 +2657,7 @@ void ProjectSession::decline_recovery() noexcept {
     recovery_manifest_.reset();
     recovery_texture_.reset();
     recovery_vector_.reset();
+    recovery_material_.reset();
     recovery_entity_.reset();
     recovery_animation_.reset();
     recovery_textured_path_.reset();
@@ -2581,7 +2684,7 @@ bool ProjectSession::can_redo() const noexcept {
 
 bool ProjectSession::has_recovery() const noexcept {
     return recovery_manifest_.has_value() || recovery_texture_.has_value() ||
-        recovery_vector_.has_value() ||
+        recovery_vector_.has_value() || recovery_material_.has_value() ||
         recovery_entity_.has_value() || recovery_animation_.has_value() ||
         recovery_textured_path_.has_value() ||
         recovery_visual_composition_.has_value() ||

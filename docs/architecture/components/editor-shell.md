@@ -101,6 +101,11 @@ C4Component
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource
   sélectionnable.
+- L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
+  opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
+  validée passe par le `CommandStack`; sauvegarde, autosave et récupération
+  utilisent le chemin du document sélectionné, et les entités entrantes sont
+  affichées sans état de sélection implicite.
 - Le hub propose aussi `New entity...`. Le prompt crée un nœud racine avec
   drawable, matériau optionnel et transform, valide les références locales,
   publie atomiquement dans `entities`, puis réindexe l’entité.

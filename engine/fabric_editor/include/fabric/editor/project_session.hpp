@@ -112,6 +112,10 @@ public:
     [[nodiscard]] bool reset_selected_texture_view(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_material(
+        project::MaterialDefinition material,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_vector_node(
         std::size_t node_index, project::VectorNode node,
         AutosaveScheduler::Clock::time_point now =
@@ -267,6 +271,7 @@ private:
         manifest,
         texture,
         vector,
+        material,
         entity,
         animation,
         input,
@@ -292,6 +297,7 @@ private:
     std::optional<project::ProjectManifest> recovery_manifest_;
     std::optional<project::TextureAsset> recovery_texture_;
     std::optional<project::VectorAsset> recovery_vector_;
+    std::optional<project::MaterialDefinition> recovery_material_;
     std::optional<project::EntityDefinition> recovery_entity_;
     std::optional<project::AnimationClip> recovery_animation_;
     std::optional<project::TexturedPath> recovery_textured_path_;
@@ -299,6 +305,7 @@ private:
     std::optional<project::VisualComponent> recovery_visual_component_;
     std::filesystem::path selected_vector_document_path_;
     std::filesystem::path selected_texture_document_path_;
+    std::filesystem::path selected_material_document_path_;
     std::filesystem::path selected_entity_document_path_;
     std::filesystem::path selected_animation_document_path_;
     std::filesystem::path selected_input_document_path_;
