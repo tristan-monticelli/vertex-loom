@@ -190,6 +190,9 @@ struct CanvasUiState {
     ImVec2 drag_start_mouse{};
     fabric::core::Transform drag_start_transform;
     fabric::project::VectorNode drag_start_node;
+    bool entity_gizmo_dragging{};
+    ImVec2 entity_gizmo_start_mouse{};
+    fabric::core::Transform entity_gizmo_start_transform;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;
     ImVec2 native_origin{};
@@ -2384,7 +2387,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
 
 void draw_packet_preview_canvas(CanvasUiState& canvas,
                                 const ImVec2 available,
-                                const std::string_view label) {
+                                const std::string_view label,
+                                fabric::editor::ProjectSession* editable_session = nullptr) {
     ImGui::InvisibleButton("Entity canvas", available,
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
@@ -2431,6 +2435,46 @@ void draw_packet_preview_canvas(CanvasUiState& canvas,
     ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
     ImGui::TextDisabled("%s · %.0f%%", std::string(label).c_str(),
                         canvas.zoom * 100.0F);
+    if (editable_session && editable_session->selected_entity() &&
+        canvas.selected_node < editable_session->selected_entity()->nodes.size()) {
+        const auto& node = editable_session->selected_entity()->nodes[
+            canvas.selected_node];
+        const auto gizmo = to_screen(node.transform.position);
+        auto* draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddLine({gizmo.x - 12.0F, gizmo.y},
+                           {gizmo.x + 12.0F, gizmo.y},
+                           IM_COL32(100, 210, 255, 230), 2.0F);
+        draw_list->AddLine({gizmo.x, gizmo.y - 12.0F},
+                           {gizmo.x, gizmo.y + 12.0F},
+                           IM_COL32(100, 210, 255, 230), 2.0F);
+        draw_list->AddCircleFilled(gizmo, 5.0F, IM_COL32(100, 210, 255, 255));
+        const bool canvas_hovered = ImGui::IsMouseHoveringRect(
+            origin, {origin.x + available.x, origin.y + available.y});
+        if (canvas_hovered && !node.locked &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+            std::hypot(ImGui::GetIO().MousePos.x - gizmo.x,
+                       ImGui::GetIO().MousePos.y - gizmo.y) <= 14.0F) {
+            canvas.entity_gizmo_dragging = true;
+            canvas.entity_gizmo_start_mouse = ImGui::GetIO().MousePos;
+            canvas.entity_gizmo_start_transform = node.transform;
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            canvas.entity_gizmo_dragging = false;
+        if (canvas.entity_gizmo_dragging && !node.locked) {
+            const ImVec2 delta{
+                ImGui::GetIO().MousePos.x - canvas.entity_gizmo_start_mouse.x,
+                ImGui::GetIO().MousePos.y - canvas.entity_gizmo_start_mouse.y};
+            const auto scale = std::max(0.01F, pixels_per_unit);
+            auto changed = node;
+            changed.transform = canvas.entity_gizmo_start_transform;
+            changed.transform.position.x += delta.x / scale;
+            changed.transform.position.y -= delta.y / scale;
+            if (editable_session->set_selected_entity_node(
+                    canvas.selected_node, std::move(changed)))
+                ImGui::SetTooltip("Move node · %.2f, %.2f",
+                                  delta.x / scale, -delta.y / scale);
+        }
+    }
 }
 
 void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
@@ -2761,7 +2805,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
-            "Entity preview");
+            "Entity preview", &session);
     } else if (preview.texture != 0U && session.imported_texture() &&
                session.selected_resource() != nullptr &&
                session.selected_resource()->kind ==

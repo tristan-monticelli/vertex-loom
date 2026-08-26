@@ -154,6 +154,10 @@ C4Component
   incompatibles, l’inspecteur demande confirmation et indique leur nombre ;
   l’annulation conserve le composant, et la confirmation passe par la même
   commande de nœud.
+- Le canvas d’entité affiche un gizmo de translation pour le nœud sélectionné ;
+  un drag convertit le delta écran en unités monde et passe par
+  `set_selected_entity_node`. Les nœuds verrouillés restent non éditables ;
+  le parcours E2E du drag reste à ajouter.
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.
