@@ -81,10 +81,10 @@ packets en test headless, Asset Studio, Map Studio et Preview Runtime.
 Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
 étirement, largeur variable, UV continus, raccords, texture manquante et
 séparation stricte entre ruban de rendu et collision.
-Le graphe de mécaniques couvrira validation des ports, références, cycles
+Le graphe de mécaniques couvre validation des ports, références, cycles
 interdits, ordre déterministe, corps et joints invalides, capteurs, moteurs,
 undo/redo et reconstruction du monde après reset de preview. La première
-fixture sera une plateforme tournante activable par présence et transportant
+fixture est une plateforme tournante activable par présence et transportant
 le personnage sans logique propre à la map.
 L'export de map couvrira fermeture transitive des dépendances, ordre
 déterministe, chemins portables, absence de ressources externes et chargement
@@ -159,6 +159,11 @@ de le recharger directement dans Preview Runtime. Le binaire
 `--package ...` ; le workflow CI `textile-reference-benchmark` archive les
 rapports p95 de la scène textile sur Ubuntu, macOS et Windows avec un seuil de
 60 FPS.
+`fabric_preview_runtime_tests` publie aussi un projet temporaire contenant une
+mécanique motorisée sans activation externe, exporte son paquet puis charge
+uniquement ce paquet. Après 60 frames SDL cachées, il vérifie le nombre exact de
+pas mécaniques, la rotation Box2D du corps et le déplacement effectif du draw
+packet lié à l'entité du prefab.
 La fixture `tests/fixtures/studio-rotating-platform` conserve le graphe créé
 par Map Studio et l'entité textile créée par Asset Studio. Son test headless
 matérialise le capteur Box2D, place un personnage dynamique, vérifie son

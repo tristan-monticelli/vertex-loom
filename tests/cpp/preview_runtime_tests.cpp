@@ -4,6 +4,7 @@
 #include "fabric/project/entity.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map_package.hpp"
+#include "fabric/project/mechanic_graph.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/project/vector_asset.hpp"
 #include "fabric/project/visual_composition.hpp"
@@ -16,6 +17,7 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -177,6 +179,101 @@ fabric::project::EntityDefinition entity() {
                        .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
                                      .resource = fabric::project::ResourceReference{
                                          {.value = "runtime-vector"}, "vector"}}}}};
+}
+
+fabric::project::MechanicValue mechanic_default_value(
+    const fabric::project::MechanicValueType type,
+    const std::string_view id) {
+    using Type = fabric::project::MechanicValueType;
+    switch (type) {
+    case Type::boolean: return false;
+    case Type::integer: return std::int64_t{};
+    case Type::scalar: return 0.0F;
+    case Type::text:
+        if (id == "body-type") return std::string{"dynamic"};
+        return std::string{"value"};
+    case Type::vec2: return fabric::core::Vec2{};
+    case Type::resource:
+        return fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"};
+    case Type::body_handle:
+    case Type::pivot_handle:
+    case Type::joint_handle: break;
+    }
+    return false;
+}
+
+fabric::project::MechanicNodeDefinition mechanic_node(
+    const fabric::project::MechanicNodeKind kind, std::string id) {
+    const auto& schema = fabric::project::mechanic_node_schema(kind);
+    fabric::project::MechanicNodeDefinition result{
+        .id = std::move(id), .type = std::string{schema.type}};
+    for (const auto& port : schema.ports)
+        result.ports.push_back({
+            .id = std::string{port.id}, .name = std::string{port.id},
+            .direction = port.direction, .type = port.type});
+    for (const auto& property : schema.properties)
+        if (property.required)
+            result.properties.push_back({
+                .id = std::string{property.id},
+                .value = mechanic_default_value(property.type, property.id)});
+    return result;
+}
+
+void set_mechanic_property(fabric::project::MechanicNodeDefinition& node,
+                           const std::string& id,
+                           fabric::project::MechanicValue value) {
+    const auto property = std::ranges::find(
+        node.properties, id, &fabric::project::MechanicNodeProperty::id);
+    if (property == node.properties.end())
+        node.properties.push_back({id, std::move(value)});
+    else
+        property->value = std::move(value);
+}
+
+fabric::project::MechanicGraph always_running_mechanic() {
+    using Kind = fabric::project::MechanicNodeKind;
+    auto body = mechanic_node(Kind::body, "platform");
+    set_mechanic_property(body, "position", fabric::core::Vec2{0.0F, 0.0F});
+    set_mechanic_property(body, "size", fabric::core::Vec2{2.0F, 2.0F});
+    set_mechanic_property(body, "density", 1.0F);
+    set_mechanic_property(body, "friction", 0.8F);
+    set_mechanic_property(body, "entity",
+        fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"});
+    auto pivot = mechanic_node(Kind::pivot, "anchor");
+    set_mechanic_property(pivot, "position", fabric::core::Vec2{0.0F, 0.0F});
+    auto joint = mechanic_node(Kind::joint, "hinge");
+    auto motor = mechanic_node(Kind::motor, "drive");
+    set_mechanic_property(motor, "speed", 90.0F);
+    set_mechanic_property(motor, "max-torque", 100.0F);
+    return {
+        .document = {.schema_version = 1,
+                     .type = "mechanic",
+                     .id = {.value = "runtime-mechanic"},
+                     .name = "Runtime Mechanic"},
+        .nodes = {std::move(body), std::move(pivot), std::move(joint),
+                  std::move(motor)},
+        .connections = {{"platform", "body", "anchor", "body"},
+                        {"platform", "body", "hinge", "body-a"},
+                        {"anchor", "pivot", "hinge", "pivot"},
+                        {"hinge", "joint", "drive", "joint"}}};
+}
+
+fabric::project::MapDocument map_with_mechanic_instance() {
+    auto result = map();
+    result.prefabs.push_back({
+        .id = "runtime-prefab",
+        .entity = {{.value = "runtime-entity"}, "entity"},
+        .mechanic = fabric::project::ResourceReference{
+            {.value = "runtime-mechanic"}, "mechanic"}});
+    result.instances.push_back({
+        .id = "runtime-instance",
+        .prefab = fabric::project::ResourceReference{
+            {.value = "runtime-prefab"}, "prefab"},
+        .layer_id = "instances",
+        .transform = {.position = {3.0F, 2.0F}}});
+    return result;
 }
 
 fabric::project::VisualComposition visual_composition() {
@@ -1283,6 +1380,52 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("published mechanic instances execute and move their visual in runtime") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-mechanic-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root.string() + "-package";
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+    REQUIRE(fabric::project::publish_mechanic_graph(
+        root, manifest(), always_running_mechanic()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_mechanic_instance()).ok());
+    REQUIRE(fabric::project::publish_map_package(
+        root, {.value = "preview"}, package).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({
+        .package_root = package,
+        .mode = fabric::runtime::RuntimeMode::smoke_test,
+        .frame_limit = 60U}));
+    REQUIRE(runtime.mechanic_instance_count() == 1U);
+    const auto initial = runtime.mechanic_body_states("runtime-instance");
+    REQUIRE(initial.has_value());
+    REQUIRE(initial->size() == 1U);
+    CHECK(initial->front().position.x == Catch::Approx(3.0F));
+    CHECK(initial->front().position.y == Catch::Approx(2.0F));
+    CHECK(initial->front().rotation_degrees == Catch::Approx(0.0F));
+
+    REQUIRE(runtime.run());
+    const auto moved = runtime.mechanic_body_states("runtime-instance");
+    REQUIRE(moved.has_value());
+    REQUIRE(moved->size() == 1U);
+    CHECK(std::abs(moved->front().rotation_degrees) > 45.0F);
+    CHECK(runtime.stats().mechanic_steps == 60U);
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    const auto& moved_point =
+        runtime.last_frame_packets().front().fill_vertices.front();
+    CHECK(moved_point.x != Catch::Approx(2.0F));
+    CHECK(moved_point.y != Catch::Approx(1.0F));
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
 }
 
 } // namespace

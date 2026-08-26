@@ -29,13 +29,13 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   `--scene`.
 - [x] Ajouter un test d'intégration du binaire : slot existant → lancement →
   fermeture → contenu identique hors mutations explicites.
-- [ ] **Instancier les `MechanicGraph` dans Preview Runtime.** Map Studio les
+- [x] **Instancier les `MechanicGraph` dans Preview Runtime.** Map Studio les
   édite et les simule, les paquets les publient, mais `PreviewRuntime` ne charge
   ni ne compile les mécaniques référencées par les prefabs.
-- [ ] Supprimer l'affirmation « Preview Runtime instancie exactement le graphe »
+- [x] Supprimer l'affirmation « Preview Runtime instancie exactement le graphe »
   de l'ADR-0106 et du C4 tant que la tranche runtime n'est pas réellement
   livrée, ou livrer la tranche avant de conserver cette affirmation.
-- [ ] Ajouter un test paquet → runtime qui prouve le mouvement réel d'une
+- [x] Ajouter un test paquet → runtime qui prouve le mouvement réel d'une
   plateforme mécanique, pas seulement la compilation isolée de son graphe.
 - [x] **Protéger la fermeture de Map Studio.** Les événements de fermeture
   passent désormais par Save/Discard/Cancel pour la map et la mécanique dirty.
@@ -143,9 +143,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession` et tests headless |
 | MANQUE | End-to-end graphique | `docs/02-quality-strategy.md` indique « Plus tard » et aucune commande réelle |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
-| MANQUE | Intégration mécanique dans Preview Runtime | aucune utilisation de `MechanicSimulation` dans `fabric_runtime` |
+| CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
 | MANQUE | Fidélité du modèle Scene au runtime | `maps`, `layer_id` et `entry_point` ne sont pas appliqués |
-| MANQUE | Architecture fidèle au code | le C4 et l'ADR-0106 présentent la mécanique runtime comme livrée |
+| CONFORME | Architecture fidèle au code mécanique | ADR-0106, C4 et flux d'instance correspondent au runtime testé |
 | MANQUE | Modularité des interfaces | `asset_studio/main.cpp` dépasse 4 000 lignes et `map_studio/main.cpp` 2 000 lignes |
 | N/A | Backend, compte et réseau | produit local sans backend dans le périmètre actuel |
 
@@ -153,7 +153,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 - [x] Lot A : non-régression des slots et reprise réelle.
 - [ ] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
-- [ ] Lot C : exécution runtime des mécaniques publiées.
+- [x] Lot C : exécution runtime des mécaniques publiées.
 - [ ] Lot D : scènes multi-maps, entry points et paquet de scènes.
 - [ ] Lot E : triggers cohérents avec les formes et toutes les entités.
 - [ ] Lot F : BehaviorGraph, monstres et transformations d'entités.

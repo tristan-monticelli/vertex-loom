@@ -2,6 +2,7 @@
 
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
+#include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/project/progress_save.hpp"
@@ -56,6 +57,7 @@ struct PreviewRuntimeOptions {
 struct PreviewRuntimeStats {
     std::size_t frames{};
     std::size_t physics_steps{};
+    std::size_t mechanic_steps{};
     std::size_t xpbd_steps{};
     std::size_t deformation_instances{};
     std::size_t deformed_packets{};
@@ -129,6 +131,9 @@ public:
     [[nodiscard]] const std::vector<render::VectorDrawPacket>&
     last_frame_packets() const noexcept;
     [[nodiscard]] std::size_t animation_count() const noexcept;
+    [[nodiscard]] std::size_t mechanic_instance_count() const noexcept;
+    [[nodiscard]] std::optional<std::vector<physics::MechanicBodyState>>
+    mechanic_body_states(const std::string& instance_id) const;
     [[nodiscard]] std::optional<project::EvaluationResult> evaluate_animation(
         const core::ResourceId& animation_id, float time) const;
     [[nodiscard]] std::vector<project::AnimationMarkerHit> animation_markers(

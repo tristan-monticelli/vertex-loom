@@ -78,6 +78,17 @@ struct PreviewRuntime::Impl {
         std::string node_id;
     };
 
+    struct MechanicVisualBinding {
+        std::string body_node_id;
+        core::Vec2 initial_position;
+        float initial_rotation_degrees{};
+    };
+
+    struct MechanicInstanceSimulation {
+        physics::MechanicSimulation simulation;
+        std::optional<MechanicVisualBinding> visual_binding;
+    };
+
     SDL_Window* window{};
     SDL_GLContext context{};
     render::OpenGLVectorRenderer renderer;
@@ -109,12 +120,42 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     std::unordered_map<std::string, AnimatedVisualComponent>
         animated_visual_components;
+    std::unordered_map<std::string, MechanicInstanceSimulation>
+        mechanic_instances;
     std::vector<GameplayEvent> gameplay_events;
     std::vector<AnimationMarkerEvent> animation_marker_events;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
     bool sdl_initialized{};
+
+    render::VectorDrawPacket apply_mechanic_pose(
+        render::VectorDrawPacket packet, const std::string& instance_id) const {
+        const auto mechanic = mechanic_instances.find(instance_id);
+        if (mechanic == mechanic_instances.end() ||
+            !mechanic->second.visual_binding) return packet;
+        const auto& binding = *mechanic->second.visual_binding;
+        const auto body = std::ranges::find(
+            mechanic->second.simulation.body_states(), binding.body_node_id,
+            &physics::MechanicBodyState::node_id);
+        if (body == mechanic->second.simulation.body_states().end()) return packet;
+        const auto radians =
+            (body->rotation_degrees - binding.initial_rotation_degrees) *
+            0.017453292519943295F;
+        const auto cosine = std::cos(radians);
+        const auto sine = std::sin(radians);
+        const auto transform_point = [&](core::Vec2& point) {
+            point.x -= binding.initial_position.x;
+            point.y -= binding.initial_position.y;
+            const auto rotated_x = point.x * cosine - point.y * sine;
+            const auto rotated_y = point.x * sine + point.y * cosine;
+            point.x = rotated_x + body->position.x;
+            point.y = rotated_y + body->position.y;
+        };
+        for (auto& point : packet.outline) transform_point(point);
+        for (auto& point : packet.fill_vertices) transform_point(point);
+        return packet;
+    }
 
     void begin_evaluation_cache(const float time) const {
         if (evaluation_cache_valid && evaluation_cache_time == time) return;
@@ -500,6 +541,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_bounds_dynamic.clear();
     impl_->entity_simulations.clear();
     impl_->animated_visual_components.clear();
+    impl_->mechanic_instances.clear();
     impl_->gameplay_events.clear();
     impl_->animation_marker_events.clear();
     impl_->packet_indices_by_instance.clear();
@@ -678,6 +720,55 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     if (directory_error) {
         errors_.push_back("animations: could not enumerate animation documents");
         return false;
+    }
+    for (const auto& instance : map_->instances) {
+        if (!instance.prefab) continue;
+        const auto prefab = std::ranges::find(
+            map_->prefabs, instance.prefab->id.value,
+            &project::PrefabDefinition::id);
+        if (prefab == map_->prefabs.end() || !prefab->mechanic) continue;
+        auto graph = project::load_mechanic_graph(
+            options_.project_root, *manifest_,
+            project::mechanic_graph_document_path(
+                *manifest_, prefab->mechanic->id));
+        if (!graph.ok()) {
+            append_errors(errors_, graph.errors);
+            return false;
+        }
+        auto compiled = physics::compile_mechanic_graph(
+            *graph.asset, *map_, prefab->mechanic_overrides,
+            instance.transform);
+        if (!compiled.ok()) {
+            append_errors(errors_, compiled.errors);
+            return false;
+        }
+        std::vector<const physics::MechanicBodyDescription*> visual_bodies;
+        for (const auto& body : compiled.plan->bodies)
+            if (body.visual_entity && body.visual_entity->id == prefab->entity.id)
+                visual_bodies.push_back(&body);
+        if (visual_bodies.size() > 1U) {
+            errors_.push_back(
+                "prefab mechanic has multiple bodies for its visual entity: " +
+                prefab->id);
+            return false;
+        }
+        Impl::MechanicInstanceSimulation runtime_mechanic;
+        if (!visual_bodies.empty()) {
+            runtime_mechanic.visual_binding = Impl::MechanicVisualBinding{
+                .body_node_id = visual_bodies.front()->node_id,
+                .initial_position = visual_bodies.front()->position,
+                .initial_rotation_degrees =
+                    visual_bodies.front()->rotation_degrees};
+        }
+        if (!runtime_mechanic.simulation.load(std::move(*compiled.plan))) {
+            errors_.push_back(
+                "could not create mechanic simulation for instance: " +
+                instance.id);
+            return false;
+        }
+        runtime_mechanic.simulation.play();
+        impl_->mechanic_instances.emplace(
+            instance.id, std::move(runtime_mechanic));
     }
     for (const auto& instance : map_->instances) {
         std::vector<project::MapProperty> properties;
@@ -1052,7 +1143,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
              !simulation->second.constraints.empty() ||
              !simulation->second.ik_chains.empty() ||
              impl_->animation_instances.contains(instance_id) ||
-             impl_->animation_state_machines.contains(instance_id));
+             impl_->animation_state_machines.contains(instance_id) ||
+             impl_->mechanic_instances.contains(instance_id));
         impl_->packet_bounds_dynamic.push_back(dynamic);
     }
     return true;
@@ -1212,6 +1304,18 @@ bool PreviewRuntime::run() {
                 if (replay_player_->checkpoint()) ++stats_.replay_checkpoints;
             }
             if (character_) character_->update(input_, static_cast<float>(fixed_time_step));
+            for (auto& [instance_id, mechanic] : impl_->mechanic_instances) {
+                const auto previous_steps = mechanic.simulation.step_count();
+                if (!mechanic.simulation.update(
+                        static_cast<float>(fixed_time_step))) {
+                    errors_.push_back(
+                        "mechanic simulation step failed for instance: " +
+                        instance_id);
+                    return false;
+                }
+                stats_.mechanic_steps +=
+                    mechanic.simulation.step_count() - previous_steps;
+            }
             for (auto& [instance_id, simulation] : impl_->entity_simulations) {
                 if (!simulation.xpbd) continue;
                 simulation.previous_xpbd_positions.clear();
@@ -1377,7 +1481,7 @@ bool PreviewRuntime::run() {
                                                  std::move(packet));
             }
         }
-        const auto animate_packet = [&](render::VectorDrawPacket packet) {
+        const auto animate_entity_packet = [&](render::VectorDrawPacket packet) {
             const auto animated_visual =
                 animated_visual_packets.find(packet.node_id);
             if (animated_visual != animated_visual_packets.end())
@@ -1530,6 +1634,13 @@ bool PreviewRuntime::run() {
             for (auto& point : packet.fill_vertices) animate_point(point);
             return packet;
         };
+        const auto animate_packet = [&](render::VectorDrawPacket packet) {
+            const auto separator = packet.node_id.find(':');
+            const auto instance_id = separator == std::string::npos
+                ? std::string{} : packet.node_id.substr(0, separator);
+            return impl_->apply_mechanic_pose(
+                animate_entity_packet(std::move(packet)), instance_id);
+        };
         std::vector<render::VectorDrawPacket> visible_packets;
         bool direct_render = impl_->packets.size() == impl_->packet_bounds.size() &&
             impl_->packets.size() == impl_->packet_bounds_dynamic.size();
@@ -1620,6 +1731,18 @@ bool PreviewRuntime::run() {
 
 std::size_t PreviewRuntime::animation_count() const noexcept {
     return impl_ ? impl_->animation_clips.size() : 0U;
+}
+
+std::size_t PreviewRuntime::mechanic_instance_count() const noexcept {
+    return impl_ ? impl_->mechanic_instances.size() : 0U;
+}
+
+std::optional<std::vector<physics::MechanicBodyState>>
+PreviewRuntime::mechanic_body_states(const std::string& instance_id) const {
+    if (!impl_) return std::nullopt;
+    const auto mechanic = impl_->mechanic_instances.find(instance_id);
+    if (mechanic == impl_->mechanic_instances.end()) return std::nullopt;
+    return mechanic->second.simulation.body_states();
 }
 
 const std::vector<GameplayEvent>& PreviewRuntime::gameplay_events() const noexcept {
