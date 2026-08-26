@@ -720,7 +720,9 @@ automatiquement sur les trois plateformes.
 - [x] Lot 4 : cible explicite des animations.
 - [ ] Lot 5 : BehaviorGraph et inputs physiques séparés.
 - [ ] Lot 6 : transformation d'entité.
-- [ ] Lot 7 : personnalisateur vectoriel complet.
+- [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
+  transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
+  comparaison des draw packets sont validés.
 - [ ] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire.
 
 Le chantier est terminé uniquement lorsque les huit lots et tous leurs gates
