@@ -2280,9 +2280,16 @@ int run(const std::filesystem::path& project_root,
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputText("New instance id", &placement_id);
             ImGui::SetNextItemWidth(180.0F);
-            ImGui::InputText("Resource id", &placement_resource_id);
             ImGui::SetNextItemWidth(180.0F);
             ImGui::Combo("Resource kind", &placement_kind, "entity\0prefab\0");
+            if (placement_kind == 0 && session.manifest()) {
+                const auto directory = session.project_root() /
+                    session.manifest()->directories.entities;
+                draw_resource_picker("Entity resources:", directory, ".entity.json",
+                                     placement_resource_id);
+            } else {
+                ImGui::InputText("Prefab resource id", &placement_resource_id);
+            }
             ImGui::BeginDisabled(placement_id.empty() || placement_resource_id.empty() ||
                                  active_layer_id.empty());
             if (ImGui::Button(placement_mode ? "Cancel placement" : "Place in canvas"))
