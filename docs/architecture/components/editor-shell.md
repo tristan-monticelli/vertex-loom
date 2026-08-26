@@ -1,4 +1,4 @@
-# C4 Component — coquille Asset Studio
+# C4 Component — coquilles Asset Studio et Map Studio
 
 ```mermaid
 C4Component
@@ -18,7 +18,7 @@ C4Component
         Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
-        Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer une session dirty")
+        Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer ou fermer une ou plusieurs sessions dirty")
     }
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
@@ -51,6 +51,10 @@ C4Component
 
 - Le chemin peut être fourni au démarrage ; les actions interactives utilisent
   le sélecteur natif de dossier ou de fichier.
+- Asset Studio et Map Studio routent toute fermeture par
+  `SessionTransitionGuard`. Map Studio agrège le dirty de sa map et de sa
+  mécanique ouverte, nomme les documents concernés dans la modale et ne quitte
+  après `Save and continue` que si chaque sauvegarde demandée réussit.
 - La création demande un nom et un dossier parent existant. Le dossier projet
   final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
   vide ; le dossier parent peut contenir d'autres fichiers.
