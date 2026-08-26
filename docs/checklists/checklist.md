@@ -585,8 +585,10 @@ sur un comportement sans modifier le runtime.
 
 ## 10 — Personnalisateur vectoriel complet
 
-- [ ] Mettre à jour le C4 et écrire les ADR manquants avant les nouveaux
-  contrats ou commandes.
+- [x] Mettre à jour le C4 et écrire les ADR manquants avant les nouveaux
+  contrats ou commandes. Le C4 de l’éditeur documente désormais le clipboard
+  et le snapping de timeline ; `ADR-0126` et `ADR-0127` documentent ces
+  changements et la suppression protégée des collisions.
 - [x] Ajouter un arbre ordonné de nœuds vectoriels.
 - [x] Ajouter les actions Add, Duplicate, Reparent, Reorder et Delete.
 - [x] Ajouter les primitives rectangle, ellipse, ligne et path.
