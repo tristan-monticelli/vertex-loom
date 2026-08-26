@@ -5873,7 +5873,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     creation.input_capture = false;
                 };
                 if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
-                    apply_capture({fabric::project::InputDevice::keyboard, static_cast<int>(event.key.keysym.sym)});
+                    fabric::project::InputBinding binding{
+                        fabric::project::InputDevice::keyboard,
+                        static_cast<int>(event.key.keysym.sym)};
+                    binding.ctrl = (event.key.keysym.mod & KMOD_CTRL) != 0;
+                    binding.shift = (event.key.keysym.mod & KMOD_SHIFT) != 0;
+                    binding.alt = (event.key.keysym.mod & KMOD_ALT) != 0;
+                    binding.super = (event.key.keysym.mod & KMOD_GUI) != 0;
+                    apply_capture(binding);
                     continue;
                 }
                 if (event.type == SDL_CONTROLLERBUTTONDOWN) {
