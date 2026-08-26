@@ -166,7 +166,8 @@ cycles composant/composition dans le validateur headless.
 La conversion primitive → path est testée pour rectangle, ellipse et ligne,
 avec refus des lignes dégénérées ; la géométrie convertie reste éditable dans
 le personnalisateur Asset Studio. Les insertions et suppressions de commandes
-respectent aussi la tête `move` et le minimum de deux commandes ; la plume et
+de segment vérifient aussi la conservation des points, la tête `move` et le
+minimum de deux commandes ; la plume et
 la manipulation directe des points sur canvas sont implémentées, mais restent
 à couvrir par un parcours SDL E2E avant de fermer leur gate UX.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement

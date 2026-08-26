@@ -451,4 +451,11 @@ TEST_CASE("vector primitives convert to editable path commands") {
     CHECK_FALSE(fabric::project::remove_path_command(editable_path, 0U));
     CHECK_FALSE(fabric::project::insert_path_command(
         editable_path, 2U, {.kind = Kind::move, .point = {2.0F, 0.0F}}));
+
+    REQUIRE(fabric::project::insert_path_command(
+        editable_path, 1U,
+        {.kind = Kind::line, .point = {0.5F, 0.25F}}));
+    CHECK(editable_path.path[1].point == fabric::core::Vec2{0.5F, 0.25F});
+    REQUIRE(fabric::project::remove_path_command(editable_path, 1U));
+    CHECK(editable_path.path[1].point == fabric::core::Vec2{1.0F, 0.0F});
 }

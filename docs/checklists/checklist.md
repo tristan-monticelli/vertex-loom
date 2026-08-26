@@ -614,7 +614,9 @@ sur un comportement sans modifier le runtime.
 - [x] Faire passer chaque geste par CommandStack avec fusion continue.
 - [x] Tester chaque outil déjà livré en undo, redo, autosave, récupération et
   reload.
-- [ ] Ajouter des tests géométriques pour insertion et suppression de points.
+- [x] Ajouter des tests géométriques pour insertion et suppression de points ;
+  les tests vérifient les points de segment, la tête `move` et le minimum de
+  deux commandes.
 - [ ] Ajouter des tests end-to-end des interactions canvas.
 - [x] Comparer les draw packets Asset Studio, Map Studio et Preview Runtime.
 
