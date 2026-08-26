@@ -219,9 +219,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Un vectoriel natif sélectionné expose nom, parent, clip, transform et une
   partie des paramètres de fill image après création.
 - [x] Ajouter Add, Duplicate, Reorder et Delete pour les nœuds vectoriels.
-- [ ] Éditer bounds, points, commandes de path et poignées Bézier directement
-  sur le canvas du `VectorAsset`. L'éditeur « Pen and attachments » existant
-  appartient à `TexturedPath` et ne remplace pas cet éditeur.
+- [x] Éditer bounds, points, commandes de path et poignées Bézier directement
+  sur le canvas du `VectorAsset`. Le canvas natif expose déplacement d’ancres,
+  poignées liées/symétriques/libres, insertion/suppression de commandes et
+  transform bounds/scale/pivot ; l’E2E `asset_studio_vector_canvas_e2e` vérifie
+  ajout, retrait, édition Bézier et persistance après reload. L’éditeur « Pen
+  and attachments » de `TexturedPath` reste un parcours distinct.
 - [x] Permettre de changer le type du fill après création et de choisir ou
   remplacer sa texture avec le picker commun.
 - [x] Exposer ajout, retrait, couleur, largeur, join et cap du stroke.
