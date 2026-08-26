@@ -663,4 +663,364 @@ bool runtime_can_load_map_package(const MapPackageManifest& manifest,
     return minimum && runtime && *runtime >= *minimum;
 }
 
+ValidationReport validate_scene_package_manifest(
+    const ScenePackageManifest& manifest) {
+    ValidationReport report;
+    if (manifest.schema_version != current_scene_package_schema_version)
+        error(report.errors, ErrorCode::unsupported_schema_version,
+              "schemaVersion", "only scene package schema version 1 is supported");
+    if (manifest.type != "scene-package")
+        error(report.errors, ErrorCode::invalid_asset, "type",
+              "must be scene-package");
+    if (!core::ResourceId::is_valid(manifest.id.value))
+        error(report.errors, ErrorCode::invalid_resource_id, "id",
+              "must be a valid resource id");
+    if (manifest.name.empty())
+        error(report.errors, ErrorCode::invalid_asset, "name",
+              "must not be empty");
+    if (!parse_semantic_version(manifest.minimum_runtime_version))
+        error(report.errors, ErrorCode::invalid_asset,
+              "minimumRuntimeVersion", "must be MAJOR.MINOR.PATCH SemVer");
+    if (!core::ResourceId::is_valid(manifest.root_scene.id.value) ||
+        manifest.root_scene.expected_type != "scene")
+        error(report.errors, ErrorCode::resource_type_mismatch, "rootScene",
+              "must reference a scene");
+
+    std::set<std::pair<std::string, std::string>> resources;
+    std::set<std::string> paths;
+    std::pair<std::string, std::string> previous;
+    bool first = true;
+    bool root_found = false;
+    for (const auto& entry : manifest.resources) {
+        const auto key = std::pair{entry.resource.expected_type,
+                                   entry.resource.id.value};
+        if (!core::ResourceId::is_valid(entry.resource.id.value) ||
+            entry.resource.expected_type.empty())
+            error(report.errors, ErrorCode::invalid_resource_id, "resources",
+                  "resource id and type must be valid");
+        if (!resources.insert(key).second)
+            error(report.errors, ErrorCode::duplicate_resource, "resources",
+                  "resource type/id pairs must be unique");
+        if (!first && key <= previous)
+            error(report.errors, ErrorCode::invalid_asset, "resources",
+                  "must be strictly ordered by type then id");
+        first = false;
+        previous = key;
+        root_found = root_found || entry.resource == manifest.root_scene;
+        const auto register_path = [&](const std::filesystem::path& path,
+                                       const std::string_view field) {
+            if (!portable_relative_path(path))
+                error(report.errors, ErrorCode::invalid_path,
+                      std::string(field),
+                      "must be a portable relative package path");
+            else if (!paths.insert(path.generic_string()).second)
+                error(report.errors, ErrorCode::duplicate_resource,
+                      std::string(field), "package paths must be unique");
+        };
+        register_path(entry.document_path, "resources.documentPath");
+        std::string previous_payload;
+        bool first_payload = true;
+        for (const auto& payload : entry.payload_paths) {
+            const auto path = payload.generic_string();
+            if (!first_payload && path <= previous_payload)
+                error(report.errors, ErrorCode::invalid_asset,
+                      "resources.payloadPaths", "must be strictly ordered");
+            first_payload = false;
+            previous_payload = path;
+            register_path(payload, "resources.payloadPaths");
+        }
+    }
+    if (!root_found)
+        error(report.errors, ErrorCode::missing_resource, "rootScene",
+              "must be present in resources");
+    return report;
+}
+
+std::string serialize_scene_package_manifest(
+    const ScenePackageManifest& manifest) {
+    Json resources = Json::array();
+    for (const auto& entry : manifest.resources) {
+        Json payloads = Json::array();
+        for (const auto& path : entry.payload_paths)
+            payloads.push_back(path.generic_string());
+        resources.push_back({{"resource", reference_json(entry.resource)},
+                             {"documentPath",
+                              entry.document_path.generic_string()},
+                             {"payloadPaths", std::move(payloads)}});
+    }
+    return Json{{"schemaVersion", manifest.schema_version},
+                {"type", manifest.type},
+                {"id", manifest.id.value},
+                {"name", manifest.name},
+                {"minimumRuntimeVersion", manifest.minimum_runtime_version},
+                {"rootScene", reference_json(manifest.root_scene)},
+                {"resources", std::move(resources)}}
+               .dump(2) + "\n";
+}
+
+ScenePackageManifestResult parse_scene_package_manifest(
+    const std::string_view json_text) {
+    ScenePackageManifestResult result;
+    Json json;
+    try {
+        json = Json::parse(json_text);
+    } catch (...) {
+        error(result.errors, ErrorCode::invalid_json, "scene-package.json",
+              "cannot parse scene package JSON");
+        return result;
+    }
+    if (!json.is_object()) {
+        error(result.errors, ErrorCode::invalid_asset, "scene-package.json",
+              "top-level value must be an object");
+        return result;
+    }
+    reject_unknown_fields(json,
+                          {"schemaVersion", "type", "id", "name",
+                           "minimumRuntimeVersion", "rootScene", "resources"},
+                          {}, result.errors);
+    ScenePackageManifest manifest;
+    const auto schema = json.find("schemaVersion");
+    if (schema == json.end() || !schema->is_number_unsigned() ||
+        schema->get<std::uint64_t>() >
+            std::numeric_limits<std::uint32_t>::max())
+        error(result.errors, ErrorCode::invalid_asset, "schemaVersion",
+              "expected an unsigned 32-bit integer");
+    else
+        manifest.schema_version = schema->get<std::uint32_t>();
+    read_text(json, "type", manifest.type, result.errors);
+    read_text(json, "id", manifest.id.value, result.errors);
+    read_text(json, "name", manifest.name, result.errors);
+    read_text(json, "minimumRuntimeVersion",
+              manifest.minimum_runtime_version, result.errors);
+    const auto root = json.find("rootScene");
+    if (root == json.end())
+        error(result.errors, ErrorCode::invalid_asset, "rootScene",
+              "expected a resource reference");
+    else
+        read_reference(*root, manifest.root_scene, "rootScene", result.errors);
+    const auto resources = json.find("resources");
+    if (resources == json.end() || !resources->is_array()) {
+        error(result.errors, ErrorCode::invalid_asset, "resources",
+              "expected an array");
+    } else {
+        for (std::size_t index = 0; index < resources->size(); ++index) {
+            const auto& item = (*resources)[index];
+            const auto prefix = "resources[" + std::to_string(index) + "]";
+            if (!item.is_object()) {
+                error(result.errors, ErrorCode::invalid_asset, prefix,
+                      "expected an object");
+                continue;
+            }
+            reject_unknown_fields(item,
+                                  {"resource", "documentPath", "payloadPaths"},
+                                  prefix, result.errors);
+            MapPackageResource entry;
+            const auto resource = item.find("resource");
+            if (resource == item.end())
+                error(result.errors, ErrorCode::invalid_asset,
+                      prefix + ".resource", "expected a resource reference");
+            else
+                read_reference(*resource, entry.resource,
+                               prefix + ".resource", result.errors);
+            std::string document_path;
+            if (read_text(item, "documentPath", document_path, result.errors,
+                          prefix))
+                entry.document_path = document_path;
+            const auto payloads = item.find("payloadPaths");
+            if (payloads == item.end() || !payloads->is_array())
+                error(result.errors, ErrorCode::invalid_asset,
+                      prefix + ".payloadPaths", "expected an array");
+            else
+                for (const auto& payload : *payloads) {
+                    if (!payload.is_string())
+                        error(result.errors, ErrorCode::invalid_asset,
+                              prefix + ".payloadPaths",
+                              "expected string paths");
+                    else
+                        entry.payload_paths.emplace_back(
+                            payload.get<std::string>());
+                }
+            manifest.resources.push_back(std::move(entry));
+        }
+    }
+    if (!result.errors.empty()) return result;
+    auto validation = validate_scene_package_manifest(manifest);
+    if (!validation.ok()) {
+        result.errors = std::move(validation.errors);
+        return result;
+    }
+    result.manifest = std::move(manifest);
+    return result;
+}
+
+ScenePackageManifestResult plan_scene_package(
+    const std::filesystem::path& project_root,
+    const core::ResourceId& scene_id,
+    const std::string_view minimum_runtime_version) {
+    ScenePackageManifestResult output;
+    const auto loaded_manifest = load_manifest(project_root);
+    if (!loaded_manifest.ok()) {
+        output.errors = loaded_manifest.errors;
+        return output;
+    }
+    const auto root_scene = load_scene(
+        project_root, *loaded_manifest.manifest,
+        scene_document_path(*loaded_manifest.manifest, scene_id));
+    if (!root_scene.ok()) {
+        output.errors = root_scene.errors;
+        return output;
+    }
+    ScenePackageManifest package{
+        .id = scene_id,
+        .name = root_scene.asset->document.name,
+        .minimum_runtime_version = std::string(minimum_runtime_version),
+        .root_scene = {scene_id, "scene"}};
+    using Key = std::pair<std::string, std::string>;
+    std::map<Key, MapPackageResource> resources;
+    std::set<std::string> scene_ids{scene_id.value};
+    std::vector<core::ResourceId> pending_scenes{scene_id};
+    std::set<std::string> map_ids;
+    while (!pending_scenes.empty()) {
+        const auto current_id = pending_scenes.back();
+        pending_scenes.pop_back();
+        const auto loaded = load_scene(
+            project_root, *loaded_manifest.manifest,
+            scene_document_path(*loaded_manifest.manifest, current_id));
+        if (!loaded.ok()) {
+            append_errors(output.errors, loaded.errors);
+            continue;
+        }
+        const MapPackageResource scene_resource{
+            .resource = {current_id, "scene"},
+            .document_path = scene_document_path(
+                *loaded_manifest.manifest, current_id)};
+        resources.emplace(Key{"scene", current_id.value}, scene_resource);
+        for (const auto& map_reference : loaded.asset->maps)
+            map_ids.insert(map_reference.map.id.value);
+        for (const auto& transition : loaded.asset->transitions)
+            if (scene_ids.insert(transition.target_scene.id.value).second)
+                pending_scenes.push_back(transition.target_scene.id);
+    }
+    for (const auto& map_id : map_ids) {
+        const auto planned = plan_map_package(
+            project_root, {.value = map_id}, minimum_runtime_version);
+        if (!planned.ok()) {
+            append_errors(output.errors, planned.errors);
+            continue;
+        }
+        for (const auto& resource : planned.manifest->resources) {
+            const Key key{resource.resource.expected_type,
+                          resource.resource.id.value};
+            const auto [existing, inserted] = resources.emplace(key, resource);
+            if (!inserted && existing->second != resource)
+                error(output.errors, ErrorCode::duplicate_resource,
+                      resource.resource.id.value,
+                      "resource resolves to conflicting package files");
+        }
+    }
+    std::map<std::string, std::string> types_by_identifier;
+    for (const auto& [key, resource] : resources) {
+        (void)resource;
+        const auto [existing, inserted] =
+            types_by_identifier.emplace(key.second, key.first);
+        if (!inserted && existing->second != key.first)
+            error(output.errors, ErrorCode::duplicate_resource, key.second,
+                  "resource identifier is used by both " + existing->second +
+                      " and " + key.first);
+    }
+    if (!output.errors.empty()) return output;
+    for (auto& [key, resource] : resources) {
+        (void)key;
+        package.resources.push_back(std::move(resource));
+    }
+    const auto validation = validate_scene_package_manifest(package);
+    if (!validation.ok()) {
+        output.errors = validation.errors;
+        return output;
+    }
+    output.manifest = std::move(package);
+    return output;
+}
+
+ScenePackagePublishResult publish_scene_package(
+    const std::filesystem::path& project_root,
+    const core::ResourceId& scene_id,
+    const std::filesystem::path& destination,
+    const std::string_view minimum_runtime_version) {
+    ScenePackagePublishResult output{.destination = destination};
+    const auto planned = plan_scene_package(
+        project_root, scene_id, minimum_runtime_version);
+    if (!planned.ok()) {
+        output.errors = planned.errors;
+        return output;
+    }
+    std::error_code filesystem_error;
+    if (std::filesystem::exists(destination, filesystem_error)) {
+        error(output.errors, ErrorCode::asset_already_exists, "destination",
+              "package destination already exists");
+        return output;
+    }
+    if (filesystem_error || destination.empty()) {
+        error(output.errors, ErrorCode::invalid_path, "destination",
+              "package destination is invalid");
+        return output;
+    }
+    std::filesystem::create_directories(destination, filesystem_error);
+    if (filesystem_error) {
+        error(output.errors, ErrorCode::io_error, "destination",
+              "cannot create package destination");
+        return output;
+    }
+    const auto rollback = [&] {
+        std::error_code ignored;
+        std::filesystem::remove_all(destination, ignored);
+    };
+    const auto copy_file = [&](const std::filesystem::path& relative) {
+        const auto source = project_root / relative;
+        const auto target = destination / relative;
+        std::filesystem::create_directories(
+            target.parent_path(), filesystem_error);
+        if (filesystem_error ||
+            !std::filesystem::copy_file(
+                source, target, std::filesystem::copy_options::none,
+                filesystem_error)) {
+            error(output.errors, ErrorCode::io_error,
+                  relative.generic_string(), "cannot copy package file");
+            return false;
+        }
+        return true;
+    };
+    bool copied = true;
+    for (const auto& resource : planned.manifest->resources) {
+        copied = copy_file(resource.document_path) && copied;
+        for (const auto& payload : resource.payload_paths)
+            copied = copy_file(payload) && copied;
+    }
+    if (copied) {
+        std::ofstream manifest_file(
+            destination / scene_package_manifest_filename,
+            std::ios::binary | std::ios::trunc);
+        manifest_file << serialize_scene_package_manifest(*planned.manifest);
+        if (!manifest_file)
+            error(output.errors, ErrorCode::io_error, "scene-package.json",
+                  "cannot write package manifest");
+    }
+    if (!output.errors.empty()) {
+        rollback();
+        return output;
+    }
+    output.manifest = planned.manifest;
+    return output;
+}
+
+bool runtime_can_load_scene_package(
+    const ScenePackageManifest& manifest,
+    const std::string_view runtime_version) noexcept {
+    if (manifest.schema_version != current_scene_package_schema_version)
+        return false;
+    const auto minimum = parse_semantic_version(manifest.minimum_runtime_version);
+    const auto runtime = parse_semantic_version(runtime_version);
+    return minimum && runtime && *runtime >= *minimum;
+}
+
 } // namespace fabric::project

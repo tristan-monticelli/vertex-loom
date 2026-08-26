@@ -13,7 +13,7 @@ C4Container
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest projet, MapPackageManifest v1, textures, documents vectoriels et graphe de ressources")
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées par les studios, prompts typés, règles testables de sélection, gizmos et crop raster borné, historique réversible, autosave, preview et publication")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
-        Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet de map déterministe sans interface graphique")
+        Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
         Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")

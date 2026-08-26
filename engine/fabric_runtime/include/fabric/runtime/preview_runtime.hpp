@@ -37,6 +37,7 @@ using GameplayEventHandler = std::function<bool(const GameplayEvent&)>;
 struct PreviewRuntimeOptions {
     std::filesystem::path project_root;
     std::optional<std::filesystem::path> package_root;
+    std::optional<core::ResourceId> package_scene_id;
     core::ResourceId map_id;
     std::optional<core::ResourceId> scene_id;
     std::optional<core::ResourceId> replay_id;

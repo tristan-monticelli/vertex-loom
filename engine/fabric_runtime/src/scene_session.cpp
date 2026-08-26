@@ -1,8 +1,11 @@
 #include "fabric/runtime/scene_session.hpp"
 
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/map_package.hpp"
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 #include <ranges>
 
 namespace fabric::runtime {
@@ -71,6 +74,55 @@ bool SceneRuntimeSession::load(const std::filesystem::path& project_root,
     }
     manifest_ = *loaded_project.manifest;
     return load_scene(scene_id);
+}
+
+bool SceneRuntimeSession::load_package(
+    const std::filesystem::path& package_root,
+    std::optional<core::ResourceId> scene_id) {
+    project_root_ = package_root;
+    manifest_.reset();
+    scene_.reset();
+    map_.reset();
+    entry_point_.reset();
+    errors_.clear();
+    const auto scene_manifest_path =
+        package_root / project::scene_package_manifest_filename;
+    const auto map_manifest_path =
+        package_root / project::map_package_manifest_filename;
+    std::error_code filesystem_error;
+    const bool has_scene_manifest =
+        std::filesystem::is_regular_file(scene_manifest_path, filesystem_error);
+    filesystem_error.clear();
+    const bool has_map_manifest =
+        std::filesystem::is_regular_file(map_manifest_path, filesystem_error);
+    if (!has_scene_manifest || has_map_manifest) {
+        errors_.push_back(
+            "package must contain exactly one scene-package.json manifest");
+        return false;
+    }
+    std::ifstream input(scene_manifest_path, std::ios::binary);
+    if (!input) {
+        errors_.push_back("scene package manifest could not be opened");
+        return false;
+    }
+    const std::string json{std::istreambuf_iterator<char>{input},
+                           std::istreambuf_iterator<char>{}};
+    const auto package = project::parse_scene_package_manifest(json);
+    if (!package.ok()) {
+        append_errors(errors_, package.errors);
+        return false;
+    }
+    if (!project::runtime_can_load_scene_package(*package.manifest)) {
+        errors_.push_back(
+            "scene package requires an unsupported runtime version or schema");
+        return false;
+    }
+    manifest_ = project::ProjectManifest{
+        .schema_version = project::current_schema_version,
+        .id = package.manifest->id,
+        .name = package.manifest->name};
+    manifest_->directories = {};
+    return load_scene(scene_id.value_or(package.manifest->root_scene.id));
 }
 
 bool SceneRuntimeSession::load_scene(

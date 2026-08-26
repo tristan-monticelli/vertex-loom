@@ -52,9 +52,10 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   est actuellement persisté puis ignoré par `SceneRuntimeSession`.
 - [ ] Ajouter un Scene Studio ou un éditeur de scènes intégré. Les scènes et
   transitions n'ont aujourd'hui aucun parcours d'authoring graphique.
-- [ ] Publier une unité capable de contenir scènes et transitions. Le paquet
-  portable actuel a une map racine et ne peut pas exécuter une campagne de
-  scènes depuis `--package`.
+- [x] Publier une unité capable de contenir scènes et transitions.
+  `ScenePackageManifest v1` ferme les scènes, maps et dépendances atteignables ;
+  `fabric_map_package_export --scene` la publie et `game_runtime --package`
+  l'exécute sans projet source.
 - [ ] Refuser un trigger lié à une collision `chain`, ou implémenter sa
   sémantique : le validateur l'accepte alors que `TriggerRuntime::contains`
   retourne toujours `false` pour ce type.
@@ -144,7 +145,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la modale de fermeture réelle ; les autres parcours restent à automatiser |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
-| PARTIEL | Fidélité du modèle Scene au runtime | composition multi-map, mounts et entry points sont appliqués ; paquet et Studio restent à livrer |
+| PARTIEL | Fidélité du modèle Scene au runtime | composition multi-map, mounts, entry points et paquet de campagne sont appliqués ; le Studio reste à livrer |
 | CONFORME | Architecture fidèle au code mécanique | ADR-0106, C4 et flux d'instance correspondent au runtime testé |
 | MANQUE | Modularité des interfaces | `asset_studio/main.cpp` dépasse 4 000 lignes et `map_studio/main.cpp` 2 000 lignes |
 | N/A | Backend, compte et réseau | produit local sans backend dans le périmètre actuel |

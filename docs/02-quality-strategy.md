@@ -110,7 +110,13 @@ même identifiant utilisé par deux types. Ces erreurs doivent être retournées
 avant la création d'un dossier de paquet.
 La publication headless vérifie la copie du manifeste et des payloads,
 l'absence d'écrasement d'une destination existante et le rollback d'une
-destination nouvellement créée en cas d'échec.
+destination nouvellement créée en cas d'échec. Le même contrat est couvert
+pour `ScenePackageManifest v1` : transitions cycliques autorisées, fermeture
+de toutes les scènes et maps atteignables, round-trip déterministe, chargement
+de la scène racine ou d'une scène active, puis transition atomique depuis le
+paquet. La commande réelle est
+`fabric_map_package_export --scene <id> <projet> <destination>` suivie de
+`game_runtime --package <destination> --smoke-test 1`.
 Le workflow CI publie une fois `studio-rotating-platform` sur Ubuntu, transfère
 le dossier comme artefact et le charge avec `game_runtime --package` sur Ubuntu,
 macOS et Windows ; aucune conversion ni réécriture n'est exécutée entre les

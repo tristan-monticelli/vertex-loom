@@ -604,6 +604,48 @@ TEST_CASE("preview runtime loads the published map package directly") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime loads root and selected scenes from a campaign package") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-scene-package-source-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root.string() + "-published.scene-package";
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
+    auto root_scene = scene();
+    root_scene.transitions.push_back(
+        {"continue", {{.value = "target-scene"}, "scene"}, "start",
+         std::nullopt});
+    auto target_scene = scene();
+    target_scene.document.id = {.value = "target-scene"};
+    target_scene.document.name = "Target Scene";
+    REQUIRE(fabric::project::publish_scene(root, manifest(), root_scene).ok());
+    REQUIRE(fabric::project::publish_scene(root, manifest(), target_scene).ok());
+    REQUIRE(fabric::project::publish_scene_package(
+        root, {.value = "preview-scene"}, package).ok());
+
+    fabric::runtime::PreviewRuntime root_runtime;
+    REQUIRE(root_runtime.load({
+        .package_root = package,
+        .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(root_runtime.scene().has_value());
+    CHECK(root_runtime.scene()->document.id.value == "preview-scene");
+    CHECK(root_runtime.map()->document.id.value == "preview-scene");
+    REQUIRE(root_runtime.run());
+
+    fabric::runtime::PreviewRuntime target_runtime;
+    REQUIRE(target_runtime.load({
+        .package_root = package,
+        .package_scene_id = fabric::core::ResourceId{.value = "target-scene"},
+        .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(target_runtime.scene().has_value());
+    CHECK(target_runtime.scene()->document.id.value == "target-scene");
+    CHECK(target_runtime.map()->document.id.value == "target-scene");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
+}
+
 TEST_CASE("preview runtime resolves a scene entry map before graphics") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-scene-" + std::to_string(

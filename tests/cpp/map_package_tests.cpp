@@ -1,4 +1,5 @@
 #include "fabric/project/map_package.hpp"
+#include "fabric/project/scene.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -35,6 +36,18 @@ fabric::project::MapPackageManifest package_manifest() {
                 .document_path = "assets/textures/yarn-fill.texture.json",
                 .payload_paths = {"assets/textures/yarn-fill.png"}},
         }};
+}
+
+fabric::project::SceneDocument scene(const char* id, const char* target) {
+    fabric::project::SceneDocument result{
+        .document = {.schema_version = 1, .type = "scene",
+                     .id = {.value = id}, .name = id},
+        .maps = {{{{.value = "platform-preview"}, "map"}, "world"}},
+        .entry_map = fabric::project::ResourceReference{
+            {.value = "platform-preview"}, "map"}};
+    result.transitions.push_back({"continue", {{.value = target}, "scene"},
+                                  "start", std::nullopt});
+    return result;
 }
 
 std::filesystem::path fixture(const std::string_view name) {
@@ -304,6 +317,77 @@ TEST_CASE("map package publication copies the planned closure without overwrite"
 
     const auto rejected = fabric::project::publish_map_package(
         project.root(), {.value = "platform-preview"}, destination);
+    CHECK_FALSE(rejected.ok());
+    CHECK(has_error(rejected,
+                    fabric::project::ErrorCode::asset_already_exists));
+    std::filesystem::remove_all(destination, cleanup_error);
+}
+
+TEST_CASE("scene package planning closes a cyclic scene campaign") {
+    TemporaryProject project{"studio-rotating-platform"};
+    const auto loaded = fabric::project::load_manifest(project.root());
+    REQUIRE(loaded.ok());
+    REQUIRE(fabric::project::publish_scene(
+        project.root(), *loaded.manifest, scene("scene-a", "scene-b")).ok());
+    REQUIRE(fabric::project::publish_scene(
+        project.root(), *loaded.manifest, scene("scene-b", "scene-a")).ok());
+
+    const auto planned = fabric::project::plan_scene_package(
+        project.root(), {.value = "scene-a"});
+    REQUIRE(planned.ok());
+    CHECK(planned.manifest->root_scene == fabric::project::ResourceReference{
+        {.value = "scene-a"}, "scene"});
+    CHECK(std::ranges::count_if(
+              planned.manifest->resources, [](const auto& resource) {
+                  return resource.resource.expected_type == "scene";
+              }) == 2);
+    CHECK(std::ranges::count_if(
+              planned.manifest->resources, [](const auto& resource) {
+                  return resource.resource.expected_type == "map";
+              }) == 1);
+    CHECK(std::ranges::count_if(
+              planned.manifest->resources, [](const auto& resource) {
+                  return resource.resource.expected_type == "mechanic";
+              }) == 1);
+
+    const auto serialized =
+        fabric::project::serialize_scene_package_manifest(*planned.manifest);
+    const auto parsed =
+        fabric::project::parse_scene_package_manifest(serialized);
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.manifest == *planned.manifest);
+    CHECK(fabric::project::runtime_can_load_scene_package(*parsed.manifest));
+}
+
+TEST_CASE("scene package publication copies every scene and map dependency") {
+    TemporaryProject project{"studio-rotating-platform"};
+    const auto loaded = fabric::project::load_manifest(project.root());
+    REQUIRE(loaded.ok());
+    REQUIRE(fabric::project::publish_scene(
+        project.root(), *loaded.manifest, scene("scene-a", "scene-b")).ok());
+    REQUIRE(fabric::project::publish_scene(
+        project.root(), *loaded.manifest, scene("scene-b", "scene-a")).ok());
+    const auto destination = project.root().parent_path() /
+        (project.root().filename().string() + "-scene-published");
+    std::error_code cleanup_error;
+    std::filesystem::remove_all(destination, cleanup_error);
+
+    const auto published = fabric::project::publish_scene_package(
+        project.root(), {.value = "scene-a"}, destination);
+    REQUIRE(published.ok());
+    CHECK(std::filesystem::is_regular_file(
+        destination / "scene-package.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "scenes/scene-a.scene.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "scenes/scene-b.scene.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "maps/platform-preview.map.json"));
+    CHECK(std::filesystem::is_regular_file(
+        destination / "assets/textures/platform-thread.png"));
+
+    const auto rejected = fabric::project::publish_scene_package(
+        project.root(), {.value = "scene-a"}, destination);
     CHECK_FALSE(rejected.ok());
     CHECK(has_error(rejected,
                     fabric::project::ErrorCode::asset_already_exists));

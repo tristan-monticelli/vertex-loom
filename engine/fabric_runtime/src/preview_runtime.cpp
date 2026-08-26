@@ -551,10 +551,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     const bool valid_map_id = core::ResourceId::is_valid(options_.map_id.value);
     const bool valid_scene_id = options_.scene_id.has_value() &&
         core::ResourceId::is_valid(options_.scene_id->value);
+    const bool valid_package_scene_id = options_.package_scene_id.has_value() &&
+        core::ResourceId::is_valid(options_.package_scene_id->value);
     const bool package_mode = options_.package_root.has_value();
     if ((!package_mode && options_.project_root.empty()) ||
         (package_mode && !options_.project_root.empty()) ||
         (options_.scene_id.has_value() && !valid_scene_id) ||
+        (options_.package_scene_id.has_value() && !valid_package_scene_id) ||
+        (!package_mode && options_.package_scene_id.has_value()) ||
         (!package_mode && !options_.scene_id.has_value() && !valid_map_id) ||
         (package_mode && (options_.scene_id.has_value() || valid_map_id)) ||
         (options_.scene_id.has_value() && valid_map_id)) {
@@ -567,39 +571,89 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     // This is intentionally before SDL_Init and window creation.
     project::ManifestResult loaded_project;
     if (package_mode) {
-        std::ifstream manifest_file(*options_.package_root / project::map_package_manifest_filename);
-        if (!manifest_file) {
-            errors_.push_back("map package manifest could not be opened");
+        const auto map_manifest_path =
+            *options_.package_root / project::map_package_manifest_filename;
+        const auto scene_manifest_path =
+            *options_.package_root / project::scene_package_manifest_filename;
+        std::error_code filesystem_error;
+        const bool has_map_manifest = std::filesystem::is_regular_file(
+            map_manifest_path, filesystem_error);
+        filesystem_error.clear();
+        const bool has_scene_manifest = std::filesystem::is_regular_file(
+            scene_manifest_path, filesystem_error);
+        if (has_map_manifest == has_scene_manifest) {
+            errors_.push_back(
+                "package requires exactly one map-package.json or scene-package.json manifest");
             return false;
         }
-        const std::string manifest_text{
-            std::istreambuf_iterator<char>(manifest_file), std::istreambuf_iterator<char>()};
-        const auto package = project::parse_map_package_manifest(manifest_text);
-        if (!package.ok() || !project::runtime_can_load_map_package(*package.manifest)) {
-            append_errors(errors_, package.errors);
-            errors_.push_back("map package requires an unsupported runtime version or schema");
-            return false;
-        }
-        for (const auto& resource : package.manifest->resources) {
-            std::string path_error;
-            if (!package_path_is_file(*options_.package_root, resource.document_path, path_error)) {
-                errors_.push_back(path_error);
-                return false;
-            }
-            for (const auto& payload : resource.payload_paths) {
-                if (!package_path_is_file(*options_.package_root, payload, path_error)) {
+        const auto validate_resources = [&](const auto& resources) {
+            for (const auto& resource : resources) {
+                std::string path_error;
+                if (!package_path_is_file(*options_.package_root,
+                                          resource.document_path,
+                                          path_error)) {
                     errors_.push_back(path_error);
                     return false;
                 }
+                for (const auto& payload : resource.payload_paths) {
+                    if (!package_path_is_file(*options_.package_root, payload,
+                                              path_error)) {
+                        errors_.push_back(path_error);
+                        return false;
+                    }
+                }
             }
+            return true;
+        };
+        std::ifstream manifest_file(
+            has_map_manifest ? map_manifest_path : scene_manifest_path,
+            std::ios::binary);
+        const std::string manifest_text{
+            std::istreambuf_iterator<char>(manifest_file), std::istreambuf_iterator<char>()};
+        if (has_map_manifest) {
+            if (options_.package_scene_id) {
+                errors_.push_back("a map package cannot select a scene");
+                return false;
+            }
+            const auto package =
+                project::parse_map_package_manifest(manifest_text);
+            if (!package.ok()) {
+                append_errors(errors_, package.errors);
+                return false;
+            }
+            if (!project::runtime_can_load_map_package(*package.manifest)) {
+                errors_.push_back(
+                    "map package requires an unsupported runtime version or schema");
+                return false;
+            }
+            if (!validate_resources(package.manifest->resources)) return false;
+            loaded_project.manifest = project::ProjectManifest{
+                .schema_version = project::current_schema_version,
+                .id = package.manifest->id,
+                .name = package.manifest->name};
+            options_.map_id = package.manifest->root_map.id;
+        } else {
+            const auto package =
+                project::parse_scene_package_manifest(manifest_text);
+            if (!package.ok()) {
+                append_errors(errors_, package.errors);
+                return false;
+            }
+            if (!project::runtime_can_load_scene_package(*package.manifest)) {
+                errors_.push_back(
+                    "scene package requires an unsupported runtime version or schema");
+                return false;
+            }
+            if (!validate_resources(package.manifest->resources)) return false;
+            loaded_project.manifest = project::ProjectManifest{
+                .schema_version = project::current_schema_version,
+                .id = package.manifest->id,
+                .name = package.manifest->name};
+            options_.scene_id = options_.package_scene_id.value_or(
+                package.manifest->root_scene.id);
         }
-        loaded_project.manifest = project::ProjectManifest{
-            .schema_version = project::current_schema_version,
-            .id = package.manifest->id,
-            .name = package.manifest->name};
         loaded_project.manifest->directories = {};
         options_.project_root = *options_.package_root;
-        options_.map_id = package.manifest->root_map.id;
     } else {
         loaded_project = project::load_project(options_.project_root);
         if (!loaded_project.ok()) {

@@ -141,6 +141,13 @@ int main(int argc, char** argv) {
 
     if (!configured_actions.empty()) options.input_actions = std::move(configured_actions);
 
+    if (options.package_root &&
+        (!options.project_root.empty() ||
+         fabric::core::ResourceId::is_valid(options.map_id.value) || scene_id)) {
+        std::cerr << "error: --package cannot be combined with --project, --map or --scene\n";
+        return 2;
+    }
+
     if (save_slot && save_path) {
         std::cerr << "error: --save-slot and --save-path are mutually exclusive\n";
         return 2;
@@ -182,7 +189,18 @@ int main(int argc, char** argv) {
     }
 
     fabric::runtime::SceneRuntimeSession scene_session;
-    if (scene_id && !scene_session.load(options.project_root, *scene_id)) {
+    bool scene_campaign = false;
+    if (options.package_root && std::filesystem::is_regular_file(
+            *options.package_root /
+            fabric::project::scene_package_manifest_filename)) {
+        if (!scene_session.load_package(*options.package_root)) {
+            for (const auto& error : scene_session.errors())
+                std::cerr << "error: " << error << '\n';
+            return 1;
+        }
+        scene_id = scene_session.scene()->document.id;
+        scene_campaign = true;
+    } else if (scene_id && !scene_session.load(options.project_root, *scene_id)) {
         for (const auto& error : scene_session.errors())
             std::cerr << "error: " << error << '\n';
         return 1;
@@ -193,7 +211,10 @@ int main(int argc, char** argv) {
     do {
         scene_changed = false;
         if (scene_id) options.map_id = {};
-        options.scene_id = scene_id
+        options.package_scene_id = scene_campaign && scene_id
+            ? std::optional<fabric::core::ResourceId>{scene_session.scene()->document.id}
+            : std::nullopt;
+        options.scene_id = !scene_campaign && scene_id
             ? std::optional<fabric::core::ResourceId>{scene_session.scene()->document.id}
             : std::nullopt;
         options.character_spawn = scene_id && scene_session.entry_point()

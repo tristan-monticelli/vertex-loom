@@ -1,5 +1,6 @@
 #include "fabric/runtime/scene_session.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/map_package.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -87,6 +88,57 @@ TEST_CASE("scene runtime session transitions atomically between scenes") {
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("scene runtime session transitions inside a published campaign") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-scene-package-session-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root.string() + "-package";
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, project_manifest,
+        {.document = {.schema_version = 1, .type = "entity",
+                      .id = {.value = "marker-entity"},
+                      .name = "Marker Entity"}}).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, project_manifest, map("map-a")).ok());
+    auto target_map = map("map-b");
+    target_map.instances.push_back({
+        .id = "start-marker",
+        .entity = {{{.value = "marker-entity"}, "entity"}},
+        .layer_id = "world",
+        .transform = {.position = {4.0F, 2.0F}},
+        .properties = {{"sceneEntryPoint", std::string{"start"}}}});
+    REQUIRE(fabric::project::publish_map(
+        root, project_manifest, target_map).ok());
+    auto first = scene("scene-a", "map-a");
+    first.transitions.push_back(
+        {"to-b", {{.value = "scene-b"}, "scene"}, "start",
+         fabric::core::ResourceId{.value = "open-door"}});
+    auto second = scene("scene-b", "map-b");
+    second.transitions.push_back(
+        {"to-a", {{.value = "scene-a"}, "scene"}, "start",
+         std::nullopt});
+    REQUIRE(fabric::project::publish_scene(
+        root, project_manifest, first).ok());
+    REQUIRE(fabric::project::publish_scene(
+        root, project_manifest, second).ok());
+    REQUIRE(fabric::project::publish_scene_package(
+        root, {.value = "scene-a"}, package).ok());
+
+    fabric::runtime::SceneRuntimeSession session;
+    REQUIRE(session.load_package(package));
+    CHECK(session.scene()->document.id.value == "scene-a");
+    REQUIRE(session.transition_for_event({.value = "open-door"}));
+    CHECK(session.scene()->document.id.value == "scene-b");
+    REQUIRE(session.entry_point().has_value());
+    CHECK(session.entry_point()->position == fabric::core::Vec2{4.0F, 2.0F});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
 }
 
 } // namespace
