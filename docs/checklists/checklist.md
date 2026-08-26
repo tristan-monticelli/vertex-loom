@@ -654,7 +654,7 @@ utilisées pour tous les types de ressources.
   type : `tests/fixtures/studio-textile-head` couvre désormais les ressources
   indexées, y compris input, behavior, matériau, audio et scène.
 - [ ] Automatiser les parcours suivants :
-  - [ ] parcourir et sélectionner une texture ;
+  - [x] parcourir et sélectionner une texture ;
   - [x] modifier un crop puis créer une autre ressource ;
   - [x] vérifier l'autosave de l'ancienne ressource ;
   - [x] dupliquer et renommer une ressource ;
