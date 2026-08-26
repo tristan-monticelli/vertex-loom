@@ -97,9 +97,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   animation et permettre de changer cette cible depuis l'inspecteur.
 - [x] Ne plus utiliser la dernière entité sélectionnée comme cible implicite de
   preview d'une animation.
-- [ ] Transformer le Project tree en explorateur de ressources administrable.
-  Il reste une liste plate à gauche sans Duplicate, Rename, Reveal, Copy ID,
-  analyse des références ni Delete sécurisé.
+- [x] Transformer le Project tree en explorateur de ressources administrable.
+  Il expose désormais l’arbre unifié, Duplicate, Rename, Reveal, Copy ID,
+  analyse des références et Delete sécurisé dans le rail droit.
 - [x] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
 - [ ] Remplacer les identifiants texte libres de Map Studio par des pickers
   typés et recherchables pour entités, prefabs, mécaniques et événements.
