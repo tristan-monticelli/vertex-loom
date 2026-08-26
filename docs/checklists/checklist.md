@@ -103,8 +103,8 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
 - [ ] Remplacer les identifiants texte libres de Map Studio par des pickers
   typés et recherchables pour entités, prefabs, mécaniques et événements.
-- [ ] Permettre d'ouvrir et de créer une map depuis Map Studio. Sans arguments
-  CLI, l'interface affiche seulement la commande à relancer.
+- [x] Permettre d'ouvrir et de créer une map depuis Map Studio sans relancer
+  l'outil avec des arguments CLI.
 - [ ] Ajouter confirmations et analyse d'impact avant les suppressions de
   nœuds, collisions, triggers, événements et autres ressources.
 - [ ] Synchroniser les états dirty de la map et de la mécanique dans un shell

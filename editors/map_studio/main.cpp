@@ -1817,6 +1817,9 @@ int run(const std::filesystem::path& project_root,
                   << map_renderer.initialization_error() << '\n';
     }
     std::string status;
+    std::string new_map_id;
+    std::string new_map_name;
+    std::string open_map_id;
     std::vector<fabric::project::Error> package_errors;
     const auto prepare_package = [&] {
         if (session.dirty() && !session.save()) {
@@ -2078,7 +2081,31 @@ int run(const std::filesystem::path& project_root,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
                          ImGuiWindowFlags_NoCollapse);
         if (!session.has_map()) {
-            ImGui::TextWrapped("Open a map with: map_studio <project-directory> <map-id>");
+            ImGui::TextUnformatted("Map Studio");
+            ImGui::TextDisabled("Select a map or create one without restarting the studio.");
+            const auto manifest = fabric::project::load_manifest(project_root);
+            if (manifest.ok()) {
+                const auto maps_directory = project_root / manifest.manifest->directories.maps;
+                draw_resource_picker("Open map:", maps_directory, ".map.json", open_map_id);
+                ImGui::SameLine();
+                ImGui::BeginDisabled(open_map_id.empty());
+                if (ImGui::Button("Open selected")) {
+                    status = session.open(project_root, {.value = open_map_id})
+                        ? "Map opened" : "Map could not be opened";
+                }
+                ImGui::EndDisabled();
+                ImGui::InputText("New map id", &new_map_id);
+                ImGui::InputText("New map name", &new_map_name);
+                ImGui::BeginDisabled(new_map_id.empty() || new_map_name.empty());
+                if (ImGui::Button("Create map")) {
+                    const fabric::project::MapDocument map{
+                        .document = {.schema_version = 1, .type = "map",
+                                     .id = {.value = new_map_id}, .name = new_map_name}};
+                    status = session.create(project_root, map)
+                        ? "Map created" : "Map creation failed";
+                }
+                ImGui::EndDisabled();
+            }
             draw_errors(session);
         } else {
             if (session.has_recovery()) {
