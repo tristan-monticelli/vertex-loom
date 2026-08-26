@@ -108,6 +108,7 @@ struct CreationUiState {
     bool input_capture{};
     std::size_t input_capture_action{};
     std::size_t input_capture_binding{};
+    bool input_capture_existing{};
 };
 
 #if defined(__APPLE__)
@@ -4143,6 +4144,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::SameLine();
                     ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
                     ImGui::SameLine();
+                    if (ImGui::SmallButton("Capture next")) {
+                        creation.input_capture = true;
+                        creation.input_capture_existing = true;
+                        creation.input_capture_action = action_index;
+                        creation.input_capture_binding = binding_index;
+                    }
+                    ImGui::SameLine();
                     if (ImGui::SmallButton("Remove binding")) {
                         action_removed = session.remove_selected_input_binding(
                             action_index, binding_index);
@@ -5433,6 +5441,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Capture next")) {
                     creation.input_capture = true;
+                    creation.input_capture_existing = false;
                     creation.input_capture_action = action_index;
                     creation.input_capture_binding = binding_index;
                 }
@@ -5845,26 +5854,24 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
             if (creation.input_capture) {
-                if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
-                    auto& actions = creation.input.actions;
-                    if (creation.input_capture_action < actions.size() &&
-                        creation.input_capture_binding < actions[creation.input_capture_action].bindings.size()) {
-                        auto& binding = actions[creation.input_capture_action].bindings[creation.input_capture_binding];
-                        binding.device = fabric::project::InputDevice::keyboard;
-                        binding.code = event.key.keysym.sym;
-                        creation.input_capture = false;
+                const auto apply_capture = [&](const fabric::project::InputBinding binding) {
+                    if (creation.input_capture_existing) {
+                        if (session.selected_input())
+                            static_cast<void>(session.set_selected_input_binding(
+                                creation.input_capture_action,
+                                creation.input_capture_binding, binding));
+                    } else if (creation.input_capture_action < creation.input.actions.size() &&
+                               creation.input_capture_binding < creation.input.actions[creation.input_capture_action].bindings.size()) {
+                        creation.input.actions[creation.input_capture_action].bindings[creation.input_capture_binding] = binding;
                     }
+                    creation.input_capture = false;
+                };
+                if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
+                    apply_capture({fabric::project::InputDevice::keyboard, static_cast<int>(event.key.keysym.sym)});
                     continue;
                 }
                 if (event.type == SDL_CONTROLLERBUTTONDOWN) {
-                    auto& actions = creation.input.actions;
-                    if (creation.input_capture_action < actions.size() &&
-                        creation.input_capture_binding < actions[creation.input_capture_action].bindings.size()) {
-                        auto& binding = actions[creation.input_capture_action].bindings[creation.input_capture_binding];
-                        binding.device = fabric::project::InputDevice::gamepad;
-                        binding.code = static_cast<int>(event.cbutton.button);
-                        creation.input_capture = false;
-                    }
+                    apply_capture({fabric::project::InputDevice::gamepad, static_cast<int>(event.cbutton.button)});
                     continue;
                 }
             }
