@@ -184,6 +184,12 @@ InputResult parse_input(const std::string_view serialized) {
                             }
                             if (const auto found = binding_json.find("threshold"); found != binding_json.end() && found->is_number()) binding.threshold = found->get<float>();
                             if (const auto found = binding_json.find("deadZone"); found != binding_json.end() && found->is_number()) binding.dead_zone = found->get<float>();
+                            if (const auto found = binding_json.find("modifiers"); found != binding_json.end() && found->is_object()) {
+                                if (const auto value = found->find("ctrl"); value != found->end() && value->is_boolean()) binding.ctrl = value->get<bool>();
+                                if (const auto value = found->find("shift"); value != found->end() && value->is_boolean()) binding.shift = value->get<bool>();
+                                if (const auto value = found->find("alt"); value != found->end() && value->is_boolean()) binding.alt = value->get<bool>();
+                                if (const auto value = found->find("super"); value != found->end() && value->is_boolean()) binding.super = value->get<bool>();
+                            }
                             action.bindings.push_back(binding);
                         }
                     }
@@ -207,7 +213,7 @@ std::string serialize_input(const InputDocument& input) {
     for (const auto& action : input.actions) {
         Json item = {{"id", action.id}, {"bindings", Json::array()}};
         for (const auto& binding : action.bindings)
-            item["bindings"].push_back({{"device", device_name(binding.device)}, {"code", binding.code}, {"kind", kind_name(binding.kind)}, {"threshold", binding.threshold}, {"deadZone", binding.dead_zone}});
+            item["bindings"].push_back({{"device", device_name(binding.device)}, {"code", binding.code}, {"kind", kind_name(binding.kind)}, {"threshold", binding.threshold}, {"deadZone", binding.dead_zone}, {"modifiers", {{"ctrl", binding.ctrl}, {"shift", binding.shift}, {"alt", binding.alt}, {"super", binding.super}}}});
         json["actions"].push_back(std::move(item));
     }
     return json.dump(2) + "\n";

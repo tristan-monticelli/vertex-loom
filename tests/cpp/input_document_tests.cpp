@@ -98,3 +98,15 @@ TEST_CASE("input document rejects a mismatched filename") {
         return error.code == fabric::project::ErrorCode::invalid_path;
     }));
 }
+
+TEST_CASE("input document round-trips axis thresholds and modifiers") {
+    auto input = example();
+    input.actions[0].bindings[0].kind = fabric::project::InputBindingKind::axis;
+    input.actions[0].bindings[0].threshold = 0.75F;
+    input.actions[0].bindings[0].dead_zone = 0.2F;
+    input.actions[0].bindings[0].ctrl = true;
+    input.actions[0].bindings[0].shift = true;
+    const auto parsed = fabric::project::parse_input(fabric::project::serialize_input(input));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.input == input);
+}

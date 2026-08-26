@@ -5401,6 +5401,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::InputFloat("Threshold", &binding.threshold, 0.05F, 0.1F, "%.2f");
                     ImGui::InputFloat("Dead zone", &binding.dead_zone, 0.05F, 0.1F, "%.2f");
                 }
+                ImGui::TextUnformatted("Modifiers");
+                ImGui::SameLine();
+                ImGui::Checkbox("Ctrl", &binding.ctrl);
+                ImGui::SameLine();
+                ImGui::Checkbox("Shift", &binding.shift);
+                ImGui::SameLine();
+                ImGui::Checkbox("Alt", &binding.alt);
+                ImGui::SameLine();
+                ImGui::Checkbox("Super", &binding.super);
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
                 ImGui::SameLine();

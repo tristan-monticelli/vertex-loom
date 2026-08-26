@@ -22,6 +22,10 @@ struct InputBinding {
     InputBindingKind kind{InputBindingKind::button};
     float threshold{0.5F};
     float dead_zone{0.1F};
+    bool ctrl{};
+    bool shift{};
+    bool alt{};
+    bool super{};
 
     friend bool operator==(const InputBinding&, const InputBinding&) = default;
 };
