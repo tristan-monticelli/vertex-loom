@@ -49,7 +49,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   géométrie, E2E canvas et comparaison des draw packets.
 - [ ] Inspecteur : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
-  tailles minimales, navigation clavier et contraste.
+  tailles minimales, navigation clavier et contraste ; remplacer aussi les
+  deux colonnes monolithiques de Map Studio par des panneaux hiérarchisés,
+  redimensionnables et focalisés sur la sélection.
 - [ ] UX E2E : IDs widgets stables, fixture multi-ressources, parcours texture/
   crop/input/joueur/monstre/path Bézier, diagnostics/screenshots et exécution
   macOS/Windows/Linux.
