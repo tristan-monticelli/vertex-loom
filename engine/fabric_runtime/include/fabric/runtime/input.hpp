@@ -3,6 +3,7 @@
 #include "fabric/project/input.hpp"
 
 #include <string>
+#include <cstdint>
 #include <string_view>
 #include <span>
 #include <unordered_set>
@@ -24,6 +25,7 @@ public:
     void press(InputDevice device, int code, bool repeat = false) noexcept;
     void release(InputDevice device, int code) noexcept;
     void set_axis(InputDevice device, int code, float value) noexcept;
+    void set_keyboard_modifiers(std::uint16_t modifiers) noexcept;
     void press_action(std::string_view action) noexcept;
     void release_action(std::string_view action) noexcept;
 
@@ -47,6 +49,7 @@ private:
     std::unordered_set<std::string> pressed_actions_;
     std::unordered_set<std::string> released_actions_;
     std::unordered_map<std::string, float> axis_values_;
+    std::uint16_t keyboard_modifiers_{};
 };
 
 } // namespace fabric::runtime

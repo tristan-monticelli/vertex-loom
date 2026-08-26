@@ -1876,9 +1876,13 @@ bool PreviewRuntime::run() {
                     std::pow(1.1F, static_cast<float>(event.wheel.y)));
             if (input_.actions().empty() || replay_player_) continue;
             if (event.type == SDL_KEYDOWN)
+                input_.set_keyboard_modifiers(event.key.keysym.mod);
+            if (event.type == SDL_KEYDOWN)
                 input_.press(InputDevice::keyboard, event.key.keysym.sym,
                              event.key.repeat != 0);
             else if (event.type == SDL_KEYUP)
+                input_.set_keyboard_modifiers(event.key.keysym.mod);
+            if (event.type == SDL_KEYUP)
                 input_.release(InputDevice::keyboard, event.key.keysym.sym);
             else if (event.type == SDL_CONTROLLERBUTTONDOWN)
                 input_.press(InputDevice::gamepad, event.cbutton.button);

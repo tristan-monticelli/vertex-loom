@@ -7,6 +7,11 @@
 
 namespace fabric::runtime {
 
+constexpr std::uint16_t modifier_ctrl = 0x00c0;
+constexpr std::uint16_t modifier_shift = 0x0003;
+constexpr std::uint16_t modifier_alt = 0x0300;
+constexpr std::uint16_t modifier_super = 0x0c00;
+
 bool InputActionMap::define_action(std::string id) {
     if (id.empty()) return false;
     for (const auto& action : actions_)
@@ -48,10 +53,18 @@ bool InputActionMap::matches(const std::string_view action, const InputDevice de
     for (const auto& definition : actions_) {
         if (definition.id != action) continue;
         for (const auto binding : definition.bindings)
-            if (binding.device == device && binding.code == code) return true;
+            if (binding.device == device && binding.code == code &&
+                (!binding.ctrl || (keyboard_modifiers_ & modifier_ctrl) != 0U) &&
+                (!binding.shift || (keyboard_modifiers_ & modifier_shift) != 0U) &&
+                (!binding.alt || (keyboard_modifiers_ & modifier_alt) != 0U) &&
+                (!binding.super || (keyboard_modifiers_ & modifier_super) != 0U)) return true;
         return false;
     }
     return false;
+}
+
+void InputActionMap::set_keyboard_modifiers(const std::uint16_t modifiers) noexcept {
+    keyboard_modifiers_ = modifiers;
 }
 
 void InputActionMap::begin_frame() noexcept {

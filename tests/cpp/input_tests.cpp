@@ -73,3 +73,15 @@ TEST_CASE("input action map evaluates axis dead zones and thresholds") {
     input.set_axis(fabric::runtime::InputDevice::gamepad, 0, 0.8F);
     CHECK(input.held("move"));
 }
+
+TEST_CASE("input action map requires configured keyboard modifiers") {
+    fabric::runtime::InputActionMap input;
+    REQUIRE(input.define_action("dash"));
+    fabric::project::InputBinding binding{fabric::runtime::InputDevice::keyboard, 68};
+    binding.ctrl = true;
+    REQUIRE(input.bind("dash", binding));
+    input.press(fabric::runtime::InputDevice::keyboard, 68);
+    CHECK_FALSE(input.held("dash"));
+    input.set_keyboard_modifiers(0x00c0);
+    CHECK(input.held("dash"));
+}
