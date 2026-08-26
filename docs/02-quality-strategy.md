@@ -109,6 +109,9 @@ liés, symétriques et libres, ainsi que le refus des commandes non cubiques.
 Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
 étirement, largeur variable, UV continus, raccords, texture manquante et
 séparation stricte entre ruban de rendu et collision.
+Le stroke image vectoriel est couvert par `fabric_render_tests` (texture,
+répétition, UV et transform) et par le preset `beam` de la fixture
+`tests/fixtures/studio-beam`, qui reste visible dans le parcours des presets.
 Le graphe de mécaniques couvre validation des ports, références, cycles
 interdits, ordre déterministe, corps et joints invalides, capteurs, moteurs,
 undo/redo et reconstruction du monde après reset de preview. La première

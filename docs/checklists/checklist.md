@@ -95,7 +95,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
   `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
   renderer les applique désormais dans les draw packets et les chemins OpenGL.
-- [ ] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
+- [x] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
   déformation ; livrer un preset `beam` préexistant et visible comme exemple.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
@@ -606,7 +606,7 @@ sur un comportement sans modifier le runtime.
 - [x] Exposer couleur, largeur, join et cap du stroke.
 - [x] Rendre effectivement largeur, join `round`/`bevel`/`miter` et cap dans
   le renderer ; les draw packets et les chemins OpenGL reflètent ces paramètres.
-- [ ] Ajouter un stroke image (texture, répétition, UV, offset et échelle) et
+- [x] Ajouter un stroke image (texture, répétition, UV, offset et échelle) et
   fournir un preset `beam` préexistant pour expliquer le résultat attendu.
 - [x] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
 - [ ] Afficher les clips imbriqués fidèlement sur le canvas.
