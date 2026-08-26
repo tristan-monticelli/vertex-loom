@@ -468,6 +468,17 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         )
     endif()
 
+    if(FABRIC_BUILD_EDITORS)
+        add_test(
+            NAME map_studio_close_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-close-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_close_e2e.cmake
+        )
+    endif()
+
     add_executable(fabric_audio_mixer_tests tests/cpp/audio_mixer_tests.cpp)
     target_link_libraries(fabric_audio_mixer_tests PRIVATE
         fabric_runtime Catch2::Catch2WithMain)

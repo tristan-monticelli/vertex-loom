@@ -188,6 +188,11 @@ avant et après la transition.
 La session map couvre création et ouverture selon le même scénario et recharge
 chaque map précédente depuis son fichier pour prouver la persistance de ses
 instances.
+Le CTest `map_studio_close_e2e` exécute le vrai binaire avec une fenêtre cachée
+sur trois copies temporaires de la fixture textile. Il couvre fermeture de
+fenêtre, `SDL_QUIT` produit par le raccourci système et échec de remplacement
+atomique ; chaque cas compare les octets du principal et de l'autosave et
+confirme que la session dirty reste ouverte après Cancel ou Save échoué.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

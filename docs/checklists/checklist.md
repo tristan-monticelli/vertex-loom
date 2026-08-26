@@ -39,7 +39,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   plateforme mécanique, pas seulement la compilation isolée de son graphe.
 - [x] **Protéger la fermeture de Map Studio.** Les événements de fermeture
   passent désormais par Save/Discard/Cancel pour la map et la mécanique dirty.
-- [ ] Tester fermeture fenêtre, raccourci système et erreur de sauvegarde avec
+- [x] Tester fermeture fenêtre, raccourci système et erreur de sauvegarde avec
   conservation du document principal et de l'autosave.
 
 ### Défauts P1 — logique du moteur incomplète ou contradictoire
@@ -141,7 +141,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | CONFORME | Écritures projet atomiques et validation stricte | contrats `fabric_project`, tests de stockage et publication |
 | CONFORME | Défenses de chemins et fermeture transitive des paquets | tests traversal, symlink et `map_package_tests.cpp` |
 | CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession` et tests headless |
-| MANQUE | End-to-end graphique | `docs/02-quality-strategy.md` indique « Plus tard » et aucune commande réelle |
+| PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la modale de fermeture réelle ; les autres parcours restent à automatiser |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
 | MANQUE | Fidélité du modèle Scene au runtime | `maps`, `layer_id` et `entry_point` ne sont pas appliqués |
@@ -152,7 +152,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 ### Ordre de correction issu du nouvel audit
 
 - [x] Lot A : non-régression des slots et reprise réelle.
-- [ ] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
+- [x] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
 - [x] Lot C : exécution runtime des mécaniques publiées.
 - [ ] Lot D : scènes multi-maps, entry points et paquet de scènes.
 - [ ] Lot E : triggers cohérents avec les formes et toutes les entités.

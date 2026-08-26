@@ -55,6 +55,12 @@ C4Component
   `SessionTransitionGuard`. Map Studio agrège le dirty de sa map et de sa
   mécanique ouverte, nomme les documents concernés dans la modale et ne quitte
   après `Save and continue` que si chaque sauvegarde demandée réussit.
+- Le harnais CTest de Map Studio lance la coquille SDL/OpenGL cachée avec une
+  copie temporaire d'un projet valide. Il injecte séparément
+  `SDL_WINDOWEVENT_CLOSE` et `SDL_QUIT`, exige l'ouverture de la modale, puis
+  vérifie que Cancel conserve le document principal et l'autosave. Son scénario
+  d'échec empêche atomiquement le remplacement du document, vérifie que la
+  session reste dirty et restaure le principal avant de quitter par Discard.
 - Dans un projet Asset Studio déjà ouvert, sélectionner, créer ou importer
   appelle une transition de document unique dans `ProjectSession`. Le document
   dirty valide est sauvegardé, puis l'intention continue sans demander une

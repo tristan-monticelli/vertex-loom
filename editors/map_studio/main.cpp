@@ -2,6 +2,7 @@
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/project/document_storage.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
@@ -20,7 +21,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
+#include <chrono>
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <limits>
 #include <ranges>
@@ -33,6 +37,23 @@
 #include <vector>
 
 namespace {
+
+enum class CloseE2eMode { window, system_shortcut, save_failure };
+
+std::optional<CloseE2eMode> close_e2e_mode(const std::string_view value) {
+    if (value == "window") return CloseE2eMode::window;
+    if (value == "shortcut") return CloseE2eMode::system_shortcut;
+    if (value == "save-failure") return CloseE2eMode::save_failure;
+    return std::nullopt;
+}
+
+std::optional<std::string> read_binary_file(
+    const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input) return std::nullopt;
+    return std::string{std::istreambuf_iterator<char>{input},
+                       std::istreambuf_iterator<char>{}};
+}
 
 void draw_errors(const fabric::editor::MapSession& session) {
     for (const auto& error : session.errors()) {
@@ -1414,7 +1435,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
 }
 
 int run(const std::filesystem::path& project_root,
-        const fabric::core::ResourceId& map_id) {
+        const fabric::core::ResourceId& map_id,
+        const std::optional<CloseE2eMode> e2e_mode = std::nullopt) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -1438,9 +1460,11 @@ int run(const std::filesystem::path& project_root,
 #endif
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
+        (e2e_mode ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+        window_flags);
     if (window == nullptr) {
         std::cerr << SDL_GetError() << '\n';
         NFD_Quit();
@@ -1489,6 +1513,42 @@ int run(const std::filesystem::path& project_root,
     if (!project_root.empty()) {
         if (!session.open(project_root, map_id)) status = "Map could not be opened";
         else status = "Map opened";
+    }
+    bool e2e_failed = false;
+    bool e2e_event_injected = false;
+    bool e2e_modal_handled = false;
+    std::filesystem::path e2e_primary_path;
+    std::filesystem::path e2e_autosave_path;
+    std::optional<std::string> e2e_primary_contents;
+    std::optional<std::string> e2e_autosave_contents;
+    const auto fail_e2e = [&](const std::string_view message) {
+        std::cerr << "Map Studio close E2E: " << message << '\n';
+        e2e_failed = true;
+    };
+    if (e2e_mode) {
+        if (!session.has_map() || !session.manifest()) {
+            fail_e2e("fixture map could not be opened");
+        } else if (!session.declare_event({
+                       {.value = "close-e2e-dirty"}, {}})) {
+            fail_e2e("fixture could not be made dirty");
+        } else {
+            const auto autosave_start =
+                fabric::editor::AutosaveScheduler::Clock::now();
+            static_cast<void>(session.update_autosave(autosave_start));
+            const auto autosave_status = session.update_autosave(
+                autosave_start + std::chrono::seconds{31});
+            if (autosave_status != fabric::editor::AutosaveStatus::saved)
+                fail_e2e("autosave was not written");
+            const auto document_path = fabric::project::map_document_path(
+                *session.manifest(), map_id);
+            e2e_primary_path = project_root / document_path;
+            e2e_autosave_path = project_root /
+                fabric::project::autosave_document_path(document_path);
+            e2e_primary_contents = read_binary_file(e2e_primary_path);
+            e2e_autosave_contents = read_binary_file(e2e_autosave_path);
+            if (!e2e_primary_contents || !e2e_autosave_contents)
+                fail_e2e("primary or autosave could not be read");
+        }
     }
     std::string event_id;
     std::string selected_event_id;
@@ -1544,6 +1604,20 @@ int run(const std::filesystem::path& project_root,
     };
     bool running = true;
     while (running) {
+        if (e2e_mode && !e2e_failed && !e2e_event_injected) {
+            SDL_Event close_event{};
+            if (*e2e_mode == CloseE2eMode::window) {
+                close_event.type = SDL_WINDOWEVENT;
+                close_event.window.event = SDL_WINDOWEVENT_CLOSE;
+                close_event.window.windowID = SDL_GetWindowID(window);
+            } else {
+                close_event.type = SDL_QUIT;
+            }
+            if (SDL_PushEvent(&close_event) < 0)
+                fail_e2e("close event could not be injected");
+            e2e_event_injected = true;
+        }
+        if (e2e_mode && e2e_failed) running = false;
         SDL_Event event{};
         while (SDL_PollEvent(&event) != 0) {
             ImGui_ImplSDL2_ProcessEvent(&event);
@@ -2218,6 +2292,69 @@ int run(const std::filesystem::path& project_root,
                                   mechanic_session.graph()
                                       ? mechanic_session.graph()->document.name.c_str()
                                       : "current mechanic");
+            if (e2e_mode && !e2e_modal_handled) {
+                if (!transition_guard.confirmation_required() ||
+                    !session.dirty() ||
+                    read_binary_file(e2e_primary_path) != e2e_primary_contents ||
+                    read_binary_file(e2e_autosave_path) != e2e_autosave_contents) {
+                    fail_e2e("close request changed the active document or autosave");
+                } else if (*e2e_mode != CloseE2eMode::save_failure) {
+                    static_cast<void>(transition_guard.resolve(
+                        fabric::editor::UnsavedDecision::cancel));
+                    if (transition_guard.pending() || !session.dirty())
+                        fail_e2e("Cancel did not preserve the dirty session");
+                    transition_guard.request(
+                        fabric::editor::SessionAction::quit, session.dirty());
+                    if (transition_guard.resolve(
+                            fabric::editor::UnsavedDecision::discard) !=
+                        fabric::editor::SessionAction::quit)
+                        fail_e2e("Discard did not finish the close request");
+                    running = false;
+                } else {
+                    const auto backup = std::filesystem::path{
+                        e2e_primary_path.string() + ".e2e-backup"};
+                    std::error_code filesystem_error;
+                    std::filesystem::rename(
+                        e2e_primary_path, backup, filesystem_error);
+                    const bool primary_backed_up = !filesystem_error;
+                    if (primary_backed_up)
+                        std::filesystem::create_directory(
+                            e2e_primary_path, filesystem_error);
+                    if (filesystem_error) {
+                        fail_e2e("save failure could not be prepared");
+                    } else {
+                        const bool saved = session.save();
+                        static_cast<void>(transition_guard.resolve(
+                            fabric::editor::UnsavedDecision::save, saved));
+                        if (saved || !transition_guard.confirmation_required() ||
+                            !transition_guard.pending() || !session.dirty() ||
+                            read_binary_file(backup) != e2e_primary_contents ||
+                            read_binary_file(e2e_autosave_path) !=
+                                e2e_autosave_contents)
+                            fail_e2e("Save failure did not preserve recovery state");
+                    }
+                    if (primary_backed_up) {
+                        filesystem_error.clear();
+                        std::filesystem::remove(
+                            e2e_primary_path, filesystem_error);
+                        if (!filesystem_error)
+                            std::filesystem::rename(
+                                backup, e2e_primary_path, filesystem_error);
+                    }
+                    if (!primary_backed_up || filesystem_error ||
+                        read_binary_file(e2e_primary_path) !=
+                            e2e_primary_contents)
+                        fail_e2e("primary document could not be restored");
+                    if (!e2e_failed &&
+                        transition_guard.resolve(
+                            fabric::editor::UnsavedDecision::discard) !=
+                            fabric::editor::SessionAction::quit)
+                        fail_e2e("failed Save did not keep the close decision open");
+                    running = false;
+                }
+                e2e_modal_handled = true;
+                ImGui::CloseCurrentPopup();
+            }
             if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
                 bool saved = true;
                 if (mechanic_session.dirty()) saved = mechanic_session.save();
@@ -2273,17 +2410,23 @@ int run(const std::filesystem::path& project_root,
     SDL_DestroyWindow(window);
     NFD_Quit();
     SDL_Quit();
-    return 0;
+    return e2e_failed ? 1 : 0;
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 1 && argc != 3) {
-        std::cerr << "usage: map_studio [project-directory map-id]\n";
+    const bool e2e = argc == 5 && std::string_view{argv[1]} == "--e2e-close";
+    const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
+    if ((argc != 1 && argc != 3 && !e2e) || (e2e && !e2e_mode)) {
+        std::cerr << "usage: map_studio [project-directory map-id]\n"
+                     "       map_studio --e2e-close "
+                     "<window|shortcut|save-failure> project-directory map-id\n";
         return 64;
     }
-    const std::filesystem::path project = argc == 3 ? argv[1] : std::filesystem::path{};
-    const fabric::core::ResourceId map_id{argc == 3 ? argv[2] : ""};
-    return run(project, map_id);
+    const std::filesystem::path project = e2e
+        ? argv[3] : argc == 3 ? argv[1] : std::filesystem::path{};
+    const fabric::core::ResourceId map_id{
+        e2e ? argv[4] : argc == 3 ? argv[2] : ""};
+    return run(project, map_id, e2e_mode);
 }
