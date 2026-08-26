@@ -163,6 +163,7 @@ struct CanvasUiState {
         rotate,
         scale,
         pivot,
+        pen,
     };
 
     enum class DragOperation {
@@ -1717,7 +1718,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     }
     ImGui::InvisibleButton("Native canvas", available,
                            ImGuiButtonFlags_MouseButtonLeft |
-                               ImGuiButtonFlags_MouseButtonMiddle);
+                               ImGuiButtonFlags_MouseButtonMiddle |
+                               ImGuiButtonFlags_MouseButtonRight);
     const ImVec2 origin = ImGui::GetItemRectMin();
     canvas.native_canvas = true;
     canvas.native_origin = origin;
@@ -1772,6 +1774,22 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 x * cosine - y * sine,
             node.transform.position.y + node.transform.pivot.y +
                 x * sine + y * cosine};
+    };
+    const auto world_to_local = [](const fabric::project::VectorNode& node,
+                                   const fabric::core::Vec2 world) {
+        const float angle = -node.transform.rotation_degrees *
+            std::numbers::pi_v<float> / 180.0F;
+        const float cosine = std::cos(angle);
+        const float sine = std::sin(angle);
+        const float x = world.x - node.transform.position.x - node.transform.pivot.x;
+        const float y = world.y - node.transform.position.y - node.transform.pivot.y;
+        return fabric::core::Vec2{
+            (x * cosine + y * sine) /
+                std::max(std::abs(node.transform.scale.x), 0.0001F) +
+                node.transform.pivot.x,
+            (-x * sine + y * cosine) /
+                std::max(std::abs(node.transform.scale.y), 0.0001F) +
+                node.transform.pivot.y};
     };
     auto* draw_list = ImGui::GetWindowDrawList();
     const float target_grid_pixels = 48.0F;
@@ -1838,6 +1856,70 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         CanvasUiState::DragOperation operation =
             CanvasUiState::DragOperation::none;
         if (selected_node != nullptr && !selected_node->locked) {
+            if (canvas.tool == CanvasUiState::Tool::pen &&
+                selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+                auto changed = *selected_node;
+                const auto local = world_to_local(*selected_node, to_world(mouse));
+                std::size_t insert_index = changed.shape.path.size();
+                float closest_segment = 14.0F;
+                fabric::core::Vec2 previous{};
+                bool has_previous = false;
+                for (std::size_t index = 0; index < changed.shape.path.size(); ++index) {
+                    const auto& command = changed.shape.path[index];
+                    if (command.kind == fabric::project::VectorPathCommandKind::move) {
+                        previous = command.point;
+                        has_previous = true;
+                        continue;
+                    }
+                    if ((command.kind == fabric::project::VectorPathCommandKind::line ||
+                         command.kind == fabric::project::VectorPathCommandKind::cubic) &&
+                        has_previous) {
+                        const auto start = to_screen(transform_point(*selected_node, previous));
+                        const auto end = to_screen(transform_point(*selected_node, command.point));
+                        const ImVec2 segment{end.x - start.x, end.y - start.y};
+                        const ImVec2 relative{mouse.x - start.x, mouse.y - start.y};
+                        const float length_squared = segment.x * segment.x + segment.y * segment.y;
+                        const float factor = length_squared > 0.0001F
+                            ? std::clamp((relative.x * segment.x + relative.y * segment.y) /
+                                             length_squared,
+                                         0.0F, 1.0F)
+                            : 0.0F;
+                        const ImVec2 projection{start.x + segment.x * factor,
+                                                start.y + segment.y * factor};
+                        const float distance = std::hypot(
+                            mouse.x - projection.x, mouse.y - projection.y);
+                        if (distance < closest_segment) {
+                            closest_segment = distance;
+                            insert_index = index;
+                        }
+                        previous = command.point;
+                    } else if (command.kind != fabric::project::VectorPathCommandKind::close) {
+                        previous = command.point;
+                    }
+                }
+                if (insert_index == changed.shape.path.size() &&
+                    !changed.shape.path.empty() &&
+                    changed.shape.path.back().kind ==
+                        fabric::project::VectorPathCommandKind::close)
+                    insert_index -= 1U;
+                if (changed.shape.path.empty()) {
+                    changed.shape.path.push_back({
+                        .kind = fabric::project::VectorPathCommandKind::move,
+                        .point = local});
+                    static_cast<void>(session.set_selected_vector_node(
+                        canvas.selected_node, std::move(changed)));
+                } else {
+                    const auto command = fabric::project::VectorShape::PathCommand{
+                        .kind = fabric::project::VectorPathCommandKind::line,
+                        .point = local};
+                    if (fabric::project::insert_path_command(
+                            changed.shape, insert_index, command)) {
+                        static_cast<void>(session.set_selected_vector_node(
+                            canvas.selected_node, std::move(changed)));
+                        canvas.selected_path_points = {insert_index};
+                    }
+                }
+            }
             if (canvas.tool == CanvasUiState::Tool::move &&
                 selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
                 const auto distance = [](const ImVec2 left, const ImVec2 right) {
@@ -1929,6 +2011,37 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             canvas.drag_start_mouse = mouse;
             canvas.drag_start_transform = selected_node->transform;
             canvas.drag_start_node = *selected_node;
+        }
+    }
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+        selected_node != nullptr && !selected_node->locked &&
+        canvas.tool == CanvasUiState::Tool::pen &&
+        selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+        const ImVec2 mouse = io.MousePos;
+        std::optional<std::size_t> hit;
+        float closest = 10.0F;
+        for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
+            const auto& command = selected_node->shape.path[index];
+            if (command.kind == fabric::project::VectorPathCommandKind::move ||
+                command.kind == fabric::project::VectorPathCommandKind::line ||
+                command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                const auto candidate = to_screen(
+                    transform_point(*selected_node, command.point));
+                const float distance = std::hypot(
+                    mouse.x - candidate.x, mouse.y - candidate.y);
+                if (distance < closest) {
+                    closest = distance;
+                    hit = index;
+                }
+            }
+        }
+        if (hit) {
+            auto changed = *selected_node;
+            if (fabric::project::remove_path_command(changed.shape, *hit)) {
+                static_cast<void>(session.set_selected_vector_node(
+                    canvas.selected_node, std::move(changed)));
+            }
+            canvas.selected_path_points.clear();
         }
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -2584,6 +2697,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::RadioButton("Pivot", canvas.tool == CanvasUiState::Tool::pivot)) {
             canvas.tool = CanvasUiState::Tool::pivot;
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Pen", canvas.tool == CanvasUiState::Tool::pen)) {
+            canvas.tool = CanvasUiState::Tool::pen;
         }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
         draw_native_vector_canvas(
