@@ -524,16 +524,16 @@ externe.
 
 - [ ] Aucun paramètre proposé dans un prompt ne doit disparaître après création.
 - [ ] Utiliser les mêmes composants de formulaire pour création et édition.
-- [ ] Afficher la validation au niveau du champ concerné.
+- [x] Afficher la validation au niveau du champ concerné.
 - [ ] Afficher la raison exacte d'un bouton désactivé.
-- [ ] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
+- [x] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
 - [ ] Ajouter focus et scroll automatiques vers le premier champ invalide.
 - [ ] Ajouter tooltips pour les propriétés techniques.
 - [ ] Afficher les unités pour toutes les valeurs numériques.
-- [ ] Utiliser les noms visibles comme interaction principale et les IDs comme
+- [x] Utiliser les noms visibles comme interaction principale et les IDs comme
   information secondaire.
 - [ ] Ajouter raccourcis clavier et commandes de menu cohérents.
-- [ ] Rendre les actions destructives visuellement distinctes.
+- [x] Rendre les actions destructives visuellement distinctes.
 - [ ] Vérifier le comportement aux tailles minimales de fenêtre.
 - [ ] Vérifier navigation clavier et contraste.
 
