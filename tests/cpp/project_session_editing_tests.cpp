@@ -301,11 +301,15 @@ TEST_CASE("resource duplication rewrites only selected dependencies") {
     fabric::editor::CreateVectorArtworkPrompt artwork;
     artwork.name = "Source Art";
     REQUIRE(session.create_vector_artwork(artwork));
+    fabric::editor::CreateMaterialPrompt material;
+    material.name = "Shared Material";
+    REQUIRE(session.create_material(material));
     fabric::editor::CreateEntityPrompt entity;
     entity.name = "Owner";
     entity.node_name = "Root";
     entity.drawable = fabric::project::EntityDrawableKind::vector;
     entity.resource_id = "source-art";
+    entity.material_id = "shared-material";
     REQUIRE(session.create_entity(entity));
 
     fabric::editor::ResourceDuplicationOptions options;
@@ -322,6 +326,9 @@ TEST_CASE("resource duplication rewrites only selected dependencies") {
     REQUIRE(session.selected_entity()->nodes.front().drawable.resource);
     CHECK(session.selected_entity()->nodes.front().drawable.resource->id.value ==
           "source-art-copy");
+    REQUIRE(session.selected_entity()->nodes.front().drawable.material);
+    CHECK(session.selected_entity()->nodes.front().drawable.material->id.value ==
+          "shared-material");
     CHECK(std::filesystem::is_regular_file(
         project.path() / "assets/vectors/source-art-copy.vector.json"));
 }
