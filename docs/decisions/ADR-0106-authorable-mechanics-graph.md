@@ -63,6 +63,20 @@ Le corps peut référencer une entité visuelle créée dans Asset Studio ; cett
 référence reste distincte de sa forme de collision et sera composée par la map
 sans convertir l'image ou le composant visuel en géométrie physique.
 
+Preview Runtime crée une `MechanicSimulation` indépendante pour chaque
+instance de prefab mécanique. Il charge le graphe publié, applique les
+overrides du prefab et le transform uniforme de l'instance avec le même
+compilateur que Map Studio, puis avance la simulation au pas fixe `1/60 s`.
+Un échec de chargement, compilation ou création Box2D refuse la map avant la
+création de la fenêtre.
+
+Dans le contrat v1, un corps dont `visual_entity` référence l'entité du prefab
+pilote les paquets visuels de cette instance. Le runtime applique aux paquets
+la translation et la rotation relatives entre la pose physique initiale et la
+pose courante du corps. Une entité sans corps visuel correspondant conserve le
+transform statique de la map ; plusieurs corps correspondants sont refusés car
+une instance v1 ne possède qu'une racine visuelle.
+
 ## Alternatives
 
 Un prefab codé par mécanique serait rapide mais non composable. Un langage de
@@ -77,5 +91,7 @@ inspectable sans exécuter de code arbitraire.
   modifient aucun document persistant.
 - Le graphe et la map restent les sources de vérité persistantes.
 - Preview Runtime instancie exactement le graphe validé par Map Studio.
+- Les simulations mécaniques d'instances distinctes ne partagent aucun handle
+  Box2D et leurs pas exécutés sont observables dans les métriques runtime.
 - Un prefab peut référencer une mécanique et exposer certains paramètres comme
   overrides typés.

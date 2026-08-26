@@ -103,6 +103,13 @@ une copie paramétrée pour la preview sans modifier la ressource mécanique. Le
 transform uniforme de l'instance déplace corps, pivots et capteurs dans le même
 repère monde que son entité visuelle.
 
+Preview Runtime possède une simulation Box2D mécanique par instance de prefab.
+Il charge et compile ces graphes avant SDL, les avance avec le pas fixe du
+runtime et projette la pose relative de l'unique corps lié à l'entité du prefab
+sur les draw packets de l'instance. Les graphes invalides et les liaisons
+visuelles ambiguës empêchent le chargement au lieu de produire une map
+partiellement active.
+
 Une tranche fonctionnelle suit la même direction de données dans les outils et
 le runtime : contrat partagé, commande d'authoring, preview du studio,
 sauvegarde dans le projet, composition dans Map Studio, puis chargement du

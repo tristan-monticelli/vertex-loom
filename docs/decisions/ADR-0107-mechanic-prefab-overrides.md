@@ -41,5 +41,5 @@ valeurs effectives du prefab.
 - Un même graphe mécanique peut servir à plusieurs prefabs configurés.
 - Le visuel, la collision et la mécanique restent trois données distinctes.
 - Les overrides invalides sont refusés avant toute création Box2D.
-- Le runtime futur devra utiliser la même résolution d'overrides que la
-  preview de Map Studio.
+- Preview Runtime utilise la même résolution d'overrides et le même transform
+  d'instance que la preview de Map Studio.
