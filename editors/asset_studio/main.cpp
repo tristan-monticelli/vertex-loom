@@ -6798,6 +6798,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool vector_canvas_e2e_complete = false;
     std::size_t vector_canvas_e2e_frame = 0U;
     std::size_t vector_canvas_e2e_initial_path_size = 0U;
+    fabric::core::Vec2 vector_canvas_e2e_initial_anchor{};
     if (vector_canvas_e2e && session.has_project()) {
         const fabric::core::ResourceId vector_id{.value =
             "head-button-artwork"};
@@ -6813,6 +6814,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 node.shape.kind = fabric::project::VectorShapeKind::path;
                 node.shape.path = *converted;
                 vector_canvas_e2e_initial_path_size = node.shape.path.size();
+                if (node.shape.path.size() > 1U)
+                    vector_canvas_e2e_initial_anchor = node.shape.path[1].point;
                 vector_canvas_e2e_complete =
                     session.set_selected_vector_node(0U, std::move(node));
                 canvas.selected_node = 0U;
@@ -6832,25 +6835,36 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
-        if (vector_canvas_e2e && vector_canvas_e2e_frame >= 2U &&
-            vector_canvas_e2e_frame < 6U) {
-            SDL_Event event{};
-            const bool button_down = vector_canvas_e2e_frame % 2U == 0U;
-            event.type = button_down ? SDL_MOUSEBUTTONDOWN
-                                     : SDL_MOUSEBUTTONUP;
-            event.button.button = vector_canvas_e2e_frame == 4U ||
-                    vector_canvas_e2e_frame == 5U
-                ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
-            event.button.windowID = SDL_GetWindowID(window);
-            event.button.x = 705;
-            event.button.y = 135;
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 6U)
+            canvas.tool = CanvasUiState::Tool::move;
+        const bool pen_click = vector_canvas_e2e &&
+            vector_canvas_e2e_frame >= 2U && vector_canvas_e2e_frame < 6U;
+        const bool move_gesture = vector_canvas_e2e &&
+            vector_canvas_e2e_frame >= 6U && vector_canvas_e2e_frame < 9U;
+        if (pen_click || move_gesture) {
+            const auto frame = vector_canvas_e2e_frame;
+            const bool button_event = pen_click || frame == 6U || frame == 8U;
+            const bool button_down = pen_click ? frame % 2U == 0U : frame == 6U;
+            const bool right_click = frame == 4U || frame == 5U;
+            const int mouse_x = move_gesture && frame >= 7U ? 730 : 705;
+            const int mouse_y = 135;
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
-            motion.motion.x = event.button.x;
-            motion.motion.y = event.button.y;
+            motion.motion.x = mouse_x;
+            motion.motion.y = mouse_y;
             static_cast<void>(SDL_PushEvent(&motion));
-            static_cast<void>(SDL_PushEvent(&event));
+            if (button_event) {
+                SDL_Event event{};
+                event.type = button_down ? SDL_MOUSEBUTTONDOWN
+                                         : SDL_MOUSEBUTTONUP;
+                event.button.button = right_click
+                    ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+                event.button.windowID = SDL_GetWindowID(window);
+                event.button.x = mouse_x;
+                event.button.y = mouse_y;
+                static_cast<void>(SDL_PushEvent(&event));
+            }
         }
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
@@ -7199,13 +7213,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     session.created_vector()->native &&
                     session.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size;
-            } else if (vector_canvas_e2e_frame >= 6U) {
+            } else if (vector_canvas_e2e_frame == 9U) {
                 vector_canvas_e2e_complete =
                     vector_canvas_e2e_complete && session.created_vector() &&
                     session.created_vector()->native &&
                     !session.created_vector()->native->nodes.empty() &&
                     session.created_vector()->native->nodes.front().shape.path.size() ==
-                        vector_canvas_e2e_initial_path_size && session.save();
+                        vector_canvas_e2e_initial_path_size &&
+                    session.created_vector()->native->nodes.front().shape.path[1].point.x !=
+                        vector_canvas_e2e_initial_anchor.x && session.save();
                 if (!vector_canvas_e2e_complete) {
                     const auto current_size = session.created_vector() &&
                             session.created_vector()->native &&

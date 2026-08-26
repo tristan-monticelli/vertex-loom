@@ -52,10 +52,10 @@ le projet résultant. Il prouve le contrat de données et de session, pas encore
 le geste souris complet du canvas.
 Le test CTest `asset_studio_vector_canvas_e2e` ouvre toutefois Asset Studio dans
 une fenêtre SDL cachée, attend la stabilisation ImGui, injecte un clic gauche
-sur le canvas Plume puis un clic droit sur l’ancre créée, et vérifie la taille
-du path après chaque geste et après sauvegarde. Il constitue la première preuve
-du canvas réel ; les parcours multi-plateformes, diagnostics et screenshots
-restent ouverts.
+sur le canvas Plume puis un clic droit sur l’ancre créée, déplace ensuite une
+ancre avec l’outil Move et vérifie le path après chaque geste et après
+sauvegarde. Il constitue la première preuve du canvas réel ; les parcours
+multi-plateformes, diagnostics et screenshots restent ouverts.
 Le scénario Behavior E2E crée aussi un document d’input avec plusieurs actions
 et bindings, le recharge, puis utilise le même BehaviorGraph pour une source IA
 avant son attachement à une entité.
