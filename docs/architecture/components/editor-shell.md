@@ -7,7 +7,7 @@ C4Component
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
-        Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; expose les opérations administratives sûres")
+        Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
@@ -93,10 +93,17 @@ C4Component
   ouvre un sélecteur des ressources déjà indexées et ne publie aucun document.
   Les actions matériau, entité et animation utilisent leurs prompts typés et
   publient des documents validés avant réindexation.
-- Le panneau gauche liste les ressources réellement présentes, conserve une
+- Le rail droit liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
   L'index est reconstruit à l'ouverture et après publication ; sélectionner
   recharge le document validé et son aperçu depuis le projet.
+- Le rail droit du Resource Explorer regroupe dossiers logiques, recherche,
+  filtre de type et actions contextuelles. Une duplication conserve les
+  dépendances partagées et génère un identifiant et un chemin uniques. Rename
+  ne modifie que le nom visible. Delete analyse d'abord toutes les références
+  entrantes, refuse une rupture, exige confirmation puis déplace uniquement le
+  document dans `.vertex-loom-trash`; Undo le restaure sans supprimer les
+  sources PNG ou SVG partagées.
 - Le hub de création sépare maintenant `New material / fill` des imports et
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource

@@ -2,6 +2,8 @@
 
 #include "asset_storage.hpp"
 
+#include <nlohmann/json.hpp>
+
 #include <atomic>
 #include <chrono>
 #include <fstream>
@@ -270,6 +272,40 @@ StoredDocumentResult load_document(
     const DocumentValidator& validator) {
     return load_document_from_relative_path(project_root, document_path,
                                             validator);
+}
+
+ValidationReport rename_document_display_name(
+    const std::filesystem::path& project_root,
+    const std::filesystem::path& document_path,
+    std::string name,
+    const DocumentValidator& validator) {
+    ValidationReport report;
+    if (name.empty()) {
+        add_error(report.errors, ErrorCode::invalid_asset, "name",
+                  "document name must not be empty");
+        return report;
+    }
+    auto loaded = load_document(project_root, document_path, validator);
+    if (!loaded.ok()) {
+        report.errors = std::move(loaded.errors);
+        return report;
+    }
+    nlohmann::json document;
+    try {
+        document = nlohmann::json::parse(*loaded.contents);
+    } catch (...) {
+        add_error(report.errors, ErrorCode::invalid_json, "document",
+                  "cannot parse the document while renaming it");
+        return report;
+    }
+    if (!document.is_object()) {
+        add_error(report.errors, ErrorCode::invalid_asset, "document",
+                  "document must be an object");
+        return report;
+    }
+    document["name"] = std::move(name);
+    return save_document_atomic(project_root, document_path,
+                                document.dump(2) + "\n", validator);
 }
 
 std::filesystem::path autosave_document_path(

@@ -688,6 +688,37 @@ bool duplicate_project_resource(
                                     "Duplicated: ");
 }
 
+std::string file_url(const std::filesystem::path& path) {
+    constexpr char hexadecimal[] = "0123456789ABCDEF";
+    std::string url{"file://"};
+    for (const auto byte : path.generic_string()) {
+        const auto value = static_cast<unsigned char>(byte);
+        const bool safe = (value >= 'a' && value <= 'z') ||
+            (value >= 'A' && value <= 'Z') ||
+            (value >= '0' && value <= '9') || byte == '/' || byte == ':' ||
+            byte == '-' || byte == '_' || byte == '.' || byte == '~';
+        if (safe) {
+            url.push_back(byte);
+        } else {
+            url.push_back('%');
+            url.push_back(hexadecimal[value >> 4U]);
+            url.push_back(hexadecimal[value & 0x0FU]);
+        }
+    }
+    return url;
+}
+
+void reveal_project_resource(
+    const fabric::editor::ProjectSession& session,
+    const fabric::editor::StudioResource& resource,
+    std::string& status) {
+    const auto directory = std::filesystem::absolute(
+        session.project_root() / resource.document_path).parent_path();
+    status = SDL_OpenURL(file_url(directory).c_str()) == 0
+        ? "Resource folder opened."
+        : std::string{"Could not reveal the resource: "} + SDL_GetError();
+}
+
 std::string_view studio_resource_kind_label(
     const fabric::editor::StudioResourceKind kind) {
     using Kind = fabric::editor::StudioResourceKind;
@@ -721,6 +752,28 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     }
 
     static ImGuiTextFilter filter;
+    static std::optional<fabric::editor::StudioResource> delete_request;
+    static std::vector<fabric::editor::StudioResource> delete_impact;
+    static std::optional<fabric::editor::StudioResource> rename_request;
+    static std::string rename_value;
+    bool open_delete_popup = false;
+    bool open_rename_popup = false;
+    const auto request_delete = [&](const fabric::editor::StudioResource& resource) {
+        const auto incoming = session.incoming_references(
+            resource.kind, resource.id);
+        if (!incoming) {
+            status = "Reference analysis failed; inspect diagnostics.";
+            return;
+        }
+        delete_request = resource;
+        delete_impact = *incoming;
+        open_delete_popup = true;
+    };
+    const auto request_rename = [&](const fabric::editor::StudioResource& resource) {
+        rename_request = resource;
+        rename_value = resource.name;
+        open_rename_popup = true;
+    };
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
     const char* kind_filters[] = {
@@ -737,6 +790,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             duplicate_project_resource(session, resource, preview, status);
         }
         ImGui::SameLine();
+        if (ImGui::Button("Rename...")) request_rename(*selected);
+        ImGui::SameLine();
         if (ImGui::Button("Copy ID")) {
             SDL_SetClipboardText(selected->id.value.c_str());
             status = "Resource ID copied.";
@@ -746,6 +801,20 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             const auto path = selected->document_path.generic_string();
             SDL_SetClipboardText(path.c_str());
             status = "Resource path copied.";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Reveal"))
+            reveal_project_resource(session, *selected, status);
+        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.55F, 0.16F, 0.15F, 1.0F});
+        if (ImGui::Button("Delete...")) request_delete(*selected);
+        ImGui::PopStyleColor();
+        if (session.can_restore_trashed_resource()) {
+            ImGui::SameLine();
+            if (ImGui::Button("Undo delete")) {
+                status = session.restore_trashed_resource()
+                    ? "Deleted resource restored."
+                    : "Restore failed; inspect diagnostics.";
+            }
         }
     }
     ImGui::Spacing();
@@ -763,6 +832,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             ImGuiTreeNodeFlags_SpanAvailWidth;
         if (!ImGui::TreeNodeEx(label, flags)) return;
         std::optional<fabric::editor::StudioResource> duplicate_request;
+        std::optional<fabric::editor::StudioResource> context_delete_request;
+        std::optional<fabric::editor::StudioResource> context_rename_request;
         for (const auto& resource : session.resources()) {
             if (resource.kind != kind ||
                 !filter.PassFilter(resource.name.c_str(),
@@ -782,6 +853,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 if (ImGui::MenuItem("Duplicate")) {
                     duplicate_request = resource;
                 }
+                if (ImGui::MenuItem("Rename..."))
+                    context_rename_request = resource;
                 if (ImGui::MenuItem("Copy ID")) {
                     SDL_SetClipboardText(resource.id.value.c_str());
                     status = "Resource ID copied.";
@@ -791,6 +864,11 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                     SDL_SetClipboardText(path.c_str());
                     status = "Resource path copied.";
                 }
+                if (ImGui::MenuItem("Reveal on disk"))
+                    reveal_project_resource(session, resource, status);
+                ImGui::Separator();
+                if (ImGui::MenuItem("Delete..."))
+                    context_delete_request = resource;
                 ImGui::EndPopup();
             }
             ImGui::SameLine();
@@ -807,6 +885,10 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         if (duplicate_request)
             duplicate_project_resource(
                 session, *duplicate_request, preview, status);
+        if (context_delete_request)
+            request_delete(*context_delete_request);
+        if (context_rename_request)
+            request_rename(*context_rename_request);
         if (!any) {
             ImGui::TextDisabled("None");
         }
@@ -831,6 +913,90 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Scenes", fabric::editor::StudioResourceKind::scene, 13);
     draw_kind("Mechanics", fabric::editor::StudioResourceKind::mechanic, 14);
     draw_kind("Replays", fabric::editor::StudioResourceKind::replay, 15);
+
+    if (open_delete_popup) ImGui::OpenPopup("Delete resource");
+    if (ImGui::BeginPopupModal("Delete resource", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (!delete_request) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::Text("Delete %s?", delete_request->name.c_str());
+            ImGui::TextDisabled("%s · %s",
+                delete_request->id.value.c_str(),
+                delete_request->document_path.generic_string().c_str());
+            ImGui::Spacing();
+            if (delete_impact.empty()) {
+                ImGui::TextWrapped(
+                    "The document will move to the recoverable project trash. Shared PNG/SVG sources are kept.");
+            } else {
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                   "Blocked: %zu incoming reference(s)",
+                                   delete_impact.size());
+                for (const auto& source : delete_impact)
+                    ImGui::BulletText("%s (%s)", source.name.c_str(),
+                                      source.id.value.c_str());
+                ImGui::TextWrapped(
+                    "Replace the references or cancel before deleting this resource.");
+            }
+            ImGui::BeginDisabled(!delete_impact.empty());
+            ImGui::PushStyleColor(
+                ImGuiCol_Button, ImVec4{0.55F, 0.16F, 0.15F, 1.0F});
+            if (ImGui::Button("Move to trash", {140.0F, 0.0F})) {
+                const auto target = *delete_request;
+                if (session.trash_resource(target.kind, target.id, true)) {
+                    clear_asset_preview(preview);
+                    status = "Resource moved to project trash; Undo delete is available.";
+                    delete_request.reset();
+                    delete_impact.clear();
+                    ImGui::CloseCurrentPopup();
+                } else {
+                    status = "Delete failed; inspect diagnostics.";
+                }
+            }
+            ImGui::PopStyleColor();
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
+                delete_request.reset();
+                delete_impact.clear();
+                ImGui::CloseCurrentPopup();
+                status = "Delete cancelled.";
+            }
+        }
+        ImGui::EndPopup();
+    }
+    if (open_rename_popup) ImGui::OpenPopup("Rename resource");
+    if (ImGui::BeginPopupModal("Rename resource", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (!rename_request) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::TextDisabled("Stable ID: %s",
+                                rename_request->id.value.c_str());
+            ImGui::SetNextItemWidth(420.0F);
+            ImGui::InputText("Visible name", &rename_value);
+            ImGui::BeginDisabled(rename_value.empty());
+            if (ImGui::Button("Rename", {110.0F, 0.0F})) {
+                const auto target = *rename_request;
+                if (session.rename_resource(
+                        target.kind, target.id, rename_value)) {
+                    status = "Resource renamed; stable ID and path kept.";
+                    rename_request.reset();
+                    ImGui::CloseCurrentPopup();
+                } else {
+                    status = "Rename failed; inspect diagnostics.";
+                }
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
+                rename_request.reset();
+                ImGui::CloseCurrentPopup();
+                status = "Rename cancelled.";
+            }
+        }
+        ImGui::EndPopup();
+    }
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,

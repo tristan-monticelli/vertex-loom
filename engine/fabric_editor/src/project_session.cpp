@@ -13,6 +13,7 @@
 #include "fabric/render/svg_vector.hpp"
 
 #include <algorithm>
+#include <functional>
 #include <memory>
 #include <limits>
 #include <string_view>
@@ -25,6 +26,86 @@ project::ValidationReport validate_serialized_manifest(
     const std::string_view contents) {
     auto parsed = project::parse_manifest(contents);
     return {.errors = std::move(parsed.errors)};
+}
+
+std::string_view expected_type(const StudioResourceKind kind) noexcept {
+    switch (kind) {
+    case StudioResourceKind::texture: return "texture";
+    case StudioResourceKind::vector: return "vector";
+    case StudioResourceKind::material: return "material";
+    case StudioResourceKind::entity: return "entity";
+    case StudioResourceKind::animation: return "animation";
+    case StudioResourceKind::input: return "input";
+    case StudioResourceKind::behavior: return "behavior";
+    case StudioResourceKind::transformation: return "transformation";
+    case StudioResourceKind::textured_path: return "texturedPath";
+    case StudioResourceKind::visual_composition: return "visualComposition";
+    case StudioResourceKind::visual_component: return "visualComponent";
+    case StudioResourceKind::map: return "map";
+    case StudioResourceKind::scene: return "scene";
+    case StudioResourceKind::mechanic: return "mechanic";
+    case StudioResourceKind::replay: return "replay";
+    }
+    return {};
+}
+
+std::function<project::ValidationReport(std::string_view)> resource_validator(
+    const StudioResourceKind kind, const project::ProjectManifest& manifest) {
+    return [kind, &manifest](const std::string_view contents) {
+        project::ValidationReport report;
+        switch (kind) {
+        case StudioResourceKind::texture:
+            report.errors = project::parse_texture_asset(manifest, contents).errors;
+            break;
+        case StudioResourceKind::vector:
+            report.errors = project::parse_vector_asset(manifest, contents).errors;
+            break;
+        case StudioResourceKind::material:
+            report.errors = project::parse_material(manifest, contents).errors;
+            break;
+        case StudioResourceKind::entity:
+            report.errors = project::parse_entity(manifest, contents).errors;
+            break;
+        case StudioResourceKind::animation:
+            report.errors = project::parse_animation(manifest, contents).errors;
+            break;
+        case StudioResourceKind::input:
+            report.errors = project::parse_input(contents).errors;
+            break;
+        case StudioResourceKind::behavior:
+            report.errors = project::parse_behavior_graph(manifest, contents).errors;
+            break;
+        case StudioResourceKind::transformation:
+            report.errors = project::parse_entity_transformation(
+                manifest, contents).errors;
+            break;
+        case StudioResourceKind::textured_path:
+            report.errors = project::parse_textured_path(manifest, contents).errors;
+            break;
+        case StudioResourceKind::visual_composition:
+            report.errors = project::parse_visual_composition(
+                manifest, contents).errors;
+            break;
+        case StudioResourceKind::visual_component:
+            report.errors = project::parse_visual_component(
+                manifest, contents).errors;
+            break;
+        case StudioResourceKind::map:
+            report.errors = project::parse_map(manifest, contents).errors;
+            break;
+        case StudioResourceKind::scene:
+            report.errors = project::parse_scene(manifest, contents).errors;
+            break;
+        case StudioResourceKind::mechanic:
+            report.errors = project::parse_mechanic_graph(
+                manifest, contents).errors;
+            break;
+        case StudioResourceKind::replay:
+            report.errors = project::parse_replay(manifest, contents).errors;
+            break;
+        }
+        return report;
+    };
 }
 
 std::optional<std::vector<StudioResource>> index_project_resources(
@@ -386,6 +467,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
+    trashed_resource_.reset();
     errors_.clear();
     return true;
 }
@@ -452,6 +534,7 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     dirty_document_ = DirtyDocument::none;
     commands_.clear();
     autosave_.reset();
+    trashed_resource_.reset();
     errors_ = std::move(recovery.errors);
     return true;
 }
@@ -1652,6 +1735,253 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
                 project_root_, *manifest_, value); });
     }
     return false;
+}
+
+bool ProjectSession::rename_resource(const StudioResourceKind kind,
+                                     const core::ResourceId& id,
+                                     std::string name) {
+    if (name.empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "name",
+                    "the resource name must not be empty"}};
+        return false;
+    }
+    const auto source = std::ranges::find_if(
+        resources_, [&](const StudioResource& resource) {
+            return resource.kind == kind && resource.id == id;
+        });
+    if (source == resources_.end()) {
+        errors_ = {{project::ErrorCode::missing_resource, "rename",
+                    "the resource to rename is not indexed"}};
+        return false;
+    }
+    if (!save_before_document_transition()) return false;
+    const auto validator = resource_validator(kind, *manifest_);
+    auto saved = project::rename_document_display_name(
+        project_root_, source->document_path, std::move(name), validator);
+    if (!saved.ok()) {
+        errors_ = std::move(saved.errors);
+        return false;
+    }
+    return refresh_resources() && select_resource(kind, id);
+}
+
+std::optional<std::vector<StudioResource>>
+ProjectSession::incoming_references(const StudioResourceKind kind,
+                                    const core::ResourceId& id) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "references",
+                    "a project must be open before analyzing references"}};
+        return std::nullopt;
+    }
+    std::vector<StudioResource> incoming;
+    const auto target_type = expected_type(kind);
+    const auto inspect = [&](const StudioResource& source,
+                             const std::vector<project::ResourceReference>& refs) {
+        if (std::ranges::any_of(refs, [&](const auto& reference) {
+                return reference.id == id &&
+                    reference.expected_type == target_type;
+            })) incoming.push_back(source);
+    };
+    const auto failed = [&](auto& loaded) {
+        if (loaded.ok()) return false;
+        errors_ = std::move(loaded.errors);
+        return true;
+    };
+
+    for (const auto& source : resources_) {
+        switch (source.kind) {
+        case StudioResourceKind::texture:
+        case StudioResourceKind::input:
+            break;
+        case StudioResourceKind::vector: {
+            auto loaded = project::load_vector_asset(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::vector_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::material: {
+            auto loaded = project::load_material(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::material_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::entity: {
+            auto loaded = project::load_entity(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::entity_resource_references(*loaded.entity));
+            break;
+        }
+        case StudioResourceKind::animation: {
+            auto loaded = project::load_animation(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::animation_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::behavior: {
+            auto loaded = project::load_behavior_graph(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::behavior_graph_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::transformation: {
+            auto loaded = project::load_entity_transformation(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::entity_transformation_resource_references(
+                        *loaded.asset));
+            break;
+        }
+        case StudioResourceKind::textured_path: {
+            auto loaded = project::load_textured_path(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::textured_path_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::visual_composition: {
+            auto loaded = project::load_visual_composition(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::visual_composition_resource_references(
+                        *loaded.asset));
+            break;
+        }
+        case StudioResourceKind::visual_component: {
+            auto loaded = project::load_visual_component(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::visual_component_resource_references(
+                        *loaded.asset));
+            break;
+        }
+        case StudioResourceKind::map: {
+            auto loaded = project::load_map(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::map_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::scene: {
+            auto loaded = project::load_scene(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::scene_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::mechanic: {
+            auto loaded = project::load_mechanic_graph(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source,
+                    project::mechanic_graph_resource_references(*loaded.asset));
+            break;
+        }
+        case StudioResourceKind::replay: {
+            auto loaded = project::load_replay(
+                project_root_, *manifest_, source.document_path);
+            if (failed(loaded)) return std::nullopt;
+            inspect(source, project::replay_resource_references(*loaded.asset));
+            break;
+        }
+        }
+    }
+    errors_.clear();
+    return incoming;
+}
+
+bool ProjectSession::trash_resource(const StudioResourceKind kind,
+                                    const core::ResourceId& id,
+                                    const bool confirmed) {
+    if (!confirmed) {
+        errors_ = {{project::ErrorCode::invalid_asset, "delete",
+                    "resource removal requires explicit confirmation"}};
+        return false;
+    }
+    const auto source = std::ranges::find_if(
+        resources_, [&](const StudioResource& resource) {
+            return resource.kind == kind && resource.id == id;
+        });
+    if (source == resources_.end()) {
+        errors_ = {{project::ErrorCode::missing_resource, "delete",
+                    "the resource to remove is not indexed"}};
+        return false;
+    }
+    auto incoming = incoming_references(kind, id);
+    if (!incoming) return false;
+    if (!incoming->empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "delete",
+                    "the resource is still referenced by " +
+                        std::to_string(incoming->size()) + " document(s)"}};
+        return false;
+    }
+    if (!save_before_document_transition()) return false;
+
+    const auto original = project_root_ / source->document_path;
+    const auto trash_directory = project_root_ / ".vertex-loom-trash";
+    std::error_code filesystem_error;
+    std::filesystem::create_directories(trash_directory, filesystem_error);
+    if (filesystem_error) {
+        errors_ = {{project::ErrorCode::io_error, "delete",
+                    "cannot create the recoverable project trash"}};
+        return false;
+    }
+    auto trash = trash_directory / source->document_path.filename();
+    for (std::size_t suffix = 2U; std::filesystem::exists(trash); ++suffix)
+        trash = trash_directory /
+            (source->document_path.filename().string() + "." +
+             std::to_string(suffix));
+    std::filesystem::rename(original, trash, filesystem_error);
+    if (filesystem_error) {
+        errors_ = {{project::ErrorCode::io_error, "delete",
+                    "cannot move the resource document to project trash"}};
+        return false;
+    }
+    trashed_resource_ = TrashedResource{*source, original, trash};
+    commands_.clear();
+    autosave_.reset();
+    dirty_document_ = DirtyDocument::none;
+    if (!refresh_resources()) {
+        std::error_code restore_error;
+        std::filesystem::rename(trash, original, restore_error);
+        trashed_resource_.reset();
+        return false;
+    }
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::restore_trashed_resource() {
+    if (!trashed_resource_) {
+        errors_ = {{project::ErrorCode::missing_resource, "undoDelete",
+                    "there is no recoverable resource removal"}};
+        return false;
+    }
+    std::error_code filesystem_error;
+    std::filesystem::rename(trashed_resource_->trash_path,
+                            trashed_resource_->original_path,
+                            filesystem_error);
+    if (filesystem_error) {
+        errors_ = {{project::ErrorCode::io_error, "undoDelete",
+                    "cannot restore the resource document from project trash"}};
+        return false;
+    }
+    const auto restored = trashed_resource_->resource;
+    trashed_resource_.reset();
+    return refresh_resources() && select_resource(restored.kind, restored.id);
+}
+
+bool ProjectSession::can_restore_trashed_resource() const noexcept {
+    return trashed_resource_.has_value();
 }
 
 bool ProjectSession::set_project_name(

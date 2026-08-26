@@ -45,6 +45,11 @@ struct RecoveryResult {
     const std::filesystem::path& project_root,
     const std::filesystem::path& document_path,
     const DocumentValidator& validator);
+[[nodiscard]] ValidationReport rename_document_display_name(
+    const std::filesystem::path& project_root,
+    const std::filesystem::path& document_path,
+    std::string name,
+    const DocumentValidator& validator);
 [[nodiscard]] std::filesystem::path autosave_document_path(
     const std::filesystem::path& document_path);
 [[nodiscard]] ValidationReport save_autosave_atomic(

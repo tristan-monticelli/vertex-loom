@@ -332,26 +332,26 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
   - [x] New ;
   - [x] Import ;
   - [x] Duplicate ;
-  - [ ] Rename ;
+  - [x] Rename ;
   - [ ] Replace references ;
-  - [ ] Reveal on disk ;
+  - [x] Reveal on disk ;
   - [x] Copy ID ;
   - [x] Copy path ;
-  - [ ] Delete.
+  - [x] Delete.
 - [ ] Ajouter les mêmes actions dans un menu contextuel.
 - [x] Définir une commande générique de duplication par type de ressource.
 - [x] Générer un nouvel identifiant stable et un nouveau chemin à la duplication.
 - [ ] Permettre de choisir la copie superficielle ou la duplication de certaines
   dépendances.
 - [ ] Réécrire uniquement les références internes choisies dans la copie.
-- [ ] Analyser les références entrantes avant suppression.
-- [ ] Bloquer la suppression lorsqu'elle casserait le projet sans stratégie
+- [x] Analyser les références entrantes avant suppression.
+- [x] Bloquer la suppression lorsqu'elle casserait le projet sans stratégie
   choisie.
 - [ ] Proposer remplacement des références, suppression en cascade explicitée
   ou annulation.
-- [ ] Demander confirmation avant toute suppression matérielle.
-- [ ] Ne jamais supprimer automatiquement une source externe ou partagée.
-- [ ] Ajouter undo pour les opérations récupérables du registre.
+- [x] Demander confirmation avant toute suppression matérielle.
+- [x] Ne jamais supprimer automatiquement une source externe ou partagée.
+- [x] Ajouter undo pour les opérations récupérables du registre.
 - [ ] Tester les opérations sur chaque type de ressource.
 - [ ] Tester collision d'identifiant, cycles, fichiers absents et échec disque.
 

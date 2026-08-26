@@ -107,7 +107,10 @@ TEST_CASE("resource index includes maps scenes mechanics and replays") {
     REQUIRE(fabric::project::publish_scene(project.path(), manifest, {
         .document = {.schema_version = fabric::project::current_scene_schema_version,
                      .type = "scene", .id = {.value = "indexed-scene"},
-                     .name = "Indexed Scene"}}).ok());
+                     .name = "Indexed Scene"},
+        .maps = {{{{.value = "indexed-map"}, "map"}, "world"}},
+        .entry_map = fabric::project::ResourceReference{
+            {.value = "indexed-map"}, "map"}}).ok());
     REQUIRE(fabric::project::publish_mechanic_graph(project.path(), manifest, {
         .document = {
             .schema_version = fabric::project::current_mechanic_graph_schema_version,
@@ -138,9 +141,33 @@ TEST_CASE("resource index includes maps scenes mechanics and replays") {
                                            "Indexed Copy"));
         REQUIRE(session.selected_resource() != nullptr);
         CHECK(session.selected_resource()->id == copy_id);
+        REQUIRE(session.rename_resource(kind, copy_id, "Renamed Copy"));
+        CHECK(session.selected_resource()->name == "Renamed Copy");
+        CHECK_FALSE(session.rename_resource(kind, copy_id, ""));
         CHECK_FALSE(session.duplicate_resource(kind, source_id, copy_id,
                                                "Collision"));
     }
+
+    const auto incoming = session.incoming_references(
+        fabric::editor::StudioResourceKind::map, {.value = "indexed-map"});
+    REQUIRE(incoming.has_value());
+    CHECK(incoming->size() == 2U);
+    CHECK_FALSE(session.trash_resource(
+        fabric::editor::StudioResourceKind::map, {.value = "indexed-map"},
+        true));
+    CHECK_FALSE(session.trash_resource(
+        fabric::editor::StudioResourceKind::replay,
+        {.value = "indexed-replay"}, false));
+    REQUIRE(session.trash_resource(
+        fabric::editor::StudioResourceKind::replay,
+        {.value = "indexed-replay"}, true));
+    CHECK(session.can_restore_trashed_resource());
+    CHECK_FALSE(std::filesystem::exists(
+        project.path() / "assets/replays/indexed-replay.replay.json"));
+    REQUIRE(session.restore_trashed_resource());
+    CHECK(std::filesystem::is_regular_file(
+        project.path() / "assets/replays/indexed-replay.replay.json"));
+    CHECK_FALSE(session.can_restore_trashed_resource());
 }
 
 TEST_CASE("vector artwork prompt publishes a reloadable native document") {

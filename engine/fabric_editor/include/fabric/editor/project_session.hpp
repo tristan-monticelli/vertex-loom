@@ -223,6 +223,16 @@ public:
                                           const core::ResourceId& id,
                                           const core::ResourceId& copy_id,
                                           std::string copy_name);
+    [[nodiscard]] bool rename_resource(StudioResourceKind kind,
+                                       const core::ResourceId& id,
+                                       std::string name);
+    [[nodiscard]] std::optional<std::vector<StudioResource>>
+    incoming_references(StudioResourceKind kind, const core::ResourceId& id);
+    [[nodiscard]] bool trash_resource(StudioResourceKind kind,
+                                      const core::ResourceId& id,
+                                      bool confirmed);
+    [[nodiscard]] bool restore_trashed_resource();
+    [[nodiscard]] bool can_restore_trashed_resource() const noexcept;
 
     [[nodiscard]] bool has_project() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;
@@ -332,6 +342,12 @@ private:
     CommandStack commands_;
     AutosaveScheduler autosave_;
     std::vector<project::Error> errors_;
+    struct TrashedResource {
+        StudioResource resource;
+        std::filesystem::path original_path;
+        std::filesystem::path trash_path;
+    };
+    std::optional<TrashedResource> trashed_resource_;
 
     [[nodiscard]] bool prepare_animation_edit(
         AutosaveScheduler::Clock::time_point now);
