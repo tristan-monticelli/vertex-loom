@@ -744,10 +744,14 @@ bool select_and_preview_resource(fabric::editor::ProjectSession& session,
     return true;
 }
 
+std::string_view studio_resource_kind_label(
+    fabric::editor::StudioResourceKind kind);
+
 bool duplicate_project_resource(
     fabric::editor::ProjectSession& session,
     const fabric::editor::StudioResource& resource,
-    AssetPreview& preview, std::string& status) {
+    AssetPreview& preview, std::string& status,
+    fabric::editor::ResourceDuplicationOptions options = {}) {
     const auto base = resource.id.value + "-copy";
     auto candidate = base;
     for (std::size_t suffix = 2U;
@@ -758,7 +762,8 @@ bool duplicate_project_resource(
         candidate = base + "-" + std::to_string(suffix);
     const auto copy_name = resource.name + " Copy";
     if (!session.duplicate_resource(resource.kind, resource.id,
-                                    {.value = candidate}, copy_name)) {
+                                    {.value = candidate}, copy_name,
+                                    std::move(options))) {
         status = "Resource duplication failed; inspect diagnostics.";
         return false;
     }
@@ -766,6 +771,41 @@ bool duplicate_project_resource(
     return selected != nullptr &&
         select_and_preview_resource(session, *selected, preview, status,
                                     "Duplicated: ");
+}
+
+std::vector<fabric::editor::StudioResource> direct_duplication_candidates(
+    fabric::editor::ProjectSession& session,
+    const fabric::editor::StudioResource& resource) {
+    std::vector<fabric::project::ResourceReference> references;
+    if (resource.kind == fabric::editor::StudioResourceKind::entity) {
+        const auto loaded = fabric::project::load_entity(
+            session.project_root(), *session.manifest(), resource.document_path);
+        if (loaded.ok()) references = fabric::project::entity_resource_references(
+            *loaded.entity);
+    } else if (resource.kind == fabric::editor::StudioResourceKind::vector) {
+        const auto loaded = fabric::project::load_vector_asset(
+            session.project_root(), *session.manifest(), resource.document_path);
+        if (loaded.ok()) references = fabric::project::vector_resource_references(
+            *loaded.asset);
+    }
+    std::vector<fabric::editor::StudioResource> candidates;
+    for (const auto& reference : references) {
+        const auto candidate = std::ranges::find_if(
+            session.resources(), [&](const auto& value) {
+                const bool type_matches =
+                    (reference.expected_type == "visualComponent" &&
+                     value.kind == fabric::editor::StudioResourceKind::visual_component) ||
+                    studio_resource_kind_label(value.kind) == reference.expected_type;
+                return type_matches &&
+                    value.id == reference.id;
+            });
+        if (candidate != session.resources().end() &&
+            std::ranges::none_of(candidates, [&](const auto& value) {
+                return value.kind == candidate->kind && value.id == candidate->id;
+            }))
+            candidates.push_back(*candidate);
+    }
+    return candidates;
 }
 
 std::string file_url(const std::filesystem::path& path) {
@@ -843,8 +883,12 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     static std::string replacement_id;
     static std::optional<fabric::editor::StudioResource> rename_request;
     static std::string rename_value;
+    static std::optional<fabric::editor::StudioResource> duplicate_options_request;
+    static std::vector<fabric::editor::StudioResource> duplicate_candidates;
+    static std::vector<char> duplicate_candidate_selected;
     bool open_delete_popup = false;
     bool open_rename_popup = false;
+    bool open_duplicate_options_popup = false;
     const auto request_delete = [&](const fabric::editor::StudioResource& resource) {
         const auto incoming = session.incoming_references(
             resource.kind, resource.id);
@@ -862,6 +906,13 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         rename_value = resource.name;
         open_rename_popup = true;
     };
+    const auto request_duplicate_options =
+        [&](const fabric::editor::StudioResource& resource) {
+            duplicate_options_request = resource;
+            duplicate_candidates = direct_duplication_candidates(session, resource);
+            duplicate_candidate_selected.assign(duplicate_candidates.size(), false);
+            open_duplicate_options_popup = true;
+        };
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
     const char* kind_filters[] = {
@@ -952,6 +1003,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 if (ImGui::MenuItem("Duplicate")) {
                     duplicate_request = resource;
                 }
+                if (ImGui::MenuItem("Duplicate with selected dependencies..."))
+                    request_duplicate_options(resource);
                 if (ImGui::MenuItem("Rename..."))
                     context_rename_request = resource;
                 if (ImGui::MenuItem("Copy ID")) {
@@ -1015,6 +1068,52 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Audio", fabric::editor::StudioResourceKind::audio, 16);
 
     if (open_delete_popup) ImGui::OpenPopup("Delete resource");
+    if (open_duplicate_options_popup)
+        ImGui::OpenPopup("Duplicate with dependencies");
+    if (ImGui::BeginPopupModal("Duplicate with dependencies", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (!duplicate_options_request) {
+            ImGui::CloseCurrentPopup();
+        } else {
+            ImGui::TextWrapped("Choose dependencies to clone for %s.",
+                               duplicate_options_request->name.c_str());
+            if (duplicate_candidates.empty())
+                ImGui::TextDisabled("No supported direct dependencies found.");
+            for (std::size_t index = 0; index < duplicate_candidates.size(); ++index) {
+                auto& candidate = duplicate_candidates[index];
+                ImGui::PushID(static_cast<int>(index));
+                bool selected_dependency = duplicate_candidate_selected[index] != 0;
+                if (ImGui::Checkbox(candidate.name.c_str(), &selected_dependency))
+                    duplicate_candidate_selected[index] = selected_dependency ? 1 : 0;
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s · %s", candidate.id.value.c_str(),
+                                    studio_resource_kind_label(candidate.kind).data());
+                ImGui::PopID();
+            }
+            if (ImGui::Button("Duplicate")) {
+                fabric::editor::ResourceDuplicationOptions options;
+                for (std::size_t index = 0; index < duplicate_candidates.size(); ++index) {
+                    if (!duplicate_candidate_selected[index]) continue;
+                    const auto& dependency = duplicate_candidates[index];
+                    options.dependencies.push_back({
+                        .kind = dependency.kind,
+                        .source_id = dependency.id,
+                        .destination_id = {.value = dependency.id.value + "-copy"},
+                        .destination_name = dependency.name + " Copy"});
+                }
+                duplicate_project_resource(session, *duplicate_options_request,
+                                           preview, status, std::move(options));
+                duplicate_options_request.reset();
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) {
+                duplicate_options_request.reset();
+                ImGui::CloseCurrentPopup();
+            }
+        }
+        ImGui::EndPopup();
+    }
     if (ImGui::BeginPopupModal("Delete resource", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         if (!delete_request) {
@@ -6977,7 +7076,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         return 1;
     }
     SDL_GL_MakeCurrent(window, gl_context);
-    SDL_GL_SetSwapInterval(1);
+    SDL_GL_SetSwapInterval(
+        (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
+         texture_e2e || vector_e2e || vector_canvas_e2e) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
