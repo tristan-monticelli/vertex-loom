@@ -22,6 +22,7 @@
 #include <nfd_sdl2.h>
 
 #include <filesystem>
+#include <array>
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
@@ -2004,7 +2005,7 @@ int run(const std::filesystem::path& project_root,
     std::string active_layer_id;
     std::string new_layer_id;
     std::string new_layer_name;
-    int new_layer_kind = 2;
+    int new_layer_kind = 1;
     bool placement_mode = false;
     std::string placement_id;
     std::string placement_resource_id;
@@ -2187,13 +2188,16 @@ int run(const std::filesystem::path& project_root,
             ImGui::InputText("Layer name", &new_layer_name);
             ImGui::SetNextItemWidth(150.0F);
             ImGui::Combo("Layer kind", &new_layer_kind,
-                         "visual\0tiles\0instances\0collision\0triggers\0gameplay\0");
+                         "visual\0instances\0collision\0triggers\0");
             ImGui::SameLine();
             ImGui::BeginDisabled(new_layer_id.empty() || new_layer_name.empty());
             if (ImGui::Button("Add layer")) {
                 const auto added = session.add_layer({
                     new_layer_id, new_layer_name,
-                    static_cast<fabric::project::MapLayerKind>(new_layer_kind),
+                    std::array{fabric::project::MapLayerKind::visual,
+                               fabric::project::MapLayerKind::instances,
+                               fabric::project::MapLayerKind::collision,
+                               fabric::project::MapLayerKind::triggers}[static_cast<std::size_t>(new_layer_kind)],
                     true, false, 0.0F});
                 status = added ? "Layer added" : "Layer creation rejected";
                 if (added) {

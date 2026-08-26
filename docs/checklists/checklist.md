@@ -78,9 +78,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   projet. Ils sont aujourd'hui principalement injectés par options CLI.
 - [ ] Définir un contrat audio projet avec ressources, événements, volume,
   boucle et mixage ; `--audio <wav>` ne représente pas un pipeline de jeu.
-- [ ] Donner un contenu réel aux couches `tiles`, `visual` et `gameplay`, ou les
-  retirer de l'interface. Le contrat map les propose mais ne stocke aucun tile
-  ni contenu spécialisé pour ces couches.
+- [x] Donner un contenu réel aux couches supportées (`visual`, `instances`,
+  `collision`, `triggers`) et retirer de l'interface les couches `tiles` et
+  `gameplay` tant qu'elles n'ont pas de stockage spécialisé.
 
 ### Défauts P1 — parcours Studio
 
