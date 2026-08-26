@@ -5341,6 +5341,32 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText(("Action " + std::to_string(action_index + 1)).c_str());
             ImGui::SetNextItemWidth(260.0F);
             ImGui::InputText("Id", &action.id);
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Duplicate")) {
+                auto copy = action;
+                copy.id += "_copy";
+                creation.input.actions.insert(creation.input.actions.begin() + static_cast<std::ptrdiff_t>(action_index + 1), std::move(copy));
+                ImGui::PopID();
+                break;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Remove") && creation.input.actions.size() > 1) {
+                creation.input.actions.erase(creation.input.actions.begin() + static_cast<std::ptrdiff_t>(action_index));
+                ImGui::PopID();
+                break;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Up") && action_index > 0) {
+                std::swap(creation.input.actions[action_index], creation.input.actions[action_index - 1]);
+                ImGui::PopID();
+                break;
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Down") && action_index + 1 < creation.input.actions.size()) {
+                std::swap(creation.input.actions[action_index], creation.input.actions[action_index + 1]);
+                ImGui::PopID();
+                break;
+            }
             for (std::size_t binding_index = 0;
                  binding_index < action.bindings.size(); ++binding_index) {
                 auto& binding = action.bindings[binding_index];
@@ -5359,8 +5385,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 action.bindings.push_back({fabric::project::InputDevice::keyboard, 0});
             ImGui::PopID();
         }
-        if (ImGui::Button("Add action"))
-            creation.input.actions.push_back({"action", {}});
+        if (ImGui::Button("Add action")) {
+            std::string id = "action";
+            std::size_t suffix = 2;
+            while (std::ranges::any_of(creation.input.actions, [&](const auto& item) { return item.id == id; }))
+                id = "action_" + std::to_string(suffix++);
+            creation.input.actions.push_back({std::move(id), {}});
+        }
         const auto validation = creation.input.validate(
             session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
