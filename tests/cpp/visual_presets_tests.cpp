@@ -9,6 +9,11 @@
 #include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/project/mechanic_graph.hpp"
 #include "fabric/project/replay.hpp"
+#include "fabric/project/audio.hpp"
+#include "fabric/project/behavior_graph.hpp"
+#include "fabric/project/input.hpp"
+#include "fabric/project/material.hpp"
+#include "fabric/project/scene.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
@@ -304,6 +309,56 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
         .events = {{60, "platform-activate", "sensor"}},
         .checkpoints = {{60, {{"textile-head", 0, 0, 0}}}}};
     REQUIRE(fabric::project::publish_replay(root, manifest(), replay).ok());
+
+    REQUIRE(fabric::project::publish_input(
+        root, manifest(),
+        {.document = {.schema_version = 2,
+                      .type = "input",
+                      .id = {.value = "default"},
+                      .name = "Default controls"},
+         .actions = {{"move", {{fabric::project::InputBinding{
+             .device = fabric::project::InputDevice::keyboard,
+             .code = 65,
+             .kind = fabric::project::InputBindingKind::button}}}}}})
+                .ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "behavior",
+                      .id = {.value = "player"},
+                      .name = "Player behavior"},
+         .nodes = {{.id = "move-source",
+                    .type = "action_source",
+                    .ports = {{"out",
+                               fabric::project::BehaviorPortDirection::output,
+                               fabric::project::BehaviorValueType::signal}},
+                    .properties = {{"semantic_id", std::string{"move"}}}}}})
+                .ok());
+    REQUIRE(fabric::project::publish_material(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "material",
+                      .id = {.value = "default-material"},
+                      .name = "Default material"}})
+                .ok());
+    REQUIRE(fabric::project::publish_audio(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "audio",
+                      .id = {.value = "ui"},
+                      .name = "UI audio"},
+         .events = {{"confirm", "assets/audio/confirm.wav", 0.8F, false}}})
+                .ok());
+    REQUIRE(fabric::project::publish_scene(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "scene",
+                      .id = {.value = "preview"},
+                      .name = "Preview scene"},
+         .maps = {{{{.value = "textile-head-preview"}, "map"}, "world"}},
+         .entry_map = fabric::project::ResourceReference{
+             {.value = "textile-head-preview"}, "map"}})
+                .ok());
 }
 
 void create_textile_head_fixture(const std::filesystem::path& root) {
@@ -427,6 +482,52 @@ std::string read_binary(const std::filesystem::path& path) {
     std::ifstream input(path, std::ios::binary);
     return {std::istreambuf_iterator<char>{input},
             std::istreambuf_iterator<char>{}};
+}
+
+bool auxiliary_documents_equal(const std::filesystem::path& left,
+                               const std::filesystem::path& right,
+                               const std::filesystem::path& relative) {
+    const auto relative_string = relative.generic_string();
+    if (relative_string == "assets/audio/ui.audio.json") {
+        const auto lhs = fabric::project::parse_audio(read_binary(left / relative));
+        const auto rhs = fabric::project::parse_audio(read_binary(right / relative));
+        return lhs.ok() && rhs.ok() && *lhs.audio == *rhs.audio;
+    }
+    if (relative_string == "assets/input/default.input.json") {
+        const auto lhs = fabric::project::parse_input(read_binary(left / relative));
+        const auto rhs = fabric::project::parse_input(read_binary(right / relative));
+        return lhs.ok() && rhs.ok() && *lhs.input == *rhs.input;
+    }
+    if (relative_string == "assets/behaviors/player.behavior.json") {
+        const auto lhs = fabric::project::parse_behavior_graph(
+            manifest(), read_binary(left / relative));
+        const auto rhs = fabric::project::parse_behavior_graph(
+            manifest(), read_binary(right / relative));
+        return lhs.ok() && rhs.ok() && *lhs.asset == *rhs.asset;
+    }
+    if (relative_string == "assets/materials/default-material.material.json") {
+        const auto lhs = fabric::project::parse_material(
+            manifest(), read_binary(left / relative));
+        const auto rhs = fabric::project::parse_material(
+            manifest(), read_binary(right / relative));
+        return lhs.ok() && rhs.ok() && *lhs.asset == *rhs.asset;
+    }
+    if (relative_string == "scenes/preview.scene.json") {
+        const auto lhs = fabric::project::parse_scene(
+            manifest(), read_binary(left / relative));
+        const auto rhs = fabric::project::parse_scene(
+            manifest(), read_binary(right / relative));
+        return lhs.ok() && rhs.ok() && *lhs.asset == *rhs.asset;
+    }
+    return false;
+}
+
+bool is_auxiliary_document(const std::filesystem::path& relative) {
+    return relative.generic_string() == "assets/audio/ui.audio.json" ||
+           relative.generic_string() == "assets/input/default.input.json" ||
+           relative.generic_string() == "assets/behaviors/player.behavior.json" ||
+           relative.generic_string() == "assets/materials/default-material.material.json" ||
+           relative.generic_string() == "scenes/preview.scene.json";
 }
 
 } // namespace
@@ -712,9 +813,13 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     const auto expected_files = fixture_files(fixture);
     const auto regenerated_files = fixture_files(regenerated);
     REQUIRE(regenerated_files == expected_files);
-    for (const auto& relative : expected_files)
-        CHECK(read_binary(regenerated / relative) ==
-              read_binary(fixture / relative));
+    for (const auto& relative : expected_files) {
+        if (is_auxiliary_document(relative))
+            CHECK(auxiliary_documents_equal(fixture, regenerated, relative));
+        else
+            CHECK(read_binary(regenerated / relative) ==
+                  read_binary(fixture / relative));
+    }
     REQUIRE(fabric::project::validate_project(fixture).ok());
 
     const auto fixture_manifest = fabric::project::load_manifest(fixture);

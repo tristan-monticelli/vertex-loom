@@ -170,7 +170,10 @@ cette map et chaque packet est apparié par identifiant stable pour comparer
 géométrie, UV, indices, couleurs et texture au résultat du resolver direct.
 Elle contient également une ressource input, un BehaviorGraph, un matériau,
 un document audio et une scène afin de fournir une fixture multi-ressources au
-Resource Explorer et aux futurs parcours UX.
+Resource Explorer et aux futurs parcours UX. Ces cinq documents auxiliaires
+sont comparés sémantiquement lors de la régénération, car leur sérialisation
+canonique réordonne les champs et normalise les flottants ; les documents
+produits par les sessions Studio restent comparés octet par octet.
 La scène conserve également une plateforme tournante créée par Map Studio,
 son prefab, son capteur et l'événement `platform-activate`; le graphe est
 validé dans la même fixture afin que la suite puisse ajouter la simulation et
