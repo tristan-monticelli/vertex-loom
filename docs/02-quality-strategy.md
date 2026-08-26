@@ -37,6 +37,9 @@ un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
 disponible, puis un crop raster sur une texture bicolore avec lecture du pixel
 attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
+L'ordre de composition d'Asset Studio rend le canvas OpenGL avant ImGui ; le
+panneau de preview reste sans fond opaque uniquement pendant ce rendu afin que
+les modals, contrôles et gizmos conservent toujours la priorité visuelle.
 Le workflow manuel `workflow_dispatch` exécute aussi
 `fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60` sur
 macOS, Windows et Linux sous Xvfb, puis archive un rapport JSON par plateforme.

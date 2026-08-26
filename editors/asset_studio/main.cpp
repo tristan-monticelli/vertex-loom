@@ -1244,21 +1244,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({viewport->Size.x - left_width - right_width,
                               content_height});
-    ImGui::Begin("Preview", nullptr, fixed_panel_flags);
+    ImGui::Begin("Preview", nullptr,
+                 fixed_panel_flags | ImGuiWindowFlags_NoBackground);
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     auto* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddRectFilled(origin, {origin.x + available.x, origin.y + available.y},
-                             IM_COL32(21, 24, 30, 255), 4.0F);
-    constexpr float grid = 32.0F;
-    for (float x = origin.x; x < origin.x + available.x; x += grid) {
-        draw_list->AddLine({x, origin.y}, {x, origin.y + available.y},
-                           IM_COL32(43, 48, 58, 120));
-    }
-    for (float y = origin.y; y < origin.y + available.y; y += grid) {
-        draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
-                           IM_COL32(43, 48, 58, 120));
-    }
     const bool native_selected = session.selected_resource() != nullptr &&
         session.selected_resource()->kind ==
         fabric::editor::StudioResourceKind::vector &&
@@ -1274,6 +1264,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
              fabric::editor::StudioResourceKind::visual_composition ||
          session.selected_resource()->kind ==
              fabric::editor::StudioResourceKind::visual_component);
+    const bool open_gl_canvas = native_selected || visual_selected ||
+        entity_selected ||
+        (session.selected_resource() != nullptr &&
+         session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::animation &&
+         session.selected_entity() && !entity_preview.packets.empty());
+    if (!open_gl_canvas) {
+        draw_list->AddRectFilled(
+            origin, {origin.x + available.x, origin.y + available.y},
+            IM_COL32(21, 24, 30, 255), 4.0F);
+    }
+    constexpr float grid = 32.0F;
+    for (float x = origin.x; x < origin.x + available.x; x += grid) {
+        draw_list->AddLine({x, origin.y}, {x, origin.y + available.y},
+                           IM_COL32(43, 48, 58, 120));
+    }
+    for (float y = origin.y; y < origin.y + available.y; y += grid) {
+        draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
+                           IM_COL32(43, 48, 58, 120));
+    }
     if (native_selected) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         ImGui::TextUnformatted("Gizmo");
@@ -3903,8 +3913,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         SDL_GL_GetDrawableSize(window, &drawable_width, &drawable_height);
         glViewport(0, 0, drawable_width, drawable_height);
         glClearColor(0.035F, 0.041F, 0.052F, 1.0F);
-        glClear(GL_COLOR_BUFFER_BIT);
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         const bool render_native_vector = canvas.native_canvas &&
             session.created_vector() && session.created_vector()->native;
         const bool render_entity = canvas.native_canvas && entity_selection &&
@@ -3975,6 +3984,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             static_cast<void>(native_renderer.draw(
                 packets, native_viewport, texture_resolver));
         }
+        glViewport(0, 0, drawable_width, drawable_height);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
     }
 
