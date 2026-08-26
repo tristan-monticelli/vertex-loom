@@ -150,6 +150,10 @@ C4Component
   ressources indexées plutôt que des identifiants implicites. Chaque mutation passe par
   `CommandStack`, reste undoable et ne peut pas introduire de cycle ou de
   transform non fini.
+- Si un changement de drawable rend les overrides d’un `VisualComponent`
+  incompatibles, l’inspecteur demande confirmation et indique leur nombre ;
+  l’annulation conserve le composant, et la confirmation passe par la même
+  commande de nœud.
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.

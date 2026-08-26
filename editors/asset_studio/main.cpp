@@ -2568,6 +2568,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AnimationUiState& animation_ui,
                     TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
+                    std::optional<std::pair<std::size_t,
+                                            fabric::project::EntityDrawableKind>>&
+                        pending_drawable_kind,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
@@ -4420,6 +4423,46 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText("Drawable");
             const auto drawable_label = std::string(
                 fabric::project::to_string(node.drawable.kind));
+            const auto apply_drawable_kind =
+                [&](fabric::project::EntityNode& changed,
+                    const fabric::project::EntityDrawableKind kind) {
+                    changed.drawable.kind = kind;
+                    if (kind == fabric::project::EntityDrawableKind::none) {
+                        changed.drawable.resource.reset();
+                        changed.drawable.material.reset();
+                        changed.drawable.component_instance.reset();
+                        return true;
+                    }
+                    const auto resource_kind = kind ==
+                            fabric::project::EntityDrawableKind::texture
+                        ? fabric::editor::StudioResourceKind::texture
+                        : kind == fabric::project::EntityDrawableKind::vector
+                        ? fabric::editor::StudioResourceKind::vector
+                        : fabric::editor::StudioResourceKind::visual_component;
+                    const auto first = std::ranges::find_if(
+                        session.resources(), [&](const auto& resource) {
+                            return resource.kind == resource_kind;
+                        });
+                    if (first == session.resources().end()) return false;
+                    const char* expected = kind ==
+                            fabric::project::EntityDrawableKind::texture
+                        ? "texture"
+                        : kind == fabric::project::EntityDrawableKind::vector
+                        ? "vector" : "visualComponent";
+                    if (!changed.drawable.resource ||
+                        changed.drawable.resource->expected_type != expected)
+                        changed.drawable.resource =
+                            fabric::project::ResourceReference{first->id, expected};
+                    if (kind == fabric::project::EntityDrawableKind::visual_component) {
+                        changed.drawable.material.reset();
+                        if (!changed.drawable.component_instance)
+                            changed.drawable.component_instance =
+                                fabric::project::VisualComponentInstance{};
+                    } else {
+                        changed.drawable.component_instance.reset();
+                    }
+                    return true;
+                };
             if (ImGui::BeginCombo("Kind", drawable_label.c_str())) {
                 for (const auto kind : {
                          fabric::project::EntityDrawableKind::none,
@@ -4443,36 +4486,58 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::BeginDisabled(!available);
                     if (ImGui::Selectable(label.c_str(),
                                           node.drawable.kind == kind)) {
-                        node.drawable.kind = kind;
-                        if (kind == fabric::project::EntityDrawableKind::none) {
-                            node.drawable.resource.reset();
-                            node.drawable.material.reset();
-                            node.drawable.component_instance.reset();
+                        const auto has_overrides =
+                            node.drawable.component_instance &&
+                            !node.drawable.component_instance->overrides.empty();
+                        if (has_overrides &&
+                            kind != fabric::project::EntityDrawableKind::visual_component) {
+                            pending_drawable_kind =
+                                std::pair{canvas.selected_node, kind};
+                            ImGui::OpenPopup("Discard incompatible overrides?");
                         } else {
-                            const char* expected = kind ==
-                                    fabric::project::EntityDrawableKind::texture
-                                ? "texture"
-                                : kind == fabric::project::EntityDrawableKind::vector
-                                ? "vector" : "visualComponent";
-                            if (!node.drawable.resource ||
-                                node.drawable.resource->expected_type != expected)
-                                node.drawable.resource =
-                                    fabric::project::ResourceReference{
-                                        first->id, expected};
-                            if (kind == fabric::project::EntityDrawableKind::visual_component) {
-                                node.drawable.material.reset();
-                                if (!node.drawable.component_instance)
-                                    node.drawable.component_instance =
-                                        fabric::project::VisualComponentInstance{};
-                            } else {
-                                node.drawable.component_instance.reset();
-                            }
+                            if (!apply_drawable_kind(node, kind))
+                                status = "Drawable kind unavailable; inspect diagnostics.";
+                            else
+                                commit_entity_node(node);
                         }
-                        commit_entity_node(node);
                     }
                     ImGui::EndDisabled();
                 }
                 ImGui::EndCombo();
+            }
+            if (ImGui::BeginPopupModal("Discard incompatible overrides?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto valid = pending_drawable_kind.has_value() &&
+                    pending_drawable_kind->first < entity.nodes.size();
+                std::size_t override_count = 0U;
+                if (valid) {
+                    const auto& pending_node =
+                        entity.nodes[pending_drawable_kind->first];
+                    if (pending_node.drawable.component_instance)
+                        override_count = pending_node.drawable.component_instance->overrides.size();
+                    ImGui::Text("Change drawable kind and discard %zu override(s)?",
+                                override_count);
+                    ImGui::TextDisabled(
+                        "Overrides belong to the current visual component and cannot be applied to the new kind.");
+                }
+                ImGui::BeginDisabled(!valid);
+                if (ImGui::Button("Discard overrides and change")) {
+                    auto changed = entity.nodes[pending_drawable_kind->first];
+                    if (apply_drawable_kind(changed, pending_drawable_kind->second) &&
+                        session.set_selected_entity_node(
+                            pending_drawable_kind->first, std::move(changed))) {
+                        status = "Drawable changed; incompatible overrides discarded.";
+                        pending_drawable_kind.reset();
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) {
+                    pending_drawable_kind.reset();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
             if (node.drawable.kind !=
                 fabric::project::EntityDrawableKind::none) {
@@ -6607,6 +6672,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     AnimationUiState animation_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
+    std::optional<std::pair<std::size_t, fabric::project::EntityDrawableKind>>
+        pending_drawable_kind;
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
@@ -7194,6 +7261,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        visual_preview,
                        animation_ui, textured_path_ui,
                        project_settings,
+                       pending_drawable_kind,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);
         draw_behavior_editor(session, behavior_session, creation, status);
