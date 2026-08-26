@@ -1,6 +1,8 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/animation_timeline.hpp"
 #include "fabric/editor/map_session.hpp"
+#include "fabric/editor/mechanic_session.hpp"
+#include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/texture_asset.hpp"
@@ -232,9 +234,13 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
                      .type = "map",
                      .id = {.value = "textile-head-preview"},
                      .name = "Textile Head Preview"},
-        .layers = {{"instances", "Instances",
+        .layers = {{"gameplay", "Gameplay",
+                    fabric::project::MapLayerKind::gameplay,
+                    true, false, 0.0F},
+                   {"instances", "Instances",
                     fabric::project::MapLayerKind::instances,
-                    true, false, 0.0F}}}));
+                    true, false, 0.0F}},
+        .events = {{{.value = "platform-activate"}, {}}}}));
     REQUIRE(map.place_instance({
         .id = "textile-head",
         .entity = fabric::project::ResourceReference{
@@ -244,6 +250,42 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
         {.value = "textile-head"},
         {"animation", fabric::project::ResourceReference{
             {.value = "beam-scroll"}, "animation"}}));
+
+    const auto preset = fabric::editor::build_rotating_platform_preset(
+        manifest(), *map.map(), {
+            .id = {.value = "rotating-platform"},
+            .name = "Rotating Platform",
+            .activation = fabric::editor::RotatingPlatformActivation::sensor,
+            .visual_entity = fabric::project::ResourceReference{
+                {.value = "rotating-platform-entity"}, "entity"},
+            .position = {0.0F, 0.0F},
+            .size = {6.0F, 0.6F},
+            .sensor_center = {0.0F, 1.0F},
+            .sensor_size = {7.0F, 2.0F},
+            .speed_degrees_per_second = 90.0F,
+            .direction = -1,
+            .acceleration_degrees_per_second_squared = 180.0F,
+            .maximum_torque = 250.0F,
+            .limit_enabled = true,
+            .minimum_angle_degrees = -35.0F,
+            .maximum_angle_degrees = 35.0F});
+    REQUIRE(preset.ok());
+    fabric::editor::MechanicSession mechanic;
+    REQUIRE(mechanic.create(root, *map.map(), *preset.graph));
+    REQUIRE(mechanic.save());
+    REQUIRE(map.add_prefab({
+        .id = "rotating-platform-prefab",
+        .entity = {{.value = "rotating-platform-entity"}, "entity"},
+        .mechanic = fabric::project::ResourceReference{
+            {.value = "rotating-platform"}, "mechanic"}}));
+    REQUIRE(map.set_prefab_mechanic_override(
+        {.value = "rotating-platform-prefab"}, {"speed", 60.0F}));
+    REQUIRE(map.place_instance({
+        .id = "rotating-platform-instance",
+        .prefab = fabric::project::ResourceReference{
+            {.value = "rotating-platform-prefab"}, "prefab"},
+        .layer_id = "instances",
+        .transform = {.position = {0.0F, 2.0F}}}, {.enabled = false}));
     REQUIRE(map.save());
 }
 
@@ -279,6 +321,12 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
                   "head-seam", "Head Seam");
     create_preset(fabric::editor::VisualPresetKind::seam,
                   "beam", "Beam");
+    REQUIRE(studio.create_visual_preset({
+        .kind = fabric::editor::VisualPresetKind::seam,
+        .id = {.value = "platform-strip"},
+        .name = "Platform Strip",
+        .thread_texture = fabric::project::ResourceReference{
+            {.value = "head-thread"}, "texture"}}));
 
     REQUIRE(studio.create_visual_composition(
         {.value = "textile-head-composition"}, "Textile Head Composition",
@@ -338,6 +386,11 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
         {.value = "textile-head"}, "Textile Head",
         {.value = "textile-head-composition"},
         {{-4.0F, -3.0F}, {8.0F, 6.0F}}));
+    REQUIRE(studio.create_entity({
+        .name = "Rotating Platform Entity",
+        .node_name = "Platform",
+        .drawable = fabric::project::EntityDrawableKind::visual_component,
+        .resource_id = "platform-strip"}));
     add_textile_head_runtime_documents(root);
 }
 
@@ -668,7 +721,7 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
         .project_root = fixture,
         .map_id = {.value = "textile-head-preview"},
         .mode = fabric::runtime::RuntimeMode::smoke_test}));
-    REQUIRE(runtime.map()->instances.size() == 1U);
+    REQUIRE(runtime.map()->instances.size() == 2U);
     REQUIRE(runtime.animation_count() == 1U);
     const auto beam_evaluation =
         runtime.evaluate_instance_animation("textile-head", 0.5F);
@@ -678,7 +731,7 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     CHECK(std::get<float>(beam_evaluation->properties.front().value) ==
           Catch::Approx(2.0F));
     REQUIRE(runtime.run());
-    REQUIRE(runtime.last_frame_packets().size() == resolved.packets.size());
+    REQUIRE(runtime.last_frame_packets().size() == resolved.packets.size() + 1U);
     for (const auto& studio_packet : resolved.packets) {
         const auto packet_suffix = std::string{":"} + studio_packet.node_id;
         const auto runtime_packet_it = std::ranges::find_if(

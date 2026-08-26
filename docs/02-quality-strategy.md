@@ -138,6 +138,10 @@ mi-largeur. Elle crée
 aussi son entité et sa map par les sessions Studio ; Preview Runtime charge
 cette map et chaque packet est apparié par identifiant stable pour comparer
 géométrie, UV, indices, couleurs et texture au résultat du resolver direct.
+La scène conserve également une plateforme tournante créée par Map Studio,
+son prefab, son capteur et l'événement `platform-activate`; le graphe est
+validé dans la même fixture afin que la suite puisse ajouter la simulation et
+la réaction du personnage sans changer de projet de référence.
 La fixture `tests/fixtures/studio-rotating-platform` conserve le graphe créé
 par Map Studio et l'entité textile créée par Asset Studio. Son test headless
 matérialise le capteur Box2D, place un personnage dynamique, vérifie son

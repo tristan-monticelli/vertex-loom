@@ -1,7 +1,12 @@
 {
   "chunkSize": 64.0,
   "collisions": [],
-  "events": [],
+  "events": [
+    {
+      "id": "platform-activate",
+      "payload": []
+    }
+  ],
   "id": "textile-head-preview",
   "instances": [
     {
@@ -40,9 +45,43 @@
           "y": 1.0
         }
       }
+    },
+    {
+      "chunkX": 0,
+      "chunkY": 0,
+      "id": "rotating-platform-instance",
+      "layer": "instances",
+      "prefab": {
+        "expectedType": "prefab",
+        "id": "rotating-platform-prefab"
+      },
+      "properties": [],
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 2.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      }
     }
   ],
   "layers": [
+    {
+      "depth": 0.0,
+      "id": "gameplay",
+      "kind": "gameplay",
+      "locked": false,
+      "name": "Gameplay",
+      "visible": true
+    },
     {
       "depth": 0.0,
       "id": "instances",
@@ -53,7 +92,29 @@
     }
   ],
   "name": "Textile Head Preview",
-  "prefabs": [],
+  "prefabs": [
+    {
+      "entity": {
+        "expectedType": "entity",
+        "id": "rotating-platform-entity"
+      },
+      "id": "rotating-platform-prefab",
+      "mechanic": {
+        "expectedType": "mechanic",
+        "id": "rotating-platform"
+      },
+      "mechanicOverrides": [
+        {
+          "parameter": "speed",
+          "value": {
+            "kind": "scalar",
+            "value": 60.0
+          }
+        }
+      ],
+      "overrides": []
+    }
+  ],
   "schemaVersion": 1,
   "triggers": [],
   "type": "map"
