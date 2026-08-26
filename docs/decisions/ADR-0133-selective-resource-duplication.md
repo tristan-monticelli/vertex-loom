@@ -15,8 +15,10 @@ dépendances devaient devenir indépendantes.
 `ResourceDuplicationDependency`. Chaque entrée décrit le type, l’identifiant
 source, l’identifiant destination et le nom de la copie. Les dépendances sont
 dupliquées avant le document principal. Les documents `EntityDefinition` et
-`VectorAsset` réécrivent uniquement les références sélectionnées, en vérifiant
-également leur `expected_type`.
+`VectorAsset` réécrivent leurs références structurées ; les autres documents
+passant par le duplicateur générique utilisent le même fallback JSON typé. Dans
+les deux cas, seules les références sélectionnées et de même `expected_type`
+sont réécrites.
 
 Une dépendance invalide ou cyclique avec la ressource principale est rejetée
 avant la publication de la copie principale ; les erreurs de publication sont

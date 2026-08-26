@@ -1717,6 +1717,52 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
         }
     };
 
+    const auto copy_document_path = [&] {
+        auto path = source_path;
+        const auto filename = path.filename().string();
+        const auto source_prefix = id.value;
+        if (filename.starts_with(source_prefix))
+            path.replace_filename(copy_id.value + filename.substr(source_prefix.size()));
+        return path;
+    };
+    const auto rewrite_published_copy = [&] {
+        if (options.dependencies.empty()) return true;
+        const auto path = copy_document_path();
+        const auto loaded = project::load_document(
+            project_root_, path, resource_validator(kind, *manifest_));
+        if (!loaded.ok()) {
+            errors_ = loaded.errors;
+            return false;
+        }
+        Json document;
+        try {
+            document = Json::parse(*loaded.contents);
+        } catch (const Json::exception&) {
+            errors_ = {{project::ErrorCode::invalid_json, "duplicate",
+                        "published copy is not valid JSON"}};
+            return false;
+        }
+        for (const auto& dependency : options.dependencies)
+            static_cast<void>(replace_typed_references(
+                document, dependency.source_id.value,
+                dependency.destination_id.value,
+                expected_type(dependency.kind)));
+        const auto rewritten = document.dump(2) + "\n";
+        const auto validation = resource_validator(kind, *manifest_)(rewritten);
+        if (!validation.ok()) {
+            errors_ = validation.errors;
+            return false;
+        }
+        const auto saved = project::save_document_atomic(
+            project_root_, path, rewritten,
+            resource_validator(kind, *manifest_));
+        if (!saved.ok()) {
+            errors_ = saved.errors;
+            return false;
+        }
+        return true;
+    };
+
     const auto publish_copy = [&](auto loaded, auto publisher) {
         if (!loaded.ok()) {
             errors_ = std::move(loaded.errors);
@@ -1729,6 +1775,7 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
             errors_ = std::move(published.errors);
             return false;
         }
+        if (!rewrite_published_copy()) return false;
         return refresh_resources() && select_resource(kind, copy_id);
     };
 
@@ -1750,6 +1797,7 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
             errors_ = std::move(published.errors);
             return false;
         }
+        if (!rewrite_published_copy()) return false;
         return refresh_resources() && select_resource(kind, copy_id);
     }
     case StudioResourceKind::vector: {
@@ -1785,6 +1833,7 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
                 return false;
             }
         }
+        if (!rewrite_published_copy()) return false;
         return refresh_resources() && select_resource(kind, copy_id);
     }
     case StudioResourceKind::material:
@@ -1822,6 +1871,7 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
             errors_ = std::move(published.errors);
             return false;
         }
+        if (!rewrite_published_copy()) return false;
         return refresh_resources() && select_resource(kind, copy_id);
     }
     case StudioResourceKind::animation:
