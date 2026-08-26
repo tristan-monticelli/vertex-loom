@@ -22,6 +22,7 @@ void usage() {
                  "[--save-slot <slot>] "
                  "[--save-path <file>] "
                  "[--character] "
+                 "[--character-actions <left> <right> <jump>] "
                  "[--input <id>] "
                  "[--follow-character] "
                  "[--camera-limits <x> <y> <width> <height>] "
@@ -87,6 +88,17 @@ int main(int argc, char** argv) {
             save_path = std::filesystem::path(argv[++index]);
         } else if (argument == "--character") {
             options.enable_character = true;
+        } else if (argument == "--character-actions" && index + 3 < argc) {
+            fabric::runtime::PreviewRuntimeOptions::CharacterActions actions{
+                .left = argv[++index], .right = argv[++index],
+                .jump = argv[++index]};
+            if (!fabric::core::ResourceId::is_valid(actions.left) ||
+                !fabric::core::ResourceId::is_valid(actions.right) ||
+                !fabric::core::ResourceId::is_valid(actions.jump)) {
+                std::cerr << "error: --character-actions expects three valid semantic ids\n";
+                return 2;
+            }
+            options.character_actions = std::move(actions);
         } else if (argument == "--follow-character") {
             options.follow_character = true;
         } else if (argument == "--camera-limits" && index + 4 < argc) {

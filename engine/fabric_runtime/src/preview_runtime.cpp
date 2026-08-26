@@ -1166,7 +1166,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
 
     std::optional<project::InputDocument> loaded_input;
     if (options_.input_id ||
-        (options_.enable_character && options_.input_actions.empty())) {
+        (options_.character_actions && options_.input_actions.empty())) {
         const auto input_id = options_.input_id.value_or(core::ResourceId{.value = "default"});
         if (!core::ResourceId::is_valid(input_id.value)) {
             errors_.push_back("input id is invalid");
@@ -1379,6 +1379,21 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 errors_.push_back("could not configure persisted input actions");
                 return false;
             }
+        }
+    }
+    if (options_.character_actions) {
+        const auto& actions = *options_.character_actions;
+        const auto declared = [&](const std::string& id) {
+            return core::ResourceId::is_valid(id) &&
+                std::ranges::any_of(input_.actions(), [&](const auto& action) {
+                    return action.id == id;
+                });
+        };
+        if (!declared(actions.left) || !declared(actions.right) ||
+            !declared(actions.jump)) {
+            errors_.push_back(
+                "character actions must name three declared semantic actions");
+            return false;
         }
     }
     if (options_.enable_character) {
@@ -1898,8 +1913,18 @@ bool PreviewRuntime::run() {
                 }
             }
             impl_->flush_transformations();
-            if (character_)
-                character_->update(input_, static_cast<float>(fixed_time_step));
+            if (character_) {
+                CharacterControlFrame controls;
+                if (options_.character_actions) {
+                    const auto& actions = *options_.character_actions;
+                    controls.horizontal =
+                        (input_.held(actions.right) ? 1.0F : 0.0F) -
+                        (input_.held(actions.left) ? 1.0F : 0.0F);
+                    controls.jump_pressed = input_.pressed(actions.jump);
+                }
+                character_->update(controls,
+                                   static_cast<float>(fixed_time_step));
+            }
             for (auto& [instance_id, mechanic] : impl_->mechanic_instances) {
                 const auto previous_steps = mechanic.simulation.step_count();
                 if (!mechanic.simulation.update(

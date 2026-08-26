@@ -38,6 +38,8 @@ utilisent le stockage explicite de l'évaluateur.
 
 - Une action identique peut provenir du joueur, d'une IA ou d'une map.
 - Le remapping physique ne change pas le comportement.
+- Le contrôleur physique optionnel consomme un frame normalisé et ne contient
+  plus les noms `move_left`, `move_right` ou `jump`.
 - Le graphe est fermé transitivement dans les paquets avec l'entité.
 - Les temporisations et cooldowns ne sont jamais persistés dans le document
   d'auteur ; replay et pas fixe fournissent leur déterminisme.

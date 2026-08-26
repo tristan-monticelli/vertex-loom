@@ -70,7 +70,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   et exposer l'édition de ces propriétés dans Map Studio.
 - [x] Définir un système de comportements attachable aux entités, séparé des
   bindings physiques, puis l'utiliser pour le joueur comme pour les monstres.
-- [ ] Retirer le couplage runtime aux trois actions codées en dur
+- [x] Retirer le couplage runtime aux trois actions codées en dur
   `move_left`, `move_right` et `jump`.
 - [ ] Ajouter les transformations atomiques d'une instance d'entité A vers B,
   avec politique explicite de transfert d'état.

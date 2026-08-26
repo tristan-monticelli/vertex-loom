@@ -850,10 +850,12 @@ TEST_CASE("preview runtime accepts a custom locomotion binding table") {
     REQUIRE(runtime.load({.project_root = root,
                           .map_id = {.value = "preview"},
                           .input_actions = {
-                              {"move_left", {{fabric::runtime::InputDevice::keyboard, 74}}},
-                              {"move_right", {{fabric::runtime::InputDevice::keyboard, 76}}},
-                              {"jump", {{fabric::runtime::InputDevice::gamepad, 1}}}},
+                              {"west", {{fabric::runtime::InputDevice::keyboard, 74}}},
+                              {"east", {{fabric::runtime::InputDevice::keyboard, 76}}},
+                              {"leap", {{fabric::runtime::InputDevice::gamepad, 1}}}},
                           .enable_character = true,
+                          .character_actions = fabric::runtime::PreviewRuntimeOptions::CharacterActions{
+                              .left = "west", .right = "east", .jump = "leap"},
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.run());
     CHECK(runtime.stats().physics_steps == 1U);
@@ -875,15 +877,17 @@ TEST_CASE("preview runtime loads the default persisted locomotion bindings") {
                      .id = {.value = "default"},
                      .name = "Default Input"},
         .actions = {
-            {"move_left", {{fabric::project::InputDevice::keyboard, 74}}},
-            {"move_right", {{fabric::project::InputDevice::keyboard, 76}}},
-            {"jump", {{fabric::project::InputDevice::gamepad, 1}}}}};
+            {"west", {{fabric::project::InputDevice::keyboard, 74}}},
+            {"east", {{fabric::project::InputDevice::keyboard, 76}}},
+            {"leap", {{fabric::project::InputDevice::gamepad, 1}}}}};
     REQUIRE(fabric::project::publish_input(root, project_manifest, input).ok());
 
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({.project_root = root,
                           .map_id = {.value = "preview"},
                           .enable_character = true,
+                          .character_actions = fabric::runtime::PreviewRuntimeOptions::CharacterActions{
+                              .left = "west", .right = "east", .jump = "leap"},
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.run());
     CHECK(runtime.stats().physics_steps == 1U);
@@ -1374,7 +1378,7 @@ TEST_CASE("preview runtime drives the character controller from replay actions")
     REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
     auto movement = replay();
     movement.document.id.value = "movement-replay";
-    movement.inputs = {{0, "move_right", true, false}};
+    movement.inputs = {{0, "advance", true, false}};
     movement.events.clear();
     movement.checkpoints.clear();
     REQUIRE(fabric::project::publish_replay(root, project_manifest, movement).ok());
@@ -1382,7 +1386,11 @@ TEST_CASE("preview runtime drives the character controller from replay actions")
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
                           .replay_id = fabric::core::ResourceId{.value = "movement-replay"},
+                          .input_actions = {{"retreat", {}}, {"advance", {}},
+                                            {"ascend", {}}},
                           .enable_character = true,
+                          .character_actions = fabric::runtime::PreviewRuntimeOptions::CharacterActions{
+                              .left = "retreat", .right = "advance", .jump = "ascend"},
                           .mode = fabric::runtime::RuntimeMode::smoke_test,
                           .frame_limit = 2}));
     REQUIRE(runtime.run());

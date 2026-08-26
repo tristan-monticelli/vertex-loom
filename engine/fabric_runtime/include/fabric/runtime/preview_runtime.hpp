@@ -48,6 +48,12 @@ struct PreviewRuntimeOptions {
     GameplayEventHandler gameplay_event_handler;
     std::vector<InputActionDefinition> input_actions;
     bool enable_character{};
+    struct CharacterActions {
+        std::string left;
+        std::string right;
+        std::string jump;
+    };
+    std::optional<CharacterActions> character_actions;
     std::optional<core::Vec2> character_spawn;
     bool follow_character{};
     std::optional<core::Rect> camera_limits;

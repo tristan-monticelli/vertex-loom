@@ -1,5 +1,7 @@
 #include "fabric/runtime/character_controller.hpp"
 
+#include <algorithm>
+
 namespace fabric::runtime {
 
 bool CharacterController::create(physics::PhysicsWorld& world, const core::Vec2 position,
@@ -12,16 +14,15 @@ bool CharacterController::create(physics::PhysicsWorld& world, const core::Vec2 
     return true;
 }
 
-void CharacterController::update(const InputActionMap& input, const float) noexcept {
+void CharacterController::update(const CharacterControlFrame controls,
+                                 const float) noexcept {
     if (!valid()) return;
     const auto current = world_->character_position();
-    const auto left = input.held("move_left");
-    const auto right = input.held("move_right");
-    const auto horizontal = (right ? 1.0F : 0.0F) - (left ? 1.0F : 0.0F);
+    const auto horizontal = std::clamp(controls.horizontal, -1.0F, 1.0F);
     const auto was_airborne = state_ == LocomotionState::airborne;
     auto velocity = core::Vec2{horizontal * config_.horizontal_speed,
                                was_airborne ? world_->character_velocity().y : 0.0F};
-    if (!was_airborne && input.pressed("jump")) {
+    if (!was_airborne && controls.jump_pressed) {
         velocity.y = config_.jump_speed;
         state_ = LocomotionState::airborne;
     }

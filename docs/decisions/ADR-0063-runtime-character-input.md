@@ -3,16 +3,15 @@
 ## Décision
 
 Le Preview Runtime expose `--character` pour activer un personnage Box2D et
-son `CharacterController`. Les touches `A`/flèche gauche, `D`/flèche droite
-et espace sont traduites en actions logiques `move_left`, `move_right` et
-`jump`. Un ReplayPlayer peut alimenter exactement le même `InputActionMap`.
-Les boutons D-pad gauche/droite et A d’un contrôleur SDL sont également
-reliés à ces actions.
+son `CharacterController`. Les trois actions sémantiques de locomotion sont
+choisies explicitement avec `--character-actions <left> <right> <jump>` ou
+`PreviewRuntimeOptions.character_actions`. Un ReplayPlayer peut alimenter
+exactement le même `InputActionMap` sans convention de nom.
 
-Le programme peut fournir une table de bindings à `PreviewRuntimeOptions`.
-Elle doit déclarer les trois actions de locomotion ; sinon le chargement est
-refusé avant la création de la fenêtre. En l’absence de table, les bindings
-SDL historiques restent utilisés.
+Lorsque `character_actions` est fourni, la table de bindings ou le document
+Input doit déclarer les trois identifiants ; sinon le chargement est refusé
+avant la création de la fenêtre. Sans cette option, le corps existe mais reste
+stationnaire : aucune action implicite n'est injectée.
 
 La table peut aussi être construite sans code avec des options répétables
 `--bind <action> <keyboard|gamepad> <code>` de `game_runtime`. Les doublons,
