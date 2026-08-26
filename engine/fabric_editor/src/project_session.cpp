@@ -1681,6 +1681,26 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
                         "dependency source, destination and name must be valid and distinct"}};
             return false;
         }
+        if (std::ranges::none_of(resources_, [&](const auto& resource) {
+                return resource.kind == dependency.kind &&
+                    resource.id == dependency.source_id;
+            }) ||
+            std::ranges::any_of(resources_, [&](const auto& resource) {
+                return resource.kind == dependency.kind &&
+                    resource.id == dependency.destination_id;
+            }) ||
+            std::ranges::any_of(options.dependencies, [&](const auto& other) {
+                return &other != &dependency &&
+                    other.kind == dependency.kind &&
+                    other.destination_id == dependency.destination_id;
+            })) {
+            errors_ = {{project::ErrorCode::duplicate_resource,
+                        "duplicate.dependencies",
+                        "dependency source must exist and destination IDs must be unique"}};
+            return false;
+        }
+    }
+    for (const auto& dependency : options.dependencies) {
         if (!duplicate_resource(dependency.kind, dependency.source_id,
                                 dependency.destination_id,
                                 dependency.destination_name))
