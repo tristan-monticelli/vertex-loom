@@ -4233,6 +4233,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::TextDisabled("Evaluated properties: %zu",
                                 evaluated.properties.size());
             for (const auto& property : evaluated.properties) {
+                const bool target_node_missing = session.selected_entity().has_value() &&
+                    std::ranges::none_of(session.selected_entity()->nodes,
+                        [&](const auto& node) { return node.id == property.binding.node_id; });
+                if (target_node_missing) {
+                    ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                       "Invalid animation binding: missing node '%s'",
+                                       property.binding.node_id.c_str());
+                }
                 const auto value_label = std::visit(
                     [](const auto& value) {
                         using Value = std::decay_t<decltype(value)>;

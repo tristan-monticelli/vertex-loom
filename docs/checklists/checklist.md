@@ -443,7 +443,7 @@ rail droit sans recréation ni édition JSON.
   texte libre.
 - [x] Construire les propriétés depuis le registre de descripteurs de la cible.
 - [ ] Exposer transform, matériau, fill, image fill et paramètres de composant.
-- [ ] Signaler immédiatement les bindings devenus invalides.
+- [x] Signaler immédiatement les bindings devenus invalides.
 - [ ] Ajouter une action pour réparer ou remplacer un binding invalide.
 - [x] Permettre de créer le clip depuis l'entité sélectionnée.
 - [x] Permettre d'ajouter un clip à l'entité depuis son rail.
