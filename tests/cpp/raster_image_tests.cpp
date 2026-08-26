@@ -291,6 +291,31 @@ void native_geometry_preserves_image_fill_payload() {
                 packet.fill_indices.size() == 3U &&
                 packet.fill_uv.size() == packet.fill_vertices.size(),
             "image fill payload or silhouette was lost in draw packet");
+    require(packet.fill_vertices == packet.outline,
+            "image fill transform moved the shape geometry");
+    require(std::abs(packet.fill_uv.front().x - 0.124F) < 0.002F &&
+                std::abs(packet.fill_uv.front().y + 0.243F) < 0.002F,
+            "image fill transform was not applied independently to UVs");
+}
+
+void native_geometry_builds_textured_stroke_payload() {
+    auto asset = native_geometry_fixture();
+    asset.native->nodes.front().stroke = fabric::project::VectorStroke{
+        .width = 2.0F,
+        .image = fabric::project::VectorImageFill{
+            .texture = {{.value = "beam-thread"}, "texture"},
+            .transform = {.position = {0.25F, -0.5F}, .scale = {2.0F, 3.0F},
+                          .pivot = {0.0F, 0.0F}}},
+        .repeat_texture_x = true};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U,
+            "textured stroke geometry packet build failed");
+    const auto& packet = result.packets.front();
+    require(packet.stroke_image.has_value() && packet.stroke_repeat_texture_x &&
+                packet.stroke_uv.size() == packet.stroke_vertices.size() &&
+                packet.stroke_uv.front() == fabric::core::Vec2{0.25F, -0.5F} &&
+                packet.stroke_uv[1] == fabric::core::Vec2{20.25F, -0.5F},
+            "textured stroke payload or UVs were not propagated");
 }
 
 void native_geometry_applies_node_and_parent_transforms() {
@@ -341,6 +366,82 @@ void native_geometry_marks_open_strokes() {
             "line stroke packet was not marked as open");
 }
 
+void native_geometry_tessellates_strokes() {
+    auto asset = native_geometry_fixture();
+    auto& node = asset.native->nodes.front();
+    node.stroke = fabric::project::VectorStroke{
+        .width = 2.0F, .join = fabric::project::VectorStrokeJoin::bevel};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U,
+            "stroke geometry packet build failed");
+    const auto& packet = result.packets.front();
+    require(packet.stroke_vertices.size() == 30U &&
+                packet.stroke_indices.size() == 36U,
+            "stroke was not tessellated into segment quads");
+    require(packet.stroke_vertices[0] == fabric::core::Vec2{0.0F, 1.0F} &&
+                packet.stroke_vertices[3] == fabric::core::Vec2{0.0F, -1.0F},
+            "stroke width was not applied to segment geometry");
+}
+
+void native_geometry_applies_square_stroke_caps() {
+    auto asset = native_geometry_fixture();
+    auto& node = asset.native->nodes.front();
+    node.shape.kind = fabric::project::VectorShapeKind::line;
+    node.shape.points = {{0.0F, 0.0F}, {4.0F, 0.0F}};
+    node.stroke = fabric::project::VectorStroke{
+        .width = 2.0F, .cap = fabric::project::VectorStrokeCap::square};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U,
+            "square cap geometry packet build failed");
+    const auto& vertices = result.packets.front().stroke_vertices;
+    require(vertices.size() == 4U && vertices.front().x == -1.0F &&
+                vertices[1].x == 5.0F,
+            "square caps did not extend the stroke endpoints");
+}
+
+void native_geometry_applies_round_stroke_caps() {
+    auto asset = native_geometry_fixture();
+    auto& node = asset.native->nodes.front();
+    node.shape.kind = fabric::project::VectorShapeKind::line;
+    node.shape.points = {{0.0F, 0.0F}, {4.0F, 0.0F}};
+    node.stroke = fabric::project::VectorStroke{
+        .width = 2.0F, .cap = fabric::project::VectorStrokeCap::round};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U,
+            "round cap geometry packet build failed");
+    const auto& packet = result.packets.front();
+    require(packet.stroke_vertices.size() == 32U &&
+                packet.stroke_indices.size() == 78U,
+            "round caps did not add semicircle geometry");
+}
+
+void native_geometry_covers_round_stroke_joins() {
+    auto asset = native_geometry_fixture();
+    auto& node = asset.native->nodes.front();
+    node.stroke = fabric::project::VectorStroke{
+        .width = 2.0F, .join = fabric::project::VectorStrokeJoin::round};
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U &&
+                result.packets.front().stroke_vertices.size() == 54U,
+            "round joins did not add vertex coverage");
+}
+
+void native_geometry_distinguishes_bevel_and_miter_joins() {
+    auto bevel = native_geometry_fixture();
+    bevel.native->nodes.front().stroke = fabric::project::VectorStroke{
+        .width = 2.0F, .join = fabric::project::VectorStrokeJoin::bevel};
+    auto miter = bevel;
+    miter.native->nodes.front().stroke->join =
+        fabric::project::VectorStrokeJoin::miter;
+    const auto bevel_result = fabric::render::build_native_draw_packets(bevel);
+    const auto miter_result = fabric::render::build_native_draw_packets(miter);
+    require(bevel_result.ok() && miter_result.ok(),
+            "bevel and miter geometry packet build failed");
+    require(bevel_result.packets.front().stroke_vertices.size() == 30U &&
+                miter_result.packets.front().stroke_vertices.size() == 48U,
+            "bevel and miter joins did not produce distinct geometry");
+}
+
 } // namespace
 
 int main() {
@@ -353,8 +454,14 @@ int main() {
     raster_views_produce_shared_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
+    native_geometry_builds_textured_stroke_payload();
     native_geometry_applies_node_and_parent_transforms();
     opengl_vector_renderer_reports_uninitialized_use();
     native_geometry_marks_open_strokes();
+    native_geometry_tessellates_strokes();
+    native_geometry_applies_square_stroke_caps();
+    native_geometry_applies_round_stroke_caps();
+    native_geometry_covers_round_stroke_joins();
+    native_geometry_distinguishes_bevel_and_miter_joins();
     return 0;
 }

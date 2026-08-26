@@ -533,6 +533,67 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 index_scratch_.size() / 3U);
             packet_index = next;
         }
+        glDisable(GL_TEXTURE_2D);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        for (const auto& packet : packets) {
+            if (!packet.stroke || packet.stroke_vertices.empty() ||
+                packet.stroke_indices.empty()) continue;
+            std::optional<OpenGLTextureHandle> texture;
+            const bool textured = packet.stroke_image.has_value();
+            if (textured) {
+                if (!texture_resolver) {
+                    stats.errors.push_back(
+                        "legacy OpenGL renderer requires a texture resolver for strokes");
+                    continue;
+                }
+                texture = texture_resolver(packet.stroke_image->texture.id);
+                if (!texture || texture->handle == 0U ||
+                    packet.stroke_uv.size() != packet.stroke_vertices.size()) {
+                    stats.errors.push_back(
+                        "legacy OpenGL textured stroke could not be resolved");
+                    continue;
+                }
+            }
+            vertex_scratch_.clear();
+            vertex_scratch_.reserve(packet.stroke_vertices.size());
+            for (std::size_t index = 0; index < packet.stroke_vertices.size(); ++index) {
+                const auto point = packet.stroke_vertices[index];
+                const auto uv = textured ? packet.stroke_uv[index] : core::Vec2{};
+                vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
+            }
+            if (textured) {
+                glEnable(GL_TEXTURE_2D);
+                glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+                glBindTexture(GL_TEXTURE_2D, texture->handle);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                                packet.stroke_repeat_texture_x
+                                    ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glColor4f(packet.stroke->color.red, packet.stroke->color.green,
+                          packet.stroke->color.blue,
+                          packet.stroke->color.alpha * packet.stroke_image->opacity);
+                glTexCoordPointer(2, GL_FLOAT, sizeof(Vertex),
+                                  reinterpret_cast<const std::byte*>(
+                                      vertex_scratch_.data()) + 2U * sizeof(float));
+            } else {
+                glDisable(GL_TEXTURE_2D);
+                glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+                glColor4f(packet.stroke->color.red, packet.stroke->color.green,
+                          packet.stroke->color.blue, packet.stroke->color.alpha);
+            }
+            glVertexPointer(2, GL_FLOAT, sizeof(Vertex), vertex_scratch_.data());
+            glDrawElements(GL_TRIANGLES,
+                           static_cast<GLsizei>(packet.stroke_indices.size()),
+                           GL_UNSIGNED_INT, packet.stroke_indices.data());
+            ++stats.draw_calls;
+            ++stats.packets_drawn;
+            stats.triangles_drawn += static_cast<std::uint32_t>(
+                packet.stroke_indices.size() / 3U);
+        }
+        glDisable(GL_TEXTURE_2D);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisable(GL_BLEND);
         glDisableClientState(GL_VERTEX_ARRAY);
         glMatrixMode(GL_MODELVIEW);
@@ -665,22 +726,56 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     };
 
     const auto draw_stroke = [&](const VectorDrawPacket& packet) {
-        if (!packet.stroke.has_value() || packet.outline.size() < 2U) return false;
+        if (!packet.stroke.has_value() || packet.stroke_vertices.empty() ||
+            packet.stroke_indices.empty()) return false;
         vertex_scratch_.clear();
-        vertex_scratch_.reserve(packet.outline.size());
-        for (const auto point : packet.outline) {
-            vertex_scratch_.push_back({point.x, point.y, 0.0F, 0.0F});
+        vertex_scratch_.reserve(packet.stroke_vertices.size());
+        const bool has_uv = packet.stroke_uv.size() == packet.stroke_vertices.size();
+        for (std::size_t index = 0; index < packet.stroke_vertices.size(); ++index) {
+            const auto point = packet.stroke_vertices[index];
+            const auto uv = has_uv ? packet.stroke_uv[index] : core::Vec2{};
+            vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
         }
         upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),
                       vertex_scratch_.data(), vertex_buffer_capacity_);
-        const auto& color = packet.stroke->color;
-        functions.uniform_4f(color_uniform_, color.red, color.green,
-                             color.blue, color.alpha);
-        functions.uniform_1i(textured_uniform_, 0);
-        functions.uniform_1f(opacity_uniform_, 1.0F);
-        functions.draw_arrays(packet.closed_outline ? GL_LINE_LOOP : GL_LINE_STRIP,
-                              0, static_cast<GLsizei>(vertex_scratch_.size()));
+        upload_buffer(GL_ELEMENT_ARRAY_BUFFER,
+                      packet.stroke_indices.size() * sizeof(std::uint32_t),
+                      packet.stroke_indices.data(), index_buffer_capacity_);
+        if (packet.stroke_image && texture_resolver && has_uv) {
+            const auto texture = texture_resolver(
+                packet.stroke_image->texture.id);
+            if (!texture || texture->handle == 0U) {
+                stats.errors.push_back(
+                    "OpenGL stroke texture reference could not be resolved: " +
+                    packet.stroke_image->texture.id.value);
+                return false;
+            }
+            functions.uniform_4f(color_uniform_, packet.stroke->color.red,
+                                 packet.stroke->color.green,
+                                 packet.stroke->color.blue,
+                                 packet.stroke->color.alpha);
+            functions.uniform_1i(textured_uniform_, 1);
+            functions.uniform_1f(opacity_uniform_, packet.stroke_image->opacity);
+            functions.uniform_1i(image_texture_uniform_, 0);
+            functions.active_texture(GL_TEXTURE0);
+            functions.bind_texture(GL_TEXTURE_2D, texture->handle);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                            packet.stroke_repeat_texture_x
+                                ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        } else {
+            const auto& color = packet.stroke->color;
+            functions.uniform_4f(color_uniform_, color.red, color.green,
+                                 color.blue, color.alpha);
+            functions.uniform_1i(textured_uniform_, 0);
+            functions.uniform_1f(opacity_uniform_, 1.0F);
+        }
+        functions.draw_elements(
+            GL_TRIANGLES, static_cast<GLsizei>(packet.stroke_indices.size()),
+            GL_UNSIGNED_INT, nullptr);
         ++stats.draw_calls;
+        stats.triangles_drawn += static_cast<std::uint32_t>(
+            packet.stroke_indices.size() / 3U);
         return true;
     };
 

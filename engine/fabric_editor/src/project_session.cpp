@@ -16,6 +16,7 @@
 #include <functional>
 #include <memory>
 #include <limits>
+#include <nlohmann/json.hpp>
 #include <string_view>
 #include <utility>
 
@@ -110,6 +111,32 @@ std::function<project::ValidationReport(std::string_view)> resource_validator(
         }
         return report;
     };
+}
+
+using Json = nlohmann::json;
+
+std::size_t replace_typed_references(
+    Json& value, const std::string_view old_id,
+    const std::string_view replacement_id, const std::string_view expected) {
+    std::size_t replacements = 0U;
+    if (value.is_object()) {
+        const auto id = value.find("id");
+        const auto type = value.find("expectedType");
+        if (id != value.end() && type != value.end() && id->is_string() &&
+            type->is_string() && id->get<std::string>() == old_id &&
+            type->get<std::string>() == expected) {
+            value["id"] = replacement_id;
+            ++replacements;
+        }
+        for (auto& child : value.items())
+            replacements += replace_typed_references(
+                child.value(), old_id, replacement_id, expected);
+    } else if (value.is_array()) {
+        for (auto& child : value)
+            replacements += replace_typed_references(
+                child, old_id, replacement_id, expected);
+    }
+    return replacements;
 }
 
 std::optional<std::vector<StudioResource>> index_project_resources(
@@ -557,6 +584,36 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
 
 bool ProjectSession::save_before_document_transition() {
     return !commands_.dirty() || save();
+}
+
+bool ProjectSession::prepare_dirty_document_edit(
+    const DirtyDocument expected, const project::ErrorCode code,
+    std::string field, std::string message,
+    const AutosaveScheduler::Clock::time_point now) {
+    const bool compatible_input_manifest_edit =
+        expected == DirtyDocument::manifest &&
+        dirty_document_ == DirtyDocument::input;
+    if (commands_.dirty() && dirty_document_ != expected &&
+        !compatible_input_manifest_edit) {
+        errors_ = {{code, std::move(field), std::move(message)}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    return true;
+}
+
+bool ProjectSession::prepare_manifest_edit(
+    const AutosaveScheduler::Clock::time_point now) {
+    return prepare_dirty_document_edit(
+        DirtyDocument::manifest, project::ErrorCode::invalid_manifest,
+        "project", "save current asset changes before editing project settings",
+        now);
 }
 
 bool ProjectSession::import_png(const std::filesystem::path& source,
@@ -1948,6 +2005,149 @@ ProjectSession::incoming_references(const StudioResourceKind kind,
     return incoming;
 }
 
+std::optional<std::vector<StudioResource>>
+ProjectSession::behavior_consumers(const std::string_view semantic_action) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "behaviorConsumers",
+                    "a project must be open before analyzing behavior consumers"}};
+        return std::nullopt;
+    }
+    std::vector<StudioResource> consumers;
+    for (const auto& source : resources_) {
+        if (source.kind != StudioResourceKind::behavior) continue;
+        auto loaded = project::load_behavior_graph(
+            project_root_, *manifest_, source.document_path);
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return std::nullopt;
+        }
+        const bool consumes = std::ranges::any_of(
+            loaded.asset->nodes, [&](const auto& node) {
+                if (node.type != "action_source") return false;
+                const auto property = std::ranges::find_if(
+                    node.properties, [](const auto& item) {
+                        return item.id == "semantic_id";
+                    });
+                return property != node.properties.end() &&
+                    std::holds_alternative<std::string>(property->value) &&
+                    std::get<std::string>(property->value) == semantic_action;
+            });
+        if (consumes) consumers.push_back(source);
+    }
+    errors_.clear();
+    return consumers;
+}
+
+bool ProjectSession::replace_incoming_references(
+    const StudioResourceKind kind, const core::ResourceId& id,
+    const core::ResourceId& replacement_id) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "replaceReferences",
+                    "a project must be open before replacing references"}};
+        return false;
+    }
+    if (id == replacement_id || !core::ResourceId::is_valid(replacement_id.value)) {
+        errors_ = {{project::ErrorCode::invalid_resource_id,
+                    "replaceReferences", "replacement must be a different valid id"}};
+        return false;
+    }
+    const auto target = std::ranges::find_if(
+        resources_, [&](const StudioResource& resource) {
+            return resource.kind == kind && resource.id == id;
+        });
+    const auto replacement = std::ranges::find_if(
+        resources_, [&](const StudioResource& resource) {
+            return resource.kind == kind && resource.id == replacement_id;
+        });
+    if (target == resources_.end() || replacement == resources_.end()) {
+        errors_ = {{project::ErrorCode::missing_resource,
+                    "replaceReferences", "both resources must be indexed"}};
+        return false;
+    }
+    const auto incoming = incoming_references(kind, id);
+    if (!incoming) return false;
+    if (incoming->empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset,
+                    "replaceReferences", "the resource has no incoming references"}};
+        return false;
+    }
+    if (!save_before_document_transition()) return false;
+
+    struct PendingRewrite {
+        StudioResource source;
+        std::string original;
+        std::string rewritten;
+    };
+    std::vector<PendingRewrite> pending;
+    pending.reserve(incoming->size());
+    const auto expected = expected_type(kind);
+    for (const auto& source : *incoming) {
+        const auto loaded = project::load_document(
+            project_root_, source.document_path,
+            resource_validator(source.kind, *manifest_));
+        if (!loaded.ok()) {
+            errors_ = loaded.errors;
+            return false;
+        }
+        try {
+            auto document = Json::parse(*loaded.contents);
+            if (replace_typed_references(document, id.value,
+                                          replacement_id.value, expected) == 0U)
+                continue;
+            pending.push_back({source, *loaded.contents, document.dump(2) + "\n"});
+        } catch (const Json::exception&) {
+            errors_ = {{project::ErrorCode::invalid_json,
+                        "replaceReferences", "referencing document is not valid JSON"}};
+            return false;
+        }
+    }
+    if (pending.empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset,
+                    "replaceReferences", "no typed references could be replaced"}};
+        return false;
+    }
+    for (const auto& item : pending) {
+        const auto validation = resource_validator(item.source.kind, *manifest_)(
+            item.rewritten);
+        if (!validation.ok()) {
+            errors_ = validation.errors;
+            return false;
+        }
+    }
+    const auto rollback = [&](const std::size_t count) {
+        for (std::size_t index = 0U; index < count; ++index)
+            static_cast<void>(project::save_document_atomic(
+                project_root_, pending[index].source.document_path,
+                pending[index].original,
+                resource_validator(pending[index].source.kind, *manifest_)));
+    };
+    std::size_t saved = 0U;
+    for (; saved < pending.size(); ++saved) {
+        const auto result = project::save_document_atomic(
+            project_root_, pending[saved].source.document_path,
+            pending[saved].rewritten,
+            resource_validator(pending[saved].source.kind, *manifest_));
+        if (!result.ok()) {
+            errors_ = result.errors;
+            rollback(saved);
+            return false;
+        }
+    }
+    const auto selected = selected_resource();
+    const auto selected_kind = selected ? selected->kind : kind;
+    const auto selected_id = selected ? selected->id : replacement_id;
+    if (!refresh_resources()) {
+        rollback(pending.size());
+        return false;
+    }
+    commands_.clear();
+    autosave_.reset();
+    dirty_document_ = DirtyDocument::none;
+    errors_.clear();
+    if (selected) static_cast<void>(select_resource(selected_kind, selected_id));
+    return true;
+}
+
 bool ProjectSession::trash_resource(const StudioResourceKind kind,
                                     const core::ResourceId& id,
                                     const bool confirmed) {
@@ -2040,26 +2240,7 @@ bool ProjectSession::set_project_name(
                     "a project must be open before editing its name"}};
         return false;
     }
-    if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
-                              dirty_document_ == DirtyDocument::vector ||
-                              dirty_document_ == DirtyDocument::material ||
-                              dirty_document_ == DirtyDocument::entity ||
-                              dirty_document_ == DirtyDocument::animation ||
-                              dirty_document_ == DirtyDocument::textured_path ||
-                              dirty_document_ == DirtyDocument::visual_composition ||
-                              dirty_document_ == DirtyDocument::visual_component)) {
-        errors_ = {{project::ErrorCode::invalid_manifest, "project",
-                    "save current asset changes before editing project settings"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
-            return false;
-        }
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_manifest_edit(now)) return false;
     if (manifest_->name == name) {
         return true;
     }
@@ -2090,26 +2271,7 @@ bool ProjectSession::set_pixels_per_unit(
                     "a project must be open before editing its units"}};
         return false;
     }
-    if (commands_.dirty() && (dirty_document_ == DirtyDocument::texture ||
-                              dirty_document_ == DirtyDocument::vector ||
-                              dirty_document_ == DirtyDocument::material ||
-                              dirty_document_ == DirtyDocument::entity ||
-                              dirty_document_ == DirtyDocument::animation ||
-                              dirty_document_ == DirtyDocument::textured_path ||
-                              dirty_document_ == DirtyDocument::visual_composition ||
-                              dirty_document_ == DirtyDocument::visual_component)) {
-        errors_ = {{project::ErrorCode::invalid_manifest, "project",
-                    "save current asset changes before editing project settings"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
-            return false;
-        }
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_manifest_edit(now)) return false;
     if (manifest_->pixels_per_unit == pixels_per_unit) {
         return true;
     }
@@ -2132,6 +2294,47 @@ bool ProjectSession::set_pixels_per_unit(
     return true;
 }
 
+bool ProjectSession::set_runtime_settings(
+    std::optional<project::RuntimeSettings> settings,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!has_project()) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "runtime",
+                    "a project must be open before editing runtime settings"}};
+        return false;
+    }
+    auto candidate = *manifest_;
+    candidate.runtime = settings;
+    const auto validation = project::validate_manifest(candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (settings && settings->audio) {
+        const auto audio = std::ranges::find_if(
+            resources_, [&](const StudioResource& resource) {
+                return resource.kind == StudioResourceKind::audio &&
+                    resource.id == *settings->audio;
+            });
+        if (audio == resources_.end()) {
+            errors_ = {{project::ErrorCode::missing_resource, "runtime.audio",
+                        "the selected audio resource is not indexed"}};
+            return false;
+        }
+    }
+    if (manifest_->runtime == settings) return true;
+    if (!commands_.execute(
+            std::make_unique<SetValueCommand<std::optional<project::RuntimeSettings>>>(
+                manifest_->runtime, std::move(settings)))) {
+        errors_ = {{project::ErrorCode::invalid_manifest, "runtime",
+                    "cannot execute the runtime settings modification"}};
+        return false;
+    }
+    autosave_.mark_changed(now);
+    dirty_document_ = DirtyDocument::manifest;
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::prepare_texture_edit(
     const AutosaveScheduler::Clock::time_point now) {
     if (!imported_texture_) {
@@ -2139,19 +2342,9 @@ bool ProjectSession::prepare_texture_edit(
                     "select a texture before editing its view"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::texture) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a texture"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
-    return true;
+    return prepare_dirty_document_edit(
+        DirtyDocument::texture, project::ErrorCode::invalid_asset, "selection",
+        "save or undo the current document before editing a texture", now);
 }
 
 bool ProjectSession::set_selected_texture_view(
@@ -2194,18 +2387,10 @@ bool ProjectSession::set_selected_material(
                     "select a material before editing it"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::material) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a material"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() &&
-            update_autosave(now) == AutosaveStatus::failed) return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::material, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing a material",
+            now)) return false;
     material.document.id = selected_material_->document.id;
     material.document.type = "material";
     material.document.schema_version = project::current_material_schema_version;
@@ -2239,19 +2424,10 @@ bool ProjectSession::set_selected_vector_node(
                     "select a native vector node before editing it"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::vector) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save project settings before editing a vector"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::vector, project::ErrorCode::invalid_asset,
+            "selection", "save project settings before editing a vector", now))
         return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
-            return false;
-        }
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
     if (created_vector_->native->nodes[node_index].locked && node.locked) {
         errors_ = {{project::ErrorCode::invalid_asset, "node",
                     "locked vector nodes cannot be edited"}};
@@ -2286,18 +2462,10 @@ bool ProjectSession::replace_selected_vector_nodes(
                     "select a native vector before editing its nodes"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::vector) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a vector"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::vector, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing a vector", now))
         return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
     auto candidate = *created_vector_;
     candidate.native->nodes = nodes;
     auto validation = project::validate_vector_asset(*manifest_, candidate);
@@ -2394,19 +2562,10 @@ bool ProjectSession::set_selected_entity_node(
                     "select an entity node before editing it"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing an entity"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing an entity", now))
         return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed) {
-            return false;
-        }
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
     auto candidate = *selected_entity_;
     candidate.nodes[node_index] = node;
     auto validation = project::validate_entity(*manifest_, candidate);
@@ -2430,14 +2589,9 @@ bool ProjectSession::set_selected_entity_behavior(
     std::optional<project::ResourceReference> behavior,
     const AutosaveScheduler::Clock::time_point now) {
     if (!selected_entity_ || !manifest_) return false;
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
-        errors_ = {{project::ErrorCode::invalid_asset, "editor",
-                    "save the active document before editing the entity"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        commands_.clear(); autosave_.reset(); dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset, "editor",
+            "save the active document before editing the entity", now)) return false;
     auto next = *selected_entity_;
     next.behavior = std::move(behavior);
     const auto validation = project::validate_entity(*manifest_, next);
@@ -2458,19 +2612,10 @@ bool ProjectSession::set_selected_visual_composition(
                     "select a visual composition before editing it"}};
         return false;
     }
-    if (commands_.dirty() &&
-        dirty_document_ != DirtyDocument::visual_composition) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a composition"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() &&
-            update_autosave(now) == AutosaveStatus::failed) return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::visual_composition, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing a composition",
+            now)) return false;
     auto validation = project::validate_visual_composition(
         *manifest_, composition);
     if (!validation.ok()) {
@@ -2498,19 +2643,10 @@ bool ProjectSession::set_selected_textured_path(
                     "select a textured path before editing it"}};
         return false;
     }
-    if (commands_.dirty() &&
-        dirty_document_ != DirtyDocument::textured_path) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a textured path"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() &&
-            update_autosave(now) == AutosaveStatus::failed) return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::textured_path, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing a textured path",
+            now)) return false;
     auto validation = project::validate_textured_path(*manifest_, path);
     if (!validation.ok()) {
         errors_ = std::move(validation.errors);
@@ -2537,19 +2673,10 @@ bool ProjectSession::set_selected_visual_component(
                     "select a visual component before editing it"}};
         return false;
     }
-    if (commands_.dirty() &&
-        dirty_document_ != DirtyDocument::visual_component) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing a component"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() &&
-            update_autosave(now) == AutosaveStatus::failed) return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::visual_component, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing a component",
+            now)) return false;
     auto validation = project::validate_visual_component(*manifest_, component);
     if (!validation.ok()) {
         errors_ = std::move(validation.errors);
@@ -2575,18 +2702,10 @@ bool ProjectSession::add_selected_entity_node(
                     "select an entity before adding a node"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing an entity"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing an entity", now))
         return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
     auto candidate = *selected_entity_;
     candidate.nodes.push_back(std::move(node));
     auto validation = project::validate_entity(*manifest_, candidate);
@@ -2639,11 +2758,10 @@ bool ProjectSession::move_selected_entity_node(
         return false;
     }
     if (node_index == destination_index) return true;
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing an entity"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset, "selection",
+            "save or undo the current document before editing an entity", now))
         return false;
-    }
     auto nodes = selected_entity_->nodes;
     auto moved = std::move(nodes[node_index]);
     nodes.erase(nodes.begin() + static_cast<std::ptrdiff_t>(node_index));
@@ -2683,18 +2801,10 @@ bool ProjectSession::remove_selected_entity_node(
                     "remove or reparent child nodes before removing this node"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing an entity"}};
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset, "selection",
+            "save or undo the current document before editing an entity", now))
         return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
     auto candidate = *selected_entity_;
     candidate.nodes.erase(candidate.nodes.begin() +
                           static_cast<std::ptrdiff_t>(node_index));
@@ -2723,19 +2833,10 @@ bool ProjectSession::prepare_animation_edit(
                     "select an animation before editing it"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::animation) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing an animation"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
-    return true;
+    return prepare_dirty_document_edit(
+        DirtyDocument::animation, project::ErrorCode::invalid_asset,
+        "selection", "save or undo the current document before editing an animation",
+        now);
 }
 
 bool ProjectSession::sync_animation_preview_entity() {
@@ -2760,19 +2861,9 @@ bool ProjectSession::prepare_input_edit(
                     "select input bindings before editing them"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::input) {
-        errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                    "save or undo the current document before editing input bindings"}};
-        return false;
-    }
-    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
-        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
-            return false;
-        commands_.clear();
-        autosave_.reset();
-        dirty_document_ = DirtyDocument::none;
-    }
-    return true;
+    return prepare_dirty_document_edit(
+        DirtyDocument::input, project::ErrorCode::invalid_asset, "selection",
+        "save or undo the current document before editing input bindings", now);
 }
 
 bool ProjectSession::set_selected_input_action_id(

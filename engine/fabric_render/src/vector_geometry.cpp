@@ -8,6 +8,9 @@
 namespace fabric::render {
 namespace {
 
+core::Vec2 apply_transform(const core::Vec2 point,
+                           const core::Transform& transform);
+
 float cross(const core::Vec2 a, const core::Vec2 b, const core::Vec2 c) {
     return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
@@ -73,6 +76,170 @@ std::vector<std::uint32_t> triangulate(const std::vector<core::Vec2>& points) {
     }
     result.insert(result.end(), {remaining[0], remaining[1], remaining[2]});
     return result;
+}
+
+void build_stroke_geometry(const std::vector<core::Vec2>& outline,
+                           const project::VectorStroke& stroke,
+                           const bool closed,
+                           std::vector<core::Vec2>& vertices,
+                           std::vector<std::uint32_t>& indices,
+                           std::vector<core::Vec2>& uv) {
+    if (outline.size() < 2U || !std::isfinite(stroke.width) ||
+        stroke.width <= 0.0F) return;
+    const auto segment_count = closed ? outline.size() : outline.size() - 1U;
+    const float half_width = stroke.width * 0.5F;
+    const auto map_uv = [&](const core::Vec2 value) {
+        return stroke.image ? apply_transform(value, stroke.image->transform)
+                            : value;
+    };
+    for (std::size_t index = 0; index < segment_count; ++index) {
+        auto first = outline[index];
+        auto second = outline[(index + 1U) % outline.size()];
+        auto dx = second.x - first.x;
+        auto dy = second.y - first.y;
+        const auto length = std::sqrt(dx * dx + dy * dy);
+        if (length <= 1.0e-6F) continue;
+        if (!closed && stroke.cap == project::VectorStrokeCap::square) {
+            const core::Vec2 tangent{dx / length * half_width,
+                                     dy / length * half_width};
+            if (index == 0U) first = {first.x - tangent.x, first.y - tangent.y};
+            if (index + 1U == segment_count)
+                second = {second.x + tangent.x, second.y + tangent.y};
+            dx = second.x - first.x;
+            dy = second.y - first.y;
+        }
+        const core::Vec2 normal{-dy * half_width / length,
+                                dx * half_width / length};
+        const auto base = static_cast<std::uint32_t>(vertices.size());
+        vertices.insert(vertices.end(), {{first.x + normal.x, first.y + normal.y},
+                                         {second.x + normal.x, second.y + normal.y},
+                                         {second.x - normal.x, second.y - normal.y},
+                                         {first.x - normal.x, first.y - normal.y}});
+        uv.insert(uv.end(), {map_uv({0.0F, 0.0F}), map_uv({length, 0.0F}),
+                             map_uv({length, 1.0F}), map_uv({0.0F, 1.0F})});
+        indices.insert(indices.end(), {base, base + 1U, base + 2U,
+                                       base, base + 2U, base + 3U});
+    }
+    if (!closed && stroke.cap == project::VectorStrokeCap::round) {
+        constexpr std::size_t cap_segments = 12U;
+        constexpr float pi = 3.14159265358979323846F;
+        const auto append_cap = [&](const core::Vec2 center,
+                                    const core::Vec2 tangent) {
+            const auto tangent_length = std::sqrt(
+                tangent.x * tangent.x + tangent.y * tangent.y);
+            if (tangent_length <= 1.0e-6F) return;
+            const core::Vec2 direction{tangent.x / tangent_length,
+                                       tangent.y / tangent_length};
+            const core::Vec2 normal{-direction.y, direction.x};
+            const auto base = static_cast<std::uint32_t>(vertices.size());
+            vertices.push_back(center);
+            uv.push_back(map_uv({0.0F, 0.5F}));
+            for (std::size_t step = 0; step <= cap_segments; ++step) {
+                const float angle = -pi * 0.5F + pi *
+                    static_cast<float>(step) / static_cast<float>(cap_segments);
+                vertices.push_back({center.x + half_width *
+                                        (direction.x * std::cos(angle) +
+                                         normal.x * std::sin(angle)),
+                                    center.y + half_width *
+                                        (direction.y * std::cos(angle) +
+                                         normal.y * std::sin(angle))});
+                uv.push_back(map_uv({0.0F, 0.5F}));
+                if (step > 0U) {
+                    const auto previous = base + static_cast<std::uint32_t>(step);
+                    const auto current = previous + 1U;
+                    indices.insert(indices.end(), {base, previous, current});
+                }
+            }
+        };
+        append_cap(outline.front(), {outline.front().x - outline[1].x,
+                                     outline.front().y - outline[1].y});
+        append_cap(outline.back(), {outline.back().x - outline[outline.size() - 2U].x,
+                                    outline.back().y - outline[outline.size() - 2U].y});
+    }
+    if (stroke.join == project::VectorStrokeJoin::round && outline.size() > 2U) {
+        constexpr std::size_t join_segments = 12U;
+        constexpr float pi = 3.14159265358979323846F;
+        const auto join_count = closed ? outline.size() : outline.size() - 2U;
+        const auto append_join = [&](const core::Vec2 center) {
+            const auto base = static_cast<std::uint32_t>(vertices.size());
+            vertices.push_back(center);
+            uv.push_back(map_uv({0.0F, 0.5F}));
+            for (std::size_t step = 0; step <= join_segments; ++step) {
+                const float angle = 2.0F * pi * static_cast<float>(step) /
+                    static_cast<float>(join_segments);
+                vertices.push_back({center.x + half_width * std::cos(angle),
+                                    center.y + half_width * std::sin(angle)});
+                uv.push_back(map_uv({0.0F, 0.5F}));
+                if (step > 0U) {
+                    indices.insert(indices.end(), {
+                        base, base + static_cast<std::uint32_t>(step),
+                        base + static_cast<std::uint32_t>(step) + 1U});
+                }
+            }
+        };
+        for (std::size_t index = 0; index < join_count; ++index)
+            append_join(outline[closed ? index : index + 1U]);
+    }
+    if (stroke.join != project::VectorStrokeJoin::round && outline.size() > 2U) {
+        const auto join_count = closed ? outline.size() : outline.size() - 2U;
+        const auto append_triangle = [&](const core::Vec2 first,
+                                         const core::Vec2 second,
+                                         const core::Vec2 third) {
+            const auto base = static_cast<std::uint32_t>(vertices.size());
+            vertices.insert(vertices.end(), {first, second, third});
+            uv.insert(uv.end(), 3U, map_uv({0.0F, 0.5F}));
+            indices.insert(indices.end(), {base, base + 1U, base + 2U});
+        };
+        for (std::size_t offset = 0; offset < join_count; ++offset) {
+            const auto index = closed ? offset : offset + 1U;
+            const auto previous = outline[(index + outline.size() - 1U) % outline.size()];
+            const auto current = outline[index];
+            const auto next = outline[(index + 1U) % outline.size()];
+            const auto previous_length = std::hypot(
+                current.x - previous.x, current.y - previous.y);
+            const auto next_length = std::hypot(
+                next.x - current.x, next.y - current.y);
+            if (previous_length <= 1.0e-6F || next_length <= 1.0e-6F) continue;
+            const core::Vec2 first_direction{
+                (current.x - previous.x) / previous_length,
+                (current.y - previous.y) / previous_length};
+            const core::Vec2 second_direction{
+                (next.x - current.x) / next_length,
+                (next.y - current.y) / next_length};
+            const core::Vec2 first_normal{-first_direction.y * half_width,
+                                          first_direction.x * half_width};
+            const core::Vec2 second_normal{-second_direction.y * half_width,
+                                           second_direction.x * half_width};
+            const auto add_side = [&](const float side) {
+                const core::Vec2 first_offset{
+                    current.x + first_normal.x * side,
+                    current.y + first_normal.y * side};
+                const core::Vec2 second_offset{
+                    current.x + second_normal.x * side,
+                    current.y + second_normal.y * side};
+                if (stroke.join == project::VectorStrokeJoin::bevel) {
+                    append_triangle(current, first_offset, second_offset);
+                    return;
+                }
+                const auto determinant = first_direction.x * second_direction.y -
+                    first_direction.y * second_direction.x;
+                if (std::abs(determinant) <= 1.0e-6F) {
+                    append_triangle(current, first_offset, second_offset);
+                    return;
+                }
+                const core::Vec2 delta{second_offset.x - first_offset.x,
+                                       second_offset.y - first_offset.y};
+                const auto distance = (delta.x * second_direction.y -
+                                       delta.y * second_direction.x) / determinant;
+                const core::Vec2 miter{first_offset.x + first_direction.x * distance,
+                                       first_offset.y + first_direction.y * distance};
+                append_triangle(current, first_offset, miter);
+                append_triangle(current, miter, second_offset);
+            };
+            add_side(1.0F);
+            add_side(-1.0F);
+        }
+    }
 }
 
 std::vector<core::Vec2> flatten_shape(const project::VectorShape& shape,
@@ -311,6 +478,15 @@ VectorGeometryResult build_native_draw_packets(
         if (!transform_outline(nodes, node, packet.outline, transform_error)) {
             result.errors.push_back(std::move(transform_error));
             continue;
+        }
+        if (packet.stroke) {
+            build_stroke_geometry(packet.outline, *packet.stroke,
+                                  packet.closed_outline,
+                                  packet.stroke_vertices,
+                                  packet.stroke_indices,
+                                  packet.stroke_uv);
+            packet.stroke_image = packet.stroke->image;
+            packet.stroke_repeat_texture_x = packet.stroke->repeat_texture_x;
         }
         if (node.fill.kind == project::VectorFillKind::solid ||
             node.fill.kind == project::VectorFillKind::image) {

@@ -8,6 +8,7 @@
 #include "fabric/project/entity.hpp"
 #include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/animation_ik.hpp"
+#include "fabric/project/audio.hpp"
 #include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/map_chunk_index.hpp"
@@ -1133,6 +1134,46 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         if (!loaded_project.ok()) {
             append_errors(errors_, loaded_project.errors);
             return false;
+        }
+    }
+    if (loaded_project.manifest->runtime) {
+        const auto& settings = *loaded_project.manifest->runtime;
+        if (!options_.enable_character) {
+            options_.enable_character = settings.character.enabled;
+        }
+        if (!options_.character_spawn && settings.character.spawn) {
+            options_.character_spawn = settings.character.spawn;
+        }
+        if (!options_.character_actions &&
+            !settings.character.actions[0].empty() &&
+            !settings.character.actions[1].empty() &&
+            !settings.character.actions[2].empty()) {
+            options_.character_actions = PreviewRuntimeOptions::CharacterActions{
+                .left = settings.character.actions[0],
+                .right = settings.character.actions[1],
+                .jump = settings.character.actions[2]};
+        }
+        if (!options_.follow_character) {
+            options_.follow_character = settings.camera.follow_character;
+        }
+        if (!options_.camera_limits && settings.camera.limits) {
+            options_.camera_limits = settings.camera.limits;
+        }
+        if (!options_.audio_wav && settings.audio) {
+            const auto audio = project::load_audio(
+                options_.project_root, *loaded_project.manifest,
+                project::audio_document_path(*loaded_project.manifest,
+                                             *settings.audio));
+            if (!audio.ok()) {
+                append_errors(errors_, audio.errors);
+                return false;
+            }
+            if (audio.audio->events.empty()) {
+                errors_.push_back("runtime.audio: document has no events");
+                return false;
+            }
+            options_.audio_wav = options_.project_root /
+                audio.audio->events.front().source;
         }
     }
     std::optional<project::SceneDocument> loaded_scene;

@@ -474,7 +474,6 @@ TEST_CASE("Beam texture offset uses a generic component animation property") {
     const auto bundle = fabric::editor::build_visual_preset(
         manifest(), beam_request);
     REQUIRE(bundle.ok());
-
     fabric::project::PropertyDescriptorRegistry registry;
     for (auto descriptor :
          fabric::project::visual_component_property_descriptors(

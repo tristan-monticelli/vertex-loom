@@ -273,6 +273,17 @@ void draw_resource_picker(const char* label,
         ImGui::SameLine();
         if (ImGui::SmallButton(filename.c_str())) selected_id = filename;
     }
+    if (!selected_id.empty()) {
+        const auto selected_path = directory /
+            (selected_id + std::string{suffix});
+        if (std::filesystem::is_regular_file(selected_path, error)) {
+            ImGui::TextDisabled("Type: %s", std::string{suffix}.c_str());
+            ImGui::TextDisabled("%s", selected_path.generic_string().c_str());
+        } else {
+            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                               "Missing resource: %s", selected_id.c_str());
+        }
+    }
     ImGui::PopID();
 }
 
@@ -350,8 +361,6 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
     }
     ImGui::EndDisabled();
-    ImGui::SetNextItemWidth(180.0F);
-    ImGui::InputText("Existing scene", &state.open_id);
     draw_resource_picker("Scenes:", scenes_directory, ".scene.json",
                          state.open_id);
     ImGui::SameLine();
@@ -684,8 +693,9 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         return;
     }
 
+    std::filesystem::path directory;
     if (map_session.manifest()) {
-        const auto directory = map_session.project_root() /
+        directory = map_session.project_root() /
             map_session.manifest()->directories.assets / "mechanics";
         std::error_code error;
         if (std::filesystem::exists(directory, error)) {
@@ -703,8 +713,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         }
     }
 
-    ImGui::SetNextItemWidth(180.0F);
-    ImGui::InputText("Mechanic id", &state.open_id);
+    draw_resource_picker("Mechanics:", directory, ".mechanic.json",
+                         state.open_id);
     ImGui::SameLine();
     ImGui::BeginDisabled(state.open_id.empty());
     if (ImGui::Button("Open")) {

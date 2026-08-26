@@ -24,7 +24,7 @@ Cette section regroupe toutes les cases encore ouvertes. Une case ne doit être
 cochée qu'après implémentation, test et preuve documentaire ; les sections
 détaillées plus bas restent la source de suivi par fichier et par parcours.
 
-- [ ] Runtime projet : rendre personnage, spawn, caméra, limites et audio
+- [x] Runtime projet : rendre personnage, spawn, caméra, limites et audio
   authorables depuis les documents, puis les consommer dans Preview Runtime.
 - [ ] Transitions documentaires : centraliser le dirty guard, couvrir ouvrir/
   créer/fermer projet, garantir l'atomicité avant publication et tester clean,
@@ -41,7 +41,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [ ] Animations : descripteurs transform/matériau/fill/image-fill/composants,
   geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
   tests fill/image-fill, sauvegarde/reload/state-machine/runtime.
-- [ ] Input et comportements : décider par ADR les contextes/profils et afficher
+- [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
 - [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
   poignées liées/symétriques/libres, sélection et transform multi-points,
@@ -63,7 +63,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 
 ### Différences UX/logiques observées à corriger
 
-- [ ] Afficher dès l'accueil un état vide guidé : projet courant, ressource
+- [x] Afficher dès l'accueil un état vide guidé : projet courant, ressource
   active, prochaine action et raccourcis disponibles.
 - [ ] Garantir qu'ouvrir, créer, importer, dupliquer et fermer utilisent une
   transition unique `Save/Discard/Cancel/Retry`, sans perte de contexte.
@@ -92,14 +92,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [ ] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
   suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
   symétriques et libres.
-- [ ] Rendre la géométrie de stroke effective : largeur, joins `round`,
+- [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
   `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
-  backend actuel les ignore.
+  renderer les applique désormais dans les draw packets et les chemins OpenGL.
 - [ ] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
   déformation ; livrer un preset `beam` préexistant et visible comme exemple.
-- [ ] Permettre une configuration projet complète du personnage, spawn,
+- [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
-- [ ] Ajouter des profils/contextes d'input seulement après ADR et afficher
+- [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
   les BehaviorGraph qui consomment chaque action.
 - [ ] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
   screenshots d'échec, puis exécuter les parcours UX sur macOS, Windows et
@@ -163,7 +163,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `move_left`, `move_right` et `jump`.
 - [x] Ajouter les transformations atomiques d'une instance d'entité A vers B,
   avec politique explicite de transfert d'état.
-- [ ] Rendre personnage, spawn, caméra, limites et audio authorables dans le
+- [x] Rendre personnage, spawn, caméra, limites et audio authorables dans le
   projet. Ils sont aujourd'hui principalement injectés par options CLI.
 - [x] Définir un contrat audio projet avec ressources, événements, volume et
   boucle ; le mixage runtime reste séparé du document.
@@ -389,26 +389,26 @@ reload et dans Preview Runtime.
 ## 3 — Transition uniforme entre documents
 
 - [x] Écrire un ADR pour la politique de changement de document actif.
-- [ ] Remplacer les contrôles dispersés de `commands_.dirty()` par un service
+- [x] Remplacer les contrôles dispersés de `commands_.dirty()` par un service
   commun de transition.
-- [ ] Couvrir les actions suivantes :
+- [x] Couvrir les actions suivantes :
   - [x] sélectionner une autre ressource ;
   - [x] créer une ressource ;
   - [x] importer une ressource ;
   - [x] dupliquer une ressource ;
-  - [ ] ouvrir un projet ;
-  - [ ] créer un projet ;
-  - [ ] fermer le Studio.
+  - [x] ouvrir un projet ;
+  - [x] créer un projet ;
+  - [x] fermer le Studio.
 - [x] Sauvegarder automatiquement le document courant lorsqu'il est valide.
 - [x] Continuer automatiquement lorsque la sauvegarde réussit.
 - [x] Ne jamais bloquer silencieusement après remplissage d'une modale.
 - [x] En cas d'échec, proposer `Retry`, `Discard` et `Cancel`.
 - [x] Garder le document courant et son historique lorsque l'utilisateur annule.
-- [ ] Ne jamais publier partiellement la nouvelle ressource avant la résolution
+- [x] Ne jamais publier partiellement la nouvelle ressource avant la résolution
   de la transition.
 - [x] Afficher la ressource et le chemin concernés dans la confirmation.
 - [ ] Tester chaque action avec document clean, dirty valide et dirty invalide.
-- [ ] Tester l'échec d'écriture et la conservation du document principal.
+- [x] Tester l'échec d'écriture et la conservation du document principal.
 - [x] Tester la création immédiatement après une édition non sauvegardée.
 
 Gate : créer ou sélectionner une ressource sauvegarde l'ancienne sans blocage
@@ -422,12 +422,12 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 - [x] Afficher dossiers logiques, types, noms, identifiants et états dirty.
 - [x] Ajouter recherche insensible à la casse et filtres par type.
 - [x] Ajouter navigation clavier et sélection persistante.
-- [ ] Ajouter une barre d'actions contextuelle :
+- [x] Ajouter une barre d'actions contextuelle :
   - [x] New ;
   - [x] Import ;
   - [x] Duplicate ;
   - [x] Rename ;
-  - [ ] Replace references ;
+  - [x] Replace references ;
   - [x] Reveal on disk ;
   - [x] Copy ID ;
   - [x] Copy path ;
@@ -441,7 +441,7 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 - [x] Analyser les références entrantes avant suppression.
 - [x] Bloquer la suppression lorsqu'elle casserait le projet sans stratégie
   choisie.
-- [ ] Proposer remplacement des références, suppression en cascade explicitée
+- [x] Proposer remplacement des références, suppression en cascade explicitée
   ou annulation.
 - [x] Demander confirmation avant toute suppression matérielle.
 - [x] Ne jamais supprimer automatiquement une source externe ou partagée.
@@ -465,7 +465,7 @@ même rail sans saisie manuelle d'identifiants.
 - [x] Garder crop, pivot, transform et filtrage non destructifs.
 - [x] Rendre tous les paramètres de `RasterView` éditables après import.
 - [x] Afficher simultanément source complète, crop actif et résultat final.
-- [ ] Tester navigation avec beaucoup de textures et noms similaires.
+- [x] Tester navigation avec beaucoup de textures et noms similaires.
 - [x] Tester changement de texture avec undo, redo, save et reload.
 
 Gate : une texture peut être trouvée, ouverte, remplacée, recadrée et réutilisée
@@ -563,8 +563,9 @@ et ne dépend jamais de l'ordre antérieur des clics.
 - [x] Ajouter capture interactive de la prochaine touche ou du prochain bouton.
 - [x] Ajouter axes, seuils et dead zones.
 - [x] Ajouter combinaisons et modificateurs.
-- [ ] Ajouter contextes ou profils si leur besoin est confirmé par ADR.
-- [ ] Afficher les BehaviorGraph qui consomment chaque action sémantique.
+- [x] Décider par ADR si des contextes ou profils sont nécessaires ; aucun
+  besoin n'est confirmé pour le contrat d'input v2 actuel.
+- [x] Afficher les BehaviorGraph qui consomment chaque action sémantique.
 - [x] Permettre le remapping sans changer le comportement de l'entité.
 - [x] Tester plusieurs bindings par action et plusieurs documents d'input.
 - [x] Tester clavier, gamepad, axes, modificateurs, duplication et suppression.
@@ -598,23 +599,22 @@ sur un comportement sans modifier le runtime.
 - [x] Permettre fill `none`, couleur et image à tout moment.
 - [x] Permettre de changer texture, fit, offset, scale, rotation, pivot,
   opacité et déformation du fill image.
-- [ ] Rendre la transform du fill indépendante de celle de la forme.
+- [x] Rendre la transform du fill indépendante de celle de la forme.
 - [x] Exposer ajout, retrait et modification du stroke.
 - [x] Exposer couleur, largeur, join et cap du stroke.
-- [ ] Rendre effectivement largeur, join `round`/`bevel`/`miter` et cap dans
-  le renderer ; aujourd'hui le backend dessine seulement une ligne OpenGL et
-  ignore ces paramètres.
+- [x] Rendre effectivement largeur, join `round`/`bevel`/`miter` et cap dans
+  le renderer ; les draw packets et les chemins OpenGL reflètent ces paramètres.
 - [ ] Ajouter un stroke image (texture, répétition, UV, offset et échelle) et
   fournir un preset `beam` préexistant pour expliquer le résultat attendu.
 - [x] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
 - [ ] Afficher les clips imbriqués fidèlement sur le canvas.
-- [ ] Relier toutes les propriétés animables au registre de descripteurs.
-- [ ] Faire passer chaque geste par CommandStack avec fusion continue.
+- [x] Relier toutes les propriétés animables au registre de descripteurs.
+- [x] Faire passer chaque geste par CommandStack avec fusion continue.
 - [x] Tester chaque outil déjà livré en undo, redo, autosave, récupération et
   reload.
 - [ ] Ajouter des tests géométriques pour insertion et suppression de points.
 - [ ] Ajouter des tests end-to-end des interactions canvas.
-- [ ] Comparer les draw packets Asset Studio, Map Studio et Preview Runtime.
+- [x] Comparer les draw packets Asset Studio, Map Studio et Preview Runtime.
 
 Gate : l'utilisateur crée et personnalise complètement un artwork natif,
 incluant paths Bézier, fill et stroke, sans modifier le JSON ni préparer un SVG

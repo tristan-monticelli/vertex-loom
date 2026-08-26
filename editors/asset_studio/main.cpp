@@ -51,6 +51,9 @@ using fabric::asset_studio::clear_asset_preview;
 using fabric::asset_studio::draw_import_workflow;
 using fabric::asset_studio::upload_preview;
 
+fabric::editor::ProjectSession* active_picker_session = nullptr;
+std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
+
 constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
@@ -134,6 +137,17 @@ constexpr const char* redo_shortcut = "Ctrl+Shift+Z";
 struct ProjectSettingsUiState {
     std::string name;
     double pixels_per_unit{fabric::project::default_pixels_per_unit};
+    bool runtime_enabled{};
+    float spawn_x{};
+    float spawn_y{};
+    std::array<std::string, 3> runtime_actions{};
+    bool camera_follow_character{};
+    bool camera_limits_enabled{};
+    float camera_x{};
+    float camera_y{};
+    float camera_width{100.0F};
+    float camera_height{100.0F};
+    std::string audio_id;
     bool request{};
 };
 
@@ -742,6 +756,7 @@ std::string_view studio_resource_kind_label(
     case Kind::entity: return "entity";
     case Kind::animation: return "animation";
     case Kind::input: return "input";
+    case Kind::audio: return "audio";
     case Kind::behavior: return "behavior";
     case Kind::transformation: return "transformation";
     case Kind::textured_path: return "textured path";
@@ -760,6 +775,11 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     if (!session.has_project()) {
         ImGui::TextDisabled("No project open");
         ImGui::Spacing();
+        ImGui::SeparatorText("Current state");
+        ImGui::BulletText("Current project: none");
+        ImGui::BulletText("Active resource: none");
+        ImGui::TextWrapped("Next action: create a project or open an existing one.");
+        ImGui::TextDisabled("Shortcuts: Cmd/Ctrl+O open project, Cmd/Ctrl+N create project");
         ImGui::TextWrapped("Create or open a Vertex Loom project to begin.");
         return;
     }
@@ -767,6 +787,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     static ImGuiTextFilter filter;
     static std::optional<fabric::editor::StudioResource> delete_request;
     static std::vector<fabric::editor::StudioResource> delete_impact;
+    static std::string replacement_id;
     static std::optional<fabric::editor::StudioResource> rename_request;
     static std::string rename_value;
     bool open_delete_popup = false;
@@ -780,6 +801,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         }
         delete_request = resource;
         delete_impact = *incoming;
+        replacement_id.clear();
         open_delete_popup = true;
     };
     const auto request_rename = [&](const fabric::editor::StudioResource& resource) {
@@ -793,7 +815,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         "All types", "Textures", "Vector artworks", "Materials / fills",
         "Entities", "Animations", "Input bindings", "Behaviors",
         "Transformations", "Textured paths", "Visual compositions",
-        "Visual components", "Maps", "Scenes", "Mechanics", "Replays"};
+        "Visual components", "Maps", "Scenes", "Mechanics", "Replays",
+        "Audio"};
     ImGui::SetNextItemWidth(-1.0F);
     ImGui::Combo("##resource-kind-filter", &kind_filter, kind_filters,
                  static_cast<int>(std::size(kind_filters)));
@@ -913,7 +936,6 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity, 4);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation, 5);
     draw_kind("Input bindings", fabric::editor::StudioResourceKind::input, 6);
-    draw_kind("Audio", fabric::editor::StudioResourceKind::audio, 17);
     draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior, 7);
     draw_kind("Transformations",
               fabric::editor::StudioResourceKind::transformation, 8);
@@ -927,6 +949,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Scenes", fabric::editor::StudioResourceKind::scene, 13);
     draw_kind("Mechanics", fabric::editor::StudioResourceKind::mechanic, 14);
     draw_kind("Replays", fabric::editor::StudioResourceKind::replay, 15);
+    draw_kind("Audio", fabric::editor::StudioResourceKind::audio, 16);
 
     if (open_delete_popup) ImGui::OpenPopup("Delete resource");
     if (ImGui::BeginPopupModal("Delete resource", nullptr,
@@ -951,6 +974,45 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                                       source.id.value.c_str());
                 ImGui::TextWrapped(
                     "Replace the references or cancel before deleting this resource.");
+                ImGui::SeparatorText("Replacement");
+                const auto replacement = std::ranges::find_if(
+                    session.resources(), [&](const auto& resource) {
+                        return resource.kind == delete_request->kind &&
+                            resource.id.value == replacement_id;
+                    });
+                const std::string replacement_label =
+                    replacement != session.resources().end()
+                    ? replacement->name
+                    : replacement_id.empty()
+                    ? std::string{"Choose a replacement..."}
+                    : std::string{"Missing: "} + replacement_id;
+                if (ImGui::BeginCombo("Resource", replacement_label.c_str())) {
+                    for (const auto& candidate : session.resources()) {
+                        if (candidate.kind != delete_request->kind ||
+                            candidate.id == delete_request->id) continue;
+                        const bool selected = candidate.id.value == replacement_id;
+                        if (ImGui::Selectable(candidate.name.c_str(), selected))
+                            replacement_id = candidate.id.value;
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s", candidate.id.value.c_str());
+                    }
+                    ImGui::EndCombo();
+                }
+                ImGui::BeginDisabled(replacement == session.resources().end());
+                if (ImGui::Button("Replace references")) {
+                    const auto target = *delete_request;
+                    if (session.replace_incoming_references(
+                            target.kind, target.id, {.value = replacement_id})) {
+                        const auto remaining = session.incoming_references(
+                            target.kind, target.id);
+                        delete_impact = remaining ? *remaining : delete_impact;
+                        replacement_id.clear();
+                        status = "References replaced; resource can now be moved to trash.";
+                    } else {
+                        status = "Reference replacement failed; inspect diagnostics.";
+                    }
+                }
+                ImGui::EndDisabled();
             }
             ImGui::BeginDisabled(!delete_impact.empty());
             ImGui::PushStyleColor(
@@ -962,6 +1024,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                     status = "Resource moved to project trash; Undo delete is available.";
                     delete_request.reset();
                     delete_impact.clear();
+                    replacement_id.clear();
                     ImGui::CloseCurrentPopup();
                 } else {
                     status = "Delete failed; inspect diagnostics.";
@@ -973,6 +1036,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
                 delete_request.reset();
                 delete_impact.clear();
+                replacement_id.clear();
                 ImGui::CloseCurrentPopup();
                 status = "Delete cancelled.";
             }
@@ -1335,12 +1399,52 @@ bool draw_project_resource_picker(
         ImGui::EndCombo();
     }
     if (selected != resources.end()) {
+        if (selected->kind == fabric::editor::StudioResourceKind::texture &&
+            active_picker_session != nullptr && active_picker_texture_cache != nullptr) {
+            auto& cache = *active_picker_texture_cache;
+            auto cached = cache.find(selected->id.value);
+            if (cached == cache.end() && active_picker_session->manifest()) {
+                const auto loaded = fabric::project::load_texture_asset(
+                    active_picker_session->project_root(),
+                    *active_picker_session->manifest(), selected->document_path);
+                if (loaded.ok()) {
+                    const auto decoded = fabric::render::load_png(
+                        active_picker_session->project_root() / loaded.asset->source);
+                    if (decoded.ok()) {
+                        AssetPreview thumbnail;
+                        upload_preview(thumbnail, *decoded.image);
+                        cached = cache.emplace(selected->id.value,
+                                               std::move(thumbnail)).first;
+                    }
+                }
+            }
+            if (cached != cache.end() && cached->second.texture != 0U) {
+                ImGui::Image(static_cast<ImTextureID>(cached->second.texture),
+                             {64.0F, 64.0F});
+            }
+        }
+        ImGui::TextDisabled("Type: %s",
+                           studio_resource_kind_label(selected->kind).data());
         ImGui::TextDisabled("%s",
                             selected->document_path.generic_string().c_str());
         if (selected->kind == fabric::editor::StudioResourceKind::texture &&
             selected->width != 0U && selected->height != 0U)
             ImGui::TextDisabled("%ux%u %s", selected->width, selected->height,
                                 selected->format.empty() ? "texture" : selected->format.c_str());
+        if (active_picker_session != nullptr) {
+            const auto references = active_picker_session->incoming_references(
+                selected->kind, selected->id);
+            if (references) {
+                ImGui::TextDisabled("Incoming references: %zu",
+                                   references->size());
+            }
+            const std::string open_label = "Open in Resource Explorer##picker-" +
+                selected->id.value;
+            if (ImGui::SmallButton(open_label.c_str())) {
+                static_cast<void>(active_picker_session->select_resource(
+                    selected->kind, selected->id));
+            }
+        }
     }
     return changed;
 }
@@ -2157,6 +2261,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImportUiState& imports,
                     AssetPreview& preview,
                     AssetPreview& pending_import_preview,
+                    std::unordered_map<std::string, AssetPreview>& texture_cache,
                     CanvasUiState& canvas,
                     const EntityPreviewResult& entity_preview,
                     const fabric::render::VisualCompositionDrawResult&
@@ -2170,6 +2275,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     fabric::editor::SessionTransitionGuard& transition_guard,
                     bool& running,
                     std::string& status) {
+    active_picker_session = &session;
+    active_picker_texture_cache = &texture_cache;
     canvas.native_canvas = false;
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
@@ -2194,6 +2301,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
     } else {
         ImGui::Spacing();
+        if (!session.selected_resource()) {
+            ImGui::SeparatorText("Current state");
+            ImGui::BulletText("Current project: %s", session.manifest()->name.c_str());
+            ImGui::BulletText("Active resource: none");
+            ImGui::TextWrapped("Next action: select a resource or add one from the menu.");
+        }
         if (ImGui::Button("+ Add resource...", {-1.0F, 0.0F})) {
             ImGui::OpenPopup("Add resource");
         }
@@ -3651,6 +3764,58 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::EndCombo();
                 }
+                std::string stroke_texture_id = node.stroke->image
+                    ? node.stroke->image->texture.id.value : std::string{};
+                if (draw_project_resource_picker(
+                        "Stroke image texture", session.resources(),
+                        fabric::editor::StudioResourceKind::texture,
+                        stroke_texture_id, true)) {
+                    if (stroke_texture_id.empty()) {
+                        node.stroke->image.reset();
+                    } else {
+                        node.stroke->image = fabric::project::VectorImageFill{
+                            .texture = {{.value = stroke_texture_id}, "texture"}};
+                    }
+                    commit_node(node);
+                }
+                if (node.stroke->image) {
+                    bool repeat_texture = node.stroke->repeat_texture_x;
+                    if (ImGui::Checkbox("Repeat stroke texture horizontally",
+                                        &repeat_texture)) {
+                        node.stroke->repeat_texture_x = repeat_texture;
+                        commit_node(node);
+                    }
+                    auto& image = *node.stroke->image;
+                    float image_offset[]{image.transform.position.x,
+                                        image.transform.position.y};
+                    if (ImGui::InputFloat2("Stroke image offset", image_offset)) {
+                        image.transform.position = {image_offset[0], image_offset[1]};
+                        commit_node(node);
+                    }
+                    float image_scale[]{image.transform.scale.x,
+                                       image.transform.scale.y};
+                    if (ImGui::InputFloat2("Stroke image scale", image_scale)) {
+                        image.transform.scale = {image_scale[0], image_scale[1]};
+                        commit_node(node);
+                    }
+                    float image_rotation = image.transform.rotation_degrees;
+                    if (ImGui::InputFloat("Stroke image rotation", &image_rotation,
+                                          1.0F, 10.0F, "%.2f deg")) {
+                        image.transform.rotation_degrees = image_rotation;
+                        commit_node(node);
+                    }
+                    float image_opacity = image.opacity;
+                    if (ImGui::SliderFloat("Stroke image opacity", &image_opacity,
+                                           0.0F, 1.0F, "%.2f")) {
+                        image.opacity = image_opacity;
+                        commit_node(node);
+                    }
+                    bool deform = image.deform_with_shape;
+                    if (ImGui::Checkbox("Deform stroke image with shape", &deform)) {
+                        image.deform_with_shape = deform;
+                        commit_node(node);
+                    }
+                }
             }
             ImGui::EndDisabled();
             }
@@ -4150,6 +4315,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                  action_index < input.actions.size(); ++action_index) {
                 const auto& action = input.actions[action_index];
                 ImGui::PushID(static_cast<int>(action_index));
+                if (const auto consumers = session.behavior_consumers(action.id)) {
+                    ImGui::TextDisabled("BehaviorGraph consumers: %zu",
+                                       consumers->size());
+                    for (const auto& consumer : *consumers)
+                        ImGui::BulletText("%s (%s)", consumer.name.c_str(),
+                                         consumer.id.value.c_str());
+                }
                 bool action_removed = false;
                 std::string action_id = action.id;
                 if (ImGui::InputText("Action id", &action_id) &&
@@ -4512,8 +4684,32 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 auto_key_changed = ImGui::Checkbox("Boolean value",
                                                     &animation_ui.key_boolean);
             } else {
-                auto_key_changed = ImGui::InputText("Resource id",
-                                                    &animation_ui.key_resource_id);
+                const auto selected_resource = std::ranges::find_if(
+                    session.resources(), [&](const auto& resource) {
+                        return resource.id.value == animation_ui.key_resource_id;
+                    });
+                const char* resource_label =
+                    selected_resource == session.resources().end()
+                    ? (animation_ui.key_resource_id.empty()
+                        ? "Choose a resource..." : "Missing resource")
+                    : selected_resource->name.c_str();
+                if (ImGui::BeginCombo("Resource value", resource_label)) {
+                    for (const auto& resource : session.resources()) {
+                        const bool selected =
+                            resource.id.value == animation_ui.key_resource_id;
+                        if (ImGui::Selectable(resource.name.c_str(), selected)) {
+                            animation_ui.key_resource_id = resource.id.value;
+                            auto_key_changed = true;
+                        }
+                        ImGui::SameLine();
+                        const auto kind_label = std::string(
+                            studio_resource_kind_label(resource.kind));
+                        ImGui::TextDisabled("%s · %s",
+                                           kind_label.c_str(),
+                                           resource.id.value.c_str());
+                    }
+                    ImGui::EndCombo();
+                }
             }
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
@@ -4651,6 +4847,36 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     if (project_settings.request && session.has_project()) {
         project_settings.name = session.manifest()->name;
         project_settings.pixels_per_unit = session.manifest()->pixels_per_unit;
+        project_settings.runtime_enabled = false;
+        project_settings.spawn_x = 0.0F;
+        project_settings.spawn_y = 0.0F;
+        project_settings.runtime_actions = {};
+        project_settings.camera_follow_character = false;
+        project_settings.camera_limits_enabled = false;
+        project_settings.camera_x = 0.0F;
+        project_settings.camera_y = 0.0F;
+        project_settings.camera_width = 100.0F;
+        project_settings.camera_height = 100.0F;
+        project_settings.audio_id.clear();
+        if (session.manifest()->runtime) {
+            const auto& runtime = *session.manifest()->runtime;
+            project_settings.runtime_enabled = runtime.character.enabled;
+            if (runtime.character.spawn) {
+                project_settings.spawn_x = runtime.character.spawn->x;
+                project_settings.spawn_y = runtime.character.spawn->y;
+            }
+            project_settings.runtime_actions = runtime.character.actions;
+            project_settings.camera_follow_character =
+                runtime.camera.follow_character;
+            if (runtime.camera.limits) {
+                project_settings.camera_limits_enabled = true;
+                project_settings.camera_x = runtime.camera.limits->origin.x;
+                project_settings.camera_y = runtime.camera.limits->origin.y;
+                project_settings.camera_width = runtime.camera.limits->size.x;
+                project_settings.camera_height = runtime.camera.limits->size.y;
+            }
+            if (runtime.audio) project_settings.audio_id = runtime.audio->value;
+        }
         ImGui::OpenPopup("Project settings");
         project_settings.request = false;
     }
@@ -4662,19 +4888,57 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::InputDouble("Pixels per unit",
                            &project_settings.pixels_per_unit, 1.0, 10.0,
                            "%.2f");
+        ImGui::SeparatorText("Runtime preview");
+        ImGui::Checkbox("Enable character", &project_settings.runtime_enabled);
+        ImGui::InputFloat2("Character spawn", &project_settings.spawn_x);
+        ImGui::InputText("Left action", &project_settings.runtime_actions[0]);
+        ImGui::InputText("Right action", &project_settings.runtime_actions[1]);
+        ImGui::InputText("Jump action", &project_settings.runtime_actions[2]);
+        ImGui::Checkbox("Follow character", &project_settings.camera_follow_character);
+        ImGui::Checkbox("Camera limits", &project_settings.camera_limits_enabled);
+        if (project_settings.camera_limits_enabled) {
+            ImGui::InputFloat2("Camera origin", &project_settings.camera_x);
+            ImGui::InputFloat2("Camera size", &project_settings.camera_width);
+        }
+        draw_project_resource_picker(
+            "Audio document", session.resources(),
+            fabric::editor::StudioResourceKind::audio,
+            project_settings.audio_id, true);
         ImGui::TextDisabled("%s", session.project_root().string().c_str());
         const bool valid = !project_settings.name.empty() &&
             project_settings.name.size() <= 255 &&
             std::isfinite(project_settings.pixels_per_unit) &&
             project_settings.pixels_per_unit > 0.0 &&
-            project_settings.pixels_per_unit <= 1'000'000.0;
+            project_settings.pixels_per_unit <= 1'000'000.0 &&
+            (!project_settings.camera_limits_enabled ||
+             (std::isfinite(project_settings.camera_width) &&
+              std::isfinite(project_settings.camera_height) &&
+              project_settings.camera_width >= 0.0F &&
+              project_settings.camera_height >= 0.0F));
         ImGui::BeginDisabled(!valid);
         if (ImGui::Button("Apply", {110.0F, 0.0F})) {
             const bool name_updated =
                 session.set_project_name(project_settings.name);
             const bool units_updated = session.set_pixels_per_unit(
                 project_settings.pixels_per_unit);
-            if (name_updated && units_updated) {
+            fabric::project::RuntimeSettings runtime;
+            runtime.character.enabled = project_settings.runtime_enabled;
+            runtime.character.spawn = fabric::core::Vec2{
+                project_settings.spawn_x, project_settings.spawn_y};
+            runtime.character.actions = project_settings.runtime_actions;
+            runtime.camera.follow_character =
+                project_settings.camera_follow_character;
+            if (project_settings.camera_limits_enabled) {
+                runtime.camera.limits = fabric::core::Rect{
+                    {project_settings.camera_x, project_settings.camera_y},
+                    {project_settings.camera_width, project_settings.camera_height}};
+            }
+            if (!project_settings.audio_id.empty()) {
+                runtime.audio = fabric::core::ResourceId{
+                    .value = project_settings.audio_id};
+            }
+            const bool runtime_updated = session.set_runtime_settings(runtime);
+            if (name_updated && units_updated && runtime_updated) {
                 status = "Project settings changed.";
                 ImGui::CloseCurrentPopup();
             } else {
@@ -6123,7 +6387,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
         draw_workspace(session, behavior_session, transformation_session,
                        window, path_buffer, creation, imports, preview,
-                       pending_import_preview, canvas, entity_preview,
+                       pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
                        animation_ui, textured_path_ui,
                        project_settings,

@@ -1,8 +1,10 @@
 #pragma once
 
 #include "fabric/core/resource_id.hpp"
+#include "fabric/core/types.hpp"
 
 #include <cstdint>
+#include <array>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -50,12 +52,36 @@ struct ProjectDirectories {
     friend bool operator==(const ProjectDirectories&, const ProjectDirectories&) = default;
 };
 
+struct RuntimeCharacterSettings {
+    bool enabled{};
+    std::optional<core::Vec2> spawn;
+    std::array<std::string, 3> actions{};
+
+    friend bool operator==(const RuntimeCharacterSettings&, const RuntimeCharacterSettings&) = default;
+};
+
+struct RuntimeCameraSettings {
+    bool follow_character{};
+    std::optional<core::Rect> limits;
+
+    friend bool operator==(const RuntimeCameraSettings&, const RuntimeCameraSettings&) = default;
+};
+
+struct RuntimeSettings {
+    RuntimeCharacterSettings character;
+    RuntimeCameraSettings camera;
+    std::optional<core::ResourceId> audio;
+
+    friend bool operator==(const RuntimeSettings&, const RuntimeSettings&) = default;
+};
+
 struct ProjectManifest {
     std::uint32_t schema_version{current_schema_version};
     core::ResourceId id;
     std::string name;
     double pixels_per_unit{default_pixels_per_unit};
     ProjectDirectories directories;
+    std::optional<RuntimeSettings> runtime;
 
     friend bool operator==(const ProjectManifest&, const ProjectManifest&) = default;
 };

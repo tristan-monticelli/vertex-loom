@@ -218,7 +218,8 @@ add_library(fabric_editor STATIC
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)
-target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render fabric_physics fabric_runtime)
+target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render fabric_physics fabric_runtime
+    nlohmann_json::nlohmann_json)
 
 if(FABRIC_BUILD_EDITORS)
     set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)

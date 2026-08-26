@@ -20,6 +20,11 @@ struct VectorDrawPacket {
     bool repeat_texture_x{};
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
+    std::vector<core::Vec2> stroke_vertices;
+    std::vector<std::uint32_t> stroke_indices;
+    std::optional<project::VectorImageFill> stroke_image;
+    std::vector<core::Vec2> stroke_uv;
+    bool stroke_repeat_texture_x{};
     std::vector<core::Vec2> fill_vertices;
     std::vector<core::Vec2> fill_uv;
     std::vector<std::uint32_t> fill_indices;

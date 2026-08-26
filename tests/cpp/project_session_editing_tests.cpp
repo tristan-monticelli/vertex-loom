@@ -97,6 +97,90 @@ TEST_CASE("project manifest edits use command history and explicit save") {
     CHECK(load_manifest_or_fail(project.path()).pixels_per_unit == 64.0);
 }
 
+TEST_CASE("opening an invalid project preserves the active document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.set_pixels_per_unit(64.0));
+    REQUIRE(session.dirty());
+
+    const auto invalid_project = project.path() / "missing-project";
+    CHECK_FALSE(session.open(invalid_project));
+    REQUIRE(session.manifest());
+    CHECK(session.manifest()->id.value == "editing-project");
+    CHECK(session.manifest()->pixels_per_unit == 64.0);
+    CHECK(session.dirty());
+}
+
+TEST_CASE("session save failure preserves the selected document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt prompt;
+    prompt.name = "Protected artwork";
+    REQUIRE(session.create_vector_artwork(prompt));
+    REQUIRE(session.created_vector().has_value());
+    auto node = session.created_vector()->native->nodes.front();
+    node.name = "Edited protected artwork";
+    REQUIRE(session.set_selected_vector_node(0U, std::move(node)));
+    REQUIRE(session.dirty());
+
+    const auto document = project.path() /
+        "assets/vectors/protected-artwork.vector.json";
+    REQUIRE(std::filesystem::is_regular_file(document));
+    REQUIRE(std::filesystem::remove(document));
+    REQUIRE(std::filesystem::create_directory(document));
+
+    CHECK_FALSE(session.save());
+    CHECK(session.dirty());
+    CHECK(session.created_vector().has_value());
+    CHECK(session.created_vector()->document.name == "Protected artwork");
+
+    fabric::editor::CreateMaterialPrompt material;
+    material.name = "Must not publish";
+    CHECK_FALSE(session.create_material(material));
+    CHECK_FALSE(std::filesystem::exists(
+        project.path() / "assets/materials/must-not-publish.material.json"));
+}
+
+TEST_CASE("runtime settings are editable and survive save and reload") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(fabric::project::publish_audio(
+                project.path(), *session.manifest(),
+                {.document = {.schema_version = 1,
+                              .type = "audio",
+                              .id = {.value = "level-audio"},
+                              .name = "Level Audio"},
+                 .events = {{"default", "assets/audio/level.wav", 1.0F, false}}})
+                .ok());
+    REQUIRE(session.refresh_resources());
+    const fabric::project::RuntimeSettings settings{
+        .character = {.enabled = true,
+                      .spawn = fabric::core::Vec2{2.0F, 3.0F},
+                      .actions = {"left", "right", "jump"}},
+        .camera = {.follow_character = true,
+                   .limits = fabric::core::Rect{{0.0F, 0.0F}, {20.0F, 15.0F}}},
+        .audio = fabric::core::ResourceId{.value = "level-audio"},
+    };
+    CHECK_FALSE(session.set_runtime_settings(
+        fabric::project::RuntimeSettings{
+            .audio = fabric::core::ResourceId{.value = "missing-audio"}}));
+    REQUIRE(session.set_runtime_settings(settings));
+    CHECK(session.dirty());
+    REQUIRE(session.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.manifest()->runtime.has_value());
+    CHECK(*reloaded.manifest()->runtime == settings);
+}
+
 TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
     const TemporaryDirectory project;
     write_project(project.path());
@@ -150,6 +234,12 @@ TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
         CHECK(session.selected_resource()->id == copy_id);
         REQUIRE(session.rename_resource(kind, copy_id, "Renamed Copy"));
         CHECK(session.selected_resource()->name == "Renamed Copy");
+        const auto copy_path = project.path() /
+            session.selected_resource()->document_path;
+        REQUIRE(session.trash_resource(kind, copy_id, true));
+        CHECK_FALSE(std::filesystem::exists(copy_path));
+        REQUIRE(session.restore_trashed_resource());
+        CHECK(std::filesystem::is_regular_file(copy_path));
         CHECK_FALSE(session.rename_resource(kind, copy_id, ""));
         CHECK_FALSE(session.duplicate_resource(kind, source_id, copy_id,
                                                "Collision"));
@@ -175,6 +265,156 @@ TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
     CHECK(std::filesystem::is_regular_file(
         project.path() / "assets/replays/indexed-replay.replay.json"));
     CHECK_FALSE(session.can_restore_trashed_resource());
+}
+
+TEST_CASE("resource index remains unambiguous with many similar textures") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    auto source = std::filesystem::current_path() /
+        "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+    if (!std::filesystem::is_regular_file(source)) {
+        source = std::filesystem::current_path().parent_path() /
+            "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+    }
+    REQUIRE(std::filesystem::is_regular_file(source));
+
+    constexpr std::size_t texture_count = 128U;
+    for (std::size_t index = 0; index < texture_count; ++index) {
+        const auto suffix = std::to_string(index);
+        const fabric::project::TextureAsset texture{
+            .document = {.schema_version = fabric::project::current_texture_schema_version,
+                         .type = "texture",
+                         .id = {.value = "fabric-panel-" + suffix},
+                         .name = "Fabric Panel " + suffix},
+            .source = "assets/textures/fabric-panel-" + suffix + ".png",
+            .width = 8U,
+            .height = 8U,
+        };
+        REQUIRE(fabric::project::publish_texture_asset(
+                    project.path(), manifest, texture, source)
+                    .ok());
+    }
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    const auto textures = std::ranges::count_if(
+        session.resources(), [](const auto& resource) {
+            return resource.kind == fabric::editor::StudioResourceKind::texture;
+        });
+    CHECK(textures == texture_count);
+    for (const auto index : {0U, 1U, 10U, 99U, 127U}) {
+        const auto id = fabric::core::ResourceId{
+            .value = "fabric-panel-" + std::to_string(index)};
+        CHECK(std::ranges::any_of(session.resources(), [&](const auto& resource) {
+            return resource.id == id;
+        }));
+        if (!session.errors().empty()) INFO(session.errors().front().message);
+        REQUIRE(session.select_resource(
+            fabric::editor::StudioResourceKind::texture, id));
+        REQUIRE(session.selected_resource());
+        CHECK(session.selected_resource()->id == id);
+    }
+}
+
+TEST_CASE("input actions expose their behavior graph consumers") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    fabric::project::BehaviorGraph graph;
+    graph.document.id = {.value = "player-behavior"};
+    graph.document.name = "Player behavior";
+    graph.nodes.push_back({
+        .id = "move-input",
+        .type = "action_source",
+        .ports = {{"out", fabric::project::BehaviorPortDirection::output,
+                   fabric::project::BehaviorValueType::signal}},
+        .properties = {{"semantic_id", std::string{"move"}}}});
+    REQUIRE(fabric::project::publish_behavior_graph(
+                project.path(), manifest, graph)
+                .ok());
+
+    fabric::project::InputDocument input;
+    input.document.id = {.value = "controls"};
+    input.document.name = "Controls";
+    input.actions.push_back({"move", {}});
+    REQUIRE(fabric::project::publish_input(project.path(), manifest, input).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    const auto consumers = session.behavior_consumers("move");
+    REQUIRE(consumers.has_value());
+    REQUIRE(consumers->size() == 1U);
+    CHECK(consumers->front().id.value == "player-behavior");
+    REQUIRE(session.behavior_consumers("jump").has_value());
+    CHECK(session.behavior_consumers("jump")->empty());
+}
+
+TEST_CASE("resource reference replacement is typed and reloadable") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+
+    fabric::project::MaterialDefinition old_material;
+    old_material.document.id = {.value = "old-material"};
+    old_material.document.name = "Old material";
+    REQUIRE(fabric::project::publish_material(
+                project.path(), manifest, old_material)
+                .ok());
+    fabric::project::MaterialDefinition new_material;
+    new_material.document.id = {.value = "new-material"};
+    new_material.document.name = "New material";
+    REQUIRE(fabric::project::publish_material(
+                project.path(), manifest, new_material)
+                .ok());
+
+    fabric::project::VectorAsset vector;
+    vector.document.id = {.value = "some-vector"};
+    vector.document.name = "Some vector";
+    vector.source_kind = fabric::project::VectorSourceKind::native;
+    vector.native = fabric::project::NativeVectorDefinition{
+        .size = {4.0F, 4.0F},
+        .nodes = {{.id = "shape", .name = "Shape",
+                   .shape = {.id = "shape", .kind = fabric::project::VectorShapeKind::rectangle,
+                             .bounds = {{-2.0F, -2.0F}, {4.0F, 4.0F}}},
+                   .fill = {.kind = fabric::project::VectorFillKind::none}}}};
+    REQUIRE(fabric::project::publish_native_vector_asset(
+                project.path(), manifest, vector)
+                .ok());
+
+    fabric::project::EntityDefinition entity;
+    entity.document.id = {.value = "reference-owner"};
+    entity.document.name = "Reference owner";
+    entity.nodes.push_back({
+        .id = "root",
+        .name = "Root",
+        .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
+                     .resource = fabric::project::ResourceReference{
+                         {.value = "some-vector"}, "vector"},
+                     .material = fabric::project::ResourceReference{
+                         {.value = "old-material"}, "material"}}});
+    const auto published_entity = fabric::project::publish_entity(
+        project.path(), manifest, entity);
+    if (!published_entity.ok())
+        INFO(published_entity.errors.front().field + ": " +
+             published_entity.errors.front().message);
+    REQUIRE(published_entity.ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.replace_incoming_references(
+        fabric::editor::StudioResourceKind::material,
+        {.value = "old-material"}, {.value = "new-material"}));
+    const auto loaded = fabric::project::load_entity(
+        project.path(), manifest,
+        "entities/reference-owner.entity.json");
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded.entity->nodes.front().drawable.material.has_value());
+    CHECK(loaded.entity->nodes.front().drawable.material->id.value ==
+          "new-material");
+    CHECK_FALSE(session.replace_incoming_references(
+        fabric::editor::StudioResourceKind::material,
+        {.value = "old-material"}, {.value = "new-material"}));
 }
 
 TEST_CASE("vector artwork prompt publishes a reloadable native document") {

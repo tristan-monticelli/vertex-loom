@@ -98,6 +98,8 @@ struct VectorStroke {
     float width{1.0F};
     VectorStrokeJoin join{VectorStrokeJoin::miter};
     VectorStrokeCap cap{VectorStrokeCap::butt};
+    std::optional<VectorImageFill> image;
+    bool repeat_texture_x{};
 
     friend bool operator==(const VectorStroke&, const VectorStroke&) = default;
 };

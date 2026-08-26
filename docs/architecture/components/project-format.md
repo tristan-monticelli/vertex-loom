@@ -1,5 +1,11 @@
 # C4 Component — format projet
 
+Les réglages optionnels du runtime sont portés par la section `runtime` du
+manifeste. Elle est versionnée avec le manifeste et résolue avant la création
+de la fenêtre SDL ; les projets sans cette section utilisent les valeurs par
+défaut historiques. Le contrat détaillé et sa migration sont définis dans
+[ADR-0122](../../decisions/ADR-0122-runtime-project-settings.md).
+
 ```mermaid
 C4Component
     title Vertex Loom — composants du format projet
@@ -50,10 +56,12 @@ C4Component
   et chemins non portables sont refusés.
 - `DocumentHeader` porte la version, le type, l’identifiant et le nom communs.
   `AssetDocument` reste son alias de compatibilité.
-  `InputDocument v1` est stocké sous `assets/input/<id>.input.json` et porte
+  `InputDocument v2` est stocké sous `assets/input/<id>.input.json` et porte
   une table d’actions nommées, chacune pouvant déclarer plusieurs bindings
   clavier ou manette. Les codes sont des entiers positifs ou nuls ; les
   identifiants, périphériques et doublons sont validés avant publication.
+  Les `BehaviorGraph` relient une action à leur entrée sémantique par
+  `action_source.semantic_id`.
   `TextureAsset` version 1 ajoute un chemin PNG relatif, ses dimensions et le
   format de pixels `rgba8`.
 - Une texture est déclarée par `assets/textures/<id>.texture.json` et sa source

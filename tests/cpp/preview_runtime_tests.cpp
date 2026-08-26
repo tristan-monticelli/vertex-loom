@@ -4,6 +4,7 @@
 #include "fabric/project/entity.hpp"
 #include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/entity_transformation.hpp"
+#include "fabric/project/audio.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/project/mechanic_graph.hpp"
@@ -15,6 +16,7 @@
 #include <array>
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -48,6 +50,34 @@ fabric::project::SceneDocument scene() {
                          .name = "Preview Scene"},
             .maps = {{{{.value = "preview"}, "map"}, "instances"}},
             .entry_map = fabric::project::ResourceReference{{.value = "preview"}, "map"}};
+}
+
+void write_silent_wav(const std::filesystem::path& path) {
+    std::array<std::uint8_t, 46> bytes{};
+    const auto put_u16 = [&](const std::size_t offset, const std::uint16_t value) {
+        bytes[offset] = static_cast<std::uint8_t>(value & 0xffU);
+        bytes[offset + 1] = static_cast<std::uint8_t>(value >> 8U);
+    };
+    const auto put_u32 = [&](const std::size_t offset, const std::uint32_t value) {
+        for (std::size_t shift = 0; shift < 4; ++shift)
+            bytes[offset + shift] = static_cast<std::uint8_t>(value >> (shift * 8));
+    };
+    std::copy_n("RIFF", 4, bytes.begin());
+    put_u32(4, 38U);
+    std::copy_n("WAVEfmt ", 8, bytes.begin() + 8);
+    put_u32(16, 16U);
+    put_u16(20, 1U);
+    put_u16(22, 1U);
+    put_u32(24, 8000U);
+    put_u32(28, 16000U);
+    put_u16(32, 2U);
+    put_u16(34, 16U);
+    std::copy_n("data", 4, bytes.begin() + 36);
+    put_u32(40, 2U);
+    put_u16(44, 0U);
+    std::ofstream output(path, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+                 static_cast<std::streamsize>(bytes.size()));
 }
 
 fabric::project::MapDocument map_with_gameplay_trigger() {
@@ -1023,6 +1053,62 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
     CHECK(marker_hits.back().id == "start");
     CHECK(marker_hits.back().loop_index == 1);
 
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime consumes persisted character settings") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-runtime-settings-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto project_manifest = manifest();
+    project_manifest.runtime = fabric::project::RuntimeSettings{
+        .character = {.enabled = true,
+                      .spawn = fabric::core::Vec2{4.0F, 6.0F}},
+        .camera = {.follow_character = true},
+    };
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test,
+                          .frame_limit = 1U}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.stats().character_x == Catch::Approx(4.0F));
+    CHECK(runtime.stats().character_y > 5.9F);
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime resolves persisted audio settings") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-runtime-audio-settings-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    auto project_manifest = manifest();
+    project_manifest.runtime = fabric::project::RuntimeSettings{
+        .audio = fabric::core::ResourceId{.value = "runtime-audio"},
+    };
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
+    std::filesystem::create_directories(root / "assets/audio");
+    write_silent_wav(root / "assets/audio/runtime.wav");
+    REQUIRE(fabric::project::publish_audio(
+                root, project_manifest,
+                {.document = {.schema_version = 1,
+                              .type = "audio",
+                              .id = {.value = "runtime-audio"},
+                              .name = "Runtime Audio"},
+                 .events = {{"default", "assets/audio/runtime.wav", 1.0F, false}}})
+                .ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root,
+                          .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test,
+                          .frame_limit = 1U}));
+    CHECK(runtime.run());
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
 }

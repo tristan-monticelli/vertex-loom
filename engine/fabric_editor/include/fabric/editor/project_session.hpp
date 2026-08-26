@@ -117,6 +117,10 @@ public:
         double pixels_per_unit,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_runtime_settings(
+        std::optional<project::RuntimeSettings> settings,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_texture_view(
         std::optional<project::RasterView> view,
         AutosaveScheduler::Clock::time_point now =
@@ -255,6 +259,11 @@ public:
                                        std::string name);
     [[nodiscard]] std::optional<std::vector<StudioResource>>
     incoming_references(StudioResourceKind kind, const core::ResourceId& id);
+    [[nodiscard]] bool replace_incoming_references(
+        StudioResourceKind kind, const core::ResourceId& id,
+        const core::ResourceId& replacement_id);
+    [[nodiscard]] std::optional<std::vector<StudioResource>>
+    behavior_consumers(std::string_view semantic_action);
     [[nodiscard]] bool trash_resource(StudioResourceKind kind,
                                       const core::ResourceId& id,
                                       bool confirmed);
@@ -318,6 +327,8 @@ public:
 
 private:
     [[nodiscard]] bool save_before_document_transition();
+    [[nodiscard]] bool prepare_manifest_edit(
+        AutosaveScheduler::Clock::time_point now);
     [[nodiscard]] bool replace_selected_vector_nodes(
         std::vector<project::VectorNode> nodes,
         AutosaveScheduler::Clock::time_point now);
@@ -335,6 +346,11 @@ private:
         visual_composition,
         visual_component,
     };
+
+    [[nodiscard]] bool prepare_dirty_document_edit(
+        DirtyDocument expected, project::ErrorCode code,
+        std::string field, std::string message,
+        AutosaveScheduler::Clock::time_point now);
 
     std::filesystem::path project_root_;
     std::optional<project::ProjectManifest> manifest_;

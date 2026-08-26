@@ -4,6 +4,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <memory>
 #include <string>
 
@@ -163,6 +164,68 @@ TEST_CASE("session transitions require an explicit unsaved decision") {
     guard.request(fabric::editor::SessionAction::open_project, true);
     CHECK(guard.resolve(fabric::editor::UnsavedDecision::discard) ==
           fabric::editor::SessionAction::open_project);
+}
+
+TEST_CASE("failed transition saves keep every requested action recoverable") {
+    using fabric::editor::SessionAction;
+    using fabric::editor::UnsavedDecision;
+
+    for (const auto action : {SessionAction::create_project,
+                              SessionAction::open_project,
+                              SessionAction::quit}) {
+        fabric::editor::SessionTransitionGuard guard;
+        guard.request(action, true);
+        CHECK(guard.pending());
+        CHECK(guard.confirmation_required());
+        CHECK_FALSE(guard.resolve(UnsavedDecision::save, false).has_value());
+        CHECK(guard.pending());
+        CHECK(guard.confirmation_required());
+        CHECK(guard.resolve(UnsavedDecision::discard) == action);
+        CHECK_FALSE(guard.pending());
+    }
+}
+
+TEST_CASE("clean transitions release create open and quit immediately") {
+    using fabric::editor::SessionAction;
+    for (const auto action : {SessionAction::create_project,
+                              SessionAction::open_project,
+                              SessionAction::quit}) {
+        fabric::editor::SessionTransitionGuard guard;
+        guard.request(action, false);
+        CHECK_FALSE(guard.confirmation_required());
+        CHECK(guard.take_ready() == action);
+        CHECK_FALSE(guard.pending());
+    }
+}
+
+TEST_CASE("every project transition handles clean and dirty outcomes") {
+    using fabric::editor::SessionAction;
+    using fabric::editor::UnsavedDecision;
+    constexpr auto actions = std::array{
+        SessionAction::open_project,
+        SessionAction::create_project,
+        SessionAction::quit};
+
+    for (const auto action : actions) {
+        fabric::editor::SessionTransitionGuard clean;
+        clean.request(action, false);
+        CHECK(clean.take_ready() == action);
+
+        fabric::editor::SessionTransitionGuard dirty;
+        dirty.request(action, true);
+        CHECK(dirty.confirmation_required());
+        CHECK(dirty.resolve(UnsavedDecision::save, true) == action);
+
+        fabric::editor::SessionTransitionGuard failed_save;
+        failed_save.request(action, true);
+        CHECK_FALSE(failed_save.resolve(UnsavedDecision::save, false)
+                        .has_value());
+        CHECK(failed_save.pending());
+        CHECK(failed_save.resolve(UnsavedDecision::cancel).has_value() == false);
+
+        failed_save.request(action, true);
+        CHECK(failed_save.resolve(UnsavedDecision::discard) == action);
+    }
 }
 
 TEST_CASE("autosave becomes due after two seconds of inactivity") {

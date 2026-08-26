@@ -83,6 +83,35 @@ void manifest_round_trip_is_lossless() {
     require(*parsed.manifest == expected, "manifest round-trip lost data");
 }
 
+void runtime_settings_round_trip_and_validation_are_strict() {
+    auto expected = example_manifest();
+    expected.runtime = fabric::project::RuntimeSettings{
+        .character = {.enabled = true,
+                      .spawn = fabric::core::Vec2{12.0F, -4.0F},
+                      .actions = {"move-left", "move-right", "jump"}},
+        .camera = {.follow_character = true,
+                   .limits = fabric::core::Rect{{-10.0F, -5.0F}, {200.0F, 120.0F}}},
+        .audio = fabric::core::ResourceId{.value = "level-audio"},
+    };
+    const auto parsed = fabric::project::parse_manifest(
+        fabric::project::serialize_manifest(expected));
+    require(parsed.ok(), "runtime settings did not round-trip");
+    require(*parsed.manifest == expected, "runtime settings lost data");
+
+    expected.runtime->camera.limits->size.x = -1.0F;
+    const auto invalid = fabric::project::validate_manifest(expected);
+    require(contains_error(invalid.errors, ErrorCode::invalid_manifest,
+                           "runtime.camera.limits"),
+            "negative runtime camera bounds were accepted");
+
+    expected.runtime->camera.limits->size.x = 200.0F;
+    expected.runtime->character.actions[1] = "MoveRight";
+    const auto invalid_action = fabric::project::validate_manifest(expected);
+    require(contains_error(invalid_action.errors, ErrorCode::invalid_resource_id,
+                           "runtime.character.actions[1]"),
+            "invalid runtime action identifier was accepted");
+}
+
 void legacy_manifest_is_migrated() {
     const auto migrated = fabric::project::parse_manifest(R"({
         "schemaVersion": 0,
@@ -633,6 +662,13 @@ void stroke_round_trips_and_rejects_invalid_width() {
         .width = 2.5F,
         .join = fabric::project::VectorStrokeJoin::round,
         .cap = fabric::project::VectorStrokeCap::square,
+        .image = fabric::project::VectorImageFill{
+            .texture = {{.value = "beam-thread"}, "texture"},
+            .fit = fabric::project::VectorImageFit::stretch,
+            .transform = {.scale = {2.0F, 1.0F}},
+            .opacity = 0.75F,
+        },
+        .repeat_texture_x = true,
     };
     const auto parsed = fabric::project::parse_vector_asset(
         example_manifest(), fabric::project::serialize_vector_asset(expected));
@@ -720,6 +756,7 @@ void project_validation_rejects_a_missing_vector_source() {
 int main() {
     resource_ids_are_strict();
     manifest_round_trip_is_lossless();
+    runtime_settings_round_trip_and_validation_are_strict();
     legacy_manifest_is_migrated();
     invalid_contracts_are_rejected();
     complete_project_directory_is_accepted();

@@ -355,6 +355,9 @@ bool read_fill_kind(const Json& object, VectorFillKind& destination,
 bool read_color(const Json& object, core::Color& destination,
                 std::vector<Error>& errors, const std::string& field);
 
+std::optional<VectorImageFill> read_image_fill(
+    const Json& fill, std::vector<Error>& errors, const std::string& field);
+
 bool read_stroke_join(const Json& object, VectorStrokeJoin& destination,
                       std::vector<Error>& errors, const std::string& field) {
     std::string value;
@@ -402,6 +405,11 @@ std::optional<VectorStroke> read_stroke(const Json& object,
     read_float(object, "width", stroke.width, errors, field + ".width");
     read_stroke_join(object, stroke.join, errors, field + ".join");
     read_stroke_cap(object, stroke.cap, errors, field + ".cap");
+    if (object.contains("image")) {
+        stroke.image = read_image_fill(object, errors, field + ".image");
+        read_bool(object, "repeatTextureX", stroke.repeat_texture_x, errors,
+                  field);
+    }
     return stroke;
 }
 
@@ -918,6 +926,20 @@ ValidationReport validate_vector_asset(const ProjectManifest& manifest,
                               prefix + ".stroke.width",
                               "must be finite, positive and bounded");
                 }
+                if (stroke.image) {
+                    if (stroke.image->texture.expected_type != "texture" ||
+                        !core::ResourceId::is_valid(stroke.image->texture.id.value)) {
+                        add_error(report.errors, ErrorCode::invalid_asset,
+                                  prefix + ".stroke.image.texture",
+                                  "must reference a valid texture resource");
+                    }
+                    if (!finite(stroke.image->opacity) ||
+                        stroke.image->opacity < 0.0F || stroke.image->opacity > 1.0F) {
+                        add_error(report.errors, ErrorCode::invalid_asset,
+                                  prefix + ".stroke.image.opacity",
+                                  "must be finite and between 0 and 1");
+                    }
+                }
             }
             if (node.fill.kind == VectorFillKind::solid) {
                 if (!node.fill.color.has_value()) {
@@ -1137,6 +1159,19 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"join", std::string(to_string(stroke.join))},
                     {"cap", std::string(to_string(stroke.cap))},
                 };
+                if (stroke.image) {
+                    const auto& image = *stroke.image;
+                    node_json["stroke"]["image"] = {
+                        {"texture", {{"id", image.texture.id.value},
+                                      {"expectedType", image.texture.expected_type}}},
+                        {"fit", std::string(to_string(image.fit))},
+                        {"transform", serialize_transform(image.transform)},
+                        {"opacity", image.opacity},
+                        {"deformWithShape", image.deform_with_shape},
+                    };
+                    node_json["stroke"]["repeatTextureX"] =
+                        stroke.repeat_texture_x;
+                }
             }
             if (node.parent_id.has_value()) {
                 node_json["parent"] = *node.parent_id;

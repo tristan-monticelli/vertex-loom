@@ -116,6 +116,10 @@ C4Component
 - Le hub propose aussi `New entity...`. Le prompt crée un nœud racine avec
   drawable, matériau optionnel et transform, valide les références locales,
   publie atomiquement dans `entities`, puis réindexe l’entité.
+- Le Resource Explorer analyse les références entrantes avant suppression et
+  permet de choisir une ressource de remplacement du même type. Les documents
+  entrants sont validés avant publication et la suppression reste bloquée si
+  des références subsistent.
 - Le hub propose `New animation...`. Le prompt crée un `AnimationClip v2`
   avec cible d'entité explicite ou mode générique, durée, boucle et marker
   optionnel, le publie atomiquement dans
@@ -130,7 +134,8 @@ C4Component
 - L’inspecteur d’un input existant permet de modifier les identifiants d’action,
   les périphériques et les codes, d’ajouter ou supprimer des actions et des
   bindings, puis de sauvegarder avec `CommandStack`, undo/redo et autosave
-  validé.
+  validé. Chaque action affiche aussi les `BehaviorGraph` qui la consomment
+  via un nœud `action_source` et sa propriété `semantic_id`.
 - L’inspecteur d’entité liste les nœuds dans leur ordre stable et permet de
   modifier nom, parent, ordre, transform, visibilité, verrouillage et drawable
   complet. Kind, artwork, matériau, variante, ancre et overrides utilisent les
