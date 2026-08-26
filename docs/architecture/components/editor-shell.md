@@ -108,6 +108,10 @@ C4Component
   entrantes, refuse une rupture, exige confirmation puis déplace uniquement le
   document dans `.vertex-loom-trash`; Undo le restaure sans supprimer les
   sources PNG ou SVG partagées.
+- Les actions principales désactivées d’Asset Studio expliquent désormais leur
+  précondition au survol pour les remplacements, suppressions, renommages,
+  créations de comportements et transformations, ainsi que la pose de clés
+  d’animation ; les contrôles d’édition plus fins restent à harmoniser.
 - Le hub de création sépare maintenant `New material / fill` des imports et
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource

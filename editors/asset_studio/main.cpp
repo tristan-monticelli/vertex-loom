@@ -66,6 +66,12 @@ std::string input_binding_label(const fabric::project::InputBinding& binding) {
     return "Gamepad button " + std::to_string(binding.code);
 }
 
+void draw_disabled_reason(const bool disabled, const std::string_view reason) {
+    if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        return;
+    ImGui::SetTooltip("%s", std::string(reason).c_str());
+}
+
 struct CreationUiState {
     struct BehaviorFields {
         std::string name{"Entity behavior"};
@@ -1030,6 +1036,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(replacement == session.resources().end(),
+                                     "Choose a valid same-type replacement resource first.");
             }
             ImGui::BeginDisabled(!delete_impact.empty());
             ImGui::PushStyleColor(
@@ -1049,6 +1057,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             }
             ImGui::PopStyleColor();
             ImGui::EndDisabled();
+            draw_disabled_reason(!delete_impact.empty(),
+                                 "Resolve the incoming references before moving this resource to trash.");
             ImGui::SameLine();
             if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
                 delete_request.reset();
@@ -1083,6 +1093,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(rename_value.empty(),
+                                 "Enter a visible name before renaming the resource.");
             ImGui::SameLine();
             if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
                 rename_request.reset();
@@ -1171,6 +1183,8 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
             } else status = "Behavior creation failed; inspect diagnostics.";
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Enter a non-empty name and a valid unique resource id.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
@@ -1537,6 +1551,8 @@ void draw_transformation_editor(
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Enter a valid name/id and choose two different entity resources.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
@@ -5028,6 +5044,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 set_key();
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(animation_ui.node_id.empty() ||
+                                     animation_ui.component_id.empty() ||
+                                     animation_ui.property_id.empty() ||
+                                     (animation_ui.key_kind == 4 &&
+                                      animation_ui.key_resource_id.empty()),
+                                 "Choose a target node, component, property and resource value when required.");
             ImGui::SeparatorText("Tracks");
             if (clip.tracks.empty()) {
                 ImGui::TextDisabled("No tracks yet.");

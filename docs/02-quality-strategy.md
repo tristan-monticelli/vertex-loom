@@ -143,6 +143,10 @@ la sauvegarde échoue.
 Les actions principales désactivées de Map Studio affichent aussi leur
 précondition au survol ; cette couverture reste partielle tant que les
 contrôles secondaires d’Asset Studio ne sont pas harmonisés.
+Asset Studio couvre désormais les préconditions des actions principales du
+Resource Explorer, des créations Behavior/Transformation et de la pose de
+clés ; les contrôles d’édition fins restent à couvrir avant la fermeture du
+gate global.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
