@@ -1927,8 +1927,16 @@ int run(const std::filesystem::path& project_root,
     std::string open_map_id;
     std::vector<fabric::project::Error> package_errors;
     const auto prepare_package = [&] {
+        if (mechanic_session.dirty() && !mechanic_session.save()) {
+            status = "Mechanic save failed; package action cancelled";
+            return false;
+        }
         if (session.dirty() && !session.save()) {
             status = "Save failed; package action cancelled";
+            return false;
+        }
+        if (scene_session.dirty() && !scene_session.save()) {
+            status = "Scene save failed; package action cancelled";
             return false;
         }
         return true;

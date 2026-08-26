@@ -57,6 +57,9 @@ ancre avec l’outil Move, déplace une poignée en mode `Free` et recharge le
 projet après sauvegarde pour vérifier les trois mutations. Il constitue la
 première preuve du canvas réel ; les parcours multi-plateformes, diagnostics et
 screenshots restent ouverts.
+Avant validation ou publication, Map Studio sauvegarde maintenant dans un ordre
+unique les sessions mécanique, map et scène dirty ; un échec dans l’une d’elles
+annule l’action de package avant toute écriture de publication.
 Le scénario Behavior E2E crée aussi un document d’input avec plusieurs actions
 et bindings, le recharge, puis utilise le même BehaviorGraph pour une source IA
 avant son attachement à une entité.
