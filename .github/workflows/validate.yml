@@ -159,8 +159,8 @@ jobs:
       - name: Build package exporter
         run: cmake --build build --config Release --target fabric_map_package_export --parallel
 
-      - name: Publish reference package
-        run: ./build/fabric_map_package_export --map platform-preview tests/fixtures/studio-rotating-platform "$RUNNER_TEMP/studio-package"
+      - name: Publish textile reference package
+        run: ./build/fabric_map_package_export --map textile-head-preview tests/fixtures/studio-textile-head "$RUNNER_TEMP/studio-package"
 
       - name: Upload package
         uses: actions/upload-artifact@v4

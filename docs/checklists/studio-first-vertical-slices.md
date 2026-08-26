@@ -278,15 +278,17 @@ le runtime avec le même résultat visible et physique.
 
   Preuve locale : `fabric_runtime_benchmark --project
   tests/fixtures/studio-textile-head --map textile-head-preview --frames 60
-  --min-fps 60` atteint 187.263 FPS p95 sur macOS. Le workflow CI
-  `textile-reference-benchmark` répète la mesure sur Ubuntu, macOS et Windows
-  pendant 600 frames et archive un rapport JSON par plateforme.
+  --min-fps 60` atteint 187.263 FPS p95 sur macOS. Le run CI
+  `32916206121` a répété la mesure sur Ubuntu, macOS et Windows pendant 600
+  frames et archivé les rapports JSON : 881.327, 291.389 et 1487.21 FPS p95.
 - [x] Utiliser cette scène comme fixture de non-régression visuelle et
   fonctionnelle pour les futures tranches.
 
   Preuve : la fixture est régénérée octet par octet ; ses packets sont comparés
   entre resolver direct, Preview Runtime et paquet publié, et son graphe est
-  simulé depuis les documents sauvegardés.
+  simulé depuis les documents sauvegardés. Le workflow package exporte
+  désormais `studio-textile-head` puis le charge sans conversion sur les trois
+  OS.
 
 Gate : la scène complète est construite uniquement avec Asset Studio et Map
 Studio, puis chargée depuis son paquet de map par Preview Runtime.
