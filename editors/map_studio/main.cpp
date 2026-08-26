@@ -2163,6 +2163,8 @@ int run(const std::filesystem::path& project_root,
     float new_collision_radius = 1.0F;
     float new_collision_length = 2.0F;
     int selected_trigger_index = -1;
+    std::string remove_event_request;
+    std::string remove_trigger_request;
     int trigger_editor_index = -1;
     int trigger_editor_collision_index = 0;
     fabric::project::TriggerDefinition trigger_editor;
@@ -2716,6 +2718,13 @@ int run(const std::filesystem::path& project_root,
                 const auto selected = selected_event_id == event_definition.id.value;
                 if (ImGui::Selectable(event_definition.id.value.c_str(), selected))
                     selected_event_id = event_definition.id.value;
+                ImGui::SameLine();
+                ImGui::PushID((event_definition.id.value + "-delete").c_str());
+                if (ImGui::SmallButton("Delete...")) {
+                    remove_event_request = event_definition.id.value;
+                    ImGui::OpenPopup("Delete event?");
+                }
+                ImGui::PopID();
             }
             if (!selected_event_id.empty()) {
                 const auto event_definition = std::find_if(
@@ -2781,6 +2790,42 @@ int run(const std::filesystem::path& project_root,
                     ImGui::EndDisabled();
                 }
             }
+            if (ImGui::BeginPopupModal("Delete event?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto event = std::ranges::find(
+                    map.events, remove_event_request,
+                    [](const auto& item) { return item.id.value; });
+                const auto valid = event != map.events.end();
+                const auto referenced = valid && std::ranges::any_of(
+                    map.triggers, [&](const auto& trigger) {
+                        return trigger.event_id.value == remove_event_request;
+                    });
+                if (valid) {
+                    ImGui::Text("Delete event '%s'?", remove_event_request.c_str());
+                    ImGui::TextDisabled("The event declaration and payload will be removed; map triggers must be removed first.");
+                }
+                ImGui::BeginDisabled(!valid || referenced);
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0.62F, 0.16F, 0.14F, 1.0F});
+                if (ImGui::Button("Delete event") &&
+                    session.remove_event({.value = remove_event_request})) {
+                    if (selected_event_id == remove_event_request)
+                        selected_event_id.clear();
+                    remove_event_request.clear();
+                    status = "Event deleted";
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopStyleColor();
+                ImGui::EndDisabled();
+                if (referenced)
+                    ImGui::TextDisabled("Blocked: one or more triggers still reference this event.");
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) {
+                    remove_event_request.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
+            }
             ImGui::SeparatorText("Triggers");
             for (std::size_t trigger_index = 0; trigger_index < map.triggers.size();
                  ++trigger_index) {
@@ -2793,10 +2838,38 @@ int run(const std::filesystem::path& project_root,
                     selected_trigger_index = static_cast<int>(trigger_index);
                 ImGui::SameLine();
                 if (ImGui::SmallButton("Remove")) {
-                    status = session.remove_trigger({.value = trigger.id})
-                        ? "Trigger removed" : "Trigger removal rejected";
+                    remove_trigger_request = trigger.id;
+                    ImGui::OpenPopup("Delete trigger?");
                 }
                 ImGui::PopID();
+            }
+            if (ImGui::BeginPopupModal("Delete trigger?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto trigger = std::ranges::find(
+                    map.triggers, remove_trigger_request,
+                    [](const auto& item) { return item.id; });
+                const auto valid = trigger != map.triggers.end();
+                if (valid) {
+                    ImGui::Text("Delete trigger '%s'?", remove_trigger_request.c_str());
+                    ImGui::TextDisabled("The collision-to-event link will be removed; the collision and event remain intact.");
+                }
+                ImGui::BeginDisabled(!valid);
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0.62F, 0.16F, 0.14F, 1.0F});
+                if (ImGui::Button("Delete trigger") &&
+                    session.remove_trigger({.value = remove_trigger_request})) {
+                    remove_trigger_request.clear();
+                    status = "Trigger deleted";
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopStyleColor();
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) {
+                    remove_trigger_request.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputText("New trigger id", &trigger_id);
