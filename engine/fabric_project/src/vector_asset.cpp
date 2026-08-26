@@ -835,6 +835,25 @@ bool convert_path_command(VectorShape& shape, const std::size_t index,
     return true;
 }
 
+bool open_path(VectorShape& shape) {
+    if (shape.kind != VectorShapeKind::path || shape.path.size() < 3U ||
+        shape.path.front().kind != VectorPathCommandKind::move ||
+        shape.path.back().kind != VectorPathCommandKind::close)
+        return false;
+    shape.path.pop_back();
+    return true;
+}
+
+bool close_path(VectorShape& shape) {
+    if (shape.kind != VectorShapeKind::path || shape.path.size() < 2U ||
+        shape.path.front().kind != VectorPathCommandKind::move ||
+        shape.path.back().kind == VectorPathCommandKind::close)
+        return false;
+    shape.path.push_back({.kind = VectorPathCommandKind::close,
+                          .point = shape.path.front().point});
+    return true;
+}
+
 bool remove_path_command(VectorShape& shape, const std::size_t index) {
     if (shape.kind != VectorShapeKind::path || index >= shape.path.size() ||
         shape.path.size() <= 2U || index == 0U ||

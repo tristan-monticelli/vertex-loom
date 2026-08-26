@@ -590,8 +590,8 @@ sur un comportement sans modifier le runtime.
   - [ ] supprimer un point ;
   - [x] convertir ligne en courbe ;
   - [x] convertir courbe en ligne ;
-  - [ ] ouvrir un contour ;
-  - [ ] fermer un contour.
+  - [x] ouvrir un contour ;
+  - [x] fermer un contour.
 - [ ] Afficher et modifier les poignées Bézier directement sur le canvas.
 - [ ] Supporter poignées liées, symétriques et libres.
 - [ ] Ajouter sélection simple et multiple de points.

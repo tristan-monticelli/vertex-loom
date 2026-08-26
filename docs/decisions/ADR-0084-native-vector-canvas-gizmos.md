@@ -27,6 +27,9 @@ Les segments `line` et `cubic` d’un path natif peuvent être convertis dans
 l’inspecteur ou les commandes de plume. Une conversion ligne→courbe conserve
 les extrémités et initialise des poignées colinéaires aux tiers ; une
 conversion courbe→ligne conserve l’extrémité et supprime les poignées.
+Le domaine peut aussi fermer un contour par une commande `close` vers le
+premier point, ou retirer cette commande pour le rouvrir ; ces opérations
+refusent les paths sans tête `move` valide ou les états déjà dans la cible.
 
 ## Conséquences
 

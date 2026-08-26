@@ -470,4 +470,11 @@ TEST_CASE("vector primitives convert to editable path commands") {
     CHECK(editable_path.path[1].control1 == fabric::core::Vec2{});
     CHECK_FALSE(fabric::project::convert_path_command(
         editable_path, 0U, Kind::cubic));
+    REQUIRE(fabric::project::close_path(editable_path));
+    CHECK(editable_path.path.back().kind == Kind::close);
+    CHECK(editable_path.path.back().point == editable_path.path.front().point);
+    CHECK_FALSE(fabric::project::close_path(editable_path));
+    REQUIRE(fabric::project::open_path(editable_path));
+    CHECK(editable_path.path.back().kind == Kind::line);
+    CHECK_FALSE(fabric::project::open_path(editable_path));
 }

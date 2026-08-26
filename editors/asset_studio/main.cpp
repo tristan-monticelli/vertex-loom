@@ -3693,6 +3693,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         .point = node.shape.bounds.origin});
                     commit_node(node);
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Close contour")) {
+                    if (fabric::project::close_path(node.shape)) commit_node(node);
+                    else status = "This path cannot be closed.";
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Open contour")) {
+                    if (fabric::project::open_path(node.shape)) commit_node(node);
+                    else status = "This path is already open.";
+                }
                 for (std::size_t command_index = 0;
                      command_index < node.shape.path.size(); ++command_index) {
                     auto& command = node.shape.path[command_index];
