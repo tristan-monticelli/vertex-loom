@@ -7,6 +7,7 @@
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/animation_ik.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/map_chunk_index.hpp"
 #include "fabric/project/material.hpp"
@@ -66,6 +67,8 @@ struct PreviewRuntime::Impl {
         std::vector<project::FabrikChainDefinition> ik_chains;
         std::vector<project::DeformationPose> poses;
         core::Transform instance_transform;
+        std::optional<BehaviorEvaluator> behavior;
+        std::map<std::string, project::BehaviorValue> behavior_properties;
     };
 
     struct AnimatedVisualComponent {
@@ -125,6 +128,7 @@ struct PreviewRuntime::Impl {
         mechanic_instances;
     std::vector<GameplayEvent> gameplay_events;
     std::vector<AnimationMarkerEvent> animation_marker_events;
+    std::vector<BehaviorAction> behavior_actions;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
@@ -164,6 +168,36 @@ struct PreviewRuntime::Impl {
         evaluation_cache_time = time;
         animation_evaluation_cache.clear();
         node_evaluation_cache.clear();
+    }
+
+    void apply_behavior_actions(const std::string& instance_id,
+                                const std::vector<BehaviorAction>& actions,
+                                const float fixed_step_seconds) {
+        const auto simulation = entity_simulations.find(instance_id);
+        if (simulation == entity_simulations.end()) return;
+        for (const auto& action : actions) {
+            if (action.kind == BehaviorActionKind::move) {
+                const auto vector = std::ranges::find(
+                    action.properties, "vector",
+                    &project::BehaviorNodeProperty::id);
+                if (vector != action.properties.end())
+                    if (const auto* value = std::get_if<core::Vec2>(&vector->value)) {
+                        simulation->second.instance_transform.position.x +=
+                            value->x * fixed_step_seconds;
+                        simulation->second.instance_transform.position.y +=
+                            value->y * fixed_step_seconds;
+                    }
+            } else if (action.kind == BehaviorActionKind::set_property) {
+                const auto target = std::ranges::find(
+                    action.properties, "target", &project::BehaviorNodeProperty::id);
+                const auto value = std::ranges::find(
+                    action.properties, "value", &project::BehaviorNodeProperty::id);
+                if (target != action.properties.end() && value != action.properties.end())
+                    if (const auto* id = std::get_if<std::string>(&target->value))
+                        simulation->second.behavior_properties[*id] = value->value;
+            }
+            behavior_actions.push_back(action);
+        }
     }
 };
 
@@ -546,6 +580,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->mechanic_instances.clear();
     impl_->gameplay_events.clear();
     impl_->animation_marker_events.clear();
+    impl_->behavior_actions.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -694,7 +729,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     }
 
     std::optional<project::InputDocument> loaded_input;
-    if (options_.enable_character && options_.input_actions.empty()) {
+    if (options_.input_id ||
+        (options_.enable_character && options_.input_actions.empty())) {
         const auto input_id = options_.input_id.value_or(core::ResourceId{.value = "default"});
         if (!core::ResourceId::is_valid(input_id.value)) {
             errors_.push_back("input id is invalid");
@@ -893,43 +929,20 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         manifest_.reset();
         return false;
     }
-    if (options_.enable_character) {
+    if (!options_.input_actions.empty() || loaded_input) {
         if (!options_.input_actions.empty()) {
             if (!input_.configure(options_.input_actions)) {
-                errors_.push_back("could not configure character input actions");
-                return false;
-            }
-        } else if (loaded_input) {
-            if (!input_.configure(loaded_input->actions)) {
-                errors_.push_back("could not configure persisted character input actions");
+                errors_.push_back("could not configure input actions");
                 return false;
             }
         } else {
-            for (const auto action : {"move_left", "move_right", "jump"})
-                if (!input_.define_action(action)) {
-                    errors_.push_back("could not define character input action");
-                    return false;
-                }
-            if (!input_.bind("move_left", {InputDevice::keyboard, SDLK_a}) ||
-                !input_.bind("move_left", {InputDevice::keyboard, SDLK_LEFT}) ||
-                !input_.bind("move_right", {InputDevice::keyboard, SDLK_d}) ||
-                !input_.bind("move_right", {InputDevice::keyboard, SDLK_RIGHT}) ||
-                !input_.bind("jump", {InputDevice::keyboard, SDLK_SPACE}) ||
-                !input_.bind("move_left", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_LEFT}) ||
-                !input_.bind("move_right", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_DPAD_RIGHT}) ||
-                !input_.bind("jump", {InputDevice::gamepad, SDL_CONTROLLER_BUTTON_A})) {
-                errors_.push_back("could not bind character input actions");
+            if (!input_.configure(loaded_input->actions)) {
+                errors_.push_back("could not configure persisted input actions");
                 return false;
             }
         }
-        for (const auto action : {"move_left", "move_right", "jump"}) {
-            const auto found = std::find_if(input_.actions().begin(), input_.actions().end(),
-                [&](const auto& definition) { return definition.id == action; });
-            if (found == input_.actions().end()) {
-                errors_.push_back("character input action is missing: " + std::string(action));
-                return false;
-            }
-        }
+    }
+    if (options_.enable_character) {
         character_ = std::make_unique<CharacterController>();
         if (!character_->create(
                 physics_, options_.character_spawn.value_or(core::Vec2{}))) {
@@ -995,6 +1008,17 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             .constraints = resolved_entity.constraints,
             .ik_chains = resolved_entity.ik_chains,
             .instance_transform = instance.transform};
+        if (resolved_entity.behavior) {
+            auto behavior = project::load_behavior_graph(
+                options_.project_root, *manifest_,
+                project::behavior_graph_document_path(
+                    *manifest_, resolved_entity.behavior->id));
+            if (!behavior.ok()) {
+                append_errors(errors_, behavior.errors);
+                return false;
+            }
+            simulation.behavior.emplace(std::move(*behavior.asset));
+        }
         if (simulation.xpbd) {
             simulation.previous_xpbd_positions.reserve(simulation.xpbd->particles.size());
             simulation.interpolated_xpbd_positions.reserve(simulation.xpbd->particles.size());
@@ -1384,7 +1408,7 @@ bool PreviewRuntime::run() {
     while (running && !stop_requested && (limit == 0U || stats_.frames < limit)) {
         const auto frame_start = SDL_GetPerformanceCounter();
         SDL_Event event{};
-        if (options_.enable_character && !replay_player_) input_.begin_frame();
+        if (!input_.actions().empty() && !replay_player_) input_.begin_frame();
         while (SDL_PollEvent(&event) != 0) {
             if (event.type == SDL_QUIT) running = false;
             if (event.type == SDL_MOUSEWHEEL && options_.mode == RuntimeMode::interactive)
@@ -1392,7 +1416,7 @@ bool PreviewRuntime::run() {
                     {static_cast<float>(event.wheel.mouseX),
                      static_cast<float>(event.wheel.mouseY)},
                     std::pow(1.1F, static_cast<float>(event.wheel.y)));
-            if (!options_.enable_character || replay_player_) continue;
+            if (input_.actions().empty() || replay_player_) continue;
             if (event.type == SDL_KEYDOWN)
                 input_.press(InputDevice::keyboard, event.key.keysym.sym,
                              event.key.repeat != 0);
@@ -1419,7 +1443,21 @@ bool PreviewRuntime::run() {
                 stats_.replay_events += replay_player_->events().size();
                 if (replay_player_->checkpoint()) ++stats_.replay_checkpoints;
             }
-            if (character_) character_->update(input_, static_cast<float>(fixed_time_step));
+            impl_->behavior_actions.clear();
+            for (const auto& definition : input_.actions()) {
+                if (!input_.held(definition.id) && !input_.pressed(definition.id)) continue;
+                for (auto& [instance_id, simulation] : impl_->entity_simulations) {
+                    if (!simulation.behavior) continue;
+                    auto actions = simulation.behavior->evaluate(
+                        {BehaviorSignalSource::action, definition.id, {}},
+                        static_cast<float>(fixed_time_step));
+                    impl_->apply_behavior_actions(
+                        instance_id, actions, static_cast<float>(fixed_time_step));
+                    stats_.behavior_actions += actions.size();
+                }
+            }
+            if (character_)
+                character_->update(input_, static_cast<float>(fixed_time_step));
             for (auto& [instance_id, mechanic] : impl_->mechanic_instances) {
                 const auto previous_steps = mechanic.simulation.step_count();
                 if (!mechanic.simulation.update(
@@ -2034,6 +2072,25 @@ PreviewRuntime::instance_xpbd_state(const std::string& instance_id) const {
     if (found == impl_->entity_simulations.end() || !found->second.xpbd)
         return std::nullopt;
     return found->second.xpbd;
+}
+
+std::optional<std::vector<BehaviorAction>>
+PreviewRuntime::evaluate_instance_behavior(const std::string& instance_id,
+                                           const BehaviorSignal& signal,
+                                           const float fixed_step_seconds) {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->entity_simulations.find(instance_id);
+    if (found == impl_->entity_simulations.end() || !found->second.behavior)
+        return std::nullopt;
+    auto actions = found->second.behavior->evaluate(signal, fixed_step_seconds);
+    impl_->apply_behavior_actions(instance_id, actions, fixed_step_seconds);
+    stats_.behavior_actions += actions.size();
+    return actions;
+}
+
+const std::vector<BehaviorAction>& PreviewRuntime::behavior_actions() const noexcept {
+    static const std::vector<BehaviorAction> empty;
+    return impl_ ? impl_->behavior_actions : empty;
 }
 
 } // namespace fabric::runtime

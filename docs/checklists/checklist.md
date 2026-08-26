@@ -68,7 +68,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   exclut explicitement les marqueurs.
 - [x] Consommer `TriggerDefinition.properties` en surcharge du payload global
   et exposer l'édition de ces propriétés dans Map Studio.
-- [ ] Définir un système de comportements attachable aux entités, séparé des
+- [x] Définir un système de comportements attachable aux entités, séparé des
   bindings physiques, puis l'utiliser pour le joueur comme pour les monstres.
 - [ ] Retirer le couplage runtime aux trois actions codées en dur
   `move_left`, `move_right` et `jump`.
@@ -247,10 +247,10 @@ critères de succès observables.
   IA ou un événement.
 - [x] Ajouter la sérialisation, le parseur strict et les migrations prévues.
 - [x] Ajouter la résolution au graphe de ressources et aux paquets de map.
-- [ ] Ajouter une session d'édition avec CommandStack et sauvegarde atomique.
-- [ ] Ajouter un éditeur de graphe dans Asset Studio.
-- [ ] Ajouter une preview pas-à-pas avec journal borné des signaux et actions.
-- [ ] Évaluer le même graphe dans Preview Runtime.
+- [x] Ajouter une session d'édition avec CommandStack et sauvegarde atomique.
+- [x] Ajouter un éditeur de graphe dans Asset Studio.
+- [x] Ajouter une preview pas-à-pas avec journal borné des signaux et actions.
+- [x] Évaluer le même graphe dans Preview Runtime.
 - [x] Tester un comportement piloté par le joueur.
 - [x] Tester le même comportement piloté par une IA de monstre.
 - [x] Tester le même comportement piloté par un événement de map.
@@ -423,7 +423,7 @@ publication.
   - [ ] un nouveau nœud enfant.
 - [ ] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
   sections avancées éditables plutôt que seulement dans le contrat JSON.
-- [ ] Attacher explicitement un BehaviorGraph à l'entité.
+- [x] Attacher explicitement un BehaviorGraph à l'entité.
 - [ ] Tester une entité multi-nœuds combinant texture, vectoriel et composant.
 - [ ] Tester duplication, reparentage, changement d'artwork et reload.
 

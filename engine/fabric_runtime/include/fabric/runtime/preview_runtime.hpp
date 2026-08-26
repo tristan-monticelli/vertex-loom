@@ -15,6 +15,7 @@
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/runtime/character_controller.hpp"
 #include "fabric/runtime/audio_mixer.hpp"
+#include "fabric/runtime/behavior_evaluator.hpp"
 #include "fabric/runtime/input.hpp"
 #include "fabric/runtime/trigger_runtime.hpp"
 
@@ -76,6 +77,7 @@ struct PreviewRuntimeStats {
     std::size_t replay_checkpoints{};
     std::size_t gameplay_events{};
     std::size_t animation_marker_events{};
+    std::size_t behavior_actions{};
     float character_x{};
     float character_y{};
 };
@@ -152,6 +154,12 @@ public:
     evaluate_instance_nodes(const std::string& instance_id, float time) const;
     [[nodiscard]] std::optional<project::XpbdSystem>
     instance_xpbd_state(const std::string& instance_id) const;
+    [[nodiscard]] std::optional<std::vector<BehaviorAction>>
+    evaluate_instance_behavior(const std::string& instance_id,
+                               const BehaviorSignal& signal,
+                               float fixed_step_seconds);
+    [[nodiscard]] const std::vector<BehaviorAction>&
+    behavior_actions() const noexcept;
 
 private:
     struct Impl;

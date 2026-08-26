@@ -112,6 +112,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
+            } else if (kind == StudioResourceKind::behavior) {
+                auto loaded = project::load_behavior_graph(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
             } else if (kind == StudioResourceKind::textured_path) {
                 auto loaded = project::load_textured_path(
                     project_root, manifest, relative);
@@ -163,6 +172,8 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                  assets / "input", ".input.json") ||
         !inspect(StudioResourceKind::animation,
                  assets / "animations", ".animation.json") ||
+        !inspect(StudioResourceKind::behavior,
+                 assets / "behaviors", ".behavior.json") ||
         !inspect(StudioResourceKind::textured_path,
                  assets / "paths", ".textured-path.json") ||
         !inspect(StudioResourceKind::visual_composition,
@@ -1251,6 +1262,22 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         }
         if (!recovery.errors.empty())
             selection_warnings = std::move(recovery.errors);
+    } else if (kind == StudioResourceKind::behavior) {
+        imported_texture_.reset();
+        imported_vector_.reset();
+        created_vector_.reset();
+        selected_material_.reset();
+        selected_entity_.reset();
+        selected_animation_.reset();
+        selected_input_.reset();
+        selected_textured_path_.reset();
+        selected_visual_composition_.reset();
+        selected_visual_component_.reset();
+        selected_texture_document_path_.clear();
+        selected_vector_document_path_.clear();
+        selected_entity_document_path_.clear();
+        selected_animation_document_path_.clear();
+        selected_input_document_path_.clear();
     } else if (kind == StudioResourceKind::input) {
         auto loaded = project::load_input(
             project_root_, *manifest_, match->document_path);
@@ -1548,6 +1575,30 @@ bool ProjectSession::set_selected_entity_node(
                     "cannot execute the entity node modification"}};
         return false;
     }
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_entity_behavior(
+    std::optional<project::ResourceReference> behavior,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || !manifest_) return false;
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::entity) {
+        errors_ = {{project::ErrorCode::invalid_asset, "editor",
+                    "save the active document before editing the entity"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        commands_.clear(); autosave_.reset(); dirty_document_ = DirtyDocument::none;
+    }
+    auto next = *selected_entity_;
+    next.behavior = std::move(behavior);
+    const auto validation = project::validate_entity(*manifest_, next);
+    if (!validation.ok()) { errors_ = validation.errors; return false; }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<project::EntityDefinition>>(
+            *selected_entity_, std::move(next)))) return false;
     dirty_document_ = DirtyDocument::entity;
     autosave_.mark_changed(now);
     errors_.clear();

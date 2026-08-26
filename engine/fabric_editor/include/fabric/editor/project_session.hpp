@@ -3,6 +3,7 @@
 #include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/animation.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/input.hpp"
 #include "fabric/project/manifest.hpp"
@@ -36,6 +37,7 @@ enum class StudioResourceKind {
     entity,
     animation,
     input,
+    behavior,
     textured_path,
     visual_composition,
     visual_component,
@@ -115,6 +117,10 @@ public:
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_entity_node(
         std::size_t node_index, project::EntityNode node,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_entity_behavior(
+        std::optional<project::ResourceReference> behavior,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_visual_composition(

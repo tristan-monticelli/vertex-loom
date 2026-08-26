@@ -201,6 +201,7 @@ endif()
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/animation_timeline.cpp
     engine/fabric_editor/src/autosave_scheduler.cpp
+    engine/fabric_editor/src/behavior_session.cpp
     engine/fabric_editor/src/canvas_interaction.cpp
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
@@ -214,7 +215,7 @@ add_library(fabric_editor STATIC
 )
 target_include_directories(fabric_editor PUBLIC engine/fabric_editor/include)
 target_compile_features(fabric_editor PUBLIC cxx_std_20)
-target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render fabric_physics)
+target_link_libraries(fabric_editor PUBLIC fabric_project fabric_render fabric_physics fabric_runtime)
 
 if(FABRIC_BUILD_EDITORS)
     set(NFD_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -500,6 +501,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
 
     if(FABRIC_BUILD_EDITORS)
         add_test(
+            NAME asset_studio_behavior_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-behavior-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_behavior_e2e.cmake
+        )
+        add_test(
             NAME map_studio_close_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DMAP_STUDIO=$<TARGET_FILE:map_studio>
@@ -563,6 +573,13 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_editor Catch2::Catch2WithMain)
     add_test(NAME fabric_mechanic_session_tests
              COMMAND fabric_mechanic_session_tests)
+
+    add_executable(fabric_behavior_session_tests
+        tests/cpp/behavior_session_tests.cpp)
+    target_link_libraries(fabric_behavior_session_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_behavior_session_tests
+             COMMAND fabric_behavior_session_tests)
 
     add_executable(fabric_mechanic_presets_tests
         tests/cpp/mechanic_presets_tests.cpp)

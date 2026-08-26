@@ -5,7 +5,7 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre, applique leurs actions et transformations atomiques, puis exécute animation, physique, triggers, audio, caméra et rendu")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre et applique actuellement mouvement et propriétés ; les transformations atomiques restent une tranche suivante")
         Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise assets, entités, InputDocument physiques, BehaviorGraph génériques et politiques de transformation ; prévisualise signaux et actions pas à pas")
         Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps, leurs prefabs et graphes mécaniques ; édite les paramètres de mécanique par overrides typés et inspecte leur simulation avant publication portable")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")

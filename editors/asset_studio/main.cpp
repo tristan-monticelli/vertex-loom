@@ -1,6 +1,7 @@
 #include "fabric/editor/canvas_interaction.hpp"
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/project_session.hpp"
+#include "fabric/editor/behavior_session.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
@@ -53,6 +54,10 @@ constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
 struct CreationUiState {
+    struct BehaviorFields {
+        std::string name{"Entity behavior"};
+        std::string id{"entity-behavior"};
+    } behavior;
     struct VisualCompositionFields {
         std::string name{"Visual composition"};
         std::string id{"visual-composition"};
@@ -81,6 +86,7 @@ struct CreationUiState {
     bool request_visual_preset{};
     bool request_visual_composition{};
     bool request_visual_component{};
+    bool request_behavior{};
     bool project_publish_attempted{};
 };
 
@@ -603,6 +609,7 @@ std::string_view studio_resource_kind_label(
     case Kind::entity: return "entity";
     case Kind::animation: return "animation";
     case Kind::input: return "input";
+    case Kind::behavior: return "behavior";
     case Kind::textured_path: return "textured path";
     case Kind::visual_composition: return "composition";
     case Kind::visual_component: return "component";
@@ -656,6 +663,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
     draw_kind("Input bindings", fabric::editor::StudioResourceKind::input);
+    draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior);
     draw_kind("Textured paths",
               fabric::editor::StudioResourceKind::textured_path);
     draw_kind("Visual compositions",
@@ -710,6 +718,189 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
         ImGui::TextWrapped("%s", error.message.c_str());
         ImGui::Separator();
     }
+}
+
+void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
+                          fabric::editor::BehaviorSession& behavior_session,
+                          CreationUiState& creation, std::string& status) {
+    if (creation.request_behavior) {
+        ImGui::OpenPopup("Create behavior");
+        creation.request_behavior = false;
+    }
+    if (ImGui::BeginPopupModal("Create behavior", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped("Create a BehaviorGraph v1 attachable to any entity.");
+        ImGui::InputText("Name", &creation.behavior.name);
+        ImGui::InputText("Resource id", &creation.behavior.id);
+        const bool valid = !creation.behavior.name.empty() &&
+            fabric::core::ResourceId::is_valid(creation.behavior.id);
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Create")) {
+            fabric::project::BehaviorGraph graph;
+            graph.document.id = {.value = creation.behavior.id};
+            graph.document.name = creation.behavior.name;
+            if (behavior_session.create(project_session.project_root(), graph) &&
+                project_session.refresh_resources() &&
+                project_session.select_resource(
+                    fabric::editor::StudioResourceKind::behavior,
+                    graph.document.id)) {
+                status = "Behavior created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else status = "Behavior creation failed; inspect diagnostics.";
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    const auto* selected = project_session.selected_resource();
+    if (!selected || selected->kind != fabric::editor::StudioResourceKind::behavior)
+        return;
+    if (!behavior_session.has_graph() ||
+        behavior_session.graph()->document.id != selected->id) {
+        if (!behavior_session.open(project_session.project_root(), selected->id)) {
+            status = "Behavior could not be opened.";
+            return;
+        }
+    }
+
+    ImGui::SetNextWindowSize({720.0F, 620.0F}, ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Behavior Graph")) { ImGui::End(); return; }
+    const auto& graph = *behavior_session.graph();
+    ImGui::Text("%s", graph.document.name.c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", graph.document.id.value.c_str());
+    if (ImGui::Button("Save behavior"))
+        status = behavior_session.save() ? "Behavior saved." : "Behavior save failed.";
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!behavior_session.can_undo());
+    if (ImGui::Button("Undo##behavior")) static_cast<void>(behavior_session.undo());
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!behavior_session.can_redo());
+    if (ImGui::Button("Redo##behavior")) static_cast<void>(behavior_session.redo());
+    ImGui::EndDisabled();
+
+    static int selected_node = -1;
+    static int node_type = 0;
+    static std::string new_node_id{"node"};
+    static constexpr const char* node_types[] = {
+        "action_source", "ai_source", "event_source", "trigger_source",
+        "timer_source", "property_source", "condition", "branch", "sequence",
+        "delay", "cooldown", "state", "transition", "set_property",
+        "emit_event", "play_animation", "move", "activate_mechanic",
+        "transform_entity"};
+    ImGui::SeparatorText("Nodes");
+    ImGui::SetNextItemWidth(190.0F);
+    ImGui::Combo("Type", &node_type, node_types,
+                 static_cast<int>(std::size(node_types)));
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(170.0F);
+    ImGui::InputText("Id", &new_node_id);
+    ImGui::SameLine();
+    if (ImGui::Button("Add node")) {
+        if (behavior_session.add_node(node_types[node_type], new_node_id)) {
+            selected_node = static_cast<int>(behavior_session.graph()->nodes.size() - 1U);
+            status = "Behavior node added.";
+        } else status = "Node rejected; inspect Behavior diagnostics.";
+    }
+    if (ImGui::BeginChild("Behavior node list", {260.0F, 230.0F}, true)) {
+        for (std::size_t index = 0; index < behavior_session.graph()->nodes.size(); ++index) {
+            const auto& node = behavior_session.graph()->nodes[index];
+            const std::string label = node.id + "  [" + node.type + "]##behavior-node";
+            if (ImGui::Selectable(label.c_str(), selected_node == static_cast<int>(index)))
+                selected_node = static_cast<int>(index);
+        }
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+    if (ImGui::BeginChild("Behavior node inspector", {0.0F, 230.0F}, true)) {
+        if (selected_node >= 0 &&
+            selected_node < static_cast<int>(behavior_session.graph()->nodes.size())) {
+            const auto node = behavior_session.graph()->nodes[static_cast<std::size_t>(selected_node)];
+            ImGui::Text("%s", node.type.c_str());
+            for (const auto& property : node.properties) {
+                ImGui::PushID(property.id.c_str());
+                auto value = property.value;
+                bool changed = false;
+                if (auto* typed = std::get_if<bool>(&value)) changed = ImGui::Checkbox(property.id.c_str(), typed);
+                else if (auto* typed = std::get_if<std::int64_t>(&value)) {
+                    int visible = static_cast<int>(*typed);
+                    changed = ImGui::InputInt(property.id.c_str(), &visible);
+                    *typed = visible;
+                } else if (auto* typed = std::get_if<float>(&value)) changed = ImGui::InputFloat(property.id.c_str(), typed);
+                else if (auto* typed = std::get_if<std::string>(&value)) changed = ImGui::InputText(property.id.c_str(), typed);
+                else if (auto* typed = std::get_if<fabric::core::Vec2>(&value)) {
+                    float values[2]{typed->x, typed->y}; changed = ImGui::InputFloat2(property.id.c_str(), values);
+                    *typed = {values[0], values[1]};
+                } else if (auto* typed = std::get_if<fabric::project::ResourceReference>(&value)) {
+                    changed = ImGui::InputText(property.id.c_str(), &typed->id.value);
+                    ImGui::TextDisabled("expected: %s", typed->expected_type.c_str());
+                }
+                if (changed) static_cast<void>(behavior_session.set_node_property(
+                    {.value = node.id}, property.id, std::move(value)));
+                ImGui::PopID();
+            }
+            if (ImGui::Button("Duplicate node")) {
+                const auto copy_id = node.id + "-copy";
+                if (behavior_session.duplicate_node({.value = node.id}, copy_id))
+                    selected_node = static_cast<int>(behavior_session.graph()->nodes.size() - 1U);
+            }
+            ImGui::SameLine();
+            ImGui::PushStyleColor(ImGuiCol_Button, {0.55F, 0.16F, 0.16F, 1.0F});
+            if (ImGui::Button("Delete node")) {
+                if (behavior_session.remove_node({.value = node.id})) selected_node = -1;
+            }
+            ImGui::PopStyleColor();
+        } else ImGui::TextDisabled("Select a node to edit all typed properties.");
+    }
+    ImGui::EndChild();
+
+    static std::string connection_id{"connection"}, from_node, from_port{"out"},
+        to_node, to_port{"in"};
+    ImGui::SeparatorText("Connections");
+    ImGui::InputText("Connection id", &connection_id);
+    ImGui::InputText("From node", &from_node); ImGui::SameLine();
+    ImGui::InputText("From port", &from_port);
+    ImGui::InputText("To node", &to_node); ImGui::SameLine();
+    ImGui::InputText("To port", &to_port);
+    if (ImGui::Button("Connect"))
+        static_cast<void>(behavior_session.connect({connection_id, from_node, from_port, to_node, to_port}));
+    std::optional<std::string> remove_connection;
+    for (const auto& connection : behavior_session.graph()->connections) {
+        ImGui::BulletText("%s: %s.%s -> %s.%s", connection.id.c_str(),
+                          connection.from_node.c_str(), connection.from_port.c_str(),
+                          connection.to_node.c_str(), connection.to_port.c_str());
+        ImGui::SameLine(); ImGui::PushID(connection.id.c_str());
+        if (ImGui::SmallButton("Remove")) remove_connection = connection.id;
+        ImGui::PopID();
+    }
+    if (remove_connection)
+        static_cast<void>(behavior_session.disconnect({.value = *remove_connection}));
+
+    static int signal_source = 0;
+    static std::string semantic_id{"action"};
+    static constexpr const char* source_labels[] = {"Action", "AI", "Map event", "Trigger", "Timer", "Property"};
+    ImGui::SeparatorText("Step preview");
+    ImGui::Combo("Signal source", &signal_source, source_labels, 6);
+    ImGui::InputText("Semantic id", &semantic_id);
+    if (ImGui::Button("Evaluate one fixed step")) {
+        const auto actions = behavior_session.preview(
+            {static_cast<fabric::runtime::BehaviorSignalSource>(signal_source), semantic_id, {}},
+            1.0F / 60.0F);
+        status = "Behavior preview produced " + std::to_string(actions.size()) + " action(s).";
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reset preview")) behavior_session.reset_preview();
+    if (ImGui::BeginChild("Behavior trace", {0.0F, 100.0F}, true))
+        for (const auto& entry : behavior_session.trace())
+            ImGui::Text("%s — %s", entry.node_id.c_str(), entry.message.c_str());
+    ImGui::EndChild();
+    for (const auto& error : behavior_session.errors())
+        ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
+                           error.field.c_str(), error.message.c_str());
+    ImGui::End();
 }
 
 void draw_prompt_error(const fabric::editor::PromptValidation& validation,
@@ -1395,6 +1586,7 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
 }
 
 void draw_workspace(fabric::editor::ProjectSession& session,
+                    fabric::editor::BehaviorSession& behavior_session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
                     CreationUiState& creation,
@@ -2434,6 +2626,22 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
             const auto& entity = *session.selected_entity();
+            ImGui::SeparatorText("Entity behavior");
+            std::string behavior_id = entity.behavior
+                ? entity.behavior->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Behavior", session.resources(),
+                    fabric::editor::StudioResourceKind::behavior,
+                    behavior_id, true)) {
+                const auto reference = behavior_id.empty()
+                    ? std::optional<fabric::project::ResourceReference>{}
+                    : std::optional<fabric::project::ResourceReference>{
+                        fabric::project::ResourceReference{
+                            {.value = behavior_id}, "behavior"}};
+                status = session.set_selected_entity_behavior(reference)
+                    ? "Entity behavior changed."
+                    : "Behavior attachment rejected; inspect diagnostics.";
+            }
             ImGui::SeparatorText("Entity hierarchy");
             if (!entity.nodes.empty()) {
                 canvas.selected_node = std::min(canvas.selected_node,
@@ -3029,7 +3237,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::Begin("Status", nullptr, fixed_panel_flags | ImGuiWindowFlags_NoTitleBar |
                                       ImGuiWindowFlags_NoScrollbar);
     ImGui::TextUnformatted(status.c_str());
-    if (session.dirty()) {
+    if (session.dirty() || behavior_session.dirty()) {
         ImGui::SameLine();
         ImGui::TextColored({0.89F, 0.68F, 0.34F, 1.0F}, "Unsaved changes");
     }
@@ -3881,7 +4089,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextWrapped(
             "Save them before replacing the project or closing Asset Studio?");
         if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
-            if (session.save()) {
+            if (session.save() &&
+                (!behavior_session.dirty() || behavior_session.save())) {
                 status = "Project saved.";
                 ImGui::CloseCurrentPopup();
                 if (const auto ready = transition_guard.resolve(
@@ -3914,7 +4123,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
 }
 
-int run_asset_studio(const std::filesystem::path& initial_project) {
+int run_asset_studio(const std::filesystem::path& initial_project,
+                     const bool behavior_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -3940,7 +4150,8 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     SDL_Window* window = SDL_CreateWindow(
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
+            (behavior_e2e ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
         SDL_Quit();
@@ -3992,6 +4203,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     }
 
     fabric::editor::ProjectSession session;
+    fabric::editor::BehaviorSession behavior_session;
     fabric::render::OpenGLVectorRenderer native_renderer;
     std::unordered_map<std::string, AssetPreview> texture_cache;
     if (!native_renderer.initialize()) {
@@ -4019,8 +4231,49 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             status = "Project rejected; inspect the diagnostics.";
         }
     }
+    bool behavior_e2e_complete = false;
+    if (behavior_e2e && session.has_project()) {
+        fabric::project::BehaviorGraph graph;
+        graph.document.id = {.value = "behavior-studio-e2e"};
+        graph.document.name = "Behavior Studio E2E";
+        const bool authored = behavior_session.create(initial_project, graph) &&
+            behavior_session.add_node("ai_source", "monster-ai") &&
+            behavior_session.set_node_property(
+                {.value = "monster-ai"}, "semantic_id", std::string{"attack"}) &&
+            behavior_session.add_node("emit_event", "emit-attack") &&
+            behavior_session.connect({.id = "attack-flow",
+                .from_node = "monster-ai", .from_port = "out",
+                .to_node = "emit-attack", .to_port = "in"}) &&
+            behavior_session.save();
+        const auto actions = authored ? behavior_session.preview(
+            {fabric::runtime::BehaviorSignalSource::ai_decision, "attack", {}},
+            1.0F / 60.0F) : std::vector<fabric::runtime::BehaviorAction>{};
+        fabric::editor::BehaviorSession reloaded;
+        const bool reloaded_ok = authored &&
+            reloaded.open(initial_project, {.value = "behavior-studio-e2e"}) &&
+            reloaded.graph()->nodes.size() == 2U &&
+            reloaded.graph()->connections.size() == 1U;
+        const auto entity_resource = std::ranges::find_if(
+            session.resources(), [](const auto& resource) {
+                return resource.kind == fabric::editor::StudioResourceKind::entity;
+            });
+        const bool attached = entity_resource != session.resources().end() &&
+            session.select_resource(entity_resource->kind, entity_resource->id) &&
+            session.set_selected_entity_behavior(
+                fabric::project::ResourceReference{
+                    {.value = "behavior-studio-e2e"}, "behavior"}) &&
+            session.save();
+        behavior_e2e_complete = reloaded_ok && attached && actions.size() == 1U;
+        if (!behavior_e2e_complete)
+            std::cerr << "Asset Studio Behavior E2E failed\n";
+    }
 
     bool running = true;
+    const auto dirty = [&] { return session.dirty() || behavior_session.dirty(); };
+    const auto save_all = [&] {
+        return session.save() &&
+            (!behavior_session.dirty() || behavior_session.save());
+    };
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
@@ -4030,7 +4283,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                  event.window.event == SDL_WINDOWEVENT_CLOSE &&
                  event.window.windowID == SDL_GetWindowID(window))) {
                 transition_guard.request(fabric::editor::SessionAction::quit,
-                                         session.dirty());
+                                         dirty());
             }
         }
 
@@ -4043,7 +4296,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 if (ImGui::MenuItem("New project...", new_shortcut)) {
                     transition_guard.request(
                         fabric::editor::SessionAction::create_project,
-                        session.dirty());
+                        dirty());
                 }
                 if (ImGui::MenuItem("Open project...", open_shortcut)) {
                     if (session.has_project()) {
@@ -4051,11 +4304,11 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                     }
                     transition_guard.request(
                         fabric::editor::SessionAction::open_project,
-                        session.dirty());
+                        dirty());
                 }
                 if (ImGui::MenuItem("Save", save_shortcut, false,
                                     session.has_project())) {
-                    status = session.save()
+                    status = save_all()
                         ? "Project saved."
                         : "Save failed; inspect the diagnostics.";
                 }
@@ -4066,6 +4319,9 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 if (ImGui::BeginMenu("Create", session.has_project())) {
                     if (ImGui::MenuItem("Vector artwork...")) {
                         creation.request_artwork = true;
+                    }
+                    if (ImGui::MenuItem("Behavior graph...")) {
+                        creation.request_behavior = true;
                     }
                     ImGui::EndMenu();
                 }
@@ -4082,7 +4338,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
                 ImGui::Separator();
                 if (ImGui::MenuItem("Quit", quit_shortcut)) {
                     transition_guard.request(fabric::editor::SessionAction::quit,
-                                             session.dirty());
+                                             dirty());
                 }
                 ImGui::EndMenu();
             }
@@ -4113,13 +4369,13 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_O, false)) {
             transition_guard.request(fabric::editor::SessionAction::open_project,
-                                     session.dirty());
+                                     dirty());
         }
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_N, false)) {
             transition_guard.request(
                 fabric::editor::SessionAction::create_project,
-                session.dirty());
+                dirty());
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_I, false)) {
@@ -4132,11 +4388,11 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_Q, false)) {
             transition_guard.request(fabric::editor::SessionAction::quit,
-                                     session.dirty());
+                                     dirty());
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_S, false)) {
-            status = session.save()
+            status = save_all()
                 ? "Project saved."
                 : "Save failed; inspect the diagnostics.";
         }
@@ -4188,13 +4444,24 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
             canvas.entity_world_bounds = visual_preview.bounds;
         }
 
-        draw_workspace(session, window, path_buffer, creation, imports, preview,
+        draw_workspace(session, behavior_session, window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, entity_preview,
                        visual_preview,
                        animation_ui, textured_path_ui,
                        project_settings,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);
+        draw_behavior_editor(session, behavior_session, creation, status);
+
+        const auto* active_resource = session.selected_resource();
+        if (behavior_session.dirty() && behavior_session.graph() &&
+            (!active_resource ||
+             active_resource->kind != fabric::editor::StudioResourceKind::behavior ||
+             active_resource->id != behavior_session.graph()->document.id)) {
+            status = behavior_session.save()
+                ? "Previous behavior saved automatically."
+                : "Behavior autosave transition failed.";
+        }
 
         const auto autosave_status = session.update_autosave();
         if (autosave_status == fabric::editor::AutosaveStatus::saved) {
@@ -4202,6 +4469,11 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         } else if (autosave_status == fabric::editor::AutosaveStatus::failed) {
             status = "Autosave failed; inspect the diagnostics.";
         }
+        const auto behavior_autosave = behavior_session.update_autosave();
+        if (behavior_autosave == fabric::editor::AutosaveStatus::saved)
+            status = "Behavior recovery autosave updated.";
+        else if (behavior_autosave == fabric::editor::AutosaveStatus::failed)
+            status = "Behavior autosave failed; inspect diagnostics.";
 
         ImGui::Render();
         int drawable_width = 0;
@@ -4283,6 +4555,7 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+        if (behavior_e2e) running = false;
     }
 
     if (preview.texture != 0U) {
@@ -4302,18 +4575,22 @@ int run_asset_studio(const std::filesystem::path& initial_project) {
     NFD_Quit();
     SDL_DestroyWindow(window);
     SDL_Quit();
-    return 0;
+    return behavior_e2e && !behavior_e2e_complete ? 1 : 0;
 }
 
 } // namespace
 
 int main(const int argument_count, char** arguments) {
-    if (argument_count > 2) {
-        std::cerr << "usage: asset_studio [project-directory]\n";
+    const bool behavior_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-behavior";
+    if (argument_count > 2 && !behavior_e2e) {
+        std::cerr << "usage: asset_studio [project-directory]\n"
+                     "       asset_studio --e2e-behavior project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
-        argument_count == 2 ? std::filesystem::path{arguments[1]}
+        behavior_e2e ? std::filesystem::path{arguments[2]}
+        : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
-    return run_asset_studio(initial_project);
+    return run_asset_studio(initial_project, behavior_e2e);
 }

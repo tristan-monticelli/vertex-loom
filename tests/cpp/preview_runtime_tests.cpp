@@ -2,6 +2,7 @@
 #include "fabric/runtime/scene_session.hpp"
 
 #include "fabric/project/entity.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/project/mechanic_graph.hpp"
@@ -179,6 +180,30 @@ fabric::project::EntityDefinition entity() {
                        .drawable = {.kind = fabric::project::EntityDrawableKind::vector,
                                      .resource = fabric::project::ResourceReference{
                                          {.value = "runtime-vector"}, "vector"}}}}};
+}
+
+fabric::project::BehaviorGraph shared_behavior() {
+    using Direction = fabric::project::BehaviorPortDirection;
+    using Type = fabric::project::BehaviorValueType;
+    fabric::project::BehaviorGraph result;
+    result.document.id = {.value = "runtime-behavior"};
+    result.document.name = "Runtime Behavior";
+    for (const auto& [id, type] : std::array{
+             std::pair{"player", "action_source"},
+             std::pair{"monster", "ai_source"},
+             std::pair{"map", "event_source"}}) {
+        result.nodes.push_back({.id = id, .type = type,
+            .ports = {{"out", Direction::output, Type::signal}},
+            .properties = {{"semantic_id", std::string{"advance"}}}});
+        result.connections.push_back({.id = std::string{id} + "-move",
+            .from_node = id, .from_port = "out", .to_node = "move",
+            .to_port = "in"});
+    }
+    result.nodes.push_back({.id = "move", .type = "move",
+        .ports = {{"in", Direction::input, Type::signal},
+                  {"out", Direction::output, Type::signal}},
+        .properties = {{"vector", fabric::core::Vec2{6.0F, 0.0F}}}});
+    return result;
 }
 
 fabric::project::MechanicValue mechanic_default_value(
@@ -1351,6 +1376,48 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("published Preview Runtime evaluates one attached behavior for player AI and map") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-behavior-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root.string() + "-package";
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), shared_behavior()).ok());
+    auto actor = entity();
+    actor.behavior = fabric::project::ResourceReference{
+        {.value = "runtime-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), actor).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_entity()).ok());
+    REQUIRE(fabric::project::publish_map_package(
+        root, {.value = "preview"}, package).ok());
+    REQUIRE(std::filesystem::is_regular_file(
+        std::filesystem::path{package} /
+        "assets/behaviors/runtime-behavior.behavior.json"));
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.package_root = package,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    for (const auto source : {
+             fabric::runtime::BehaviorSignalSource::action,
+             fabric::runtime::BehaviorSignalSource::ai_decision,
+             fabric::runtime::BehaviorSignalSource::map_event}) {
+        const auto actions = runtime.evaluate_instance_behavior(
+            "marker", {source, "advance", {}}, 1.0F / 60.0F);
+        REQUIRE(actions);
+        REQUIRE(actions->size() == 1U);
+        CHECK(actions->front().kind == fabric::runtime::BehaviorActionKind::move);
+    }
+    CHECK(runtime.stats().behavior_actions == 3U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
 }
 
 TEST_CASE("preview runtime resolves visual component entity drawables") {
