@@ -282,6 +282,9 @@ C4Component
   animations, applique les transforms d'instance et l'ordre calque/Z ; le
   canvas les transmet au même backend OpenGL et conserve les overlays ImGui
   de sélection, collisions et triggers.
+- Les formulaires de création et d'ouverture de Map Studio associent les
+  erreurs de validation à leur champ et affichent une correction actionnable ;
+  les boutons désactivés exposent la condition qui manque dans leur tooltip.
 - Map Studio liste les `MechanicGraph` du projet et ouvre un seul graphe à la
   fois dans `MechanicSession`. L'inspecteur peut ajouter ou retirer un nœud
   depuis les sept schémas intégrés, modifier ses propriétés typées et connecter

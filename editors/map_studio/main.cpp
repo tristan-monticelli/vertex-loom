@@ -91,6 +91,26 @@ void draw_errors(const fabric::editor::MapSession& session) {
     }
 }
 
+void draw_field_errors(const std::vector<fabric::project::Error>& errors,
+                       const std::string_view field,
+                       const std::string_view correction) {
+    const auto qualified_field = "." + std::string(field);
+    for (const auto& error : errors) {
+        if (error.field != field && !error.field.starts_with(field) &&
+            !error.field.ends_with(qualified_field)) continue;
+        ImGui::PushStyleColor(ImGuiCol_Text, {0.98F, 0.48F, 0.42F, 1.0F});
+        ImGui::TextWrapped("%s: %s", error.field.c_str(), error.message.c_str());
+        ImGui::PopStyleColor();
+        ImGui::TextDisabled("Correction: %s", std::string(correction).c_str());
+    }
+}
+
+void draw_disabled_reason(const bool disabled, const std::string_view reason) {
+    if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        return;
+    ImGui::SetTooltip("%s", std::string(reason).c_str());
+}
+
 void draw_scene_errors(const fabric::editor::SceneSession& session) {
     for (const auto& error : session.errors()) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
@@ -361,6 +381,12 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.new_id.empty() || state.new_name.empty(),
+                         "Enter both a scene id and a scene name.");
+    draw_field_errors(session.errors(), "id",
+                      "Use a unique non-empty scene id.");
+    draw_field_errors(session.errors(), "name",
+                      "Enter a visible non-empty scene name.");
     draw_resource_picker("Scenes:", scenes_directory, ".scene.json",
                          state.open_id);
     ImGui::SameLine();
@@ -375,6 +401,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.open_id.empty(),
+                         "Choose an existing scene first.");
 
     if (!session.has_scene()) {
         draw_scene_errors(session);
@@ -2149,8 +2177,14 @@ int run(const std::filesystem::path& project_root,
                         ? "Map opened" : "Map could not be opened";
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(open_map_id.empty(),
+                                     "Choose an existing map first.");
                 ImGui::InputText("New map id", &new_map_id);
+                draw_field_errors(session.errors(), "id",
+                                  "Use a unique non-empty resource id.");
                 ImGui::InputText("New map name", &new_map_name);
+                draw_field_errors(session.errors(), "name",
+                                  "Enter a visible non-empty map name.");
                 ImGui::BeginDisabled(new_map_id.empty() || new_map_name.empty());
                 if (ImGui::Button("Create map")) {
                     const fabric::project::MapDocument map{
@@ -2160,6 +2194,8 @@ int run(const std::filesystem::path& project_root,
                         ? "Map created" : "Map creation failed";
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(new_map_id.empty() || new_map_name.empty(),
+                                     "Enter both a map id and a map name.");
             }
             draw_errors(session);
         } else {
