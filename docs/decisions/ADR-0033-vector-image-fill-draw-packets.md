@@ -24,3 +24,5 @@ Le packet décrit suffisamment le fill sans posséder de pixels ni d’atlas. Le
 textures doivent être validées par le registre de ressources avant publication.
 Le renderer OpenGL devra appliquer le fit, le transform, l’opacité et
 `deform_with_shape` lors d’un incrément ultérieur.
+Les nouvelles liaisons utilisent `deform_with_shape = false` par défaut afin
+que cette capacité différée ne transforme jamais implicitement une image.

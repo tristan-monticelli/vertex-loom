@@ -268,3 +268,6 @@ la poignée de rotation dans l'orientation locale du nœud.
 Les prompts graphiques de matériau et d'entité sélectionnent leurs références
 depuis l'index typé de la session ; les validateurs headless restent la barrière
 finale contre une référence absente ou incompatible.
+Le contrôleur de crop raster borne chaque déplacement et poignée aux dimensions
+de la source ; ses tests vérifient déplacement, agrandissement maximal et taille
+minimale sans réécriture des pixels.

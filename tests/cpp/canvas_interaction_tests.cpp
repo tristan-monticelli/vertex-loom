@@ -50,3 +50,22 @@ TEST_CASE("rotation handle extends along the transformed edge") {
     CHECK(rotated.x == 10.0F);
     CHECK(rotated.y == 18.0F);
 }
+
+TEST_CASE("raster crop drag stays inside the immutable source") {
+    fabric::project::RasterView view{
+        .crop = {{10.0F, 10.0F}, {40.0F, 30.0F}},
+    };
+    const auto moved = fabric::editor::drag_raster_crop(
+        view, fabric::editor::RasterCropDrag::move, {80.0F, -20.0F}, 100, 80);
+    CHECK(moved.crop == fabric::core::Rect{{60.0F, 0.0F}, {40.0F, 30.0F}});
+
+    const auto resized = fabric::editor::drag_raster_crop(
+        view, fabric::editor::RasterCropDrag::bottom_right,
+        {100.0F, 100.0F}, 100, 80);
+    CHECK(resized.crop == fabric::core::Rect{{10.0F, 10.0F}, {90.0F, 70.0F}});
+
+    const auto minimum = fabric::editor::drag_raster_crop(
+        view, fabric::editor::RasterCropDrag::top_left,
+        {100.0F, 100.0F}, 100, 80);
+    CHECK(minimum.crop == fabric::core::Rect{{49.0F, 39.0F}, {1.0F, 1.0F}});
+}

@@ -39,6 +39,10 @@ raster.
 
 Une vectorisation ou un masque est une action explicite. La géométrie de rendu,
 la source raster et la collision restent trois responsabilités séparées.
+Le Studio initialise donc toute nouvelle liaison image sans déformation par la
+forme. Le mode de warp vectoriel reste disponible comme action avancée
+explicite ; le viewport raster propose directement déplacement et
+redimensionnement du crop tout en conservant la source complète.
 
 ## Alternatives
 

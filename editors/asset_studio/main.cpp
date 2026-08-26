@@ -139,6 +139,10 @@ struct CanvasUiState {
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
     fabric::core::Rect entity_world_bounds{{-5.0F, -5.0F}, {10.0F, 10.0F}};
+    std::string crop_resource_id;
+    std::optional<fabric::editor::RasterCropDrag> crop_drag;
+    ImVec2 crop_start_mouse{};
+    fabric::project::RasterView crop_start_view;
 };
 
 struct AnimationUiState {
@@ -1272,6 +1276,124 @@ void draw_packet_preview_canvas(CanvasUiState& canvas,
                         canvas.zoom * 100.0F);
 }
 
+void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
+                             const AssetPreview& preview,
+                             CanvasUiState& canvas, const ImVec2 available,
+                             std::string& status) {
+    if (!session.imported_texture() || preview.texture == 0U) return;
+    const auto& texture = session.imported_texture()->asset;
+    if (canvas.crop_resource_id != texture.document.id.value) {
+        canvas.crop_resource_id = texture.document.id.value;
+        canvas.crop_drag.reset();
+    }
+    ImGui::InvisibleButton("Raster crop canvas", available,
+                           ImGuiButtonFlags_MouseButtonLeft);
+    const ImVec2 origin = ImGui::GetItemRectMin();
+    const float source_width = static_cast<float>(texture.width);
+    const float source_height = static_cast<float>(texture.height);
+    const float scale = std::max(
+        0.001F, std::min((available.x - 32.0F) / source_width,
+                         (available.y - 32.0F) / source_height));
+    const ImVec2 image_size{source_width * scale, source_height * scale};
+    const ImVec2 image_min{origin.x + (available.x - image_size.x) * 0.5F,
+                           origin.y + (available.y - image_size.y) * 0.5F};
+    const ImVec2 image_max{image_min.x + image_size.x,
+                           image_min.y + image_size.y};
+    auto view = texture.view.value_or(fabric::project::RasterView{
+        .crop = {{0.0F, 0.0F}, {source_width, source_height}},
+    });
+    const auto crop_screen_rect = [&](const fabric::project::RasterView& value) {
+        return std::pair{
+            ImVec2{image_min.x + value.crop.origin.x * scale,
+                   image_min.y + value.crop.origin.y * scale},
+            ImVec2{image_min.x +
+                       (value.crop.origin.x + value.crop.size.x) * scale,
+                   image_min.y +
+                       (value.crop.origin.y + value.crop.size.y) * scale}};
+    };
+    auto [crop_min, crop_max] = crop_screen_rect(view);
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const auto near = [&](const ImVec2 point) {
+        return std::hypot(mouse.x - point.x, mouse.y - point.y) <= 11.0F;
+    };
+    if (ImGui::IsItemHovered() &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        const ImVec2 top_right{crop_max.x, crop_min.y};
+        const ImVec2 bottom_left{crop_min.x, crop_max.y};
+        if (near(crop_min)) {
+            canvas.crop_drag = fabric::editor::RasterCropDrag::top_left;
+        } else if (near(top_right)) {
+            canvas.crop_drag = fabric::editor::RasterCropDrag::top_right;
+        } else if (near(bottom_left)) {
+            canvas.crop_drag = fabric::editor::RasterCropDrag::bottom_left;
+        } else if (near(crop_max)) {
+            canvas.crop_drag = fabric::editor::RasterCropDrag::bottom_right;
+        } else if (mouse.x >= crop_min.x && mouse.x <= crop_max.x &&
+                   mouse.y >= crop_min.y && mouse.y <= crop_max.y) {
+            canvas.crop_drag = fabric::editor::RasterCropDrag::move;
+        }
+        if (canvas.crop_drag) {
+            canvas.crop_start_mouse = mouse;
+            canvas.crop_start_view = view;
+        }
+    }
+    if (canvas.crop_drag && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        const fabric::core::Vec2 delta{
+            (mouse.x - canvas.crop_start_mouse.x) / scale,
+            (mouse.y - canvas.crop_start_mouse.y) / scale};
+        const auto candidate = fabric::editor::drag_raster_crop(
+            canvas.crop_start_view, *canvas.crop_drag, delta,
+            texture.width, texture.height);
+        if (candidate.crop != view.crop) {
+            if (session.set_selected_texture_view(candidate)) {
+                view = candidate;
+                status = "Raster crop changed; source pixels are unchanged.";
+            } else {
+                status = "Raster crop rejected; inspect diagnostics.";
+            }
+        }
+    }
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+        canvas.crop_drag.reset();
+    }
+    const auto updated_crop = crop_screen_rect(view);
+    crop_min = updated_crop.first;
+    crop_max = updated_crop.second;
+    auto* draw_list = ImGui::GetWindowDrawList();
+    draw_list->PushClipRect(origin,
+                            {origin.x + available.x, origin.y + available.y},
+                            true);
+    draw_list->AddImage(
+        ImTextureRef(static_cast<ImTextureID>(preview.texture)),
+        image_min, image_max, {0.0F, 1.0F}, {1.0F, 0.0F});
+    constexpr ImU32 shade = IM_COL32(8, 10, 14, 170);
+    draw_list->AddRectFilled(image_min, {image_max.x, crop_min.y}, shade);
+    draw_list->AddRectFilled({image_min.x, crop_max.y}, image_max, shade);
+    draw_list->AddRectFilled({image_min.x, crop_min.y},
+                             {crop_min.x, crop_max.y}, shade);
+    draw_list->AddRectFilled({crop_max.x, crop_min.y},
+                             {image_max.x, crop_max.y}, shade);
+    draw_list->AddRect(crop_min, crop_max, IM_COL32(244, 190, 80, 255),
+                       0.0F, ImDrawFlags_None, 2.0F);
+    for (const ImVec2 handle : {
+             crop_min, ImVec2{crop_max.x, crop_min.y},
+             ImVec2{crop_min.x, crop_max.y}, crop_max}) {
+        draw_list->AddRectFilled({handle.x - 5.0F, handle.y - 5.0F},
+                                 {handle.x + 5.0F, handle.y + 5.0F},
+                                 IM_COL32(250, 220, 145, 255));
+    }
+    draw_list->AddText(
+        {image_min.x + 8.0F, image_min.y + 8.0F},
+        IM_COL32(245, 245, 245, 255),
+        (std::to_string(static_cast<int>(view.crop.size.x)) + " x " +
+         std::to_string(static_cast<int>(view.crop.size.y)) + " px").c_str());
+    draw_list->PopClipRect();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip(
+            "Drag inside to move the crop. Drag a corner to resize it. The source image is never rewritten.");
+    }
+}
+
 void draw_workspace(fabric::editor::ProjectSession& session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
@@ -1464,6 +1586,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
             "Entity preview");
+    } else if (preview.texture != 0U && session.imported_texture() &&
+               session.selected_resource() != nullptr &&
+               session.selected_resource()->kind ==
+                   fabric::editor::StudioResourceKind::texture) {
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
+        ImGui::TextUnformatted("Raster crop · non-destructive source");
+        ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
+        draw_raster_crop_canvas(
+            session, preview, canvas,
+            {std::max(1.0F, available.x - 16.0F),
+             std::max(1.0F, available.y - 42.0F)},
+            status);
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);
@@ -2000,8 +2134,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SeparatorText("Raster view (non-destructive)");
                 static std::string raster_view_edit_id;
                 static fabric::project::RasterView raster_view_edit;
+                static std::optional<fabric::project::RasterView>
+                    raster_view_source;
                 const auto& texture = *session.imported_texture();
-                if (raster_view_edit_id != texture.asset.document.id.value) {
+                if (raster_view_edit_id != texture.asset.document.id.value ||
+                    (raster_view_source != texture.asset.view &&
+                     !ImGui::IsAnyItemActive())) {
                     raster_view_edit_id = texture.asset.document.id.value;
                     raster_view_edit.crop = texture.asset.view
                         ? texture.asset.view->crop
@@ -2018,6 +2156,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     raster_view_edit.filter = texture.asset.view
                         ? texture.asset.view->filter
                         : fabric::project::RasterFilter::linear;
+                    raster_view_source = texture.asset.view;
                 }
                 float crop_origin[2]{raster_view_edit.crop.origin.x,
                                      raster_view_edit.crop.origin.y};
@@ -2046,6 +2185,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     raster_view_edit.transform.scale =
                         {view_scale[0], view_scale[1]};
                     if (session.set_selected_texture_view(raster_view_edit)) {
+                        raster_view_source = raster_view_edit;
                         status = "Raster view saved in the document.";
                     } else {
                         status = "Raster view rejected; inspect diagnostics.";
@@ -2055,6 +2195,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (ImGui::Button("Reset full source")) {
                     if (session.reset_selected_texture_view()) {
                         raster_view_edit_id.clear();
+                        raster_view_source.reset();
                         status = "Raster view reset to the full source.";
                     } else {
                         status = "Raster view reset failed; inspect diagnostics.";
@@ -2281,7 +2422,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_node(node);
                 }
                 bool deform = node.fill.image->deform_with_shape;
-                if (ImGui::Checkbox("Deform with shape", &deform)) {
+                if (ImGui::Checkbox("Warp pixels with shape (advanced)",
+                                    &deform)) {
                     node.fill.image->deform_with_shape = deform;
                     commit_node(node);
                 }
@@ -3177,8 +3319,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    "%.2f")) {
                 creation.artwork.image_opacity = opacity;
             }
-            ImGui::Checkbox("Deform image with shape",
+            ImGui::Checkbox("Warp pixels with vector shape (advanced)",
                             &creation.artwork.deform_image_with_shape);
+            ImGui::TextDisabled(
+                "Off keeps image placement independent; crop the raster source in its own viewport.");
         }
         const auto validation = creation.artwork.validate(
             session.project_root(), *session.manifest());

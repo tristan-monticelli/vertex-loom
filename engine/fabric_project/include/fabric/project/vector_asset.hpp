@@ -79,7 +79,7 @@ struct VectorImageFill {
     VectorImageFit fit{VectorImageFit::cover};
     core::Transform transform;
     float opacity{1.0F};
-    bool deform_with_shape{true};
+    bool deform_with_shape{};
 
     friend bool operator==(const VectorImageFill&,
                            const VectorImageFill&) = default;

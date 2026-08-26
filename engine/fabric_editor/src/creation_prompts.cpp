@@ -380,7 +380,7 @@ std::string_view label(const InitialShape shape) noexcept {
 std::string_view label(const InitialFill fill) noexcept {
     switch (fill) {
     case InitialFill::color: return "Solid color";
-    case InitialFill::image: return "Image in shape";
+    case InitialFill::image: return "Image mask (advanced)";
     case InitialFill::transparent: return "Transparent";
     }
     return "Transparent";

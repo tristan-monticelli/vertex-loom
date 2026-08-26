@@ -280,6 +280,7 @@ TEST_CASE("project and artwork prompt states are isolated and cancellable") {
     artwork_prompt.reset();
     CHECK(artwork_prompt.name.empty());
     CHECK(artwork_prompt.width == 10.0);
+    CHECK_FALSE(artwork_prompt.deform_image_with_shape);
     CHECK(project_prompt.pixels_per_unit == 100.0);
 }
 

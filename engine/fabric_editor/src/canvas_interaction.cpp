@@ -1,5 +1,6 @@
 #include "fabric/editor/canvas_interaction.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <numbers>
 
@@ -50,6 +51,46 @@ std::optional<std::size_t> topmost_vector_node_at(
         }
     }
     return std::nullopt;
+}
+
+project::RasterView drag_raster_crop(
+    const project::RasterView& start, const RasterCropDrag operation,
+    const core::Vec2 delta_pixels, const std::uint32_t source_width,
+    const std::uint32_t source_height) noexcept {
+    auto result = start;
+    const float maximum_x = static_cast<float>(source_width);
+    const float maximum_y = static_cast<float>(source_height);
+    float left = start.crop.origin.x;
+    float top = start.crop.origin.y;
+    float right = left + start.crop.size.x;
+    float bottom = top + start.crop.size.y;
+    if (operation == RasterCropDrag::move) {
+        left = std::clamp(left + delta_pixels.x, 0.0F,
+                          maximum_x - start.crop.size.x);
+        top = std::clamp(top + delta_pixels.y, 0.0F,
+                         maximum_y - start.crop.size.y);
+        right = left + start.crop.size.x;
+        bottom = top + start.crop.size.y;
+    } else {
+        if (operation == RasterCropDrag::top_left ||
+            operation == RasterCropDrag::bottom_left) {
+            left = std::clamp(left + delta_pixels.x, 0.0F, right - 1.0F);
+        }
+        if (operation == RasterCropDrag::top_right ||
+            operation == RasterCropDrag::bottom_right) {
+            right = std::clamp(right + delta_pixels.x, left + 1.0F, maximum_x);
+        }
+        if (operation == RasterCropDrag::top_left ||
+            operation == RasterCropDrag::top_right) {
+            top = std::clamp(top + delta_pixels.y, 0.0F, bottom - 1.0F);
+        }
+        if (operation == RasterCropDrag::bottom_left ||
+            operation == RasterCropDrag::bottom_right) {
+            bottom = std::clamp(bottom + delta_pixels.y, top + 1.0F, maximum_y);
+        }
+    }
+    result.crop = {{left, top}, {right - left, bottom - top}};
+    return result;
 }
 
 } // namespace fabric::editor

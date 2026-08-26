@@ -112,7 +112,7 @@ struct CreateVectorArtworkPrompt {
     project::VectorImageFit image_fit{project::VectorImageFit::cover};
     core::Transform image_transform;
     double image_opacity{1.0};
-    bool deform_image_with_shape{true};
+    bool deform_image_with_shape{};
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(
