@@ -446,7 +446,7 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 - [x] Demander confirmation avant toute suppression matérielle.
 - [x] Ne jamais supprimer automatiquement une source externe ou partagée.
 - [x] Ajouter undo pour les opérations récupérables du registre.
-- [ ] Tester les opérations sur chaque type de ressource.
+- [x] Tester les opérations sur chaque type de ressource.
 - [ ] Tester collision d'identifiant, cycles, fichiers absents et échec disque.
 
 Gate : toutes les ressources peuvent être parcourues et administrées depuis le

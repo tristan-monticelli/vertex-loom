@@ -3,6 +3,8 @@
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/project/audio.hpp"
+#include "fabric/project/behavior_graph.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/mechanic_graph.hpp"
 #include "fabric/project/replay.hpp"
@@ -211,6 +213,22 @@ TEST_CASE("resource index administers every directly creatable resource") {
                      .type = "audio", .id = {.value = "indexed-audio"},
                      .name = "Indexed Audio"},
         .events = {{"theme", "theme.wav", 0.8F, true}}}).ok());
+    auto texture_source = std::filesystem::current_path() /
+        "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+    if (!std::filesystem::is_regular_file(texture_source))
+        texture_source = std::filesystem::current_path().parent_path() /
+            "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+    REQUIRE(fabric::project::publish_texture_asset(
+                project.path(), manifest,
+                {.document = {.schema_version = 1,
+                              .type = "texture",
+                              .id = {.value = "indexed-texture"},
+                              .name = "Indexed Texture"},
+                 .source = "assets/textures/indexed-texture.png",
+                 .width = 8U,
+                 .height = 8U},
+                texture_source)
+                .ok());
 
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
@@ -224,6 +242,9 @@ TEST_CASE("resource index administers every directly creatable resource") {
     fabric::editor::CreateEntityPrompt entity_prompt;
     entity_prompt.name = "Indexed Entity";
     REQUIRE(session.create_entity(entity_prompt));
+    fabric::editor::CreateEntityPrompt destination_prompt;
+    destination_prompt.name = "Indexed Destination";
+    REQUIRE(session.create_entity(destination_prompt));
     fabric::editor::CreateAnimationPrompt animation_prompt;
     animation_prompt.name = "Indexed Animation";
     animation_prompt.generic_preview = true;
@@ -232,12 +253,49 @@ TEST_CASE("resource index administers every directly creatable resource") {
     input_prompt.name = "Indexed Input";
     REQUIRE(session.create_input(input_prompt));
 
+    REQUIRE(session.create_visual_preset({
+        .kind = fabric::editor::VisualPresetKind::seam,
+        .id = {.value = "indexed-seam"},
+        .name = "Indexed Seam",
+        .thread_texture = fabric::project::ResourceReference{
+            {.value = "indexed-texture"}, "texture"}}));
+    REQUIRE(session.save());
+
+    fabric::project::BehaviorGraph behavior;
+    behavior.document.id = {.value = "indexed-behavior"};
+    behavior.document.name = "Indexed Behavior";
+    behavior.nodes.push_back({
+        .id = "source",
+        .type = "action_source",
+        .ports = {{"out", fabric::project::BehaviorPortDirection::output,
+                   fabric::project::BehaviorValueType::signal}},
+        .properties = {{"semantic_id", std::string{"move"}}}});
+    REQUIRE(fabric::project::publish_behavior_graph(
+                project.path(), *session.manifest(), behavior)
+                .ok());
+    fabric::project::EntityTransformation transformation;
+    transformation.document.id = {.value = "indexed-transformation"};
+    transformation.document.name = "Indexed Transformation";
+    transformation.source_entity = {{.value = "indexed-entity"}, "entity"};
+    transformation.destination_entity = {
+        {.value = "indexed-destination"}, "entity"};
+    REQUIRE(fabric::project::publish_entity_transformation(
+                project.path(), *session.manifest(), transformation)
+                .ok());
+    REQUIRE(session.refresh_resources());
+
     for (const auto kind : {
+             fabric::editor::StudioResourceKind::texture,
              fabric::editor::StudioResourceKind::vector,
              fabric::editor::StudioResourceKind::material,
              fabric::editor::StudioResourceKind::entity,
              fabric::editor::StudioResourceKind::animation,
              fabric::editor::StudioResourceKind::input,
+             fabric::editor::StudioResourceKind::behavior,
+             fabric::editor::StudioResourceKind::transformation,
+             fabric::editor::StudioResourceKind::textured_path,
+             fabric::editor::StudioResourceKind::visual_composition,
+             fabric::editor::StudioResourceKind::visual_component,
              fabric::editor::StudioResourceKind::map,
              fabric::editor::StudioResourceKind::scene,
              fabric::editor::StudioResourceKind::mechanic,

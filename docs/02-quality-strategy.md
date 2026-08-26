@@ -178,10 +178,10 @@ la manipulation directe des points sur canvas sont implémentées, mais restent
 à couvrir par un parcours SDL E2E avant de fermer leur gate UX.
 Le test `resource index administers every directly creatable resource` exerce
 la sélection, duplication, renommage, mise en corbeille, restauration et les
-collisions d'identifiant sur les ressources vector, matériau, entité,
-animation, input, map, scène, mécanique, replay et audio. Les familles
-BehaviorGraph, transformation et ressources visuelles restent à ajouter à ce
-parcours générique.
+collisions d'identifiant sur les 16 familles indexées : texture, vector,
+matériau, entité, animation, input, BehaviorGraph, transformation,
+texturedPath, composition visuelle, composant visuel, map, scène, mécanique,
+replay et audio.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La
