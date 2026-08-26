@@ -377,7 +377,7 @@ même rail sans saisie manuelle d'identifiants.
 - [x] Rendre tous les paramètres de `RasterView` éditables après import.
 - [x] Afficher simultanément source complète, crop actif et résultat final.
 - [ ] Tester navigation avec beaucoup de textures et noms similaires.
-- [ ] Tester changement de texture avec undo, redo, save et reload.
+- [x] Tester changement de texture avec undo, redo, save et reload.
 
 Gate : une texture peut être trouvée, ouverte, remplacée, recadrée et réutilisée
 depuis chaque contexte sans saisir son identifiant.
