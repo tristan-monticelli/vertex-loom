@@ -80,6 +80,12 @@ d'entrée sont des instances marquées par `sceneEntryPoint`, résolues
 atomiquement avec la scène cible avant qu'un nouveau Preview Runtime place le
 personnage.
 
+`fabric_project` publie séparément les paquets map (`map-package.json`) et les
+paquets de campagne (`scene-package.json`). Le second ferme transitivement les
+scènes cibles, leurs maps et assets tout en autorisant les boucles entre
+scènes. Preview Runtime et `SceneRuntimeSession` détectent ce manifeste avant
+SDL et exécutent la campagne sans projet source.
+
 `fabric_physics` compile les sept nœuds intégrés de `MechanicGraph` en un plan
 headless ordonné de corps, pivots, joints, moteurs, capteurs, contraintes et
 liaisons vers les événements déclarés par la map. Ce plan ne contient aucun

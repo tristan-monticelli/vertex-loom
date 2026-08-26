@@ -7,6 +7,11 @@ sequenceDiagram
     participant Project as fabric_project
     participant Preview as PreviewRuntime
 
+    opt campagne portable
+        Game->>Project: ouvrir scene-package.json
+        Project-->>Game: rootScene + fermeture transitive
+    end
+
     Game->>Session: load(sceneId)
     Session->>Project: charger SceneDocument et toutes ses maps
     Project-->>Session: compose_scene_maps + points d'entrée
