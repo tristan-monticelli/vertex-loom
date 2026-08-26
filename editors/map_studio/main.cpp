@@ -246,6 +246,8 @@ void draw_resource_picker(const char* label,
     std::error_code error;
     if (!std::filesystem::exists(directory, error) || error) return;
     ImGui::TextDisabled("%s", label);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Clear")) selected_id.clear();
     ImGui::PushID(label);
     for (std::filesystem::directory_iterator iterator{directory, error}, end;
          !error && iterator != end; iterator.increment(error)) {
@@ -405,8 +407,6 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::EndDisabled();
 
     ImGui::SeparatorText("Mounted maps");
-    ImGui::SetNextItemWidth(170.0F);
-    ImGui::InputText("Map", &state.map_id);
     draw_resource_picker("Maps:", maps_directory, ".map.json", state.map_id);
     ImGui::SetNextItemWidth(170.0F);
     ImGui::InputText("Mount id", &state.mount_id);
@@ -465,8 +465,6 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::SeparatorText("Transitions");
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Transition id", &state.transition_id);
-    ImGui::SetNextItemWidth(170.0F);
-    ImGui::InputText("Target scene", &state.target_scene_id);
     draw_resource_picker("Target scenes:", scenes_directory, ".scene.json",
                          state.target_scene_id);
     ImGui::SetNextItemWidth(160.0F);
