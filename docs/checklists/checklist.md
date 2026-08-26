@@ -551,17 +551,17 @@ utilisées pour tous les types de ressources.
 - [ ] Automatiser les parcours suivants :
   - [ ] parcourir et sélectionner une texture ;
   - [ ] modifier un crop puis créer une autre ressource ;
-  - [ ] vérifier l'autosave de l'ancienne ressource ;
-  - [ ] dupliquer et renommer une ressource ;
-  - [ ] analyser puis annuler une suppression ;
-  - [ ] ajouter un artwork à une entité existante ;
-  - [ ] créer une animation ciblant cette entité ;
+  - [x] vérifier l'autosave de l'ancienne ressource ;
+  - [x] dupliquer et renommer une ressource ;
+  - [x] analyser puis annuler une suppression ;
+  - [x] ajouter un artwork à une entité existante ;
+  - [x] créer une animation ciblant cette entité ;
   - [ ] créer plusieurs actions et plusieurs bindings ;
   - [ ] programmer un comportement de joueur ;
   - [ ] programmer un comportement de monstre ;
-  - [ ] transformer une entité A vers B ;
+  - [x] transformer une entité A vers B ;
   - [ ] créer et éditer un path Bézier ;
-  - [ ] changer fill, texture et stroke après création.
+  - [x] changer fill, texture et stroke après création.
 - [ ] Capturer diagnostics et screenshots lors d'un échec.
 - [ ] Exécuter les parcours sur macOS, Windows et Linux.
 - [x] Garder les tests headless de contrats en complément, pas en remplacement.
