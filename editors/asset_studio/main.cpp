@@ -4240,6 +4240,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                                        "Invalid animation binding: missing node '%s'",
                                        property.binding.node_id.c_str());
+                    if (ImGui::SmallButton("Repair to first target node") &&
+                        session.selected_entity() && !session.selected_entity()->nodes.empty()) {
+                        auto repaired = property.binding;
+                        repaired.node_id = session.selected_entity()->nodes.front().id;
+                        status = session.replace_selected_animation_binding(
+                                     property.binding, repaired)
+                            ? "Animation binding repaired."
+                            : "Animation binding repair failed; inspect diagnostics.";
+                    }
                 }
                 const auto value_label = std::visit(
                     [](const auto& value) {

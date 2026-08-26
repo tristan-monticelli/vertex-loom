@@ -206,6 +206,9 @@ public:
         project::PropertyBinding binding, std::size_t key_index,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool replace_selected_animation_binding(
+        project::PropertyBinding from, project::PropertyBinding to,
+        AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());
     [[nodiscard]] bool move_selected_animation_key(
         project::PropertyBinding binding, std::size_t key_index, float time,
         AutosaveScheduler::Clock::time_point now =

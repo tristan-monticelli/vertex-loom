@@ -3007,6 +3007,31 @@ bool ProjectSession::remove_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::replace_selected_animation_binding(
+    project::PropertyBinding from, project::PropertyBinding to,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    auto tracks = selected_animation_->tracks;
+    bool replaced = false;
+    for (auto& track : tracks) {
+        if (track.binding == from) {
+            track.binding = to;
+            replaced = true;
+        }
+    }
+    if (!replaced || !project::validate_animation(*manifest_, *selected_animation_).ok()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks", "animation binding could not be repaired"}};
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::AnimationTrack>>>(
+            selected_animation_->tracks, std::move(tracks)))) return false;
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::move_selected_animation_key(
     project::PropertyBinding binding, const std::size_t key_index,
     const float time, const AutosaveScheduler::Clock::time_point now) {
