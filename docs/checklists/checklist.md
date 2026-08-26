@@ -500,14 +500,14 @@ sur un comportement sans modifier le runtime.
 - [ ] Ajouter sélection simple et multiple de points.
 - [ ] Ajouter déplacement, rotation et échelle d'une sélection de points.
 - [ ] Exposer les bounds des primitives.
-- [ ] Exposer le type de fill après création.
-- [ ] Permettre fill `none`, couleur et image à tout moment.
-- [ ] Permettre de changer texture, fit, offset, scale, rotation, pivot,
+- [x] Exposer le type de fill après création.
+- [x] Permettre fill `none`, couleur et image à tout moment.
+- [x] Permettre de changer texture, fit, offset, scale, rotation, pivot,
   opacité et déformation du fill image.
 - [ ] Rendre la transform du fill indépendante de celle de la forme.
-- [ ] Exposer ajout, retrait et modification du stroke.
-- [ ] Exposer couleur, largeur, join et cap du stroke.
-- [ ] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
+- [x] Exposer ajout, retrait et modification du stroke.
+- [x] Exposer couleur, largeur, join et cap du stroke.
+- [x] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
 - [ ] Afficher les clips imbriqués fidèlement sur le canvas.
 - [ ] Relier toutes les propriétés animables au registre de descripteurs.
 - [ ] Faire passer chaque geste par CommandStack avec fusion continue.
