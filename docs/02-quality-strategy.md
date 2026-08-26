@@ -182,6 +182,10 @@ collisions d'identifiant sur les 16 familles indexées : texture, vector,
 matériau, entité, animation, input, BehaviorGraph, transformation,
 texturedPath, composition visuelle, composant visuel, map, scène, mécanique,
 replay et audio.
+Le même ensemble de tests couvre les collisions d'identifiant et les
+documents absents ; les tests de fondations couvrent les cycles de dépendances
+et le test de sauvegarde de session couvre un échec disque sans perdre la
+sélection ni le document sale.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La

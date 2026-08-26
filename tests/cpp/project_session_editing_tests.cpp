@@ -348,6 +348,30 @@ TEST_CASE("resource index administers every directly creatable resource") {
     CHECK_FALSE(session.can_restore_trashed_resource());
 }
 
+TEST_CASE("resource administration reports a missing indexed document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt prompt;
+    prompt.name = "Missing Source";
+    REQUIRE(session.create_vector_artwork(prompt));
+    REQUIRE(session.save());
+    const auto source_id = fabric::core::ResourceId{.value = "missing-source"};
+    const auto source_path = project.path() /
+        "assets/vectors/missing-source.vector.json";
+    REQUIRE(std::filesystem::is_regular_file(source_path));
+    REQUIRE(std::filesystem::remove(source_path));
+
+    CHECK_FALSE(session.duplicate_resource(
+        fabric::editor::StudioResourceKind::vector, source_id,
+        {.value = "missing-source-copy"}, "Missing Source Copy"));
+    CHECK_FALSE(session.errors().empty());
+    CHECK_FALSE(std::filesystem::exists(
+        project.path() / "assets/vectors/missing-source-copy.vector.json"));
+}
+
 TEST_CASE("resource index remains unambiguous with many similar textures") {
     const TemporaryDirectory project;
     write_project(project.path());
