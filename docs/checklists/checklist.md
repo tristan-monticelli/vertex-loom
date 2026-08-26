@@ -199,9 +199,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   l'outil avec des arguments CLI.
 - [ ] Ajouter confirmations et analyse d'impact avant les suppressions de
   nœuds, collisions, triggers, événements et autres ressources.
-- [ ] Synchroniser les états dirty de la map et de la mécanique dans un shell
-  de document explicite ; ils ont actuellement deux historiques indépendants
-  sans garde de fermeture commune.
+- [x] Synchroniser les états dirty de la map et de la mécanique dans un shell
+  de document explicite ; les trois sessions partagent désormais le garde de
+  fermeture et la sauvegarde avant package.
 
 ### Défauts P2 — vectoriel, input et ergonomie détaillée
 
