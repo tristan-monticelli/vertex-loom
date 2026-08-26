@@ -568,7 +568,10 @@ rail droit sans recréation ni édition JSON.
 - [x] Permettre de créer le clip depuis l'entité sélectionnée.
 - [x] Permettre d'ajouter un clip à l'entité depuis son rail.
 - [x] Implémenter le geste valeur A au temps A → valeur B au temps B.
-- [ ] Ajouter sélection multiple, copier/coller et snapping de clés.
+- [x] Ajouter sélection multiple, copier/coller et snapping de clés. Asset
+  Studio gère la sélection par binding/index, le clipboard conserve les
+  offsets relatifs et le snapping utilise un intervalle configurable ; le
+  contrat est documenté dans `ADR-0126-animation-key-selection.md`.
 - [ ] Ajouter tangentes et easing après décision de contrat.
 - [x] Prévisualiser le clip sur l'entité dès sa création.
 - [x] Tester création ciblée, changement de cible et cible absente.
