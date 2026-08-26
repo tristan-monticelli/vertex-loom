@@ -5909,7 +5909,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool behavior_e2e = false,
                      const bool transformation_e2e = false,
                      const bool entity_e2e = false,
-                     const bool animation_e2e = false) {
+                     const bool animation_e2e = false,
+                     const bool texture_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -5936,7 +5937,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
-            ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
+            ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
+              texture_e2e)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -6017,6 +6019,51 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         } else {
             status = "Project rejected; inspect the diagnostics.";
         }
+    }
+    bool texture_e2e_complete = false;
+    if (texture_e2e && session.has_project()) {
+        const auto source = initial_project / "assets/textures/head-face.png";
+        const fabric::core::ResourceId texture_id{.value = "texture-studio-e2e"};
+        const bool imported = std::filesystem::is_regular_file(source) &&
+            session.import_png(source, texture_id, "Texture Studio E2E") &&
+            session.select_resource(
+                fabric::editor::StudioResourceKind::texture, texture_id);
+        bool cropped = false;
+        if (imported && session.imported_texture()) {
+            const auto& texture = session.imported_texture()->asset;
+            fabric::project::RasterView view;
+            view.crop = {{0.0F, 0.0F},
+                         {static_cast<float>(texture.width) * 0.5F,
+                          static_cast<float>(texture.height)}};
+            view.pivot = {0.5F, 0.5F};
+            cropped = session.set_selected_texture_view(view);
+        }
+        const auto autosave_time =
+            fabric::editor::AutosaveScheduler::Clock::now();
+        static_cast<void>(session.update_autosave(autosave_time));
+        static_cast<void>(session.update_autosave(
+            autosave_time + std::chrono::seconds{31}));
+        fabric::editor::CreateMaterialPrompt material;
+        material.name = "Texture Studio E2E Material";
+        const bool created = cropped && session.create_material(material);
+        const auto saved_texture = fabric::project::load_texture_asset(
+            initial_project, *session.manifest(),
+            fabric::project::texture_document_path(*session.manifest(), texture_id));
+        const bool view_persisted = saved_texture.ok() &&
+            saved_texture.asset->view.has_value() &&
+            saved_texture.asset->view->crop.size.x > 0.0F &&
+            saved_texture.asset->view->crop.size.x <
+                static_cast<float>(saved_texture.asset->width);
+        const auto material_resource = std::ranges::find_if(
+            session.resources(), [](const auto& resource) {
+                return resource.kind ==
+                        fabric::editor::StudioResourceKind::material &&
+                    resource.name == "Texture Studio E2E Material";
+            });
+        texture_e2e_complete = created && view_persisted &&
+            material_resource != session.resources().end() && !session.dirty();
+        if (!texture_e2e_complete)
+            std::cerr << "Asset Studio Texture E2E failed\n";
     }
     bool behavior_e2e_complete = false;
     if (behavior_e2e && session.has_project()) {
@@ -6517,7 +6564,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
-        if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
+        if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
+            texture_e2e)
             running = false;
     }
 
@@ -6541,7 +6589,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     return (behavior_e2e && !behavior_e2e_complete) ||
             (transformation_e2e && !transformation_e2e_complete) ||
             (entity_e2e && !entity_e2e_complete) ||
-            (animation_e2e && !animation_e2e_complete)
+            (animation_e2e && !animation_e2e_complete) ||
+            (texture_e2e && !texture_e2e_complete)
         ? 1 : 0;
 }
 
@@ -6556,20 +6605,24 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-entity";
     const bool animation_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-animation";
+    const bool texture_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-texture";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
-        !entity_e2e && !animation_e2e) {
+        !entity_e2e && !animation_e2e && !texture_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
                      "       asset_studio --e2e-entity project-directory\n"
-                     "       asset_studio --e2e-animation project-directory\n";
+                     "       asset_studio --e2e-animation project-directory\n"
+                     "       asset_studio --e2e-texture project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
-        (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
+        (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
+         texture_e2e)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
-                            entity_e2e, animation_e2e);
+                            entity_e2e, animation_e2e, texture_e2e);
 }
