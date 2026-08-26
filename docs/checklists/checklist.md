@@ -37,8 +37,8 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   livrée, ou livrer la tranche avant de conserver cette affirmation.
 - [ ] Ajouter un test paquet → runtime qui prouve le mouvement réel d'une
   plateforme mécanique, pas seulement la compilation isolée de son graphe.
-- [ ] **Protéger la fermeture de Map Studio.** `SDL_QUIT` ferme immédiatement la
-  boucle sans décision Save/Discard/Cancel pour la map ou la mécanique dirty.
+- [x] **Protéger la fermeture de Map Studio.** Les événements de fermeture
+  passent désormais par Save/Discard/Cancel pour la map et la mécanique dirty.
 - [ ] Tester fermeture fenêtre, raccourci système et erreur de sauvegarde avec
   conservation du document principal et de l'autosave.
 

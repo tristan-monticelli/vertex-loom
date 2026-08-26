@@ -1,6 +1,7 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
+#include "fabric/editor/session_transition.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
@@ -1468,6 +1469,7 @@ int run(const std::filesystem::path& project_root,
 
     fabric::editor::MapSession session;
     fabric::editor::MechanicSession mechanic_session;
+    fabric::editor::SessionTransitionGuard transition_guard;
     MechanicEditorState mechanic_editor;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
@@ -1545,7 +1547,14 @@ int run(const std::filesystem::path& project_root,
         SDL_Event event{};
         while (SDL_PollEvent(&event) != 0) {
             ImGui_ImplSDL2_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) running = false;
+            if (event.type == SDL_QUIT ||
+                (event.type == SDL_WINDOWEVENT &&
+                 event.window.event == SDL_WINDOWEVENT_CLOSE &&
+                 event.window.windowID == SDL_GetWindowID(window))) {
+                transition_guard.request(
+                    fabric::editor::SessionAction::quit,
+                    session.dirty() || mechanic_session.dirty());
+            }
         }
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
@@ -2189,6 +2198,61 @@ int run(const std::filesystem::path& project_root,
         }
         ImGui::End();
         draw_mechanic_editor(mechanic_session, session, mechanic_editor, status);
+
+        if (const auto ready = transition_guard.take_ready();
+            ready == fabric::editor::SessionAction::quit) {
+            running = false;
+        }
+        if (transition_guard.confirmation_required())
+            ImGui::OpenPopup("Unsaved Map Studio documents");
+        if (ImGui::BeginPopupModal("Unsaved Map Studio documents", nullptr,
+                                   ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::TextUnformatted("Save changes before closing Map Studio?");
+            if (session.dirty())
+                ImGui::BulletText("Map: %s",
+                                  session.map()
+                                      ? session.map()->document.name.c_str()
+                                      : "current map");
+            if (mechanic_session.dirty())
+                ImGui::BulletText("Mechanic: %s",
+                                  mechanic_session.graph()
+                                      ? mechanic_session.graph()->document.name.c_str()
+                                      : "current mechanic");
+            if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
+                bool saved = true;
+                if (mechanic_session.dirty()) saved = mechanic_session.save();
+                if (saved && session.dirty()) saved = session.save();
+                if (saved) {
+                    ImGui::CloseCurrentPopup();
+                    if (transition_guard.resolve(
+                            fabric::editor::UnsavedDecision::save) ==
+                        fabric::editor::SessionAction::quit) {
+                        running = false;
+                    }
+                } else {
+                    static_cast<void>(transition_guard.resolve(
+                        fabric::editor::UnsavedDecision::save, false));
+                    status = "Save failed; Map Studio remains open";
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Discard", {100.0F, 0.0F})) {
+                ImGui::CloseCurrentPopup();
+                if (transition_guard.resolve(
+                        fabric::editor::UnsavedDecision::discard) ==
+                    fabric::editor::SessionAction::quit) {
+                    running = false;
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", {100.0F, 0.0F})) {
+                static_cast<void>(transition_guard.resolve(
+                    fabric::editor::UnsavedDecision::cancel));
+                ImGui::CloseCurrentPopup();
+                status = "Close cancelled; unsaved changes kept";
+            }
+            ImGui::EndPopup();
+        }
         ImGui::Render();
         glViewport(0, 0, static_cast<GLsizei>(ImGui::GetIO().DisplaySize.x),
                    static_cast<GLsizei>(ImGui::GetIO().DisplaySize.y));
