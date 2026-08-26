@@ -1,5 +1,6 @@
 #include "fabric/project/document_storage.hpp"
 #include "fabric/project/input.hpp"
+#include "fabric/project/audio.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -109,4 +110,15 @@ TEST_CASE("input document round-trips axis thresholds and modifiers") {
     const auto parsed = fabric::project::parse_input(fabric::project::serialize_input(input));
     REQUIRE(parsed.ok());
     CHECK(*parsed.input == input);
+}
+
+TEST_CASE("audio document round-trips events") {
+    fabric::project::AudioDocument audio;
+    audio.document.id = {.value = "music"};
+    audio.document.name = "Music";
+    audio.events = {{"theme", "audio/theme.wav", 0.8F, true}};
+    const auto parsed = fabric::project::parse_audio(
+        fabric::project::serialize_audio(audio));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.audio == audio);
 }

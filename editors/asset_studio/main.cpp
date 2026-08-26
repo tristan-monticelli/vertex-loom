@@ -4097,6 +4097,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::audio) {
+            ImGui::SeparatorText("Audio events");
+            const auto loaded = fabric::project::load_audio(
+                session.project_root(), *session.manifest(), selected->document_path);
+            if (!loaded.ok()) {
+                for (const auto& error : loaded.errors)
+                    ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
+                                       error.field.c_str(), error.message.c_str());
+            } else {
+                for (const auto& event : loaded.audio->events)
+                    ImGui::BulletText("%s — %s — volume %.2f — %s",
+                                      event.id.c_str(), event.source.c_str(),
+                                      event.volume, event.loop ? "loop" : "one-shot");
+                if (loaded.audio->events.empty())
+                    ImGui::TextDisabled("No audio events defined.");
+            }
+        }
+        if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::input &&
             session.selected_input()) {
             const auto& input = *session.selected_input();
