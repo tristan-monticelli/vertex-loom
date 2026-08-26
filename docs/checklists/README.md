@@ -2,6 +2,9 @@
 
 Ce dossier conserve les feuilles de route vérifiables du produit.
 
+- [Remise à niveau complète du Studio](checklist.md) : plan ordonné couvrant
+  logique d'entité, transformations, transitions de sauvegarde, explorateur de
+  ressources, entités, animations, inputs, vectoriel et tests UX.
 - [Feuille de route restante après audit](remaining-roadmap.md) : pivot vers
   l’authoring vectoriel, personnalisateur intégré, animation générique, Map
   Studio et runtimes.
