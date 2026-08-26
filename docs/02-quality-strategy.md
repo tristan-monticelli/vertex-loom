@@ -46,8 +46,10 @@ Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
-sa primitive en path Bézier, modifie une poignée, vérifie undo/redo, sauvegarde
-et reload, puis valide le projet résultant.
+sa primitive en path Bézier, insère et retire un point, convertit un segment,
+modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide
+le projet résultant. Il prouve le contrat de données et de session, pas encore
+le geste souris complet du canvas.
 Le scénario Behavior E2E crée aussi un document d’input avec plusieurs actions
 et bindings, le recharge, puis utilise le même BehaviorGraph pour une source IA
 avant son attachement à une entité.

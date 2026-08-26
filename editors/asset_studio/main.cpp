@@ -6756,11 +6756,25 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (authored) {
                 node.shape.kind = fabric::project::VectorShapeKind::path;
                 node.shape.path = *converted;
-                if (node.shape.path.size() > 1U &&
-                    node.shape.path[1].kind ==
-                        fabric::project::VectorPathCommandKind::cubic)
-                    node.shape.path[1].control1.x += 0.15F;
-                authored = session.set_selected_vector_node(0U, node) &&
+                if (node.shape.path.size() > 1U) {
+                    const auto inserted = fabric::project::insert_path_command(
+                        node.shape, 1U,
+                        {.kind = fabric::project::VectorPathCommandKind::line,
+                         .point = {0.25F, 0.25F}});
+                    authored = inserted &&
+                        fabric::project::remove_path_command(node.shape, 1U);
+                }
+                if (authored && node.shape.path.size() > 1U) {
+                    authored = fabric::project::convert_path_command(
+                        node.shape, 1U,
+                        fabric::project::VectorPathCommandKind::cubic);
+                    if (authored)
+                        authored = fabric::editor::update_bezier_handle(
+                            node.shape, 1U, true, {0.15F, 0.15F},
+                            fabric::editor::BezierHandleMode::linked);
+                }
+                authored = authored &&
+                    session.set_selected_vector_node(0U, node) &&
                     session.undo() && session.redo() && session.save();
             }
         }
