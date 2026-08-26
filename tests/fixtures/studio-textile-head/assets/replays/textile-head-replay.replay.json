@@ -1,0 +1,29 @@
+{
+  "build": "studio-textile-head",
+  "checkpoints": [
+    {
+      "frame": 60,
+      "states": [
+        {
+          "node": "textile-head",
+          "rotation": 0,
+          "x": 0,
+          "y": 0
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "frame": 60,
+      "name": "platform-activate",
+      "payload": "sensor"
+    }
+  ],
+  "id": "textile-head-replay",
+  "inputs": [],
+  "name": "Textile Head Replay",
+  "schemaVersion": 1,
+  "seed": 20260826,
+  "type": "replay"
+}

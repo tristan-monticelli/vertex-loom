@@ -8,6 +8,7 @@
 #include "fabric/physics/mechanic_plan.hpp"
 #include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/project/mechanic_graph.hpp"
+#include "fabric/project/replay.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
@@ -291,6 +292,16 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
         .layer_id = "instances",
         .transform = {.position = {0.0F, 2.0F}}}, {.enabled = false}));
     REQUIRE(map.save());
+    const fabric::project::ReplayDocument replay{
+        .document = {.schema_version = 1,
+                     .type = "replay",
+                     .id = {.value = "textile-head-replay"},
+                     .name = "Textile Head Replay"},
+        .build = "studio-textile-head",
+        .seed = 20260826,
+        .events = {{60, "platform-activate", "sensor"}},
+        .checkpoints = {{60, {{"textile-head", 0, 0, 0}}}}};
+    REQUIRE(fabric::project::publish_replay(root, manifest(), replay).ok());
 }
 
 void create_textile_head_fixture(const std::filesystem::path& root) {
@@ -778,6 +789,42 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     CHECK(transported->position.x < 0.85F);
     CHECK(std::abs(simulation.body_states().front().rotation_degrees) > 5.0F);
 
+    fabric::editor::ProjectSession reloaded_project;
+    REQUIRE(reloaded_project.open(fixture));
+    fabric::editor::MapSession reloaded_map;
+    REQUIRE(reloaded_map.open(fixture, {.value = "textile-head-preview"}));
+    REQUIRE(reloaded_map.map()->instances.size() == 2U);
+
+    const auto loaded_replay = fabric::project::load_replay(
+        fixture, *fixture_manifest.manifest,
+        "assets/replays/textile-head-replay.replay.json");
+    REQUIRE(loaded_replay.ok());
+    REQUIRE(loaded_replay.asset->events.size() == 1U);
+    REQUIRE(loaded_replay.asset->checkpoints.size() == 1U);
+
+    fabric::runtime::PreviewRuntime replay_runtime;
+    REQUIRE(replay_runtime.load({
+        .project_root = fixture,
+        .map_id = {.value = "textile-head-preview"},
+        .replay_id = fabric::core::ResourceId{.value = "textile-head-replay"},
+        .mode = fabric::runtime::RuntimeMode::smoke_test,
+        .frame_limit = 61U}));
+    REQUIRE(replay_runtime.run());
+    CHECK(replay_runtime.replay().has_value());
+    CHECK(replay_runtime.stats().replay_checkpoints == 1U);
+
+    const auto package = temporary_root("fabric-textile-head-package");
+    REQUIRE(fabric::project::publish_map_package(
+        fixture, {.value = "textile-head-preview"}, package).ok());
+    fabric::runtime::PreviewRuntime package_runtime;
+    REQUIRE(package_runtime.load({
+        .package_root = package,
+        .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(package_runtime.run());
+    CHECK(package_runtime.last_frame_packets().size() ==
+          runtime.last_frame_packets().size());
+
     std::error_code ignored;
+    std::filesystem::remove_all(package, ignored);
     std::filesystem::remove_all(regenerated, ignored);
 }

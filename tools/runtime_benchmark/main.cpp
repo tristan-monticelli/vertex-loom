@@ -12,6 +12,7 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <optional>
 #include <string_view>
 
 namespace {
@@ -21,6 +22,9 @@ struct Options {
     std::size_t frames{600U};
     double minimum_fps{};
     std::filesystem::path report;
+    std::filesystem::path project;
+    std::filesystem::path package;
+    std::string map_id;
 };
 
 bool positive(const char* value, std::size_t& output) {
@@ -57,8 +61,17 @@ bool parse_options(const int argc, char** argv, Options& options) {
         } else if (argument == "--report" && index + 1 < argc) {
             options.report = argv[++index];
             if (options.report.empty()) return false;
+        } else if (argument == "--project" && index + 1 < argc) {
+            options.project = argv[++index];
+            if (options.project.empty()) return false;
+        } else if (argument == "--package" && index + 1 < argc) {
+            options.package = argv[++index];
+            if (options.package.empty()) return false;
+        } else if (argument == "--map" && index + 1 < argc) {
+            options.map_id = argv[++index];
+            if (options.map_id.empty()) return false;
         } else if (argument == "--help") {
-            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N] [--min-fps N] [--report path]\n";
+            std::cout << "usage: fabric_runtime_benchmark [--instances N] [--frames N] [--min-fps N] [--report path] [--project path --map id | --package path]\n";
             return false;
         } else {
             return false;
@@ -137,29 +150,40 @@ int main(const int argc, char** argv) {
     Options options;
     if (!parse_options(argc, argv, options)) return 2;
 
-    const auto root = std::filesystem::temp_directory_path() /
+    const auto generated_root = std::filesystem::temp_directory_path() /
         ("vertex-loom-runtime-benchmark-" + std::to_string(
             std::chrono::steady_clock::now().time_since_epoch().count()));
+    const bool external_scene = !options.project.empty() || !options.package.empty();
+    if (!options.project.empty() && !options.package.empty()) return 2;
+    if (!options.project.empty() && options.map_id.empty()) return 2;
+    const auto root = options.project.empty() ? generated_root : options.project;
     const auto project_manifest = manifest();
     const auto fail = [&](const std::string_view message) {
         std::cerr << "error=" << message << '\n';
         std::error_code ignored;
-        std::filesystem::remove_all(root, ignored);
+        if (!external_scene) std::filesystem::remove_all(root, ignored);
         return 1;
     };
-    if (!fabric::project::create_project(root, project_manifest).ok())
-        return fail("create_project");
-    if (!fabric::project::publish_native_vector_asset(
-            root, project_manifest, vector_asset()).ok())
-        return fail("publish_vector");
-    if (!fabric::project::publish_entity(root, project_manifest, entity()).ok())
-        return fail("publish_entity");
-    if (!fabric::project::publish_map(root, project_manifest, map(options.instances)).ok())
-        return fail("publish_map");
+    if (!external_scene) {
+        if (!fabric::project::create_project(root, project_manifest).ok())
+            return fail("create_project");
+        if (!fabric::project::publish_native_vector_asset(
+                root, project_manifest, vector_asset()).ok())
+            return fail("publish_vector");
+        if (!fabric::project::publish_entity(root, project_manifest, entity()).ok())
+            return fail("publish_entity");
+        if (!fabric::project::publish_map(root, project_manifest, map(options.instances)).ok())
+            return fail("publish_map");
+    }
 
     fabric::runtime::PreviewRuntime runtime;
     if (!runtime.load({.project_root = root,
-                       .map_id = {.value = "benchmark-map"},
+                       .package_root = options.package.empty()
+                           ? std::nullopt
+                           : std::optional<std::filesystem::path>{options.package},
+                       .map_id = {.value = external_scene
+                           ? (options.map_id.empty() ? "" : options.map_id)
+                           : "benchmark-map"},
                        .mode = fabric::runtime::RuntimeMode::benchmark,
                        .frame_limit = options.frames}))
         return fail("runtime_load");
@@ -170,13 +194,18 @@ int main(const int argc, char** argv) {
 
     const auto& stats = runtime.stats();
     const auto fps = stats.p95_frame_ms > 0.0 ? 1000.0 / stats.p95_frame_ms : 0.0;
-    const bool passed = stats.visible_instances == options.instances &&
+    const bool passed = (external_scene
+        ? stats.visible_instances > 0U
+        : stats.visible_instances == options.instances) &&
         fps >= options.minimum_fps;
     if (!options.report.empty()) {
         std::ofstream report(options.report, std::ios::binary | std::ios::trunc);
         if (!report) return fail("report_open");
         report << "{\n"
                << "  \"instances\": " << options.instances << ",\n"
+               << "  \"project\": \"" << options.project.generic_string() << "\",\n"
+               << "  \"package\": \"" << options.package.generic_string() << "\",\n"
+               << "  \"map\": \"" << options.map_id << "\",\n"
                << "  \"framesRequested\": " << options.frames << ",\n"
                << "  \"minimumFps\": " << options.minimum_fps << ",\n"
                << "  \"visibleInstances\": " << stats.visible_instances << ",\n"
@@ -205,6 +234,6 @@ int main(const int argc, char** argv) {
               << " p95_frame_ms=" << stats.p95_frame_ms
               << " fps_p95=" << fps << '\n';
     std::error_code ignored;
-    std::filesystem::remove_all(root, ignored);
+    if (!external_scene) std::filesystem::remove_all(root, ignored);
     return passed ? 0 : 1;
 }

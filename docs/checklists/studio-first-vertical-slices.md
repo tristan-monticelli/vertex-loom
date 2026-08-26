@@ -258,12 +258,35 @@ le runtime avec le même résultat visible et physique.
   Asset Studio, conserve la source raster intacte et combine crop, yeux,
   boutons, couture et Beam texturé ; la map et l'animation sont créées par les
   sessions Studio et chargées par Preview Runtime.
-- [ ] Ajouter la plateforme tournante, son capteur, ses événements et la
+- [x] Ajouter la plateforme tournante, son capteur, ses événements et la
   réaction animée du personnage.
-- [ ] Tester création, sauvegarde, reload, simulation, replay et publication.
-- [ ] Mesurer 60 FPS p95 sur la scène et conserver le rapport multiplateforme.
-- [ ] Utiliser cette scène comme fixture de non-régression visuelle et
+
+  Preuve : la fixture contient le preset de plateforme, son entité textile,
+  son prefab, le graphe `rotating-platform`, le capteur `presence` et
+  `platform-activate`. Le personnage conserve l'animation `beam-scroll` ; la
+  simulation déclenche le capteur, fait tourner la plateforme dans ses limites
+  et transporte le personnage, tandis que Preview Runtime vérifie le binding
+  animé du Beam.
+- [x] Tester création, sauvegarde, reload, simulation, replay et publication.
+
+  Preuve : la génération par `ProjectSession`, `MapSession` et
+  `MechanicSession` sauvegarde la scène ; le test la recharge par les sessions,
+  recharge le replay, l'exécute pendant 61 frames, puis publie un paquet et le
+  charge directement dans Preview Runtime. La simulation vérifie activation,
+  rotation et transport.
+- [x] Mesurer 60 FPS p95 sur la scène et conserver le rapport multiplateforme.
+
+  Preuve locale : `fabric_runtime_benchmark --project
+  tests/fixtures/studio-textile-head --map textile-head-preview --frames 60
+  --min-fps 60` atteint 187.263 FPS p95 sur macOS. Le workflow CI
+  `textile-reference-benchmark` répète la mesure sur Ubuntu, macOS et Windows
+  pendant 600 frames et archive un rapport JSON par plateforme.
+- [x] Utiliser cette scène comme fixture de non-régression visuelle et
   fonctionnelle pour les futures tranches.
+
+  Preuve : la fixture est régénérée octet par octet ; ses packets sont comparés
+  entre resolver direct, Preview Runtime et paquet publié, et son graphe est
+  simulé depuis les documents sauvegardés.
 
 Gate : la scène complète est construite uniquement avec Asset Studio et Map
 Studio, puis chargée depuis son paquet de map par Preview Runtime.

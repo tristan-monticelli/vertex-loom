@@ -145,6 +145,12 @@ la réaction du personnage sans changer de projet de référence. Le test charge
 ensuite ce graphe depuis le disque, matérialise le personnage dans le capteur,
 vérifie les états d'activation et les événements de début, puis confirme le
 transport physique et la rotation bornée.
+Le même test recharge un replay à 61 frames et publie le paquet de map avant
+de le recharger directement dans Preview Runtime. Le binaire
+`fabric_runtime_benchmark` accepte désormais `--project ... --map ...` ou
+`--package ...` ; le workflow CI `textile-reference-benchmark` archive les
+rapports p95 de la scène textile sur Ubuntu, macOS et Windows avec un seuil de
+60 FPS.
 La fixture `tests/fixtures/studio-rotating-platform` conserve le graphe créé
 par Map Studio et l'entité textile créée par Asset Studio. Son test headless
 matérialise le capteur Box2D, place un personnage dynamique, vérifie son
