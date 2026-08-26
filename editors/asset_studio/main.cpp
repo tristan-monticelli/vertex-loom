@@ -1246,6 +1246,12 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
 void draw_prompt_error(const fabric::editor::PromptValidation& validation,
                        const std::string_view field) {
     if (const auto error = validation.error_for(field)) {
+        static int last_error_frame = -1;
+        const auto frame = ImGui::GetFrameCount();
+        if (last_error_frame != frame) {
+            ImGui::SetScrollHereY(0.0F);
+            last_error_frame = frame;
+        }
         ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
                            std::string(*error).c_str());
     }
