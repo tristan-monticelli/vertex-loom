@@ -483,7 +483,7 @@ sur un comportement sans modifier le runtime.
 - [ ] Mettre à jour le C4 et écrire les ADR manquants avant les nouveaux
   contrats ou commandes.
 - [x] Ajouter un arbre ordonné de nœuds vectoriels.
-- [x] Ajouter les actions Add, Duplicate, Reorder et Delete.
+- [x] Ajouter les actions Add, Duplicate, Reparent, Reorder et Delete.
 - [x] Ajouter les primitives rectangle, ellipse, ligne et path.
 - [ ] Permettre de changer une primitive en path éditable lorsque possible.
 - [ ] Ajouter un outil plume pour :
