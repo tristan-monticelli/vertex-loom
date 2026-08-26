@@ -124,6 +124,22 @@ public:
         std::size_t node_index, project::VectorNode node,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool add_selected_vector_node(
+        project::VectorNode node,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool duplicate_selected_vector_node(
+        std::size_t node_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool move_selected_vector_node(
+        std::size_t node_index, std::size_t destination_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool remove_selected_vector_node(
+        std::size_t node_index,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_entity_node(
         std::size_t node_index, project::EntityNode node,
         AutosaveScheduler::Clock::time_point now =
@@ -291,6 +307,9 @@ public:
 
 private:
     [[nodiscard]] bool save_before_document_transition();
+    [[nodiscard]] bool replace_selected_vector_nodes(
+        std::vector<project::VectorNode> nodes,
+        AutosaveScheduler::Clock::time_point now);
 
     enum class DirtyDocument {
         none,

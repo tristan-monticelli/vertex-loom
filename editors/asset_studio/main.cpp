@@ -28,6 +28,7 @@
 #include <cstdio>
 #include <cstddef>
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <limits>
 #include <numbers>
@@ -3114,21 +3115,127 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::TextDisabled("Published as VectorAsset v2 native.");
         }
         if (selected != nullptr && selected->native && session.created_vector() &&
-            session.created_vector()->native &&
-            !session.created_vector()->native->nodes.empty()) {
+            session.created_vector()->native) {
             ImGui::SeparatorText("Nodes");
             const auto& nodes = session.created_vector()->native->nodes;
+            const auto add_rectangle_node = [&] {
+                std::string id = "node-" + std::to_string(nodes.size() + 1U);
+                while (std::ranges::any_of(nodes, [&](const auto& candidate) {
+                    return candidate.id == id;
+                })) id += "-copy";
+                const auto size = session.created_vector()->native->size;
+                fabric::project::VectorNode node{
+                    .id = id,
+                    .name = "Rectangle " + std::to_string(nodes.size() + 1U),
+                    .shape = {.id = id + "-shape",
+                              .kind = fabric::project::VectorShapeKind::rectangle,
+                              .bounds = {{-size.x * 0.125F, -size.y * 0.125F},
+                                         {std::max(0.01F, size.x * 0.25F),
+                                          std::max(0.01F, size.y * 0.25F)}}},
+                    .fill = {.kind = fabric::project::VectorFillKind::solid,
+                             .color = fabric::core::Color{
+                                 1.0F, 1.0F, 1.0F, 1.0F}}};
+                if (session.add_selected_vector_node(std::move(node))) {
+                    canvas.selected_node = nodes.size();
+                    status = "Vector node added.";
+                } else {
+                    status = "Vector node rejected; inspect diagnostics.";
+                }
+            };
+            if (ImGui::Button("Add rectangle")) add_rectangle_node();
+            if (nodes.empty()) {
+                ImGui::TextDisabled("This artwork has no nodes.");
+            } else {
+            canvas.selected_node = std::min(canvas.selected_node,
+                                            nodes.size() - 1U);
+            ImGui::SameLine();
+            if (ImGui::Button("Duplicate") &&
+                session.duplicate_selected_vector_node(canvas.selected_node)) {
+                canvas.selected_node = nodes.size();
+                status = "Vector node duplicated.";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Up") && canvas.selected_node > 0U &&
+                session.move_selected_vector_node(
+                    canvas.selected_node, canvas.selected_node - 1U)) {
+                --canvas.selected_node;
+                status = "Vector node moved.";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Down") &&
+                canvas.selected_node + 1U < nodes.size() &&
+                session.move_selected_vector_node(
+                    canvas.selected_node, canvas.selected_node + 1U)) {
+                ++canvas.selected_node;
+                status = "Vector node moved.";
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Delete..."))
+                ImGui::OpenPopup("Delete vector node?");
+            if (ImGui::BeginPopupModal("Delete vector node?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto& pending = nodes[canvas.selected_node];
+                const auto references = std::ranges::count_if(
+                    nodes, [&](const auto& candidate) {
+                        return candidate.parent_id == pending.id ||
+                            candidate.clip_node_id == pending.id;
+                    });
+                ImGui::Text("Delete '%s'?", pending.name.c_str());
+                ImGui::TextWrapped(
+                    "This node has %zu child or clip reference(s). Referenced or locked nodes are protected.",
+                    references);
+                ImGui::BeginDisabled(references != 0U || pending.locked);
+                ImGui::PushStyleColor(
+                    ImGuiCol_Button, ImVec4{0.62F, 0.16F, 0.14F, 1.0F});
+                if (ImGui::Button("Delete node") &&
+                    session.remove_selected_vector_node(canvas.selected_node)) {
+                    canvas.selected_node = canvas.selected_node == 0U
+                        ? 0U : canvas.selected_node - 1U;
+                    status = "Vector node deleted.";
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopStyleColor();
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
             canvas.selected_node = std::min(canvas.selected_node,
                                             nodes.size() - 1);
-            for (std::size_t node_index = 0; node_index < nodes.size();
-                 ++node_index) {
-                const std::string label = nodes[node_index].name + "##node-" +
-                    std::to_string(node_index);
-                if (ImGui::Selectable(label.c_str(),
-                                      canvas.selected_node == node_index)) {
-                    canvas.selected_node = node_index;
-                }
-            }
+            const std::function<void(const std::optional<std::string>&)>
+                draw_vector_children = [&](const auto& parent_id) {
+                    for (std::size_t node_index = 0; node_index < nodes.size();
+                         ++node_index) {
+                        const auto& candidate = nodes[node_index];
+                        if (candidate.parent_id != parent_id) continue;
+                        const bool has_children = std::ranges::any_of(
+                            nodes, [&](const auto& child) {
+                                return child.parent_id == candidate.id;
+                            });
+                        auto flags = ImGuiTreeNodeFlags_OpenOnArrow |
+                            ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                            ImGuiTreeNodeFlags_SpanAvailWidth;
+                        if (!has_children) flags |= ImGuiTreeNodeFlags_Leaf;
+                        if (canvas.selected_node == node_index)
+                            flags |= ImGuiTreeNodeFlags_Selected;
+                        ImGui::PushID(static_cast<int>(node_index));
+                        const bool open = ImGui::TreeNodeEx(
+                            candidate.name.c_str(), flags);
+                        if (ImGui::IsItemClicked() &&
+                            !ImGui::IsItemToggledOpen())
+                            canvas.selected_node = node_index;
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s%s%s", candidate.id.c_str(),
+                            candidate.visible ? "" : " · hidden",
+                            candidate.locked ? " · locked" : "");
+                        if (open) {
+                            draw_vector_children(candidate.id);
+                            ImGui::TreePop();
+                        }
+                        ImGui::PopID();
+                    }
+                };
+            draw_vector_children(std::nullopt);
             ImGui::SeparatorText("Node properties");
             auto node = nodes[canvas.selected_node];
             const auto commit_node = [&](fabric::project::VectorNode changed) {
@@ -3218,6 +3325,156 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.transform.rotation_degrees = rotation;
                 commit_node(node);
             }
+            float bounds_origin[]{node.shape.bounds.origin.x,
+                                  node.shape.bounds.origin.y};
+            if (ImGui::InputFloat2("Bounds origin", bounds_origin)) {
+                node.shape.bounds.origin = {bounds_origin[0], bounds_origin[1]};
+                commit_node(node);
+            }
+            float bounds_size[]{node.shape.bounds.size.x,
+                                node.shape.bounds.size.y};
+            if (ImGui::InputFloat2("Bounds size", bounds_size)) {
+                node.shape.bounds.size = {bounds_size[0], bounds_size[1]};
+                commit_node(node);
+            }
+            const auto shape_label = std::string(
+                fabric::project::to_string(node.shape.kind));
+            if (ImGui::BeginCombo("Shape", shape_label.c_str())) {
+                for (const auto shape_kind : {
+                         fabric::project::VectorShapeKind::rectangle,
+                         fabric::project::VectorShapeKind::ellipse,
+                         fabric::project::VectorShapeKind::line,
+                         fabric::project::VectorShapeKind::path}) {
+                    const auto option = std::string(
+                        fabric::project::to_string(shape_kind));
+                    if (ImGui::Selectable(option.c_str(),
+                                          node.shape.kind == shape_kind)) {
+                        node.shape.kind = shape_kind;
+                        if (shape_kind != fabric::project::VectorShapeKind::path)
+                            node.shape.path.clear();
+                        commit_node(node);
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (node.shape.kind == fabric::project::VectorShapeKind::line) {
+                ImGui::TextDisabled("Line points: %zu", node.shape.points.size());
+                if (ImGui::Button("Add line point")) {
+                    node.shape.points.push_back(node.shape.points.empty()
+                        ? node.shape.bounds.origin
+                        : fabric::core::Vec2{node.shape.points.back().x + 1.0F,
+                                              node.shape.points.back().y});
+                    commit_node(node);
+                }
+                for (std::size_t point_index = 0;
+                     point_index < node.shape.points.size(); ++point_index) {
+                    ImGui::PushID(static_cast<int>(point_index));
+                    float point[]{node.shape.points[point_index].x,
+                                  node.shape.points[point_index].y};
+                    if (ImGui::InputFloat2("Point", point)) {
+                        node.shape.points[point_index] = {point[0], point[1]};
+                        commit_node(node);
+                    }
+                    ImGui::PopID();
+                }
+            } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
+                ImGui::TextDisabled("Path commands: %zu", node.shape.path.size());
+                if (ImGui::Button("Add move command")) {
+                    node.shape.path.push_back({
+                        .kind = fabric::project::VectorPathCommandKind::move,
+                        .point = node.shape.bounds.origin});
+                    commit_node(node);
+                }
+                for (std::size_t command_index = 0;
+                     command_index < node.shape.path.size(); ++command_index) {
+                    auto& command = node.shape.path[command_index];
+                    ImGui::PushID(static_cast<int>(command_index));
+                    const auto command_label = std::string(
+                        fabric::project::to_string(command.kind));
+                    if (ImGui::BeginCombo("Command", command_label.c_str())) {
+                        for (const auto command_kind : {
+                                 fabric::project::VectorPathCommandKind::move,
+                                 fabric::project::VectorPathCommandKind::line,
+                                 fabric::project::VectorPathCommandKind::cubic,
+                                 fabric::project::VectorPathCommandKind::close}) {
+                            const auto option = std::string(
+                                fabric::project::to_string(command_kind));
+                            if (ImGui::Selectable(option.c_str(),
+                                                  command.kind == command_kind)) {
+                                command.kind = command_kind;
+                                commit_node(node);
+                            }
+                        }
+                        ImGui::EndCombo();
+                    }
+                    float command_point[]{command.point.x, command.point.y};
+                    if (ImGui::InputFloat2("Point", command_point)) {
+                        command.point = {command_point[0], command_point[1]};
+                        commit_node(node);
+                    }
+                    if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                        float control1[]{command.control1.x, command.control1.y};
+                        float control2[]{command.control2.x, command.control2.y};
+                        if (ImGui::InputFloat2("Bezier handle 1", control1)) {
+                            command.control1 = {control1[0], control1[1]};
+                            commit_node(node);
+                        }
+                        if (ImGui::InputFloat2("Bezier handle 2", control2)) {
+                            command.control2 = {control2[0], control2[1]};
+                            commit_node(node);
+                        }
+                    }
+                    if (ImGui::SmallButton("Remove command")) {
+                        node.shape.path.erase(node.shape.path.begin() +
+                                              static_cast<std::ptrdiff_t>(command_index));
+                        commit_node(node);
+                        ImGui::PopID();
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+            }
+            const auto fill_label = std::string(
+                fabric::project::to_string(node.fill.kind));
+            if (ImGui::BeginCombo("Fill type", fill_label.c_str())) {
+                const auto first_texture = std::ranges::find_if(
+                    session.resources(), [](const auto& resource) {
+                        return resource.kind ==
+                            fabric::editor::StudioResourceKind::texture;
+                    });
+                for (const auto fill_kind : {
+                         fabric::project::VectorFillKind::none,
+                         fabric::project::VectorFillKind::solid,
+                         fabric::project::VectorFillKind::image}) {
+                    const bool available = fill_kind !=
+                            fabric::project::VectorFillKind::image ||
+                        first_texture != session.resources().end();
+                    ImGui::BeginDisabled(!available);
+                    const auto option = std::string(
+                        fabric::project::to_string(fill_kind));
+                    if (ImGui::Selectable(option.c_str(),
+                                          node.fill.kind == fill_kind)) {
+                        node.fill.kind = fill_kind;
+                        if (fill_kind == fabric::project::VectorFillKind::none) {
+                            node.fill.color.reset();
+                            node.fill.image.reset();
+                        } else if (fill_kind ==
+                                   fabric::project::VectorFillKind::solid) {
+                            node.fill.color = node.fill.color.value_or(
+                                fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
+                            node.fill.image.reset();
+                        } else {
+                            node.fill.color.reset();
+                            if (!node.fill.image)
+                                node.fill.image = fabric::project::VectorImageFill{
+                                    .texture = {first_texture->id, "texture"}};
+                        }
+                        commit_node(node);
+                    }
+                    ImGui::EndDisabled();
+                }
+                ImGui::EndCombo();
+            }
             if (node.fill.kind == fabric::project::VectorFillKind::solid &&
                 node.fill.color) {
                 float color[]{node.fill.color->red, node.fill.color->green,
@@ -3230,8 +3487,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             } else if (node.fill.kind ==
                            fabric::project::VectorFillKind::image &&
                        node.fill.image) {
-                ImGui::Text("Image fill: %s",
-                            node.fill.image->texture.id.value.c_str());
+                std::string image_texture_id =
+                    node.fill.image->texture.id.value;
+                if (draw_project_resource_picker(
+                        "Image texture", session.resources(),
+                        fabric::editor::StudioResourceKind::texture,
+                        image_texture_id, false)) {
+                    node.fill.image->texture.id.value = image_texture_id;
+                    commit_node(node);
+                }
                 auto fit = node.fill.image->fit;
                 const auto fit_label =
                     std::string(fabric::project::to_string(fit));
@@ -3273,6 +3537,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     node.fill.image->transform.rotation_degrees = image_rotation;
                     commit_node(node);
                 }
+                float image_pivot[]{node.fill.image->transform.pivot.x,
+                                    node.fill.image->transform.pivot.y};
+                if (ImGui::InputFloat2("Image pivot", image_pivot)) {
+                    node.fill.image->transform.pivot = {
+                        image_pivot[0], image_pivot[1]};
+                    commit_node(node);
+                }
                 float opacity = node.fill.image->opacity;
                 if (ImGui::SliderFloat("Image opacity", &opacity, 0.0F, 1.0F,
                                        "%.2f")) {
@@ -3286,7 +3557,65 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_node(node);
                 }
             }
+            bool has_stroke = node.stroke.has_value();
+            if (ImGui::Checkbox("Stroke", &has_stroke)) {
+                if (has_stroke) node.stroke = fabric::project::VectorStroke{};
+                else node.stroke.reset();
+                commit_node(node);
+            }
+            if (node.stroke) {
+                float stroke_color[]{node.stroke->color.red,
+                                     node.stroke->color.green,
+                                     node.stroke->color.blue,
+                                     node.stroke->color.alpha};
+                if (ImGui::ColorEdit4("Stroke color", stroke_color)) {
+                    node.stroke->color = {stroke_color[0], stroke_color[1],
+                                          stroke_color[2], stroke_color[3]};
+                    commit_node(node);
+                }
+                float stroke_width = node.stroke->width;
+                if (ImGui::InputFloat("Stroke width", &stroke_width,
+                                      0.1F, 1.0F)) {
+                    node.stroke->width = stroke_width;
+                    commit_node(node);
+                }
+                const auto join_label = std::string(
+                    fabric::project::to_string(node.stroke->join));
+                if (ImGui::BeginCombo("Stroke join", join_label.c_str())) {
+                    for (const auto join : {
+                             fabric::project::VectorStrokeJoin::miter,
+                             fabric::project::VectorStrokeJoin::round,
+                             fabric::project::VectorStrokeJoin::bevel}) {
+                        const auto option = std::string(
+                            fabric::project::to_string(join));
+                        if (ImGui::Selectable(option.c_str(),
+                                              node.stroke->join == join)) {
+                            node.stroke->join = join;
+                            commit_node(node);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                const auto cap_label = std::string(
+                    fabric::project::to_string(node.stroke->cap));
+                if (ImGui::BeginCombo("Stroke cap", cap_label.c_str())) {
+                    for (const auto cap : {
+                             fabric::project::VectorStrokeCap::butt,
+                             fabric::project::VectorStrokeCap::round,
+                             fabric::project::VectorStrokeCap::square}) {
+                        const auto option = std::string(
+                            fabric::project::to_string(cap));
+                        if (ImGui::Selectable(option.c_str(),
+                                              node.stroke->cap == cap)) {
+                            node.stroke->cap = cap;
+                            commit_node(node);
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+            }
             ImGui::EndDisabled();
+            }
         }
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
@@ -4483,33 +4812,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         } else if (creation.artwork.initial_fill ==
                    fabric::editor::InitialFill::image) {
-            const auto chosen_texture = std::ranges::find_if(
-                session.resources(), [&](const fabric::editor::StudioResource& resource) {
-                    return resource.kind ==
-                               fabric::editor::StudioResourceKind::texture &&
-                        resource.id.value == creation.artwork.initial_image_id;
-                });
-            const char* chosen_label = chosen_texture == session.resources().end()
-                ? "Choose a texture..."
-                : chosen_texture->name.c_str();
-            ImGui::SetNextItemWidth(360.0F);
-            if (ImGui::BeginCombo("Texture", chosen_label)) {
-                for (const auto& resource : session.resources()) {
-                    if (resource.kind !=
-                        fabric::editor::StudioResourceKind::texture) {
-                        continue;
-                    }
-                    const bool selected = resource.id.value ==
-                        creation.artwork.initial_image_id;
-                    if (ImGui::Selectable(resource.name.c_str(), selected)) {
-                        creation.artwork.initial_image_id = resource.id.value;
-                    }
-                    if (selected) {
-                        ImGui::SetItemDefaultFocus();
-                    }
-                }
-                ImGui::EndCombo();
-            }
+            static_cast<void>(draw_project_resource_picker(
+                "Texture", session.resources(),
+                fabric::editor::StudioResourceKind::texture,
+                creation.artwork.initial_image_id, false));
             const auto fit_label = std::string(fabric::project::to_string(
                 creation.artwork.image_fit));
             if (ImGui::BeginCombo("Image fit", fit_label.c_str())) {

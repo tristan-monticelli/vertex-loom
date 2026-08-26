@@ -121,13 +121,13 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   libellés lisibles ; ajouter axes, dead zones et seuils gamepad.
 - [x] Un vectoriel natif sélectionné expose nom, parent, clip, transform et une
   partie des paramètres de fill image après création.
-- [ ] Ajouter Add, Duplicate, Reorder et Delete pour les nœuds vectoriels.
+- [x] Ajouter Add, Duplicate, Reorder et Delete pour les nœuds vectoriels.
 - [ ] Éditer bounds, points, commandes de path et poignées Bézier directement
   sur le canvas du `VectorAsset`. L'éditeur « Pen and attachments » existant
   appartient à `TexturedPath` et ne remplace pas cet éditeur.
-- [ ] Permettre de changer le type du fill après création et de choisir ou
+- [x] Permettre de changer le type du fill après création et de choisir ou
   remplacer sa texture avec le picker commun.
-- [ ] Exposer ajout, retrait, couleur, largeur, join et cap du stroke.
+- [x] Exposer ajout, retrait, couleur, largeur, join et cap du stroke.
 - [ ] Afficher les erreurs au niveau du champ dans Map Studio ; plusieurs
   formulaires utilisent encore un statut global et des valeurs texte parsées.
 - [ ] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
@@ -404,7 +404,7 @@ publication.
 
 ## 7 — Entités et artworks dans le rail droit
 
-- [ ] Remplacer la liste plate par un véritable arbre de nœuds d'entité.
+- [x] Remplacer la liste plate par un véritable arbre de nœuds d'entité.
 - [x] Ajouter les actions de nœud : Add, Duplicate, Reparent, Reorder et Delete.
 - [x] Demander confirmation avant suppression d'un nœud et afficher ses enfants.
 - [x] Exposer un inspecteur complet du drawable de chaque nœud.

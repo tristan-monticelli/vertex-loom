@@ -842,6 +842,16 @@ TEST_CASE("native vector edits use history save and recovery") {
     {
         fabric::editor::ProjectSession session;
         REQUIRE(session.open(project.path()));
+        const auto texture_source = project.path() / "editable-fill.png";
+        std::ofstream{texture_source, std::ios::binary} << "source";
+        REQUIRE(fabric::project::publish_texture_asset(
+            project.path(), *session.manifest(), {
+                .document = {.type = "texture",
+                             .id = {.value = "editable-fill"},
+                             .name = "Editable Fill"},
+                .source = "assets/textures/editable-fill.png",
+                .width = 4, .height = 4}, texture_source).ok());
+        REQUIRE(session.refresh_resources());
         fabric::editor::CreateVectorArtworkPrompt prompt;
         prompt.name = "Editable panel";
         REQUIRE(session.create_vector_artwork(prompt));
@@ -853,7 +863,21 @@ TEST_CASE("native vector edits use history save and recovery") {
         node.transform.rotation_degrees = 22.5F;
         node.transform.scale = {1.25F, 0.75F};
         node.transform.pivot = {0.5F, -0.25F};
-        node.fill.color = fabric::core::Color{0.9F, 0.2F, 0.1F, 1.0F};
+        node.fill = {
+            .kind = fabric::project::VectorFillKind::image,
+            .image = fabric::project::VectorImageFill{
+                .texture = {{.value = "editable-fill"}, "texture"},
+                .fit = fabric::project::VectorImageFit::free,
+                .transform = {.position = {0.25F, 0.5F},
+                              .rotation_degrees = 15.0F,
+                              .scale = {1.5F, 0.75F},
+                              .pivot = {0.2F, 0.8F}},
+                .opacity = 0.6F,
+                .deform_with_shape = true}};
+        node.stroke = fabric::project::VectorStroke{
+            .color = {0.9F, 0.2F, 0.1F, 1.0F}, .width = 0.4F,
+            .join = fabric::project::VectorStrokeJoin::round,
+            .cap = fabric::project::VectorStrokeCap::square};
         REQUIRE(session.set_selected_vector_node(0, node, start));
         auto second = node;
         second.transform.position.x = 4.0F;
@@ -868,6 +892,28 @@ TEST_CASE("native vector edits use history save and recovery") {
               "Moved panel");
         CHECK(session.created_vector()->native->nodes.front().transform ==
               second.transform);
+        auto child = second;
+        child.id = "second-node";
+        child.name = "Second node";
+        child.shape.id = "second-shape";
+        child.shape.kind = fabric::project::VectorShapeKind::path;
+        child.shape.path = {
+            {.kind = fabric::project::VectorPathCommandKind::move,
+             .point = {-1.0F, 0.0F}},
+            {.kind = fabric::project::VectorPathCommandKind::cubic,
+             .point = {1.0F, 0.0F}, .control1 = {-0.5F, 1.0F},
+             .control2 = {0.5F, 1.0F}}};
+        child.parent_id.reset();
+        child.clip_node_id.reset();
+        REQUIRE(session.add_selected_vector_node(child, start + 3ms));
+        REQUIRE(session.set_selected_vector_node(1U, child, start + 4ms));
+        REQUIRE(session.duplicate_selected_vector_node(1U, start + 5ms));
+        REQUIRE(session.move_selected_vector_node(2U, 1U, start + 6ms));
+        REQUIRE(session.remove_selected_vector_node(1U, start + 7ms));
+        CHECK(session.created_vector()->native->nodes.size() == 2U);
+        REQUIRE(session.undo(start + 8ms));
+        CHECK(session.created_vector()->native->nodes.size() == 3U);
+        REQUIRE(session.redo(start + 9ms));
         REQUIRE(session.update_autosave(start + 3s) ==
                 fabric::editor::AutosaveStatus::saved);
     }
@@ -892,6 +938,13 @@ TEST_CASE("native vector edits use history save and recovery") {
               .rotation_degrees = 22.5F,
               .scale = {1.25F, 0.75F},
               .pivot = {0.5F, -0.25F}});
+    REQUIRE(recovered.created_vector()->native->nodes.front().fill.image);
+    CHECK(recovered.created_vector()->native->nodes.front()
+              .fill.image->texture.id.value == "editable-fill");
+    REQUIRE(recovered.created_vector()->native->nodes.front().stroke);
+    CHECK(recovered.created_vector()->native->nodes.front().stroke->join ==
+          fabric::project::VectorStrokeJoin::round);
+    CHECK(recovered.created_vector()->native->nodes.size() == 2U);
     CHECK(recovered.dirty());
     REQUIRE(recovered.save());
     CHECK_FALSE(recovered.dirty());

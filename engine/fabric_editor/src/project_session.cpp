@@ -2228,6 +2228,115 @@ bool ProjectSession::set_selected_vector_node(
     return true;
 }
 
+bool ProjectSession::replace_selected_vector_nodes(
+    std::vector<project::VectorNode> nodes,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ || !created_vector_->native ||
+        created_vector_->source_kind != project::VectorSourceKind::native) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select a native vector before editing its nodes"}};
+        return false;
+    }
+    if (commands_.dirty() && dirty_document_ != DirtyDocument::vector) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "save or undo the current document before editing a vector"}};
+        return false;
+    }
+    if (!commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+        if (autosave_.pending() && update_autosave(now) == AutosaveStatus::failed)
+            return false;
+        commands_.clear();
+        autosave_.reset();
+        dirty_document_ = DirtyDocument::none;
+    }
+    auto candidate = *created_vector_;
+    candidate.native->nodes = nodes;
+    auto validation = project::validate_vector_asset(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = std::move(validation.errors);
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            std::vector<project::VectorNode>>>(
+            created_vector_->native->nodes, std::move(nodes)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "cannot execute the vector hierarchy modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::vector;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::add_selected_vector_node(
+    project::VectorNode node,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ || !created_vector_->native) return false;
+    auto nodes = created_vector_->native->nodes;
+    nodes.push_back(std::move(node));
+    return replace_selected_vector_nodes(std::move(nodes), now);
+}
+
+bool ProjectSession::duplicate_selected_vector_node(
+    const std::size_t node_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ || !created_vector_->native ||
+        node_index >= created_vector_->native->nodes.size()) return false;
+    auto node = created_vector_->native->nodes[node_index];
+    const auto node_base = node.id + "-copy";
+    const auto shape_base = node.shape.id + "-copy";
+    node.id = node_base;
+    node.shape.id = shape_base;
+    for (std::size_t suffix = 2U; std::ranges::any_of(
+             created_vector_->native->nodes, [&](const auto& candidate) {
+                 return candidate.id == node.id ||
+                     candidate.shape.id == node.shape.id;
+             }); ++suffix) {
+        node.id = node_base + "-" + std::to_string(suffix);
+        node.shape.id = shape_base + "-" + std::to_string(suffix);
+    }
+    node.name += " copy";
+    node.parent_id.reset();
+    node.clip_node_id.reset();
+    return add_selected_vector_node(std::move(node), now);
+}
+
+bool ProjectSession::move_selected_vector_node(
+    const std::size_t node_index, const std::size_t destination_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ || !created_vector_->native ||
+        node_index >= created_vector_->native->nodes.size() ||
+        destination_index >= created_vector_->native->nodes.size()) return false;
+    if (node_index == destination_index) return true;
+    auto nodes = created_vector_->native->nodes;
+    auto moved = std::move(nodes[node_index]);
+    nodes.erase(nodes.begin() + static_cast<std::ptrdiff_t>(node_index));
+    nodes.insert(nodes.begin() + static_cast<std::ptrdiff_t>(destination_index),
+                 std::move(moved));
+    return replace_selected_vector_nodes(std::move(nodes), now);
+}
+
+bool ProjectSession::remove_selected_vector_node(
+    const std::size_t node_index,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!created_vector_ || !created_vector_->native ||
+        node_index >= created_vector_->native->nodes.size()) return false;
+    const auto& removed = created_vector_->native->nodes[node_index];
+    if (removed.locked || std::ranges::any_of(
+            created_vector_->native->nodes, [&](const auto& candidate) {
+                return candidate.parent_id == removed.id ||
+                    candidate.clip_node_id == removed.id;
+            })) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "unlock and detach child or clip references before removal"}};
+        return false;
+    }
+    auto nodes = created_vector_->native->nodes;
+    nodes.erase(nodes.begin() + static_cast<std::ptrdiff_t>(node_index));
+    return replace_selected_vector_nodes(std::move(nodes), now);
+}
+
 bool ProjectSession::set_selected_entity_node(
     const std::size_t node_index, project::EntityNode node,
     const AutosaveScheduler::Clock::time_point now) {

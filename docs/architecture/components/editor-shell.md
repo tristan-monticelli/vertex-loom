@@ -8,7 +8,7 @@ C4Component
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
         Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
-        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
+        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
@@ -237,6 +237,9 @@ C4Component
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.
+- Le personnalisateur expose ces points, commandes et deux poignées Bézier dans
+  l'inspecteur de nœud, avec validation et CommandStack ; la manipulation
+  directe sur le canvas reste une étape UX distincte.
 - Un nœud peut conserver un contour avec couleur, largeur, jointure et
   extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
 - Les nœuds natifs peuvent référencer un parent et un clip par identifiants
