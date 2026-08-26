@@ -482,9 +482,9 @@ sur un comportement sans modifier le runtime.
 
 - [ ] Mettre à jour le C4 et écrire les ADR manquants avant les nouveaux
   contrats ou commandes.
-- [ ] Ajouter un arbre ordonné de nœuds vectoriels.
-- [ ] Ajouter les actions Add, Duplicate, Group, Reparent, Reorder et Delete.
-- [ ] Ajouter les primitives rectangle, ellipse, ligne et path.
+- [x] Ajouter un arbre ordonné de nœuds vectoriels.
+- [x] Ajouter les actions Add, Duplicate, Reorder et Delete.
+- [x] Ajouter les primitives rectangle, ellipse, ligne et path.
 - [ ] Permettre de changer une primitive en path éditable lorsque possible.
 - [ ] Ajouter un outil plume pour :
   - [ ] ajouter un point ;
@@ -499,7 +499,7 @@ sur un comportement sans modifier le runtime.
 - [ ] Supporter poignées liées, symétriques et libres.
 - [ ] Ajouter sélection simple et multiple de points.
 - [ ] Ajouter déplacement, rotation et échelle d'une sélection de points.
-- [ ] Exposer les bounds des primitives.
+- [x] Exposer les bounds des primitives.
 - [x] Exposer le type de fill après création.
 - [x] Permettre fill `none`, couleur et image à tout moment.
 - [x] Permettre de changer texture, fit, offset, scale, rotation, pivot,
