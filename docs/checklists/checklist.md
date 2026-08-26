@@ -117,8 +117,10 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   plusieurs bindings.
 - [x] Ajouter Remove et Duplicate dans ce même prompt ; la suppression reste
   protégée lorsqu'il ne reste qu'une action.
-- [ ] Remplacer les codes numériques de touches par capture interactive et
-  libellés lisibles ; ajouter axes, dead zones et seuils gamepad.
+- [x] Remplacer les codes numériques de touches par capture interactive et
+  libellés lisibles ; ajouter axes, dead zones et seuils gamepad. Asset Studio
+  capture clavier/manette, affiche les libellés SDL et persiste les contraintes
+  d'axe, dead-zone, seuil et modificateurs.
 - [x] Un vectoriel natif sélectionné expose nom, parent, clip, transform et une
   partie des paramètres de fill image après création.
 - [x] Ajouter Add, Duplicate, Reorder et Delete pour les nœuds vectoriels.
