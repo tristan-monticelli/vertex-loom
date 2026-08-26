@@ -45,6 +45,9 @@ attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
+Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
+sa primitive en path Bézier, modifie une poignée, vérifie undo/redo, sauvegarde
+et reload, puis valide le projet résultant.
 L'ordre de composition d'Asset Studio rend le canvas OpenGL avant ImGui ; le
 panneau de preview reste sans fond opaque uniquement pendant ce rendu afin que
 les modals, contrôles et gizmos conservent toujours la priorité visuelle.

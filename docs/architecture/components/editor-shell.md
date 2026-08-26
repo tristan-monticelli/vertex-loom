@@ -265,6 +265,9 @@ C4Component
   sélectionné, le canvas rend les ancres et poignées, convertit leurs
   déplacements écran en coordonnées locales et les persiste par la session ;
   la sélection multiple et les modes de poignées restent à compléter.
+- Le scénario CTest `asset_studio_vector_e2e` rejoue cette édition sur la
+  fixture textile : conversion en path, déplacement d’une poignée, undo/redo,
+  sauvegarde, reload et validation du projet.
 - Un nœud peut conserver un contour avec couleur, largeur, jointure et
   extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
 - Les nœuds natifs peuvent référencer un parent et un clip par identifiants

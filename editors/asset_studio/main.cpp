@@ -6176,7 +6176,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool transformation_e2e = false,
                      const bool entity_e2e = false,
                      const bool animation_e2e = false,
-                     const bool texture_e2e = false) {
+                     const bool texture_e2e = false,
+                     const bool vector_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -6204,7 +6205,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-              texture_e2e)
+              texture_e2e || vector_e2e)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -6484,6 +6485,45 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             reloaded.selected_entity() && !visual.packets.empty();
         if (!animation_e2e_complete)
             std::cerr << "Asset Studio Animation E2E failed\n";
+    }
+
+    bool vector_e2e_complete = false;
+    if (vector_e2e && session.has_project()) {
+        const fabric::core::ResourceId vector_id{.value =
+            "head-button-artwork"};
+        bool authored = session.select_resource(
+            fabric::editor::StudioResourceKind::vector, vector_id) &&
+            session.created_vector() && session.created_vector()->native &&
+            !session.created_vector()->native->nodes.empty();
+        if (authored) {
+            auto node = session.created_vector()->native->nodes.front();
+            const auto converted = fabric::project::path_commands_from_shape(
+                node.shape);
+            authored = converted.has_value() && converted->size() >= 2U;
+            if (authored) {
+                node.shape.kind = fabric::project::VectorShapeKind::path;
+                node.shape.path = *converted;
+                if (node.shape.path.size() > 1U &&
+                    node.shape.path[1].kind ==
+                        fabric::project::VectorPathCommandKind::cubic)
+                    node.shape.path[1].control1.x += 0.15F;
+                authored = session.set_selected_vector_node(0U, node) &&
+                    session.undo() && session.redo() && session.save();
+            }
+        }
+        fabric::editor::ProjectSession reloaded;
+        const bool reopened = authored && reloaded.open(initial_project) &&
+            reloaded.select_resource(
+                fabric::editor::StudioResourceKind::vector, vector_id) &&
+            reloaded.created_vector() && reloaded.created_vector()->native &&
+            !reloaded.created_vector()->native->nodes.empty();
+        vector_e2e_complete = reopened &&
+            reloaded.created_vector()->native->nodes.front().shape.kind ==
+                fabric::project::VectorShapeKind::path &&
+            reloaded.created_vector()->native->nodes.front().shape.path.size() >=
+                2U;
+        if (!vector_e2e_complete)
+            std::cerr << "Asset Studio Vector E2E failed\n";
     }
 
     bool running = true;
@@ -6831,7 +6871,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
         if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-            texture_e2e)
+            texture_e2e || vector_e2e)
             running = false;
     }
 
@@ -6856,7 +6896,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (transformation_e2e && !transformation_e2e_complete) ||
             (entity_e2e && !entity_e2e_complete) ||
             (animation_e2e && !animation_e2e_complete) ||
-            (texture_e2e && !texture_e2e_complete)
+            (texture_e2e && !texture_e2e_complete) ||
+            (vector_e2e && !vector_e2e_complete)
         ? 1 : 0;
 }
 
@@ -6873,22 +6914,25 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-animation";
     const bool texture_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-texture";
+    const bool vector_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-vector";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
-        !entity_e2e && !animation_e2e && !texture_e2e) {
+        !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
                      "       asset_studio --e2e-entity project-directory\n"
                      "       asset_studio --e2e-animation project-directory\n"
-                     "       asset_studio --e2e-texture project-directory\n";
+                     "       asset_studio --e2e-texture project-directory\n"
+                     "       asset_studio --e2e-vector project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-         texture_e2e)
+         texture_e2e || vector_e2e)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
-                            entity_e2e, animation_e2e, texture_e2e);
+                            entity_e2e, animation_e2e, texture_e2e, vector_e2e);
 }

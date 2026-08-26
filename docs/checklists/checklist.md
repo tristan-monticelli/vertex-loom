@@ -665,7 +665,7 @@ utilisées pour tous les types de ressources.
   - [ ] programmer un comportement de joueur ;
   - [ ] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
-  - [ ] créer et éditer un path Bézier ;
+  - [x] créer et éditer un path Bézier ;
   - [x] changer fill, texture et stroke après création.
 - [ ] Capturer diagnostics et screenshots lors d'un échec.
 - [ ] Exécuter les parcours sur macOS, Windows et Linux.
