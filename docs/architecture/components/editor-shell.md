@@ -330,6 +330,10 @@ C4Component
   animations, applique les transforms d'instance et l'ordre calque/Z ; le
   canvas les transmet au même backend OpenGL et conserve les overlays ImGui
   de sélection, collisions et triggers.
+- Map Studio sépare désormais l’édition des calques et le contenu de la carte
+  dans deux `BeginChild` nommés (`map-layers-pane` et
+  `map-selection-pane`). Le second panneau suit la sélection courante tandis
+  que le premier conserve la hiérarchie et les actions de calque.
 - Les formulaires de création et d'ouverture de Map Studio associent les
   erreurs de validation à leur champ et affichent une correction actionnable ;
   les boutons désactivés exposent la condition qui manque dans leur tooltip.

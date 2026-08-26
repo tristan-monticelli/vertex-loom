@@ -2361,7 +2361,8 @@ int run(const std::filesystem::path& project_root,
             draw_disabled_reason(!session.can_redo(),
                                  "No undone map changes are available to redo.");
             ImGui::Separator();
-            ImGui::Columns(2, "map-studio-columns", true);
+            ImGui::BeginChild("map-layers-pane", ImVec2{360.0F, 0.0F}, true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
             ImGui::Text("Layers (%zu)", map.layers.size());
             ImGui::SetNextItemWidth(120.0F);
             ImGui::InputText("Layer id", &new_layer_id);
@@ -2699,7 +2700,10 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
-            ImGui::NextColumn();
+            ImGui::EndChild();
+            ImGui::SameLine();
+            ImGui::BeginChild("map-selection-pane", ImVec2{0.0F, 0.0F}, true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
             ImGui::SeparatorText("Events");
             ImGui::SetNextItemWidth(250.0F);
             ImGui::InputText("New event id", &event_id);
@@ -3318,7 +3322,7 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::EndDisabled();
             }
-            ImGui::Columns(1);
+            ImGui::EndChild();
             if (!status.empty()) ImGui::TextDisabled("%s", status.c_str());
             draw_package_errors(package_errors);
             draw_errors(session);
