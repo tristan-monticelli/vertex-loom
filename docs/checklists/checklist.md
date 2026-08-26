@@ -280,8 +280,8 @@ Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
 - [ ] Rendre l'opération atomique dans le runtime.
 - [ ] Empêcher une frame intermédiaire sans entité valide.
 - [ ] Préserver ou reconstruire proprement collision et mécanique.
-- [ ] Exposer un formulaire typé dans Asset Studio.
-- [ ] Permettre la sélection des entités source et destination depuis le
+- [x] Exposer un formulaire typé dans Asset Studio.
+- [x] Permettre la sélection des entités source et destination depuis le
   Resource Explorer.
 - [ ] Prévisualiser la transformation dans Asset Studio et Map Studio.
 - [ ] Tester aller simple, aller-retour et chaîne de transformations.

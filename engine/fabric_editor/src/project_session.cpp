@@ -5,6 +5,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/render/svg_vector.hpp"
 
 #include <algorithm>
@@ -121,6 +122,15 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
+            } else if (kind == StudioResourceKind::transformation) {
+                auto loaded = project::load_entity_transformation(
+                    project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.asset->document.id,
+                                   loaded.asset->document.name, relative, false});
             } else if (kind == StudioResourceKind::textured_path) {
                 auto loaded = project::load_textured_path(
                     project_root, manifest, relative);
@@ -174,6 +184,8 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                  assets / "animations", ".animation.json") ||
         !inspect(StudioResourceKind::behavior,
                  assets / "behaviors", ".behavior.json") ||
+        !inspect(StudioResourceKind::transformation,
+                 assets / "transformations", ".transformation.json") ||
         !inspect(StudioResourceKind::textured_path,
                  assets / "paths", ".textured-path.json") ||
         !inspect(StudioResourceKind::visual_composition,
@@ -1262,7 +1274,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
         }
         if (!recovery.errors.empty())
             selection_warnings = std::move(recovery.errors);
-    } else if (kind == StudioResourceKind::behavior) {
+    } else if (kind == StudioResourceKind::behavior ||
+               kind == StudioResourceKind::transformation) {
         imported_texture_.reset();
         imported_vector_.reset();
         created_vector_.reset();

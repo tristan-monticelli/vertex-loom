@@ -38,6 +38,7 @@ enum class StudioResourceKind {
     animation,
     input,
     behavior,
+    transformation,
     textured_path,
     visual_composition,
     visual_component,

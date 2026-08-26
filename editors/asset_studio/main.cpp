@@ -3,6 +3,7 @@
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/behavior_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/editor/transformation_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
@@ -58,6 +59,12 @@ struct CreationUiState {
         std::string name{"Entity behavior"};
         std::string id{"entity-behavior"};
     } behavior;
+    struct TransformationFields {
+        std::string name{"Entity transformation"};
+        std::string id{"entity-transformation"};
+        std::string source_id;
+        std::string destination_id;
+    } transformation;
     struct VisualCompositionFields {
         std::string name{"Visual composition"};
         std::string id{"visual-composition"};
@@ -87,6 +94,7 @@ struct CreationUiState {
     bool request_visual_composition{};
     bool request_visual_component{};
     bool request_behavior{};
+    bool request_transformation{};
     bool project_publish_attempted{};
 };
 
@@ -610,6 +618,7 @@ std::string_view studio_resource_kind_label(
     case Kind::animation: return "animation";
     case Kind::input: return "input";
     case Kind::behavior: return "behavior";
+    case Kind::transformation: return "transformation";
     case Kind::textured_path: return "textured path";
     case Kind::visual_composition: return "composition";
     case Kind::visual_component: return "component";
@@ -664,6 +673,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
     draw_kind("Input bindings", fabric::editor::StudioResourceKind::input);
     draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior);
+    draw_kind("Transformations",
+              fabric::editor::StudioResourceKind::transformation);
     draw_kind("Textured paths",
               fabric::editor::StudioResourceKind::textured_path);
     draw_kind("Visual compositions",
@@ -992,6 +1003,184 @@ bool draw_project_resource_picker(
                             selected->document_path.generic_string().c_str());
     }
     return changed;
+}
+
+bool draw_transfer_mode(const char* label, fabric::project::TransferMode& value,
+                        const bool structural = false,
+                        const bool incompatible = false) {
+    using Mode = fabric::project::TransferMode;
+    const auto preview = std::string(fabric::project::to_string(value));
+    bool changed = false;
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        for (const auto option : {Mode::preserve, Mode::reset, Mode::mapping,
+                                  Mode::error}) {
+            if ((structural && option != Mode::preserve && option != Mode::reset) ||
+                (incompatible && option != Mode::reset && option != Mode::error))
+                continue;
+            const auto name = std::string(fabric::project::to_string(option));
+            if (ImGui::Selectable(name.c_str(), value == option)) {
+                value = option;
+                changed = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
+void draw_transformation_editor(
+    fabric::editor::ProjectSession& project_session,
+    fabric::editor::TransformationSession& transformation_session,
+    CreationUiState& creation, std::string& status) {
+    using Kind = fabric::editor::StudioResourceKind;
+    if (creation.request_transformation) {
+        ImGui::OpenPopup("Create transformation");
+        creation.request_transformation = false;
+    }
+    if (ImGui::BeginPopupModal("Create transformation", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextWrapped(
+            "Create a reusable atomic EntityTransformation v1 policy.");
+        ImGui::InputText("Name", &creation.transformation.name);
+        ImGui::InputText("Resource id", &creation.transformation.id);
+        static_cast<void>(draw_project_resource_picker(
+            "Source entity", project_session.resources(), Kind::entity,
+            creation.transformation.source_id, false));
+        static_cast<void>(draw_project_resource_picker(
+            "Destination entity", project_session.resources(), Kind::entity,
+            creation.transformation.destination_id, false));
+        const bool valid = !creation.transformation.name.empty() &&
+            fabric::core::ResourceId::is_valid(creation.transformation.id) &&
+            !creation.transformation.source_id.empty() &&
+            !creation.transformation.destination_id.empty() &&
+            creation.transformation.source_id !=
+                creation.transformation.destination_id;
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Create transformation")) {
+            fabric::project::EntityTransformation value;
+            value.document.id = {.value = creation.transformation.id};
+            value.document.name = creation.transformation.name;
+            value.source_entity = {
+                {.value = creation.transformation.source_id}, "entity"};
+            value.destination_entity = {
+                {.value = creation.transformation.destination_id}, "entity"};
+            if (transformation_session.create(
+                    project_session.project_root(), value) &&
+                project_session.refresh_resources() &&
+                project_session.select_resource(Kind::transformation,
+                                                value.document.id)) {
+                status = "Transformation created and saved.";
+                ImGui::CloseCurrentPopup();
+            } else {
+                status = "Transformation creation failed; inspect diagnostics.";
+            }
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+
+    const auto* selected = project_session.selected_resource();
+    if (!selected || selected->kind != Kind::transformation) return;
+    if (!transformation_session.has_transformation() ||
+        transformation_session.transformation()->document.id != selected->id) {
+        if (!transformation_session.open(project_session.project_root(),
+                                         selected->id)) {
+            status = "Transformation could not be opened.";
+            return;
+        }
+    }
+
+    ImGui::SetNextWindowSize({650.0F, 720.0F}, ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Entity Transformation")) { ImGui::End(); return; }
+    const auto& current = *transformation_session.transformation();
+    ImGui::Text("%s", current.document.name.c_str());
+    ImGui::SameLine(); ImGui::TextDisabled("%s", current.document.id.value.c_str());
+    if (ImGui::Button("Save transformation"))
+        status = transformation_session.save()
+            ? "Transformation saved." : "Transformation save failed.";
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!transformation_session.can_undo());
+    if (ImGui::Button("Undo##transformation"))
+        static_cast<void>(transformation_session.undo());
+    ImGui::EndDisabled(); ImGui::SameLine();
+    ImGui::BeginDisabled(!transformation_session.can_redo());
+    if (ImGui::Button("Redo##transformation"))
+        static_cast<void>(transformation_session.redo());
+    ImGui::EndDisabled();
+
+    std::string source = current.source_entity.id.value;
+    if (draw_project_resource_picker("Source entity##transformation",
+            project_session.resources(), Kind::entity, source, false))
+        static_cast<void>(transformation_session.set_source({.value = source}));
+    std::string destination = current.destination_entity.id.value;
+    if (draw_project_resource_picker("Destination entity##transformation",
+            project_session.resources(), Kind::entity, destination, false))
+        static_cast<void>(transformation_session.set_destination(
+            {.value = destination}));
+
+    ImGui::SeparatorText("Atomic state transfer policy");
+    auto policy = transformation_session.transformation()->policy;
+    bool changed = false;
+    changed |= draw_transfer_mode("World transform", policy.world_transform, true);
+    changed |= draw_transfer_mode("Instance id", policy.instance_id, true);
+    changed |= draw_transfer_mode("Layer and Z", policy.layer_and_z, true);
+    changed |= draw_transfer_mode("Physics", policy.physics, true);
+    changed |= draw_transfer_mode("Properties", policy.properties);
+    changed |= draw_transfer_mode("Behavior parameters", policy.behavior_parameters);
+    changed |= draw_transfer_mode("Animation and time", policy.animation);
+    changed |= draw_transfer_mode("Timers and cooldowns",
+                                  policy.timers_and_cooldowns, true);
+    changed |= draw_transfer_mode("Camera follow", policy.camera_follow, true);
+    changed |= draw_transfer_mode("Incompatible values",
+                                  policy.incompatible_values, false, true);
+    if (changed)
+        static_cast<void>(transformation_session.set_policy(policy));
+
+    ImGui::SeparatorText("Explicit mappings");
+    std::optional<std::size_t> remove_mapping;
+    for (std::size_t index = 0;
+         index < transformation_session.transformation()->policy.mappings.size();
+         ++index) {
+        auto next = transformation_session.transformation()->policy;
+        auto& mapping = next.mappings[index];
+        ImGui::PushID(static_cast<int>(index));
+        int domain = static_cast<int>(mapping.domain);
+        static constexpr const char* domains[]{"Property", "Behavior parameter",
+                                                "Animation"};
+        bool row_changed = ImGui::Combo("Domain", &domain, domains, 3);
+        mapping.domain = static_cast<fabric::project::TransferDomain>(domain);
+        row_changed |= ImGui::InputText("Source", &mapping.source);
+        row_changed |= ImGui::InputText("Target", &mapping.target);
+        if (ImGui::Button("Remove mapping")) remove_mapping = index;
+        if (row_changed)
+            static_cast<void>(transformation_session.set_policy(std::move(next)));
+        ImGui::Separator(); ImGui::PopID();
+    }
+    if (remove_mapping) {
+        auto next = transformation_session.transformation()->policy;
+        next.mappings.erase(next.mappings.begin() +
+                            static_cast<std::ptrdiff_t>(*remove_mapping));
+        static_cast<void>(transformation_session.set_policy(std::move(next)));
+    }
+    if (ImGui::Button("Add property mapping")) {
+        auto next = transformation_session.transformation()->policy;
+        const auto suffix = std::to_string(next.mappings.size() + 1U);
+        next.mappings.push_back({fabric::project::TransferDomain::property,
+                                 "source-" + suffix, "target-" + suffix});
+        static_cast<void>(transformation_session.set_policy(std::move(next)));
+    }
+
+    ImGui::SeparatorText("Preview contract");
+    ImGui::TextWrapped("%s -> %s. Preview Runtime applies this policy in one "
+                       "atomic replacement; failure keeps the source instance.",
+                       current.source_entity.id.value.c_str(),
+                       current.destination_entity.id.value.c_str());
+    for (const auto& issue : transformation_session.errors())
+        ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
+                           issue.field.c_str(), issue.message.c_str());
+    ImGui::End();
 }
 
 ImU32 color_to_u32(const fabric::core::Color& color) {
@@ -1587,6 +1776,7 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
 
 void draw_workspace(fabric::editor::ProjectSession& session,
                     fabric::editor::BehaviorSession& behavior_session,
+                    fabric::editor::TransformationSession& transformation_session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
                     CreationUiState& creation,
@@ -3237,7 +3427,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::Begin("Status", nullptr, fixed_panel_flags | ImGuiWindowFlags_NoTitleBar |
                                       ImGuiWindowFlags_NoScrollbar);
     ImGui::TextUnformatted(status.c_str());
-    if (session.dirty() || behavior_session.dirty()) {
+    if (session.dirty() || behavior_session.dirty() ||
+        transformation_session.dirty()) {
         ImGui::SameLine();
         ImGui::TextColored({0.89F, 0.68F, 0.34F, 1.0F}, "Unsaved changes");
     }
@@ -4090,7 +4281,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             "Save them before replacing the project or closing Asset Studio?");
         if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
             if (session.save() &&
-                (!behavior_session.dirty() || behavior_session.save())) {
+                (!behavior_session.dirty() || behavior_session.save()) &&
+                (!transformation_session.dirty() ||
+                 transformation_session.save())) {
                 status = "Project saved.";
                 ImGui::CloseCurrentPopup();
                 if (const auto ready = transition_guard.resolve(
@@ -4124,7 +4317,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 }
 
 int run_asset_studio(const std::filesystem::path& initial_project,
-                     const bool behavior_e2e = false) {
+                     const bool behavior_e2e = false,
+                     const bool transformation_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -4151,7 +4345,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
-            (behavior_e2e ? SDL_WINDOW_HIDDEN : 0U));
+            ((behavior_e2e || transformation_e2e) ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
         SDL_Quit();
@@ -4204,6 +4398,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     fabric::editor::ProjectSession session;
     fabric::editor::BehaviorSession behavior_session;
+    fabric::editor::TransformationSession transformation_session;
     fabric::render::OpenGLVectorRenderer native_renderer;
     std::unordered_map<std::string, AssetPreview> texture_cache;
     if (!native_renderer.initialize()) {
@@ -4268,11 +4463,46 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             std::cerr << "Asset Studio Behavior E2E failed\n";
     }
 
+    bool transformation_e2e_complete = false;
+    if (transformation_e2e && session.has_project()) {
+        fabric::project::EntityTransformation value;
+        value.document.id = {.value = "transformation-studio-e2e"};
+        value.document.name = "Transformation Studio E2E";
+        value.source_entity = {
+            {.value = "rotating-platform-entity"}, "entity"};
+        value.destination_entity = {
+            {.value = "textile-head-entity"}, "entity"};
+        auto policy = value.policy;
+        policy.properties = fabric::project::TransferMode::mapping;
+        policy.mappings.push_back({fabric::project::TransferDomain::property,
+                                   "health", "hit-points"});
+        const bool authored = transformation_session.create(
+                initial_project, value) &&
+            transformation_session.set_policy(policy) &&
+            transformation_session.save() && session.refresh_resources() &&
+            session.select_resource(
+                fabric::editor::StudioResourceKind::transformation,
+                value.document.id);
+        fabric::editor::TransformationSession reloaded;
+        transformation_e2e_complete = authored &&
+            reloaded.open(initial_project, value.document.id) &&
+            reloaded.transformation()->source_entity == value.source_entity &&
+            reloaded.transformation()->destination_entity ==
+                value.destination_entity &&
+            reloaded.transformation()->policy == policy;
+        if (!transformation_e2e_complete)
+            std::cerr << "Asset Studio Transformation E2E failed\n";
+    }
+
     bool running = true;
-    const auto dirty = [&] { return session.dirty() || behavior_session.dirty(); };
+    const auto dirty = [&] {
+        return session.dirty() || behavior_session.dirty() ||
+            transformation_session.dirty();
+    };
     const auto save_all = [&] {
         return session.save() &&
-            (!behavior_session.dirty() || behavior_session.save());
+            (!behavior_session.dirty() || behavior_session.save()) &&
+            (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
         SDL_Event event;
@@ -4322,6 +4552,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     }
                     if (ImGui::MenuItem("Behavior graph...")) {
                         creation.request_behavior = true;
+                    }
+                    if (ImGui::MenuItem("Entity transformation...")) {
+                        creation.request_transformation = true;
                     }
                     ImGui::EndMenu();
                 }
@@ -4444,7 +4677,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             canvas.entity_world_bounds = visual_preview.bounds;
         }
 
-        draw_workspace(session, behavior_session, window, path_buffer, creation, imports, preview,
+        draw_workspace(session, behavior_session, transformation_session,
+                       window, path_buffer, creation, imports, preview,
                        pending_import_preview, canvas, entity_preview,
                        visual_preview,
                        animation_ui, textured_path_ui,
@@ -4452,6 +4686,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        request_open, request_png, request_svg,
                        transition_guard, running, status);
         draw_behavior_editor(session, behavior_session, creation, status);
+        draw_transformation_editor(session, transformation_session, creation,
+                                   status);
 
         const auto* active_resource = session.selected_resource();
         if (behavior_session.dirty() && behavior_session.graph() &&
@@ -4461,6 +4697,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             status = behavior_session.save()
                 ? "Previous behavior saved automatically."
                 : "Behavior autosave transition failed.";
+        }
+        if (transformation_session.dirty() &&
+            transformation_session.transformation() &&
+            (!active_resource ||
+             active_resource->kind !=
+                 fabric::editor::StudioResourceKind::transformation ||
+             active_resource->id !=
+                 transformation_session.transformation()->document.id)) {
+            status = transformation_session.save()
+                ? "Previous transformation saved automatically."
+                : "Transformation autosave transition failed.";
         }
 
         const auto autosave_status = session.update_autosave();
@@ -4474,6 +4721,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             status = "Behavior recovery autosave updated.";
         else if (behavior_autosave == fabric::editor::AutosaveStatus::failed)
             status = "Behavior autosave failed; inspect diagnostics.";
+        const auto transformation_autosave =
+            transformation_session.update_autosave();
+        if (transformation_autosave == fabric::editor::AutosaveStatus::saved)
+            status = "Transformation recovery autosave updated.";
+        else if (transformation_autosave ==
+                 fabric::editor::AutosaveStatus::failed)
+            status = "Transformation autosave failed; inspect diagnostics.";
 
         ImGui::Render();
         int drawable_width = 0;
@@ -4555,7 +4809,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
-        if (behavior_e2e) running = false;
+        if (behavior_e2e || transformation_e2e) running = false;
     }
 
     if (preview.texture != 0U) {
@@ -4575,7 +4829,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     NFD_Quit();
     SDL_DestroyWindow(window);
     SDL_Quit();
-    return behavior_e2e && !behavior_e2e_complete ? 1 : 0;
+    return (behavior_e2e && !behavior_e2e_complete) ||
+            (transformation_e2e && !transformation_e2e_complete)
+        ? 1 : 0;
 }
 
 } // namespace
@@ -4583,14 +4839,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 int main(const int argument_count, char** arguments) {
     const bool behavior_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-behavior";
-    if (argument_count > 2 && !behavior_e2e) {
+    const bool transformation_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-transformation";
+    if (argument_count > 2 && !behavior_e2e && !transformation_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
-                     "       asset_studio --e2e-behavior project-directory\n";
+                     "       asset_studio --e2e-behavior project-directory\n"
+                     "       asset_studio --e2e-transformation project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
-        behavior_e2e ? std::filesystem::path{arguments[2]}
+        (behavior_e2e || transformation_e2e)
+        ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
-    return run_asset_studio(initial_project, behavior_e2e);
+    return run_asset_studio(initial_project, behavior_e2e, transformation_e2e);
 }
