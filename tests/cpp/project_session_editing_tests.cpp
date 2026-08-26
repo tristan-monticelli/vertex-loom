@@ -203,6 +203,95 @@ TEST_CASE("project transitions save valid edits and preserve invalid ones") {
     }
 }
 
+TEST_CASE("import and duplicate honor the transition guard") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    auto texture_source = std::filesystem::current_path() /
+        "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+    if (!std::filesystem::is_regular_file(texture_source))
+        texture_source = std::filesystem::current_path().parent_path() /
+            "tests/fixtures/studio-rotating-platform/assets/textures/platform-thread.png";
+
+    const auto make_dirty = [](fabric::editor::ProjectSession& session,
+                               const std::string& name) {
+        fabric::editor::CreateVectorArtworkPrompt prompt;
+        prompt.name = name;
+        REQUIRE(session.create_vector_artwork(prompt));
+        auto node = session.created_vector()->native->nodes.front();
+        node.name = "Unsaved transition edit";
+        REQUIRE(session.set_selected_vector_node(0U, std::move(node)));
+        REQUIRE(session.dirty());
+    };
+
+    SECTION("import saves a valid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Import Source");
+        REQUIRE(session.import_png(texture_source,
+                                   {.value = "transition-imported"},
+                                   "Transition Imported"));
+        auto saved = fabric::project::load_vector_asset(
+            project.path(), load_manifest_or_fail(project.path()),
+            "assets/vectors/import-source.vector.json");
+        REQUIRE(saved.ok());
+        CHECK(saved.asset->native->nodes.front().name ==
+              "Unsaved transition edit");
+    }
+
+    SECTION("duplicate saves a valid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Duplicate Source");
+        REQUIRE(session.duplicate_resource(
+            fabric::editor::StudioResourceKind::vector,
+            {.value = "duplicate-source"}, {.value = "duplicate-copy"},
+            "Duplicate Copy"));
+        auto saved = fabric::project::load_vector_asset(
+            project.path(), load_manifest_or_fail(project.path()),
+            "assets/vectors/duplicate-source.vector.json");
+        REQUIRE(saved.ok());
+        CHECK(saved.asset->native->nodes.front().name ==
+              "Unsaved transition edit");
+        CHECK(std::filesystem::is_regular_file(
+            project.path() / "assets/vectors/duplicate-copy.vector.json"));
+    }
+
+    SECTION("import preserves an invalid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Import Invalid");
+        const auto document = project.path() /
+            "assets/vectors/import-invalid.vector.json";
+        REQUIRE(std::filesystem::remove(document));
+        REQUIRE(std::filesystem::create_directory(document));
+        CHECK_FALSE(session.import_png(texture_source,
+                                       {.value = "rejected-import"},
+                                       "Rejected Import"));
+        CHECK(session.created_vector()->document.name == "Import Invalid");
+        CHECK(session.dirty());
+        CHECK_FALSE(std::filesystem::exists(
+            project.path() / "assets/textures/rejected-import.texture.json"));
+    }
+
+    SECTION("duplicate preserves an invalid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Duplicate Invalid");
+        const auto document = project.path() /
+            "assets/vectors/duplicate-invalid.vector.json";
+        REQUIRE(std::filesystem::remove(document));
+        REQUIRE(std::filesystem::create_directory(document));
+        CHECK_FALSE(session.duplicate_resource(
+            fabric::editor::StudioResourceKind::vector,
+            {.value = "duplicate-invalid"}, {.value = "rejected-copy"},
+            "Rejected Copy"));
+        CHECK(session.created_vector()->document.name == "Duplicate Invalid");
+        CHECK(session.dirty());
+        CHECK_FALSE(std::filesystem::exists(
+            project.path() / "assets/vectors/rejected-copy.vector.json"));
+    }
+}
+
 TEST_CASE("session save failure preserves the selected document") {
     const TemporaryDirectory project;
     write_project(project.path());

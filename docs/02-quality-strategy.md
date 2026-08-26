@@ -189,6 +189,9 @@ sélection ni le document sale.
 La transition de projet applique maintenant le garde commun à `open` et
 `create` ; quatre scénarios vérifient qu'un document valide est sauvegardé et
 qu'un document invalide conserve le projet actif et empêche la nouvelle cible.
+Les transitions d'import et de duplication disposent du même contrôle valide /
+invalide, avec vérification qu'aucune nouvelle ressource n'est publiée après
+un échec de sauvegarde.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La
