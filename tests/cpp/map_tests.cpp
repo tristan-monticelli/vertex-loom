@@ -31,7 +31,7 @@ fabric::project::MapDocument map() {
         .instances = {{"hero-1", std::nullopt,
                        ResourceReference{{.value = "hero"}, "prefab"}, "instances",
                        {.position = {65.0F, -1.0F}}, 1, -1, {}}},
-        .collisions = {{CollisionShapeKind::circle, "collision", false,
+        .collisions = {{CollisionShapeKind::circle, "collision", true,
                         {0.0F, 0.0F}, 2.0F, 0.0F, {}}},
         .triggers = {{"spawn", "triggers", 0, {.value = "on-spawn"}, {}}},
         .events = {{{.value = "on-spawn"}, {}}},
@@ -74,6 +74,29 @@ TEST_CASE("map validation rejects malformed instance animation bindings") {
         "animation", fabric::project::ResourceReference{
             {.value = "walk"}, "texture"}});
     REQUIRE_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+}
+
+TEST_CASE("map validation requires closed sensor trigger zones") {
+    auto invalid = map();
+    invalid.collisions.front().sensor = false;
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+
+    invalid = map();
+    invalid.collisions.front().kind =
+        fabric::project::CollisionShapeKind::chain;
+    invalid.collisions.front().points = {{0.0F, 0.0F}, {1.0F, 0.0F}};
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+
+    invalid = map();
+    invalid.instances.front().properties.push_back(
+        {"triggerHalfExtents", fabric::core::Vec2{-1.0F, 1.0F}});
+    CHECK_FALSE(fabric::project::validate_map(manifest(), invalid).ok());
+
+    auto valid = map();
+    valid.instances.front().properties.push_back(
+        {"triggerHalfExtents", fabric::core::Vec2{2.0F, 1.0F}});
+    valid.instances.front().properties.push_back({"triggerActor", false});
+    CHECK(fabric::project::validate_map(manifest(), valid).ok());
 }
 
 TEST_CASE("map prefabs round trip optional mechanic parameter overrides") {

@@ -117,6 +117,7 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, PacketSortKey> packet_sort_keys;
     std::vector<RuntimePacketBounds> packet_bounds;
     std::vector<bool> packet_bounds_dynamic;
+    std::unordered_map<std::string, core::Rect> trigger_actor_bounds;
     std::unordered_map<std::string, EntitySimulation> entity_simulations;
     std::unordered_map<std::string, AnimatedVisualComponent>
         animated_visual_components;
@@ -539,6 +540,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_sort_keys.clear();
     impl_->packet_bounds.clear();
     impl_->packet_bounds_dynamic.clear();
+    impl_->trigger_actor_bounds.clear();
     impl_->entity_simulations.clear();
     impl_->animated_visual_components.clear();
     impl_->mechanic_instances.clear();
@@ -1207,6 +1209,60 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
              impl_->mechanic_instances.contains(instance_id));
         impl_->packet_bounds_dynamic.push_back(dynamic);
     }
+    for (const auto& instance : map_->instances) {
+        const auto participates = std::ranges::find(
+            instance.properties, "triggerActor", &project::MapProperty::id);
+        if (participates != instance.properties.end()) {
+            const auto* enabled = std::get_if<bool>(&participates->value);
+            if (enabled != nullptr && !*enabled) continue;
+        }
+        std::optional<core::Rect> bounds;
+        const auto explicit_extents = std::ranges::find(
+            instance.properties, "triggerHalfExtents",
+            &project::MapProperty::id);
+        if (explicit_extents != instance.properties.end()) {
+            if (const auto* half_extents =
+                    std::get_if<core::Vec2>(&explicit_extents->value))
+                bounds = core::Rect{
+                    {instance.transform.position.x - half_extents->x,
+                     instance.transform.position.y - half_extents->y},
+                    {half_extents->x * 2.0F, half_extents->y * 2.0F}};
+        }
+        if (!bounds) {
+            const auto packet_indices =
+                impl_->packet_indices_by_instance.find(instance.id);
+            if (packet_indices != impl_->packet_indices_by_instance.end()) {
+                for (const auto packet_index : packet_indices->second) {
+                    if (packet_index >= impl_->packet_bounds.size()) continue;
+                    const auto& packet = impl_->packet_bounds[packet_index];
+                    if (!bounds) {
+                        bounds = core::Rect{
+                            packet.minimum,
+                            {packet.maximum.x - packet.minimum.x,
+                             packet.maximum.y - packet.minimum.y}};
+                    } else {
+                        const auto minimum = core::Vec2{
+                            std::min(bounds->origin.x, packet.minimum.x),
+                            std::min(bounds->origin.y, packet.minimum.y)};
+                        const auto maximum = core::Vec2{
+                            std::max(bounds->origin.x + bounds->size.x,
+                                     packet.maximum.x),
+                            std::max(bounds->origin.y + bounds->size.y,
+                                     packet.maximum.y)};
+                        *bounds = {minimum,
+                                   {maximum.x - minimum.x,
+                                    maximum.y - minimum.y}};
+                    }
+                }
+            }
+        }
+        impl_->trigger_actor_bounds.emplace(
+            instance.id,
+            bounds.value_or(core::Rect{
+                {instance.transform.position.x - 0.5F,
+                 instance.transform.position.y - 0.5F},
+                {1.0F, 1.0F}}));
+    }
     return true;
 }
 
@@ -1397,19 +1453,46 @@ bool PreviewRuntime::run() {
             }
             ++stats_.physics_steps;
             impl_->gameplay_events.clear();
+            std::vector<TriggerActor> trigger_actors;
+            trigger_actors.reserve(impl_->trigger_actor_bounds.size() +
+                                   (character_ ? 1U : 0U));
+            for (const auto& [instance_id, base_bounds] :
+                 impl_->trigger_actor_bounds) {
+                auto bounds = base_bounds;
+                const auto mechanic =
+                    impl_->mechanic_instances.find(instance_id);
+                if (mechanic != impl_->mechanic_instances.end() &&
+                    mechanic->second.visual_binding) {
+                    const auto& binding = *mechanic->second.visual_binding;
+                    const auto body = std::ranges::find(
+                        mechanic->second.simulation.body_states(),
+                        binding.body_node_id,
+                        &physics::MechanicBodyState::node_id);
+                    if (body != mechanic->second.simulation.body_states().end()) {
+                        bounds.origin.x += body->position.x -
+                            binding.initial_position.x;
+                        bounds.origin.y += body->position.y -
+                            binding.initial_position.y;
+                    }
+                }
+                trigger_actors.push_back({instance_id, bounds});
+            }
             if (character_) {
                 const auto position = character_->position();
                 stats_.character_x = position.x;
                 stats_.character_y = position.y;
-                if (triggers_) {
-                    impl_->gameplay_events = triggers_->update(position);
-                    stats_.gameplay_events += impl_->gameplay_events.size();
-                    if (options_.gameplay_event_handler) {
-                        for (const auto& event : impl_->gameplay_events) {
-                            if (!options_.gameplay_event_handler(event)) {
-                                stop_requested = true;
-                                break;
-                            }
+                trigger_actors.push_back({
+                    "runtime-character",
+                    {{position.x - 0.5F, position.y - 0.5F}, {1.0F, 1.0F}}});
+            }
+            if (triggers_) {
+                impl_->gameplay_events = triggers_->update(trigger_actors);
+                stats_.gameplay_events += impl_->gameplay_events.size();
+                if (options_.gameplay_event_handler) {
+                    for (const auto& event : impl_->gameplay_events) {
+                        if (!options_.gameplay_event_handler(event)) {
+                            stop_requested = true;
+                            break;
                         }
                     }
                 }

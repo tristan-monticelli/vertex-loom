@@ -17,6 +17,7 @@ TEST_CASE("trigger runtime emits an enter event once and resolves payload") {
     REQUIRE(entered.size() == 1);
     CHECK(entered.front().id.value == "door-open");
     CHECK(entered.front().trigger_id == "door");
+    CHECK(entered.front().actor_id == "character");
     CHECK(entered.front().kind == runtime::GameplayEventKind::entered);
     REQUIRE(entered.front().payload.size() == 1);
     CHECK(std::get<std::string>(entered.front().payload.front().value) == "blue");
@@ -28,6 +29,38 @@ TEST_CASE("trigger runtime emits an enter event once and resolves payload") {
     CHECK(exited.front().payload == entered.front().payload);
     CHECK(triggers.active_count() == 0);
     REQUIRE(triggers.update({2.0F, 0.0F}).size() == 1);
+}
+
+TEST_CASE("trigger runtime tracks actor bounds independently and merges payload") {
+    project::MapDocument map;
+    map.collisions = {{project::CollisionShapeKind::circle, "triggers", true,
+                       {2.0F, 0.0F}, 1.0F, 0.0F, {}}};
+    map.events = {{{.value = "door-open"},
+                   {{"key", std::string{"global"}},
+                    {"difficulty", std::int64_t{2}}}}};
+    map.triggers = {{"door", "triggers", 0, {.value = "door-open"},
+                     {{"key", std::string{"blue"}},
+                      {"one-shot", true}}}};
+    runtime::TriggerRuntime triggers(map);
+
+    const std::vector<runtime::TriggerActor> actors{
+        {"monster", {{0.9F, -0.25F}, {0.5F, 0.5F}}},
+        {"player", {{1.5F, -0.25F}, {0.5F, 0.5F}}}};
+    const auto entered = triggers.update(actors);
+    REQUIRE(entered.size() == 2U);
+    CHECK(entered[0].actor_id == "monster");
+    CHECK(entered[1].actor_id == "player");
+    CHECK(triggers.active_count() == 2U);
+    REQUIRE(entered[0].payload.size() == 3U);
+    CHECK(std::get<std::string>(entered[0].payload[0].value) == "blue");
+    CHECK(std::get<std::int64_t>(entered[0].payload[1].value) == 2);
+    CHECK(std::get<bool>(entered[0].payload[2].value));
+
+    const auto one_left = triggers.update({actors.front()});
+    REQUIRE(one_left.size() == 1U);
+    CHECK(one_left.front().actor_id == "player");
+    CHECK(one_left.front().kind == runtime::GameplayEventKind::exited);
+    CHECK(triggers.active_count() == 1U);
 }
 
 TEST_CASE("trigger runtime supports polygon and capsule zones") {

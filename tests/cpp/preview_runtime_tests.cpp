@@ -733,6 +733,51 @@ TEST_CASE("preview runtime handler can stop after a gameplay event") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("preview runtime emits trigger events for map entities without a CLI character") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-entity-trigger-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto project_manifest = manifest();
+    REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, project_manifest, vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, project_manifest, entity()).ok());
+    auto trigger_map = map_with_gameplay_trigger();
+    trigger_map.triggers.front().properties = {
+        {"source", std::string{"entity-zone"}}};
+    trigger_map.instances.push_back({
+        .id = "monster-one",
+        .entity = fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"},
+        .layer_id = "instances",
+        .transform = {.position = {0.0F, 0.0F}},
+        .properties = {{"triggerHalfExtents",
+                        fabric::core::Vec2{0.75F, 0.75F}}}});
+    REQUIRE(fabric::project::publish_map(
+        root, project_manifest, trigger_map).ok());
+
+    std::optional<fabric::runtime::GameplayEvent> received;
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({
+        .project_root = root,
+        .map_id = {.value = "preview"},
+        .gameplay_event_handler = [&](const auto& event) {
+            received = event;
+            return false;
+        },
+        .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(received.has_value());
+    CHECK(received->actor_id == "monster-one");
+    REQUIRE(received->payload.size() == 1U);
+    CHECK(std::get<std::string>(received->payload.front().value) ==
+          "entity-zone");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime accepts a custom locomotion binding table") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-input-config-" + std::to_string(

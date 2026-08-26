@@ -25,10 +25,20 @@ set(SCENE_DOCUMENT
     "${PROJECT_ROOT}/scenes/scene-studio-e2e.scene.json")
 set(PACKAGE_MANIFEST
     "${TEST_ROOT}/scene-studio-e2e.scene-package/scene-package.json")
+set(MAP_DOCUMENT
+    "${PROJECT_ROOT}/maps/textile-head-preview.map.json")
 if(NOT EXISTS "${SCENE_DOCUMENT}" OR IS_DIRECTORY "${SCENE_DOCUMENT}" OR
    NOT EXISTS "${PACKAGE_MANIFEST}" OR IS_DIRECTORY "${PACKAGE_MANIFEST}")
     message(FATAL_ERROR
         "Scene Studio did not persist and publish the authored campaign")
+endif()
+
+file(READ "${MAP_DOCUMENT}" MAP_JSON)
+string(JSON TRIGGER_COUNT LENGTH "${MAP_JSON}" triggers)
+string(JSON TRIGGER_SOURCE GET "${MAP_JSON}" triggers 0 properties 0 value value)
+if(NOT TRIGGER_COUNT EQUAL 1 OR
+   NOT TRIGGER_SOURCE STREQUAL "scene-studio")
+    message(FATAL_ERROR "Map Studio did not persist the trigger override")
 endif()
 
 file(READ "${SCENE_DOCUMENT}" SCENE_JSON)

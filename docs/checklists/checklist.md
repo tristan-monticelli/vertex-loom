@@ -57,19 +57,17 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   `ScenePackageManifest v1` ferme les scènes, maps et dépendances atteignables ;
   `fabric_map_package_export --scene` la publie et `game_runtime --package`
   l'exécute sans projet source.
-- [ ] Refuser un trigger lié à une collision `chain`, ou implémenter sa
-  sémantique : le validateur l'accepte alors que `TriggerRuntime::contains`
-  retourne toujours `false` pour ce type.
-- [ ] Définir si une collision de trigger doit être un sensor et rendre le
-  validateur, Box2D et le runtime cohérents sur cette règle.
-- [ ] Détecter une zone avec la forme physique de l'entité, pas seulement avec
-  le point central du personnage générique.
-- [ ] Permettre aux joueurs, monstres et autres entités de produire des entrées
-  et sorties de zones ; les triggers ne sont mis à jour que si `--character`
-  est actif.
-- [ ] Consommer ou supprimer `TriggerDefinition.properties`. Le runtime publie
-  uniquement le payload de `MapEventDefinition` et ignore les propriétés
-  propres au trigger.
+- [x] Refuser un trigger lié à une collision `chain` ; les chains restent des
+  segments physiques solides et ne définissent pas de zone fermée.
+- [x] Exiger une collision sensor pour chaque trigger et appliquer la même
+  règle dans le validateur, Box2D, Map Studio et le runtime.
+- [x] Détecter une zone avec les bounds monde de l'acteur plutôt que son point
+  central ; `triggerHalfExtents` permet une box physique explicite.
+- [x] Permettre aux joueurs, monstres et autres entités de produire des entrées
+  et sorties indépendantes, même sans `--character` ; `triggerActor=false`
+  exclut explicitement les marqueurs.
+- [x] Consommer `TriggerDefinition.properties` en surcharge du payload global
+  et exposer l'édition de ces propriétés dans Map Studio.
 - [ ] Définir un système de comportements attachable aux entités, séparé des
   bindings physiques, puis l'utiliser pour le joueur comme pour les monstres.
 - [ ] Retirer le couplage runtime aux trois actions codées en dur
@@ -157,7 +155,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
 - [x] Lot C : exécution runtime des mécaniques publiées.
 - [x] Lot D : scènes multi-maps, entry points et paquet de scènes.
-- [ ] Lot E : triggers cohérents avec les formes et toutes les entités.
+- [x] Lot E : triggers cohérents avec les formes et toutes les entités.
 - [ ] Lot F : BehaviorGraph, monstres et transformations d'entités.
 - [ ] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
 - [ ] Lot H : vectoriel complet, input avancé et tests UX end-to-end.

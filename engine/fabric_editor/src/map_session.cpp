@@ -588,6 +588,19 @@ bool MapSession::set_collision_shape(const std::size_t collision_index,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::add_collision_shape(project::CollisionShape shape) {
+    if (!map_) return false;
+    const auto layer = find_layer(*map_, {.value = shape.layer_id});
+    if (!layer || map_->layers[*layer].kind !=
+                      project::MapLayerKind::collision ||
+        map_->layers[*layer].locked)
+        return false;
+    auto next = *map_;
+    next.collisions.push_back(std::move(shape));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::undo() { return commands_.undo(); }
 bool MapSession::redo() { return commands_.redo(); }
 

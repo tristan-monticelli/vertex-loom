@@ -73,6 +73,12 @@ Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
 
+Les triggers ne sont plus liés au personnage CLI : Preview Runtime construit
+une liste d'acteurs à bounds monde pour chaque instance et pour le personnage,
+puis `TriggerRuntime` suit l'occupation par acteur. Seules les collisions sensor
+fermées sont des zones ; le payload d'événement est spécialisé par les
+propriétés du trigger et chaque émission identifie l'acteur concerné.
+
 Une scène monte toutes ses maps dans un `MapDocument` runtime éphémère. Le
 `layer_id` de chaque référence sert de namespace aux identifiants locaux ; les
 ressources projet et les événements compatibles restent partagés. Les points

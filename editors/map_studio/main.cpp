@@ -1821,13 +1821,34 @@ int run(const std::filesystem::path& project_root,
         if (!session.has_map()) {
             fail_e2e("scene fixture map could not be opened");
         } else {
+            const auto actor_position = session.map()->instances.empty()
+                ? fabric::core::Vec2{}
+                : session.map()->instances.front().transform.position;
+            const bool trigger_authored =
+                session.add_layer({"collision-e2e", "Collision E2E",
+                    fabric::project::MapLayerKind::collision,
+                    true, false, 0.0F}) &&
+                session.add_layer({"triggers-e2e", "Triggers E2E",
+                    fabric::project::MapLayerKind::triggers,
+                    true, false, 0.0F}) &&
+                session.add_collision_shape({
+                    fabric::project::CollisionShapeKind::circle,
+                    "collision-e2e", true, actor_position, 2.0F, 0.0F, {}}) &&
+                session.declare_event(
+                    {{.value = "scene-e2e-entered"}, {}}) &&
+                session.add_trigger({
+                    "scene-e2e-zone", "triggers-e2e", 0U,
+                    {.value = "scene-e2e-entered"},
+                    {{"source", std::string{"scene-studio"}}}}) &&
+                session.save();
             const fabric::project::SceneDocument scene{
                 .document = {.schema_version = 1, .type = "scene",
                              .id = {.value = "scene-studio-e2e"},
                              .name = "Scene Studio E2E"}};
             const auto destination = project_root.parent_path() /
                 "scene-studio-e2e.scene-package";
-            const bool authored = scene_session.create(project_root, scene) &&
+            const bool authored = trigger_authored &&
+                scene_session.create(project_root, scene) &&
                 scene_session.add_map({{map_id, "map"}, "world"}) &&
                 scene_session.set_entry_map(map_id) &&
                 scene_session.add_transition(
@@ -1839,8 +1860,12 @@ int run(const std::filesystem::path& project_root,
                       project_root, scene.document.id, destination)
                 : fabric::project::ScenePackagePublishResult{};
             fabric::editor::SceneSession reloaded;
+            fabric::editor::MapSession reloaded_map;
             if (!authored || !published.ok() ||
                 !reloaded.open(project_root, scene.document.id) ||
+                !reloaded_map.open(project_root, map_id) ||
+                reloaded_map.map()->triggers.size() != 1U ||
+                reloaded_map.map()->triggers.front().properties.size() != 1U ||
                 reloaded.scene()->maps.size() != 1U ||
                 reloaded.scene()->transitions.size() != 1U ||
                 !std::filesystem::is_regular_file(
@@ -1891,10 +1916,19 @@ int run(const std::filesystem::path& project_root,
     int selected_collision_index = -1;
     int collision_editor_index = -1;
     fabric::project::CollisionShape collision_editor;
+    std::string new_collision_layer;
+    int new_collision_kind = 0;
+    bool new_collision_sensor = true;
+    fabric::core::Vec2 new_collision_center{};
+    float new_collision_radius = 1.0F;
+    float new_collision_length = 2.0F;
     int selected_trigger_index = -1;
     int trigger_editor_index = -1;
     int trigger_editor_collision_index = 0;
     fabric::project::TriggerDefinition trigger_editor;
+    std::string trigger_property_id;
+    std::string trigger_property_value;
+    int trigger_property_kind = 2;
     std::vector<std::string> selected_instances;
     std::string active_layer_id;
     std::string new_layer_id;
@@ -2182,6 +2216,74 @@ int run(const std::filesystem::path& project_root,
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
+            ImGui::SetNextItemWidth(150.0F);
+            ImGui::Combo("New collision kind", &new_collision_kind,
+                         "circle\0capsule\0polygon\0chain\0");
+            ImGui::SetNextItemWidth(180.0F);
+            ImGui::InputText("Collision layer", &new_collision_layer);
+            ImGui::TextDisabled("Collision layers:");
+            for (const auto& layer : map.layers) {
+                if (layer.kind != fabric::project::MapLayerKind::collision)
+                    continue;
+                ImGui::SameLine();
+                if (ImGui::SmallButton(layer.id.c_str()))
+                    new_collision_layer = layer.id;
+            }
+            ImGui::Checkbox("New collision sensor", &new_collision_sensor);
+            if (new_collision_kind == 3) {
+                new_collision_sensor = false;
+                ImGui::SameLine();
+                ImGui::TextDisabled("chains are solid and cannot be triggers");
+            }
+            ImGui::SetNextItemWidth(220.0F);
+            ImGui::DragFloat2("New collision center",
+                              &new_collision_center.x, 0.1F);
+            if (new_collision_kind <= 1) {
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::DragFloat("New collision radius", &new_collision_radius,
+                                 0.1F, 0.01F, 4096.0F);
+            }
+            if (new_collision_kind == 1) {
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::DragFloat("New capsule length", &new_collision_length,
+                                 0.1F, 0.0F, 4096.0F);
+            }
+            ImGui::BeginDisabled(new_collision_layer.empty() ||
+                                 new_collision_radius <= 0.0F);
+            if (ImGui::Button("Add collision")) {
+                fabric::project::CollisionShape shape{
+                    .kind = static_cast<fabric::project::CollisionShapeKind>(
+                        new_collision_kind),
+                    .layer_id = new_collision_layer,
+                    .sensor = new_collision_sensor,
+                    .center = new_collision_center,
+                    .radius = new_collision_radius,
+                    .length = new_collision_length};
+                if (shape.kind ==
+                    fabric::project::CollisionShapeKind::polygon)
+                    shape.points = {
+                        {new_collision_center.x - 1.0F,
+                         new_collision_center.y - 1.0F},
+                        {new_collision_center.x + 1.0F,
+                         new_collision_center.y - 1.0F},
+                        {new_collision_center.x,
+                         new_collision_center.y + 1.0F}};
+                else if (shape.kind ==
+                         fabric::project::CollisionShapeKind::chain)
+                    shape.points = {
+                        {new_collision_center.x - 1.0F,
+                         new_collision_center.y},
+                        {new_collision_center.x + 1.0F,
+                         new_collision_center.y}};
+                const auto added = session.add_collision_shape(
+                    std::move(shape));
+                status = added ? "Collision added"
+                               : "Collision creation rejected";
+                if (added)
+                    selected_collision_index = static_cast<int>(
+                        session.map()->collisions.size() - 1U);
+            }
+            ImGui::EndDisabled();
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
                  ++collision_index) {
                 const auto& collision = map.collisions[collision_index];
@@ -2348,8 +2450,21 @@ int run(const std::filesystem::path& project_root,
             ImGui::InputText("Trigger event id", &trigger_event_id);
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputInt("Collision index", &trigger_collision_index);
+            const auto valid_trigger_collision = [&](const int index) {
+                if (index < 0 || static_cast<std::size_t>(index) >=
+                                     map.collisions.size())
+                    return false;
+                const auto& collision =
+                    map.collisions[static_cast<std::size_t>(index)];
+                return collision.sensor && collision.kind !=
+                    fabric::project::CollisionShapeKind::chain;
+            };
+            if (!valid_trigger_collision(trigger_collision_index))
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                   "Choose a closed sensor collision");
             ImGui::BeginDisabled(trigger_id.empty() || trigger_event_id.empty() ||
-                                 trigger_collision_index < 0);
+                                 !valid_trigger_collision(
+                                     trigger_collision_index));
             if (ImGui::Button("Add trigger")) {
                 const auto added = session.add_trigger(
                     {trigger_id, "triggers", static_cast<std::size_t>(trigger_collision_index),
@@ -2381,12 +2496,64 @@ int run(const std::filesystem::path& project_root,
                         return event.id == trigger_editor.event_id;
                     });
                 if (event_definition != map.events.end()) {
-                    ImGui::Text("Payload:");
+                    ImGui::Text("Event payload:");
                     for (const auto& property : event_definition->payload)
                         ImGui::BulletText("%s = %s", property.id.c_str(),
                                           property_value_text(property.value).c_str());
                 }
-                ImGui::BeginDisabled(trigger_editor_collision_index < 0 ||
+                ImGui::Text("Trigger overrides:");
+                for (std::size_t property_index = 0;
+                     property_index < trigger_editor.properties.size();
+                     ++property_index) {
+                    const auto property = trigger_editor.properties[property_index];
+                    ImGui::PushID(static_cast<int>(property_index));
+                    ImGui::BulletText("%s = %s", property.id.c_str(),
+                                      property_value_text(property.value).c_str());
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("Remove override")) {
+                        trigger_editor.properties.erase(
+                            trigger_editor.properties.begin() +
+                            static_cast<std::ptrdiff_t>(property_index));
+                        ImGui::PopID();
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Trigger property id", &trigger_property_id);
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::Combo("Trigger property type", &trigger_property_kind,
+                             "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
+                ImGui::SetNextItemWidth(180.0F);
+                ImGui::InputText("Trigger property value",
+                                 &trigger_property_value);
+                ImGui::BeginDisabled(trigger_property_id.empty() ||
+                                     trigger_property_value.empty());
+                if (ImGui::Button("Set trigger override")) {
+                    const auto value = parse_override_value(
+                        trigger_property_kind, trigger_property_value);
+                    if (value) {
+                        const auto existing = std::ranges::find(
+                            trigger_editor.properties, trigger_property_id,
+                            &fabric::project::MapProperty::id);
+                        if (existing == trigger_editor.properties.end())
+                            trigger_editor.properties.push_back(
+                                {trigger_property_id, *value});
+                        else
+                            existing->value = *value;
+                        trigger_property_id.clear();
+                        trigger_property_value.clear();
+                    } else {
+                        status = "Trigger property value rejected";
+                    }
+                }
+                ImGui::EndDisabled();
+                if (!valid_trigger_collision(trigger_editor_collision_index))
+                    ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                       "Trigger collision must be a closed sensor");
+                ImGui::BeginDisabled(
+                                     !valid_trigger_collision(
+                                         trigger_editor_collision_index) ||
                                      trigger_editor.event_id.value.empty());
                 if (ImGui::Button("Apply trigger")) {
                     trigger_editor.collision_index = static_cast<std::size_t>(

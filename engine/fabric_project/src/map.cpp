@@ -319,7 +319,36 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
                       "mechanic prefab instances require positive uniform scale");
         }
         bool has_animation = false;
+        bool has_trigger_half_extents = false;
+        bool has_trigger_actor = false;
         for (const auto& property : instance.properties) {
+            if (property.id == "triggerHalfExtents") {
+                if (has_trigger_half_extents) {
+                    error(report.errors, ErrorCode::duplicate_resource,
+                          "instances.triggerHalfExtents",
+                          "trigger bounds property must be unique");
+                }
+                has_trigger_half_extents = true;
+                const auto* half_extents =
+                    std::get_if<core::Vec2>(&property.value);
+                if (half_extents == nullptr ||
+                    !std::isfinite(half_extents->x) ||
+                    !std::isfinite(half_extents->y) ||
+                    half_extents->x <= 0.0F || half_extents->y <= 0.0F)
+                    error(report.errors, ErrorCode::invalid_asset,
+                          "instances.triggerHalfExtents",
+                          "must be a positive finite Vec2");
+            }
+            if (property.id == "triggerActor") {
+                if (has_trigger_actor)
+                    error(report.errors, ErrorCode::duplicate_resource,
+                          "instances.triggerActor",
+                          "trigger actor property must be unique");
+                has_trigger_actor = true;
+                if (!std::holds_alternative<bool>(property.value))
+                    error(report.errors, ErrorCode::invalid_asset,
+                          "instances.triggerActor", "must be a boolean");
+            }
             if (property.id != "animation") continue;
             if (has_animation) {
                 error(report.errors, ErrorCode::duplicate_resource,
@@ -363,6 +392,24 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
         if (trigger.collision_index >= map.collisions.size() || !core::ResourceId::is_valid(trigger.event_id.value) ||
             event_ids.find(trigger.event_id.value) == event_ids.end())
             error(report.errors, ErrorCode::invalid_asset, "triggers", "trigger shape or event is invalid");
+        if (trigger.collision_index < map.collisions.size()) {
+            const auto& collision = map.collisions[trigger.collision_index];
+            if (!collision.sensor)
+                error(report.errors, ErrorCode::invalid_asset,
+                      "triggers.collision.sensor",
+                      "trigger collisions must be sensors");
+            if (collision.kind == CollisionShapeKind::chain)
+                error(report.errors, ErrorCode::invalid_asset,
+                      "triggers.collision.kind",
+                      "chain collisions cannot define trigger zones");
+        }
+        std::set<std::string> property_ids;
+        for (const auto& property : trigger.properties)
+            if (!core::ResourceId::is_valid(property.id) ||
+                !property_ids.insert(property.id).second)
+                error(report.errors, ErrorCode::duplicate_resource,
+                      "triggers.properties",
+                      "property ids must be valid and unique");
     }
     return report;
 }

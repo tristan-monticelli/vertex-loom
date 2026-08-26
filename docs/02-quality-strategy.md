@@ -122,6 +122,14 @@ de la scène racine ou d'une scène active, puis transition atomique depuis le
 paquet. La commande réelle est
 `fabric_map_package_export --scene <id> <projet> <destination>` suivie de
 `game_runtime --package <destination> --smoke-test 1`.
+Les zones gameplay couvrent séparément le refus des chains et collisions
+non-sensor, l'intersection cercle/capsule/polygone avec une box d'acteur, deux
+acteurs simultanés, les sorties indépendantes et la fusion déterministe du
+payload événement/trigger. Un test Preview Runtime publie une map contenant une
+entité `monster-one`, la lance sans personnage CLI et exige l'événement portant
+son `actor_id`. Le parcours graphique Scene Studio ajoute aussi collision,
+événement, trigger et propriété locale, puis les vérifie après reload et dans
+le paquet publié.
 Le workflow CI publie une fois `studio-rotating-platform` sur Ubuntu, transfère
 le dossier comme artefact et le charge avec `game_runtime --package` sur Ubuntu,
 macOS et Windows ; aucune conversion ni réécriture n'est exécutée entre les
