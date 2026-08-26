@@ -333,6 +333,8 @@ struct SceneEditorState {
     std::string entry_point;
     std::string event_id;
     int selected_transition{-1};
+    int remove_map_request{-1};
+    int remove_transition_request{-1};
 };
 
 void draw_scene_editor(fabric::editor::SceneSession& session,
@@ -530,13 +532,37 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove map")) {
-            status = session.remove_map(index) ? "Map removed from scene"
-                                               : "Map removal rejected";
-            state.selected_map = -1;
-            ImGui::PopID();
-            break;
+            state.remove_map_request = static_cast<int>(index);
+            ImGui::OpenPopup("Remove mounted map?");
         }
         ImGui::PopID();
+    }
+    if (ImGui::BeginPopupModal("Remove mounted map?", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto valid = state.remove_map_request >= 0 &&
+            static_cast<std::size_t>(state.remove_map_request) <
+                session.scene()->maps.size();
+        if (valid) {
+            const auto& pending = session.scene()->maps[
+                static_cast<std::size_t>(state.remove_map_request)];
+            ImGui::Text("Remove map '%s' from this scene?", pending.map.id.value.c_str());
+            ImGui::TextDisabled("The mount and its layer mapping will be removed; the map resource stays intact.");
+        }
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Remove mount")) {
+            status = session.remove_map(static_cast<std::size_t>(state.remove_map_request))
+                ? "Map removed from scene" : "Map removal rejected";
+            state.selected_map = -1;
+            state.remove_map_request = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            state.remove_map_request = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
     if (session.scene()->entry_map) {
         ImGui::TextDisabled("Entry map: %s",
@@ -627,13 +653,38 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove transition")) {
-            status = session.remove_transition(index)
-                ? "Transition removed" : "Transition removal rejected";
-            state.selected_transition = -1;
-            ImGui::PopID();
-            break;
+            state.remove_transition_request = static_cast<int>(index);
+            ImGui::OpenPopup("Remove transition?");
         }
         ImGui::PopID();
+    }
+    if (ImGui::BeginPopupModal("Remove transition?", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto valid = state.remove_transition_request >= 0 &&
+            static_cast<std::size_t>(state.remove_transition_request) <
+                session.scene()->transitions.size();
+        if (valid) {
+            const auto& pending = session.scene()->transitions[
+                static_cast<std::size_t>(state.remove_transition_request)];
+            ImGui::Text("Remove transition '%s'?", pending.id.c_str());
+            ImGui::TextDisabled("The scene link will be removed; the target scene and event remain intact.");
+        }
+        ImGui::BeginDisabled(!valid);
+        if (ImGui::Button("Remove transition")) {
+            status = session.remove_transition(
+                static_cast<std::size_t>(state.remove_transition_request))
+                ? "Transition removed" : "Transition removal rejected";
+            state.selected_transition = -1;
+            state.remove_transition_request = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            state.remove_transition_request = -1;
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
     }
     draw_package_errors(package_errors);
     draw_scene_errors(session);
