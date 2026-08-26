@@ -61,6 +61,52 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [ ] Documentation et clôture : retirer les gates non prouvés UX, confirmer le
   résultat visuel/fonctionnel, puis cocher les lots 1–3, 5, 6, 7 et 8.
 
+### Différences UX/logiques observées à corriger
+
+- [ ] Afficher dès l'accueil un état vide guidé : projet courant, ressource
+  active, prochaine action et raccourcis disponibles.
+- [ ] Garantir qu'ouvrir, créer, importer, dupliquer et fermer utilisent une
+  transition unique `Save/Discard/Cancel/Retry`, sans perte de contexte.
+- [ ] Montrer dans chaque picker le type, le chemin, la miniature, les
+  dimensions, le format, les dépendances et une action d'ouverture.
+- [ ] Remplacer tous les IDs libres restants par des sélecteurs typés avec
+  recherche, état manquant et bouton de correction.
+- [ ] Afficher les erreurs au champ avec cause, contrainte attendue et action
+  de correction ; ne pas laisser un bouton désactivé sans explication.
+- [ ] Unifier les composants de formulaire entre création et édition et
+  conserver toute propriété créée dans l'inspecteur après publication.
+- [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
+  clavier et cohérent entre Asset Studio, Map Studio et scènes.
+- [ ] Ajouter une analyse d'impact avant chaque suppression et proposer
+  remplacement, cascade explicitée ou annulation.
+- [ ] Permettre duplication superficielle/profonde et réécriture sélective des
+  références internes.
+- [ ] Ajouter gizmos de nœuds et drag-and-drop des artworks vers un nœud
+  existant, un nœud racine ou un enfant.
+- [ ] Exposer les contraintes, IK, déformation, XPBD et state machines dans
+  des sections réellement éditables.
+- [ ] Faire correspondre chaque paramètre de timeline au descripteur runtime,
+  y compris transform, matériau, fill, image fill et composants.
+- [ ] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
+  tangentes et easing selon un contrat versionné.
+- [ ] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
+  suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
+  symétriques et libres.
+- [ ] Rendre la géométrie de stroke effective : largeur, joins `round`,
+  `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
+  backend actuel les ignore.
+- [ ] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
+  déformation ; livrer un preset `beam` préexistant et visible comme exemple.
+- [ ] Permettre une configuration projet complète du personnage, spawn,
+  caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
+- [ ] Ajouter des profils/contextes d'input seulement après ADR et afficher
+  les BehaviorGraph qui consomment chaque action.
+- [ ] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
+  screenshots d'échec, puis exécuter les parcours UX sur macOS, Windows et
+  Linux.
+- [ ] Vérifier aux tailles minimales de fenêtre le focus, le scroll automatique,
+  la navigation clavier, les unités, tooltips, raccourcis et le contraste.
+
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
 
 - [x] **Empêcher l'écrasement destructif des sauvegardes de progression.**
