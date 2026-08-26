@@ -5,6 +5,9 @@
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
+#include "fabric/physics/mechanic_plan.hpp"
+#include "fabric/physics/mechanic_simulation.hpp"
+#include "fabric/project/mechanic_graph.hpp"
 #include "fabric/project/texture_asset.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
@@ -16,6 +19,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -746,6 +750,33 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
         CHECK(runtime_packet.fill_color == studio_packet.fill_color);
         CHECK(runtime_packet.image_fill == studio_packet.image_fill);
     }
+
+    const auto map_asset = fabric::project::load_map(
+        fixture, *fixture_manifest.manifest,
+        "maps/textile-head-preview.map.json");
+    const auto mechanic_asset = fabric::project::load_mechanic_graph(
+        fixture, *fixture_manifest.manifest,
+        "assets/mechanics/rotating-platform.mechanic.json");
+    REQUIRE(map_asset.ok());
+    REQUIRE(mechanic_asset.ok());
+    const auto compiled = fabric::physics::compile_mechanic_graph(
+        *mechanic_asset.asset, *map_asset.asset);
+    REQUIRE(compiled.ok());
+    fabric::physics::MechanicSimulation simulation;
+    REQUIRE(simulation.load(*compiled.plan));
+    REQUIRE(simulation.place_preview_character({
+        .position = {1.0F, 0.76F}, .size = {0.6F, 1.0F},
+        .density = 1.0F, .friction = 1.2F}));
+    REQUIRE(simulation.step_once());
+    REQUIRE(simulation.sensor_states().front().active);
+    REQUIRE(simulation.activation_states().front().active);
+    REQUIRE(simulation.debug_events().size() == 1U);
+    for (int step = 0; step < 40; ++step)
+        REQUIRE(simulation.step_once());
+    const auto transported = simulation.preview_character_state();
+    REQUIRE(transported.has_value());
+    CHECK(transported->position.x < 0.85F);
+    CHECK(std::abs(simulation.body_states().front().rotation_degrees) > 5.0F);
 
     std::error_code ignored;
     std::filesystem::remove_all(regenerated, ignored);
