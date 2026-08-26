@@ -152,6 +152,11 @@ struct NativeVectorDefinition {
 [[nodiscard]] std::optional<std::vector<VectorShape::PathCommand>>
 path_commands_from_shape(const VectorShape& shape);
 
+// Converts a path segment while preserving its endpoints. Line-to-cubic uses
+// collinear handles at one-third and two-thirds of the segment.
+[[nodiscard]] bool convert_path_command(
+    VectorShape& shape, std::size_t index, VectorPathCommandKind kind);
+
 [[nodiscard]] bool insert_path_command(
     VectorShape& shape, std::size_t index, VectorShape::PathCommand command);
 [[nodiscard]] bool remove_path_command(VectorShape& shape, std::size_t index);

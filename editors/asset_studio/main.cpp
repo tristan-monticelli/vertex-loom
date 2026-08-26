@@ -3709,8 +3709,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 fabric::project::to_string(command_kind));
                             if (ImGui::Selectable(option.c_str(),
                                                   command.kind == command_kind)) {
-                                command.kind = command_kind;
-                                commit_node(node);
+                                const bool segment_conversion =
+                                    (command.kind == fabric::project::VectorPathCommandKind::line ||
+                                     command.kind == fabric::project::VectorPathCommandKind::cubic) &&
+                                    (command_kind == fabric::project::VectorPathCommandKind::line ||
+                                     command_kind == fabric::project::VectorPathCommandKind::cubic);
+                                if (!segment_conversion ||
+                                    fabric::project::convert_path_command(
+                                        node.shape, command_index, command_kind)) {
+                                    command.kind = command_kind;
+                                    commit_node(node);
+                                } else {
+                                    status = "This path segment cannot be converted.";
+                                }
                             }
                         }
                         ImGui::EndCombo();

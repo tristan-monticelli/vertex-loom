@@ -23,6 +23,11 @@ Le déplacement du pivot conserve la géométrie visuelle en compensant la
 position du nœud. Les calculs utilisent les unités monde du canvas et sont
 validés par `ProjectSession` avant publication dans le document.
 
+Les segments `line` et `cubic` d’un path natif peuvent être convertis dans
+l’inspecteur ou les commandes de plume. Une conversion ligne→courbe conserve
+les extrémités et initialise des poignées colinéaires aux tiers ; une
+conversion courbe→ligne conserve l’extrémité et supprime les poignées.
+
 ## Conséquences
 
 - Le canvas et l’inspecteur partagent le même contrat `Transform`.
@@ -30,5 +35,6 @@ validés par `ProjectSession` avant publication dans le document.
   fichier projet.
 - Le renderer et les draw packets reçoivent exactement le même transform que
   celui affiché pendant l’édition.
-- Les poignées de sommets Bézier et les transforms indépendants du fill restent
-  des incréments ultérieurs.
+- Les poignées de sommets Bézier sont éditables par leurs coordonnées de
+  commande et par le canvas ; les modes de poignées liées, symétriques et
+  libres restent des incréments ultérieurs.

@@ -588,8 +588,8 @@ sur un comportement sans modifier le runtime.
   - [ ] insérer un point sur un segment ;
   - [ ] déplacer un point ;
   - [ ] supprimer un point ;
-  - [ ] convertir ligne en courbe ;
-  - [ ] convertir courbe en ligne ;
+  - [x] convertir ligne en courbe ;
+  - [x] convertir courbe en ligne ;
   - [ ] ouvrir un contour ;
   - [ ] fermer un contour.
 - [ ] Afficher et modifier les poignées Bézier directement sur le canvas.

@@ -808,6 +808,33 @@ bool insert_path_command(VectorShape& shape, const std::size_t index,
     return true;
 }
 
+bool convert_path_command(VectorShape& shape, const std::size_t index,
+                          const VectorPathCommandKind kind) {
+    using Kind = VectorPathCommandKind;
+    if (shape.kind != VectorShapeKind::path || index == 0U ||
+        index >= shape.path.size())
+        return false;
+    auto& command = shape.path[index];
+    if ((command.kind != Kind::line && command.kind != Kind::cubic) ||
+        (kind != Kind::line && kind != Kind::cubic))
+        return false;
+    if (command.kind == kind) return true;
+    if (kind == Kind::cubic) {
+        const auto start = shape.path[index - 1U].point;
+        const auto delta_x = command.point.x - start.x;
+        const auto delta_y = command.point.y - start.y;
+        command.control1 = {start.x + delta_x / 3.0F,
+                            start.y + delta_y / 3.0F};
+        command.control2 = {start.x + delta_x * 2.0F / 3.0F,
+                            start.y + delta_y * 2.0F / 3.0F};
+    } else {
+        command.control1 = {};
+        command.control2 = {};
+    }
+    command.kind = kind;
+    return true;
+}
+
 bool remove_path_command(VectorShape& shape, const std::size_t index) {
     if (shape.kind != VectorShapeKind::path || index >= shape.path.size() ||
         shape.path.size() <= 2U || index == 0U ||
