@@ -32,7 +32,12 @@ création complète, refus d'une destination occupée, diagnostics d'échec et
 conservation du dernier projet valide. La coquille
 graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
-n'est configuré. `npm run test:gl` ajoute un smoke test OpenGL opt-in : il crée
+n'est configuré. Deux parcours graphiques locaux sont néanmoins automatisés :
+`map_studio_close_e2e` injecte les fermetures fenêtre et système et vérifie la
+modale Save/Discard/Cancel ; `map_studio_scene_e2e` lance un shell OpenGL caché,
+crée une scène, monte une map, ajoute une transition, sauvegarde, recharge et
+publie son paquet de campagne. `npm run test:gl` ajoute un smoke test OpenGL
+opt-in : il crée
 un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
 disponible, puis un crop raster sur une texture bicolore avec lecture du pixel

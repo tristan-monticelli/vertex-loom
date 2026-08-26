@@ -50,8 +50,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   actuellement sérialisé mais ignoré.
 - [x] Appliquer `SceneTransition.entry_point` lors d'une transition ; ce champ
   est actuellement persisté puis ignoré par `SceneRuntimeSession`.
-- [ ] Ajouter un Scene Studio ou un éditeur de scènes intégré. Les scènes et
-  transitions n'ont aujourd'hui aucun parcours d'authoring graphique.
+- [x] Ajouter un Scene Studio intégré à Map Studio. Il crée et ouvre les scènes,
+  édite maps montées, map d'entrée et transitions, puis couvre undo/redo,
+  autosave, récupération, validation et publication de campagne.
 - [x] Publier une unité capable de contenir scènes et transitions.
   `ScenePackageManifest v1` ferme les scènes, maps et dépendances atteignables ;
   `fabric_map_package_export --scene` la publie et `game_runtime --package`
@@ -141,11 +142,11 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | CONFORME | Projet initialisé et doctrine disponible | `.project/project-config.json`, `AGENTS.md`, `CLAUDE.md` |
 | CONFORME | Écritures projet atomiques et validation stricte | contrats `fabric_project`, tests de stockage et publication |
 | CONFORME | Défenses de chemins et fermeture transitive des paquets | tests traversal, symlink et `map_package_tests.cpp` |
-| CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession` et tests headless |
-| PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la modale de fermeture réelle ; les autres parcours restent à automatiser |
+| CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession`, `SceneSession` et tests headless |
+| PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la fermeture réelle et `map_studio_scene_e2e` l'authoring/reload/publication d'une scène ; les autres parcours restent à automatiser |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
-| PARTIEL | Fidélité du modèle Scene au runtime | composition multi-map, mounts, entry points et paquet de campagne sont appliqués ; le Studio reste à livrer |
+| CONFORME | Fidélité du modèle Scene au runtime | Scene Studio, composition multi-map, mounts, entry points, transitions et paquet de campagne sont prouvés jusqu'au runtime |
 | CONFORME | Architecture fidèle au code mécanique | ADR-0106, C4 et flux d'instance correspondent au runtime testé |
 | MANQUE | Modularité des interfaces | `asset_studio/main.cpp` dépasse 4 000 lignes et `map_studio/main.cpp` 2 000 lignes |
 | N/A | Backend, compte et réseau | produit local sans backend dans le périmètre actuel |
@@ -155,7 +156,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Lot A : non-régression des slots et reprise réelle.
 - [x] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
 - [x] Lot C : exécution runtime des mécaniques publiées.
-- [ ] Lot D : scènes multi-maps, entry points et paquet de scènes.
+- [x] Lot D : scènes multi-maps, entry points et paquet de scènes.
 - [ ] Lot E : triggers cohérents avec les formes et toutes les entités.
 - [ ] Lot F : BehaviorGraph, monstres et transformations d'entités.
 - [ ] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.

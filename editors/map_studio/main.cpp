@@ -1,6 +1,7 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
+#include "fabric/editor/scene_session.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/project/map_package.hpp"
@@ -59,6 +60,15 @@ void draw_errors(const fabric::editor::MapSession& session) {
     for (const auto& error : session.errors()) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
         ImGui::TextWrapped("%s: %s", error.field.c_str(), error.message.c_str());
+        ImGui::PopStyleColor();
+    }
+}
+
+void draw_scene_errors(const fabric::editor::SceneSession& session) {
+    for (const auto& error : session.errors()) {
+        ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
+        ImGui::TextWrapped("%s: %s", error.field.c_str(),
+                           error.message.c_str());
         ImGui::PopStyleColor();
     }
 }
@@ -222,6 +232,284 @@ void draw_resource_picker(const char* label,
         if (ImGui::SmallButton(filename.c_str())) selected_id = filename;
     }
     ImGui::PopID();
+}
+
+struct SceneEditorState {
+    std::string new_id;
+    std::string new_name;
+    std::string open_id;
+    std::string edited_name;
+    std::string map_id;
+    std::string mount_id;
+    int selected_map{-1};
+    std::string transition_id;
+    std::string target_scene_id;
+    std::string entry_point;
+    std::string event_id;
+    int selected_transition{-1};
+};
+
+void draw_scene_editor(fabric::editor::SceneSession& session,
+                       const std::filesystem::path& project_root,
+                       SDL_Window* window, SceneEditorState& state,
+                       std::string& status,
+                       std::vector<fabric::project::Error>& package_errors) {
+    ImGui::Begin("Scene Studio");
+    if (project_root.empty()) {
+        ImGui::TextDisabled("Open a project map to author its scenes.");
+        ImGui::End();
+        return;
+    }
+    const auto loaded_manifest = fabric::project::load_manifest(project_root);
+    if (!loaded_manifest.ok()) {
+        ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                           "Project manifest unavailable");
+        ImGui::End();
+        return;
+    }
+    const auto maps_directory = project_root /
+        loaded_manifest.manifest->directories.maps;
+    const auto scenes_directory = project_root /
+        loaded_manifest.manifest->directories.scenes;
+
+    ImGui::SeparatorText("Create or open");
+    ImGui::SetNextItemWidth(150.0F);
+    ImGui::InputText("Scene id", &state.new_id);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(180.0F);
+    ImGui::InputText("Scene name", &state.new_name);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
+    if (ImGui::Button("Create scene")) {
+        const fabric::project::SceneDocument scene{
+            .document = {.schema_version = 1, .type = "scene",
+                         .id = {.value = state.new_id},
+                         .name = state.new_name}};
+        const auto created = session.create(project_root, scene);
+        status = created ? "Scene created" : "Scene creation rejected";
+        if (created) {
+            state.open_id = state.new_id;
+            state.edited_name = state.new_name;
+            state.new_id.clear();
+            state.new_name.clear();
+        }
+    }
+    ImGui::EndDisabled();
+    ImGui::SetNextItemWidth(180.0F);
+    ImGui::InputText("Existing scene", &state.open_id);
+    draw_resource_picker("Scenes:", scenes_directory, ".scene.json",
+                         state.open_id);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(state.open_id.empty());
+    if (ImGui::Button("Open scene")) {
+        const auto opened = session.open(
+            project_root, {.value = state.open_id});
+        status = opened ? "Scene opened" : "Scene open rejected";
+        if (opened) {
+            state.edited_name = session.scene()->document.name;
+            state.selected_transition = -1;
+        }
+    }
+    ImGui::EndDisabled();
+
+    if (!session.has_scene()) {
+        draw_scene_errors(session);
+        ImGui::End();
+        return;
+    }
+    if (session.has_recovery()) {
+        ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
+                           "A newer valid scene autosave is available.");
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Recover scene")) {
+            if (session.accept_recovery()) {
+                state.edited_name = session.scene()->document.name;
+                status = "Scene autosave recovered";
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Dismiss scene recovery"))
+            session.decline_recovery();
+    }
+
+    const auto scene_id = session.scene()->document.id;
+    ImGui::SeparatorText("Scene document");
+    ImGui::Text("%s (%s)%s", session.scene()->document.name.c_str(),
+                scene_id.value.c_str(), session.dirty() ? " · dirty" : "");
+    if (state.edited_name.empty())
+        state.edited_name = session.scene()->document.name;
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::InputText("Name", &state.edited_name,
+                         ImGuiInputTextFlags_EnterReturnsTrue))
+        status = session.set_name(state.edited_name)
+            ? "Scene name changed" : "Scene name rejected";
+    if (ImGui::Button("Save scene"))
+        status = session.save() ? "Scene saved" : "Scene save failed";
+    ImGui::SameLine();
+    if (ImGui::Button("Validate campaign")) {
+        if (!session.dirty() || session.save()) {
+            const auto planned = fabric::project::plan_scene_package(
+                project_root, scene_id);
+            package_errors = planned.errors;
+            status = planned.ok() ? "Campaign package valid"
+                                  : "Campaign validation failed";
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Publish campaign")) {
+        if (!session.dirty() || session.save()) {
+            if (const auto parent = choose_folder(window, status)) {
+                const auto destination = *parent /
+                    (scene_id.value + ".scene-package");
+                const auto published = fabric::project::publish_scene_package(
+                    project_root, scene_id, destination);
+                package_errors = published.errors;
+                status = published.ok()
+                    ? "Campaign published: " + destination.string()
+                    : "Campaign publication failed";
+            }
+        }
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!session.can_undo());
+    if (ImGui::Button("Undo scene")) static_cast<void>(session.undo());
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!session.can_redo());
+    if (ImGui::Button("Redo scene")) static_cast<void>(session.redo());
+    ImGui::EndDisabled();
+
+    ImGui::SeparatorText("Mounted maps");
+    ImGui::SetNextItemWidth(170.0F);
+    ImGui::InputText("Map", &state.map_id);
+    draw_resource_picker("Maps:", maps_directory, ".map.json", state.map_id);
+    ImGui::SetNextItemWidth(170.0F);
+    ImGui::InputText("Mount id", &state.mount_id);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(state.map_id.empty() || state.mount_id.empty());
+    if (ImGui::Button(state.selected_map < 0 ? "Add mounted map"
+                                             : "Apply mounted map")) {
+        const fabric::project::SceneMapReference edited{
+            {{.value = state.map_id}, "map"}, state.mount_id};
+        const auto applied = state.selected_map < 0
+            ? session.add_map(edited)
+            : session.set_map(static_cast<std::size_t>(state.selected_map),
+                              edited);
+        status = applied ? "Scene map updated" : "Map mount rejected";
+        if (applied) {
+            state.map_id.clear();
+            state.mount_id.clear();
+            state.selected_map = -1;
+        }
+    }
+    ImGui::EndDisabled();
+    for (std::size_t index = 0; index < session.scene()->maps.size(); ++index) {
+        const auto map = session.scene()->maps[index];
+        ImGui::PushID(static_cast<int>(index));
+        const bool entry = session.scene()->entry_map &&
+            session.scene()->entry_map->id == map.map.id;
+        if (ImGui::RadioButton("##entry", entry))
+            static_cast<void>(session.set_entry_map(map.map.id));
+        ImGui::SameLine();
+        ImGui::Text("%s → %s", map.map.id.value.c_str(),
+                    map.layer_id.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Edit map mount")) {
+            state.selected_map = static_cast<int>(index);
+            state.map_id = map.map.id.value;
+            state.mount_id = map.layer_id;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove map")) {
+            status = session.remove_map(index) ? "Map removed from scene"
+                                               : "Map removal rejected";
+            state.selected_map = -1;
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    if (session.scene()->entry_map) {
+        ImGui::TextDisabled("Entry map: %s",
+                            session.scene()->entry_map->id.value.c_str());
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Clear entry map"))
+            static_cast<void>(session.set_entry_map(std::nullopt));
+    }
+
+    ImGui::SeparatorText("Transitions");
+    ImGui::SetNextItemWidth(150.0F);
+    ImGui::InputText("Transition id", &state.transition_id);
+    ImGui::SetNextItemWidth(170.0F);
+    ImGui::InputText("Target scene", &state.target_scene_id);
+    draw_resource_picker("Target scenes:", scenes_directory, ".scene.json",
+                         state.target_scene_id);
+    ImGui::SetNextItemWidth(160.0F);
+    ImGui::InputText("Entry point", &state.entry_point);
+    ImGui::SetNextItemWidth(160.0F);
+    ImGui::InputText("Event (optional)", &state.event_id);
+    const auto transition_from_state = [&] {
+        return fabric::project::SceneTransition{
+            state.transition_id,
+            {{.value = state.target_scene_id}, "scene"},
+            state.entry_point,
+            state.event_id.empty()
+                ? std::nullopt
+                : std::optional<fabric::core::ResourceId>{
+                      {.value = state.event_id}}};
+    };
+    ImGui::BeginDisabled(state.transition_id.empty() ||
+                         state.target_scene_id.empty() ||
+                         state.entry_point.empty());
+    if (state.selected_transition < 0) {
+        if (ImGui::Button("Add transition")) {
+            const auto added = session.add_transition(transition_from_state());
+            status = added ? "Transition added" : "Transition rejected";
+        }
+    } else if (ImGui::Button("Apply transition")) {
+        const auto applied = session.set_transition(
+            static_cast<std::size_t>(state.selected_transition),
+            transition_from_state());
+        status = applied ? "Transition changed" : "Transition rejected";
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::SmallButton("New transition")) {
+        state.selected_transition = -1;
+        state.transition_id.clear();
+        state.target_scene_id.clear();
+        state.entry_point.clear();
+        state.event_id.clear();
+    }
+    for (std::size_t index = 0; index < session.scene()->transitions.size();
+         ++index) {
+        const auto transition = session.scene()->transitions[index];
+        ImGui::PushID(static_cast<int>(index));
+        const auto label = transition.id + " → " +
+            transition.target_scene.id.value + ":" + transition.entry_point;
+        if (ImGui::Selectable(label.c_str(),
+                              state.selected_transition ==
+                                  static_cast<int>(index))) {
+            state.selected_transition = static_cast<int>(index);
+            state.transition_id = transition.id;
+            state.target_scene_id = transition.target_scene.id.value;
+            state.entry_point = transition.entry_point;
+            state.event_id = transition.event_id
+                ? transition.event_id->value : "";
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove transition")) {
+            status = session.remove_transition(index)
+                ? "Transition removed" : "Transition removal rejected";
+            state.selected_transition = -1;
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    draw_package_errors(package_errors);
+    draw_scene_errors(session);
+    ImGui::End();
 }
 
 std::string collision_shape_text(const fabric::project::CollisionShape& shape) {
@@ -1436,7 +1724,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
 
 int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id,
-        const std::optional<CloseE2eMode> e2e_mode = std::nullopt) {
+        const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
+        const bool scene_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -1461,7 +1750,7 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        (e2e_mode ? SDL_WINDOW_HIDDEN : 0U);
+        (e2e_mode || scene_e2e ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
         window_flags);
@@ -1493,8 +1782,10 @@ int run(const std::filesystem::path& project_root,
 
     fabric::editor::MapSession session;
     fabric::editor::MechanicSession mechanic_session;
+    fabric::editor::SceneSession scene_session;
     fabric::editor::SessionTransitionGuard transition_guard;
     MechanicEditorState mechanic_editor;
+    SceneEditorState scene_editor;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
     if (!map_renderer.initialize()) {
@@ -1525,6 +1816,43 @@ int run(const std::filesystem::path& project_root,
         std::cerr << "Map Studio close E2E: " << message << '\n';
         e2e_failed = true;
     };
+    bool scene_e2e_complete = false;
+    if (scene_e2e) {
+        if (!session.has_map()) {
+            fail_e2e("scene fixture map could not be opened");
+        } else {
+            const fabric::project::SceneDocument scene{
+                .document = {.schema_version = 1, .type = "scene",
+                             .id = {.value = "scene-studio-e2e"},
+                             .name = "Scene Studio E2E"}};
+            const auto destination = project_root.parent_path() /
+                "scene-studio-e2e.scene-package";
+            const bool authored = scene_session.create(project_root, scene) &&
+                scene_session.add_map({{map_id, "map"}, "world"}) &&
+                scene_session.set_entry_map(map_id) &&
+                scene_session.add_transition(
+                    {"loop", {{.value = "scene-studio-e2e"}, "scene"},
+                     "start", std::nullopt}) &&
+                scene_session.save();
+            const auto published = authored
+                ? fabric::project::publish_scene_package(
+                      project_root, scene.document.id, destination)
+                : fabric::project::ScenePackagePublishResult{};
+            fabric::editor::SceneSession reloaded;
+            if (!authored || !published.ok() ||
+                !reloaded.open(project_root, scene.document.id) ||
+                reloaded.scene()->maps.size() != 1U ||
+                reloaded.scene()->transitions.size() != 1U ||
+                !std::filesystem::is_regular_file(
+                    destination /
+                    fabric::project::scene_package_manifest_filename)) {
+                fail_e2e("scene authoring, reload or publication failed");
+            } else {
+                scene_e2e_complete = true;
+                status = "Scene E2E authored and published";
+            }
+        }
+    }
     if (e2e_mode) {
         if (!session.has_map() || !session.manifest()) {
             fail_e2e("fixture map could not be opened");
@@ -1627,7 +1955,8 @@ int run(const std::filesystem::path& project_root,
                  event.window.windowID == SDL_GetWindowID(window))) {
                 transition_guard.request(
                     fabric::editor::SessionAction::quit,
-                    session.dirty() || mechanic_session.dirty());
+                    session.dirty() || mechanic_session.dirty() ||
+                        scene_session.dirty());
             }
         }
         ImGui_ImplOpenGL3_NewFrame();
@@ -1638,6 +1967,9 @@ int run(const std::filesystem::path& project_root,
         if (mechanic_session.update_autosave() ==
             fabric::editor::AutosaveStatus::failed)
             status = "Mechanic autosave failed";
+        if (scene_session.update_autosave() ==
+            fabric::editor::AutosaveStatus::failed)
+            status = "Scene autosave failed";
         if (mechanic_session.simulation().playing())
             static_cast<void>(mechanic_session.update_preview(ImGui::GetIO().DeltaTime));
         ImGui::SetNextWindowPos({0.0F, 0.0F}, ImGuiCond_Always);
@@ -2272,6 +2604,8 @@ int run(const std::filesystem::path& project_root,
         }
         ImGui::End();
         draw_mechanic_editor(mechanic_session, session, mechanic_editor, status);
+        draw_scene_editor(scene_session, project_root, window, scene_editor,
+                          status, package_errors);
 
         if (const auto ready = transition_guard.take_ready();
             ready == fabric::editor::SessionAction::quit) {
@@ -2292,6 +2626,11 @@ int run(const std::filesystem::path& project_root,
                                   mechanic_session.graph()
                                       ? mechanic_session.graph()->document.name.c_str()
                                       : "current mechanic");
+            if (scene_session.dirty())
+                ImGui::BulletText("Scene: %s",
+                                  scene_session.scene()
+                                      ? scene_session.scene()->document.name.c_str()
+                                      : "current scene");
             if (e2e_mode && !e2e_modal_handled) {
                 if (!transition_guard.confirmation_required() ||
                     !session.dirty() ||
@@ -2359,6 +2698,8 @@ int run(const std::filesystem::path& project_root,
                 bool saved = true;
                 if (mechanic_session.dirty()) saved = mechanic_session.save();
                 if (saved && session.dirty()) saved = session.save();
+                if (saved && scene_session.dirty())
+                    saved = scene_session.save();
                 if (saved) {
                     ImGui::CloseCurrentPopup();
                     if (transition_guard.resolve(
@@ -2397,6 +2738,7 @@ int run(const std::filesystem::path& project_root,
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+        if (scene_e2e) running = false;
     }
 
     for (const auto& [_, texture] : map_textures) {
@@ -2410,23 +2752,28 @@ int run(const std::filesystem::path& project_root,
     SDL_DestroyWindow(window);
     NFD_Quit();
     SDL_Quit();
-    return e2e_failed ? 1 : 0;
+    return e2e_failed || (scene_e2e && !scene_e2e_complete) ? 1 : 0;
 }
 
 } // namespace
 
 int main(int argc, char** argv) {
     const bool e2e = argc == 5 && std::string_view{argv[1]} == "--e2e-close";
+    const bool scene_e2e = argc == 4 &&
+        std::string_view{argv[1]} == "--e2e-scene";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
-    if ((argc != 1 && argc != 3 && !e2e) || (e2e && !e2e_mode)) {
+    if ((argc != 1 && argc != 3 && !e2e && !scene_e2e) ||
+        (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
-                     "<window|shortcut|save-failure> project-directory map-id\n";
+                     "<window|shortcut|save-failure> project-directory map-id\n"
+                     "       map_studio --e2e-scene project-directory map-id\n";
         return 64;
     }
-    const std::filesystem::path project = e2e
-        ? argv[3] : argc == 3 ? argv[1] : std::filesystem::path{};
+    const std::filesystem::path project = e2e ? argv[3]
+        : scene_e2e ? argv[2]
+        : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
-        e2e ? argv[4] : argc == 3 ? argv[2] : ""};
-    return run(project, map_id, e2e_mode);
+        e2e ? argv[4] : scene_e2e ? argv[3] : argc == 3 ? argv[2] : ""};
+    return run(project, map_id, e2e_mode, scene_e2e);
 }

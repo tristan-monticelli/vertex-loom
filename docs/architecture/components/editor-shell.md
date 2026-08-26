@@ -14,6 +14,7 @@ C4Component
     Container_Boundary(editor, "fabric_editor") {
         Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
         Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph ou prévisualise sa configuration de prefab, puis pilote Box2D, le personnage de test et les overlays de cycle de vie")
+        Component(scene_session, "SceneSession", "C++20", "Édite maps montées, map d'entrée et transitions d'un SceneDocument avec historique et récupération")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
         Component(presets, "Visual preset factory", "C++20", "Produit des bundles déterministes œil, bouton, couture et fermeture à partir des contrats visuels génériques")
         Component(history, "CommandStack", "C++20", "Exécute, fusionne, annule et réapplique les modifications réversibles")
@@ -40,8 +41,11 @@ C4Component
     Rel(session, history, "Porte les mutations éditables")
     Rel(session, scheduler, "Signale les modifications")
     Rel(shell, mechanic_session, "Édite, inspecte et contrôle la simulation")
+    Rel(shell, scene_session, "Crée, ouvre et édite les campagnes de scènes")
     Rel(mechanic_session, history, "Porte les mutations du graphe")
     Rel(mechanic_session, scheduler, "Signale les modifications")
+    Rel(scene_session, history, "Porte les mutations de scène")
+    Rel(scene_session, scheduler, "Signale les modifications")
     Rel(shell, transition, "Demande une transition")
     Rel(scheduler, project, "Demande un autosave validé")
     Rel(project, files, "Lit et écrit")
@@ -71,6 +75,10 @@ C4Component
 - `MapSession` sauvegarde également la map dirty avant de créer ou d'ouvrir une
   autre map ; une cible invalide est chargée et validée avant de toucher à la
   session courante.
+- `SceneSession` applique le même shell de document aux scènes. Map Studio
+  expose création et ouverture, références de maps avec mount stable, map
+  d'entrée, transitions événementielles, undo/redo, autosave, récupération,
+  validation et publication d'une campagne portable.
 - La création demande un nom et un dossier parent existant. Le dossier projet
   final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
   vide ; le dossier parent peut contenir d'autres fichiers.

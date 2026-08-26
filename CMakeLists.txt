@@ -206,6 +206,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/mechanic_presets.cpp
     engine/fabric_editor/src/mechanic_session.cpp
     engine/fabric_editor/src/project_session.cpp
+    engine/fabric_editor/src/scene_session.cpp
     engine/fabric_editor/src/session_transition.cpp
     engine/fabric_editor/src/visual_presets.cpp
 )
@@ -447,6 +448,13 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_runtime Catch2::Catch2WithMain)
     add_test(NAME fabric_scene_session_tests COMMAND fabric_scene_session_tests)
 
+    add_executable(fabric_scene_editor_session_tests
+        tests/cpp/scene_editor_session_tests.cpp)
+    target_link_libraries(fabric_scene_editor_session_tests PRIVATE
+        fabric_editor Catch2::Catch2WithMain)
+    add_test(NAME fabric_scene_editor_session_tests
+             COMMAND fabric_scene_editor_session_tests)
+
     add_executable(fabric_progress_save_tests tests/cpp/progress_save_tests.cpp)
     target_link_libraries(fabric_progress_save_tests PRIVATE
         fabric_project Catch2::Catch2WithMain)
@@ -476,6 +484,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-close-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_close_e2e.cmake
+        )
+        add_test(
+            NAME map_studio_scene_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-scene-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_scene_e2e.cmake
         )
     endif()
 
