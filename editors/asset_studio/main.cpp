@@ -105,6 +105,9 @@ struct CreationUiState {
     bool request_behavior{};
     bool request_transformation{};
     bool project_publish_attempted{};
+    bool input_capture{};
+    std::size_t input_capture_action{};
+    std::size_t input_capture_binding{};
 };
 
 #if defined(__APPLE__)
@@ -5391,6 +5394,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::InputInt("Code", &binding.code);
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
+                ImGui::SameLine();
+                if (ImGui::SmallButton("Capture next")) {
+                    creation.input_capture = true;
+                    creation.input_capture_action = action_index;
+                    creation.input_capture_binding = binding_index;
+                }
                 ImGui::PopID();
             }
             if (ImGui::Button("Add binding"))
@@ -5404,6 +5413,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 id = "action_" + std::to_string(suffix++);
             creation.input.actions.push_back({std::move(id), {}});
         }
+        if (creation.input_capture)
+            ImGui::TextColored({1.0F, 0.8F, 0.2F, 1.0F}, "Press a key or gamepad button…");
         const auto validation = creation.input.validate(
             session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
@@ -5793,6 +5804,30 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     while (running) {
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
+            if (creation.input_capture) {
+                if (event.type == SDL_KEYDOWN && event.key.repeat == 0) {
+                    auto& actions = creation.input.actions;
+                    if (creation.input_capture_action < actions.size() &&
+                        creation.input_capture_binding < actions[creation.input_capture_action].bindings.size()) {
+                        auto& binding = actions[creation.input_capture_action].bindings[creation.input_capture_binding];
+                        binding.device = fabric::project::InputDevice::keyboard;
+                        binding.code = event.key.keysym.sym;
+                        creation.input_capture = false;
+                    }
+                    continue;
+                }
+                if (event.type == SDL_CONTROLLERBUTTONDOWN) {
+                    auto& actions = creation.input.actions;
+                    if (creation.input_capture_action < actions.size() &&
+                        creation.input_capture_binding < actions[creation.input_capture_action].bindings.size()) {
+                        auto& binding = actions[creation.input_capture_action].bindings[creation.input_capture_binding];
+                        binding.device = fabric::project::InputDevice::gamepad;
+                        binding.code = static_cast<int>(event.cbutton.button);
+                        creation.input_capture = false;
+                    }
+                    continue;
+                }
+            }
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT ||
                 (event.type == SDL_WINDOWEVENT &&

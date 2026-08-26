@@ -466,7 +466,7 @@ et ne dépend jamais de l'ordre antérieur des clics.
 - [x] Ajouter Add, Duplicate, Reorder et Remove dans la modale de création.
 - [x] Générer des identifiants uniques au lieu de répéter `action`.
 - [ ] Empêcher qu'un nouvel item invalide rende toute la modale incompréhensible.
-- [ ] Ajouter capture interactive de la prochaine touche ou du prochain bouton.
+- [x] Ajouter capture interactive de la prochaine touche ou du prochain bouton.
 - [ ] Ajouter axes, seuils et dead zones.
 - [ ] Ajouter combinaisons et modificateurs.
 - [ ] Ajouter contextes ou profils si leur besoin est confirmé par ADR.
