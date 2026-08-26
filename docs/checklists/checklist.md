@@ -324,7 +324,7 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 
 - [x] Déplacer ou reproduire l'explorateur dans le rail droit selon la maquette
   validée.
-- [ ] Garder un seul composant de navigation réutilisable dans tous les prompts.
+- [x] Garder un seul composant de navigation réutilisable dans tous les prompts.
 - [x] Afficher dossiers logiques, types, noms, identifiants et états dirty.
 - [x] Ajouter recherche insensible à la casse et filtres par type.
 - [x] Ajouter navigation clavier et sélection persistante.
@@ -338,7 +338,7 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
   - [x] Copy ID ;
   - [x] Copy path ;
   - [x] Delete.
-- [ ] Ajouter les mêmes actions dans un menu contextuel.
+- [x] Ajouter les mêmes actions dans un menu contextuel.
 - [x] Définir une commande générique de duplication par type de ressource.
 - [x] Générer un nouvel identifiant stable et un nouveau chemin à la duplication.
 - [ ] Permettre de choisir la copie superficielle ou la duplication de certaines
@@ -360,15 +360,15 @@ même rail sans saisie manuelle d'identifiants.
 
 ## 5 — Textures et browsing cohérent
 
-- [ ] Utiliser le picker recherchable commun dans tous les champs texture.
-- [ ] Remplacer la combo simple du prompt vectoriel.
-- [ ] Permettre de changer la texture d'un fill image après création.
-- [ ] Permettre de choisir une texture pour un matériau après création.
-- [ ] Permettre d'ajouter ou remplacer une texture sur un nœud d'entité.
+- [x] Utiliser le picker recherchable commun dans tous les champs texture.
+- [x] Remplacer la combo simple du prompt vectoriel.
+- [x] Permettre de changer la texture d'un fill image après création.
+- [x] Permettre de choisir une texture pour un matériau après création.
+- [x] Permettre d'ajouter ou remplacer une texture sur un nœud d'entité.
 - [ ] Afficher miniature, dimensions, format, chemin et dépendances.
 - [ ] Ajouter `Open in Resource Explorer` depuis chaque référence texture.
-- [ ] Conserver la source PNG byte-for-byte.
-- [ ] Garder crop, pivot, transform et filtrage non destructifs.
+- [x] Conserver la source PNG byte-for-byte.
+- [x] Garder crop, pivot, transform et filtrage non destructifs.
 - [ ] Rendre tous les paramètres de `RasterView` éditables après import.
 - [ ] Afficher simultanément source complète, crop actif et résultat final.
 - [ ] Tester navigation avec beaucoup de textures et noms similaires.
