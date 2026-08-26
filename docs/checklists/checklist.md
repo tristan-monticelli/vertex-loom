@@ -441,7 +441,7 @@ rail droit sans recréation ni édition JSON.
 - [x] Ne jamais conserver silencieusement une entité sélectionnée précédemment.
 - [x] Lister les nœuds réels de l'entité cible au lieu de demander `Node id` en
   texte libre.
-- [ ] Construire les propriétés depuis le registre de descripteurs de la cible.
+- [x] Construire les propriétés depuis le registre de descripteurs de la cible.
 - [ ] Exposer transform, matériau, fill, image fill et paramètres de composant.
 - [ ] Signaler immédiatement les bindings devenus invalides.
 - [ ] Ajouter une action pour réparer ou remplacer un binding invalide.
