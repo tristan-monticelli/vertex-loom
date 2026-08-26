@@ -5535,7 +5535,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("The current project has unsaved changes.");
         ImGui::TextWrapped(
             "Save them before replacing the project or closing Asset Studio?");
-        if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
+        if (ImGui::Button("Retry save and continue", {170.0F, 0.0F})) {
             if (session.save() &&
                 (!behavior_session.dirty() || behavior_session.save()) &&
                 (!transformation_session.dirty() ||
