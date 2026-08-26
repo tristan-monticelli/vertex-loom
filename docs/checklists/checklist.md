@@ -1,5 +1,170 @@
 # Checklist de remise à niveau complète du Studio
 
+## Audit complet du 26 août 2026
+
+### Périmètre et verdict
+
+- [x] Contrats projet, stockage, validation et publication inspectés.
+- [x] Boucle `game_runtime`, scènes, progression, triggers, physique, replay,
+  audio, caméra et packaging inspectés.
+- [x] Parcours Asset Studio et Map Studio inspectés dans le code.
+- [x] Architecture C4, ADR, stratégie qualité, hooks et tests inspectés.
+- [ ] Parcours graphiques exécutés avec un outil end-to-end : les binaires SDL
+  locaux ne sont pas exposés au contrôleur d'applications macOS et le projet ne
+  possède pas encore de harnais UX automatisé.
+
+Verdict : **MANQUE**. Le socle de contrats et de stockage est solide, mais le
+moteur n'est pas encore cohérent de bout en bout. Des fonctions déclarées dans
+les contrats ou les ADR ne sont pas consommées par le runtime, et plusieurs
+parcours d'édition peuvent bloquer ou perdre le contexte de travail.
+
+### Défauts P0 — corriger avant toute nouvelle fonctionnalité
+
+- [ ] **Empêcher l'écrasement destructif des sauvegardes de progression.**
+  `game/runtime/main.cpp` charge un slot existant sans appliquer son contenu,
+  puis sauvegarde un nouvel objet sans recopier `properties`. Un simple
+  lancement suivi d'une fermeture efface donc les propriétés persistées.
+- [ ] Restaurer la scène enregistrée et les propriétés du slot avant de lancer
+  le runtime.
+- [ ] Permettre de reprendre avec `--save-slot` sans imposer une seconde fois
+  `--scene`.
+- [ ] Ajouter un test d'intégration du binaire : slot existant → lancement →
+  fermeture → contenu identique hors mutations explicites.
+- [ ] **Instancier les `MechanicGraph` dans Preview Runtime.** Map Studio les
+  édite et les simule, les paquets les publient, mais `PreviewRuntime` ne charge
+  ni ne compile les mécaniques référencées par les prefabs.
+- [ ] Supprimer l'affirmation « Preview Runtime instancie exactement le graphe »
+  de l'ADR-0106 et du C4 tant que la tranche runtime n'est pas réellement
+  livrée, ou livrer la tranche avant de conserver cette affirmation.
+- [ ] Ajouter un test paquet → runtime qui prouve le mouvement réel d'une
+  plateforme mécanique, pas seulement la compilation isolée de son graphe.
+- [ ] **Protéger la fermeture de Map Studio.** `SDL_QUIT` ferme immédiatement la
+  boucle sans décision Save/Discard/Cancel pour la map ou la mécanique dirty.
+- [ ] Tester fermeture fenêtre, raccourci système et erreur de sauvegarde avec
+  conservation du document principal et de l'autosave.
+
+### Défauts P1 — logique du moteur incomplète ou contradictoire
+
+- [ ] Charger toutes les `SceneMapReference` d'une scène au lieu de charger
+  uniquement `entry_map`.
+- [ ] Définir et appliquer la sémantique de `SceneMapReference.layer_id`,
+  actuellement sérialisé mais ignoré.
+- [ ] Appliquer `SceneTransition.entry_point` lors d'une transition ; ce champ
+  est actuellement persisté puis ignoré par `SceneRuntimeSession`.
+- [ ] Ajouter un Scene Studio ou un éditeur de scènes intégré. Les scènes et
+  transitions n'ont aujourd'hui aucun parcours d'authoring graphique.
+- [ ] Publier une unité capable de contenir scènes et transitions. Le paquet
+  portable actuel a une map racine et ne peut pas exécuter une campagne de
+  scènes depuis `--package`.
+- [ ] Refuser un trigger lié à une collision `chain`, ou implémenter sa
+  sémantique : le validateur l'accepte alors que `TriggerRuntime::contains`
+  retourne toujours `false` pour ce type.
+- [ ] Définir si une collision de trigger doit être un sensor et rendre le
+  validateur, Box2D et le runtime cohérents sur cette règle.
+- [ ] Détecter une zone avec la forme physique de l'entité, pas seulement avec
+  le point central du personnage générique.
+- [ ] Permettre aux joueurs, monstres et autres entités de produire des entrées
+  et sorties de zones ; les triggers ne sont mis à jour que si `--character`
+  est actif.
+- [ ] Consommer ou supprimer `TriggerDefinition.properties`. Le runtime publie
+  uniquement le payload de `MapEventDefinition` et ignore les propriétés
+  propres au trigger.
+- [ ] Définir un système de comportements attachable aux entités, séparé des
+  bindings physiques, puis l'utiliser pour le joueur comme pour les monstres.
+- [ ] Retirer le couplage runtime aux trois actions codées en dur
+  `move_left`, `move_right` et `jump`.
+- [ ] Ajouter les transformations atomiques d'une instance d'entité A vers B,
+  avec politique explicite de transfert d'état.
+- [ ] Rendre personnage, spawn, caméra, limites et audio authorables dans le
+  projet. Ils sont aujourd'hui principalement injectés par options CLI.
+- [ ] Définir un contrat audio projet avec ressources, événements, volume,
+  boucle et mixage ; `--audio <wav>` ne représente pas un pipeline de jeu.
+- [ ] Donner un contenu réel aux couches `tiles`, `visual` et `gameplay`, ou les
+  retirer de l'interface. Le contrat map les propose mais ne stocke aucun tile
+  ni contenu spécialisé pour ces couches.
+
+### Défauts P1 — parcours Studio
+
+- [ ] Remplacer le blocage de `ProjectSession::select_resource` lorsque le
+  document est dirty par la transition commune Save/Discard/Cancel.
+- [ ] Appliquer la même transition aux créations et imports ; les méthodes de
+  création refusent actuellement l'action avec « save current changes ».
+- [ ] Rendre le matériau sélectionné modifiable. Il est chargeable et
+  créable, mais absent de `DirtyDocument`, de `save`, de l'autosave et de
+  l'inspecteur d'édition.
+- [ ] Rendre le drawable d'un nœud d'entité modifiable après création : kind,
+  ressource, matériau, composant, variante, overrides, visibilité et verrou.
+- [ ] Ajouter explicitement une entité cible lors de la création d'une
+  animation et permettre de changer cette cible depuis l'inspecteur.
+- [ ] Ne plus utiliser la dernière entité sélectionnée comme cible implicite de
+  preview d'une animation.
+- [ ] Transformer le Project tree en explorateur de ressources administrable.
+  Il reste une liste plate à gauche sans Duplicate, Rename, Reveal, Copy ID,
+  analyse des références ni Delete sécurisé.
+- [ ] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
+- [ ] Remplacer les identifiants texte libres de Map Studio par des pickers
+  typés et recherchables pour entités, prefabs, mécaniques et événements.
+- [ ] Permettre d'ouvrir et de créer une map depuis Map Studio. Sans arguments
+  CLI, l'interface affiche seulement la commande à relancer.
+- [ ] Ajouter confirmations et analyse d'impact avant les suppressions de
+  nœuds, collisions, triggers, événements et autres ressources.
+- [ ] Synchroniser les états dirty de la map et de la mécanique dans un shell
+  de document explicite ; ils ont actuellement deux historiques indépendants
+  sans garde de fermeture commune.
+
+### Défauts P2 — vectoriel, input et ergonomie détaillée
+
+- [x] Le prompt Input permet maintenant d'ajouter plusieurs actions et
+  plusieurs bindings.
+- [ ] Ajouter Remove et Duplicate dans ce même prompt ; la suppression n'est
+  disponible qu'après création.
+- [ ] Remplacer les codes numériques de touches par capture interactive et
+  libellés lisibles ; ajouter axes, dead zones et seuils gamepad.
+- [x] Un vectoriel natif sélectionné expose nom, parent, clip, transform et une
+  partie des paramètres de fill image après création.
+- [ ] Ajouter Add, Duplicate, Reorder et Delete pour les nœuds vectoriels.
+- [ ] Éditer bounds, points, commandes de path et poignées Bézier directement
+  sur le canvas du `VectorAsset`. L'éditeur « Pen and attachments » existant
+  appartient à `TexturedPath` et ne remplace pas cet éditeur.
+- [ ] Permettre de changer le type du fill après création et de choisir ou
+  remplacer sa texture avec le picker commun.
+- [ ] Exposer ajout, retrait, couleur, largeur, join et cap du stroke.
+- [ ] Afficher les erreurs au niveau du champ dans Map Studio ; plusieurs
+  formulaires utilisent encore un statut global et des valeurs texte parsées.
+- [ ] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
+  hiérarchisés, redimensionnables et focalisés sur la sélection courante.
+
+### Qualité, architecture et maintenabilité
+
+| Statut | Contrôle | Preuve |
+| --- | --- | --- |
+| CONFORME | Projet initialisé et doctrine disponible | `.project/project-config.json`, `AGENTS.md`, `CLAUDE.md` |
+| CONFORME | Écritures projet atomiques et validation stricte | contrats `fabric_project`, tests de stockage et publication |
+| CONFORME | Défenses de chemins et fermeture transitive des paquets | tests traversal, symlink et `map_package_tests.cpp` |
+| CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession` et tests headless |
+| MANQUE | End-to-end graphique | `docs/02-quality-strategy.md` indique « Plus tard » et aucune commande réelle |
+| MANQUE | Intégration progression dans `game_runtime` | les tests couvrent seulement `ProgressStore` isolé |
+| MANQUE | Intégration mécanique dans Preview Runtime | aucune utilisation de `MechanicSimulation` dans `fabric_runtime` |
+| MANQUE | Fidélité du modèle Scene au runtime | `maps`, `layer_id` et `entry_point` ne sont pas appliqués |
+| MANQUE | Architecture fidèle au code | le C4 et l'ADR-0106 présentent la mécanique runtime comme livrée |
+| MANQUE | Modularité des interfaces | `asset_studio/main.cpp` dépasse 4 000 lignes et `map_studio/main.cpp` 2 000 lignes |
+| N/A | Backend, compte et réseau | produit local sans backend dans le périmètre actuel |
+
+### Ordre de correction issu du nouvel audit
+
+- [ ] Lot A : non-régression des slots et reprise réelle.
+- [ ] Lot B : garde dirty commune Asset Studio / Map Studio / mécaniques.
+- [ ] Lot C : exécution runtime des mécaniques publiées.
+- [ ] Lot D : scènes multi-maps, entry points et paquet de scènes.
+- [ ] Lot E : triggers cohérents avec les formes et toutes les entités.
+- [ ] Lot F : BehaviorGraph, monstres et transformations d'entités.
+- [ ] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
+- [ ] Lot H : vectoriel complet, input avancé et tests UX end-to-end.
+
+Gate : aucun lot suivant ne commence tant que les tests du lot courant ne
+prouvent pas le même comportement après sauvegarde, reload et exécution dans le
+runtime publié.
+
 ## Règle de fermeture
 
 Une case fonctionnelle ne peut être cochée que lorsque le même parcours est :
