@@ -66,11 +66,13 @@ std::vector<fabric::project::EntityTransformation> load_transformations(
     return result;
 }
 
-enum class CloseE2eMode { window, system_shortcut, save_failure };
+enum class CloseE2eMode { clean, window, system_shortcut, save, save_failure };
 
 std::optional<CloseE2eMode> close_e2e_mode(const std::string_view value) {
+    if (value == "clean") return CloseE2eMode::clean;
     if (value == "window") return CloseE2eMode::window;
     if (value == "shortcut") return CloseE2eMode::system_shortcut;
+    if (value == "save") return CloseE2eMode::save;
     if (value == "save-failure") return CloseE2eMode::save_failure;
     return std::nullopt;
 }
@@ -2048,7 +2050,7 @@ int run(const std::filesystem::path& project_root,
                 fail_e2e("isolated transformation preview did not preserve the map");
         }
     }
-    if (e2e_mode) {
+    if (e2e_mode && *e2e_mode != CloseE2eMode::clean) {
         if (!session.has_map() || !session.manifest()) {
             fail_e2e("fixture map could not be opened");
         } else if (!session.declare_event({
@@ -3137,6 +3139,14 @@ int run(const std::filesystem::path& project_root,
                     read_binary_file(e2e_primary_path) != e2e_primary_contents ||
                     read_binary_file(e2e_autosave_path) != e2e_autosave_contents) {
                     fail_e2e("close request changed the active document or autosave");
+                } else if (*e2e_mode == CloseE2eMode::save) {
+                    const bool saved = session.save();
+                    if (!saved || session.dirty() ||
+                        transition_guard.resolve(
+                            fabric::editor::UnsavedDecision::save, true) !=
+                            fabric::editor::SessionAction::quit)
+                        fail_e2e("Save did not finish the close request");
+                    running = false;
                 } else if (*e2e_mode != CloseE2eMode::save_failure) {
                     static_cast<void>(transition_guard.resolve(
                         fabric::editor::UnsavedDecision::cancel));
@@ -3271,7 +3281,7 @@ int main(int argc, char** argv) {
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
-                     "<window|shortcut|save-failure> project-directory map-id\n"
+                     "<clean|window|shortcut|save|save-failure> project-directory map-id\n"
                      "       map_studio --e2e-scene project-directory map-id\n"
                      "       map_studio --e2e-transformation "
                      "project-directory map-id\n";

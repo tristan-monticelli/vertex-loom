@@ -6,7 +6,7 @@ endif()
 file(REMOVE_RECURSE "${TEST_ROOT}")
 file(MAKE_DIRECTORY "${TEST_ROOT}")
 
-foreach(MODE IN ITEMS window shortcut save-failure)
+foreach(MODE IN ITEMS clean window shortcut save save-failure)
     set(PROJECT_ROOT "${TEST_ROOT}/${MODE}")
     file(COPY "${SOURCE_FIXTURE}/" DESTINATION "${PROJECT_ROOT}")
     execute_process(
@@ -25,10 +25,13 @@ foreach(MODE IN ITEMS window shortcut save-failure)
         "${PROJECT_ROOT}/maps/textile-head-preview.map.json")
     set(AUTOSAVE
         "${PROJECT_ROOT}/.vertex-loom/autosave/maps/textile-head-preview.map.json")
-    if(NOT EXISTS "${PRIMARY}" OR IS_DIRECTORY "${PRIMARY}" OR
-       NOT EXISTS "${AUTOSAVE}")
+    if(NOT EXISTS "${PRIMARY}" OR IS_DIRECTORY "${PRIMARY}")
         message(FATAL_ERROR
-            "Map Studio ${MODE} close did not preserve primary and autosave")
+            "Map Studio ${MODE} close did not preserve primary")
+    endif()
+    if(NOT MODE STREQUAL "clean" AND NOT EXISTS "${AUTOSAVE}")
+        message(FATAL_ERROR
+            "Map Studio ${MODE} close did not preserve autosave")
     endif()
     if(EXISTS "${PRIMARY}.e2e-backup")
         message(FATAL_ERROR "Map Studio ${MODE} left a backup behind")

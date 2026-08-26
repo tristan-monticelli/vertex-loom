@@ -59,6 +59,9 @@ Le workflow manuel `workflow_dispatch` exécute aussi
 macOS, Windows et Linux sous Xvfb, puis archive un rapport JSON par plateforme.
 Ses résultats servent à fermer le gate de performance ; ils ne sont pas
 exécutés sur chaque PR.
+Le parcours `map_studio_close_e2e` couvre aussi une fermeture propre et une
+fermeture avec sauvegarde réussie, en plus de Cancel/Discard et de l'échec de
+sauvegarde.
 Le chargeur PNG couvre un fichier RGBA valide, une extension
 incorrecte et un contenu corrompu sans initialiser de fenêtre. L'import de
 texture couvre le round-trip du document, les chemins traversants, la copie
