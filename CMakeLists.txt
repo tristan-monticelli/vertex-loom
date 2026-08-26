@@ -567,6 +567,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_vector_e2e.cmake
         )
         add_test(
+            NAME asset_studio_vector_canvas_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-vector-canvas-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_vector_canvas_e2e.cmake
+        )
+        add_test(
             NAME map_studio_close_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DMAP_STUDIO=$<TARGET_FILE:map_studio>

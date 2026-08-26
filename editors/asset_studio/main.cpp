@@ -1912,10 +1912,12 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     const auto command = fabric::project::VectorShape::PathCommand{
                         .kind = fabric::project::VectorPathCommandKind::line,
                         .point = local};
-                    if (fabric::project::insert_path_command(
-                            changed.shape, insert_index, command)) {
-                        static_cast<void>(session.set_selected_vector_node(
-                            canvas.selected_node, std::move(changed)));
+                    const bool inserted = fabric::project::insert_path_command(
+                        changed.shape, insert_index, command);
+                    const bool applied = inserted &&
+                        session.set_selected_vector_node(
+                            canvas.selected_node, std::move(changed));
+                    if (applied) {
                         canvas.selected_path_points = {insert_index};
                     }
                 }
@@ -6402,7 +6404,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool entity_e2e = false,
                      const bool animation_e2e = false,
                      const bool texture_e2e = false,
-                     const bool vector_e2e = false) {
+                     const bool vector_e2e = false,
+                     const bool vector_canvas_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -6430,7 +6433,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-              texture_e2e || vector_e2e)
+              texture_e2e || vector_e2e || vector_canvas_e2e)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -6792,6 +6795,31 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (!vector_e2e_complete)
             std::cerr << "Asset Studio Vector E2E failed\n";
     }
+    bool vector_canvas_e2e_complete = false;
+    std::size_t vector_canvas_e2e_frame = 0U;
+    std::size_t vector_canvas_e2e_initial_path_size = 0U;
+    if (vector_canvas_e2e && session.has_project()) {
+        const fabric::core::ResourceId vector_id{.value =
+            "head-button-artwork"};
+        const bool selected = session.select_resource(
+            fabric::editor::StudioResourceKind::vector, vector_id);
+        if (selected && session.created_vector() &&
+            session.created_vector()->native &&
+            !session.created_vector()->native->nodes.empty()) {
+            auto node = session.created_vector()->native->nodes.front();
+            const auto converted = fabric::project::path_commands_from_shape(
+                node.shape);
+            if (converted) {
+                node.shape.kind = fabric::project::VectorShapeKind::path;
+                node.shape.path = *converted;
+                vector_canvas_e2e_initial_path_size = node.shape.path.size();
+                vector_canvas_e2e_complete =
+                    session.set_selected_vector_node(0U, std::move(node));
+                canvas.selected_node = 0U;
+                canvas.tool = CanvasUiState::Tool::pen;
+            }
+        }
+    }
 
     bool running = true;
     const auto dirty = [&] {
@@ -6804,6 +6832,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
+        if (vector_canvas_e2e && vector_canvas_e2e_frame >= 2U &&
+            vector_canvas_e2e_frame < 6U) {
+            SDL_Event event{};
+            const bool button_down = vector_canvas_e2e_frame % 2U == 0U;
+            event.type = button_down ? SDL_MOUSEBUTTONDOWN
+                                     : SDL_MOUSEBUTTONUP;
+            event.button.button = vector_canvas_e2e_frame == 4U ||
+                    vector_canvas_e2e_frame == 5U
+                ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+            event.button.windowID = SDL_GetWindowID(window);
+            event.button.x = 705;
+            event.button.y = 135;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = event.button.x;
+            motion.motion.y = event.button.y;
+            static_cast<void>(SDL_PushEvent(&motion));
+            static_cast<void>(SDL_PushEvent(&event));
+        }
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
             if (creation.input_capture) {
@@ -7137,6 +7185,41 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+        if (vector_canvas_e2e) {
+            ++vector_canvas_e2e_frame;
+            if (vector_canvas_e2e_frame == 4U && session.created_vector()) {
+                vector_canvas_e2e_complete =
+                    vector_canvas_e2e_complete &&
+                    session.created_vector()->native &&
+                    session.created_vector()->native->nodes.front().shape.path.size() ==
+                        vector_canvas_e2e_initial_path_size + 1U;
+            } else if (vector_canvas_e2e_frame == 6U && session.created_vector()) {
+                vector_canvas_e2e_complete =
+                    vector_canvas_e2e_complete &&
+                    session.created_vector()->native &&
+                    session.created_vector()->native->nodes.front().shape.path.size() ==
+                        vector_canvas_e2e_initial_path_size;
+            } else if (vector_canvas_e2e_frame >= 6U) {
+                vector_canvas_e2e_complete =
+                    vector_canvas_e2e_complete && session.created_vector() &&
+                    session.created_vector()->native &&
+                    !session.created_vector()->native->nodes.empty() &&
+                    session.created_vector()->native->nodes.front().shape.path.size() ==
+                        vector_canvas_e2e_initial_path_size && session.save();
+                if (!vector_canvas_e2e_complete) {
+                    const auto current_size = session.created_vector() &&
+                            session.created_vector()->native &&
+                            !session.created_vector()->native->nodes.empty()
+                        ? session.created_vector()->native->nodes.front().shape.path.size()
+                        : 0U;
+                    std::cerr << "Asset Studio Vector Canvas E2E failed: initial="
+                              << vector_canvas_e2e_initial_path_size
+                              << " current=" << current_size
+                              << " frame=" << vector_canvas_e2e_frame << '\n';
+                }
+                running = false;
+            }
+        }
         if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
             texture_e2e || vector_e2e)
             running = false;
@@ -7164,7 +7247,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (entity_e2e && !entity_e2e_complete) ||
             (animation_e2e && !animation_e2e_complete) ||
             (texture_e2e && !texture_e2e_complete) ||
-            (vector_e2e && !vector_e2e_complete)
+            (vector_e2e && !vector_e2e_complete) ||
+            (vector_canvas_e2e && !vector_canvas_e2e_complete)
         ? 1 : 0;
 }
 
@@ -7183,23 +7267,28 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-texture";
     const bool vector_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-vector";
+    const bool vector_canvas_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-vector-canvas";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
-        !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e) {
+        !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
+        !vector_canvas_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
                      "       asset_studio --e2e-entity project-directory\n"
                      "       asset_studio --e2e-animation project-directory\n"
                      "       asset_studio --e2e-texture project-directory\n"
-                     "       asset_studio --e2e-vector project-directory\n";
+                     "       asset_studio --e2e-vector project-directory\n"
+                     "       asset_studio --e2e-vector-canvas project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-         texture_e2e || vector_e2e)
+        texture_e2e || vector_e2e || vector_canvas_e2e)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
-                            entity_e2e, animation_e2e, texture_e2e, vector_e2e);
+                            entity_e2e, animation_e2e, texture_e2e, vector_e2e,
+                            vector_canvas_e2e);
 }
