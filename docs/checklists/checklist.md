@@ -370,7 +370,7 @@ même rail sans saisie manuelle d'identifiants.
 - [x] Permettre de changer la texture d'un fill image après création.
 - [x] Permettre de choisir une texture pour un matériau après création.
 - [x] Permettre d'ajouter ou remplacer une texture sur un nœud d'entité.
-- [ ] Afficher miniature, dimensions, format, chemin et dépendances.
+- [x] Afficher miniature, dimensions, format, chemin et dépendances.
 - [ ] Ajouter `Open in Resource Explorer` depuis chaque référence texture.
 - [x] Conserver la source PNG byte-for-byte.
 - [x] Garder crop, pivot, transform et filtrage non destructifs.
