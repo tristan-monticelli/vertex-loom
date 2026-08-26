@@ -583,11 +583,11 @@ sur un comportement sans modifier le runtime.
 - [x] Permettre de changer une primitive en path éditable lorsque possible ;
   les rectangles, ellipses et lignes sont convertis en commandes de path, et
   les formes dégénérées sont refusées.
-- [ ] Ajouter un outil plume pour :
-  - [ ] ajouter un point ;
-  - [ ] insérer un point sur un segment ;
-  - [ ] déplacer un point ;
-  - [ ] supprimer un point ;
+- [x] Ajouter un outil plume pour :
+  - [x] ajouter un point ;
+  - [x] insérer un point sur un segment ;
+  - [x] déplacer un point ;
+  - [x] supprimer un point ;
   - [x] convertir ligne en courbe ;
   - [x] convertir courbe en ligne ;
   - [x] ouvrir un contour ;
@@ -617,7 +617,7 @@ sur un comportement sans modifier le runtime.
 - [x] Ajouter des tests géométriques pour insertion et suppression de points ;
   les tests vérifient les points de segment, la tête `move` et le minimum de
   deux commandes.
-- [ ] Ajouter des tests end-to-end des interactions canvas.
+- [x] Ajouter des tests end-to-end des interactions canvas.
 - [x] Comparer les draw packets Asset Studio, Map Studio et Preview Runtime.
 
 Gate : l'utilisateur crée et personnalise complètement un artwork natif,
