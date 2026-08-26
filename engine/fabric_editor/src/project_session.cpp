@@ -1739,6 +1739,16 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
             project::load_replay(project_root_, *manifest_, source->document_path),
             [&](auto value) { return project::publish_replay(
                 project_root_, *manifest_, value); });
+    case StudioResourceKind::audio:
+        {
+            auto loaded = project::load_audio(project_root_, *manifest_, source->document_path);
+            if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
+            loaded.audio->document.id = copy_id;
+            loaded.audio->document.name = std::move(copy_name);
+            auto published = project::publish_audio(project_root_, *manifest_, *loaded.audio);
+            if (!published.ok()) { errors_ = std::move(published.errors); return false; }
+            return refresh_resources() && select_resource(kind, copy_id);
+        }
     }
     return false;
 }
@@ -1899,6 +1909,8 @@ ProjectSession::incoming_references(const StudioResourceKind kind,
             inspect(source, project::replay_resource_references(*loaded.asset));
             break;
         }
+        case StudioResourceKind::audio:
+            break;
         }
     }
     errors_.clear();
