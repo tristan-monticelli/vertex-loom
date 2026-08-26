@@ -46,6 +46,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
   poignées liées/symétriques/libres, sélection et transform multi-points,
   transform fill indépendante, clips imbriqués, registre animable, CommandStack,
+  géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
+  cap), stroke image avec répétition/UV et preset pédagogique `beam` livré par
+  défaut,
   géométrie, E2E canvas et comparaison des draw packets.
 - [ ] Inspecteur : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
@@ -552,6 +555,11 @@ sur un comportement sans modifier le runtime.
 - [ ] Rendre la transform du fill indépendante de celle de la forme.
 - [x] Exposer ajout, retrait et modification du stroke.
 - [x] Exposer couleur, largeur, join et cap du stroke.
+- [ ] Rendre effectivement largeur, join `round`/`bevel`/`miter` et cap dans
+  le renderer ; aujourd'hui le backend dessine seulement une ligne OpenGL et
+  ignore ces paramètres.
+- [ ] Ajouter un stroke image (texture, répétition, UV, offset et échelle) et
+  fournir un preset `beam` préexistant pour expliquer le résultat attendu.
 - [x] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
 - [ ] Afficher les clips imbriqués fidèlement sur le canvas.
 - [ ] Relier toutes les propriétés animables au registre de descripteurs.
