@@ -5,13 +5,13 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-    Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Valide un projet ou un Portable Map Package avant fenêtre, charge directement une scène, une map ou la map racine du paquet, évalue les AnimationClip v1 et leurs markers franchis, publie les événements de markers des instances animées, applique les pistes de transformation position/rotation/échelle et de matériau couleur/opacité aux instances liées, expose les packets de la dernière frame pour inspection headless, résout les transitions atomiques et les transitions associées aux événements gameplay, remet proprement la boucle au runtime après une transition, traduit les actions SDL configurables vers le CharacterController, interpole Camera2D avec suivi de personnage et limites monde, interpole les positions XPBD, émet les entrées et sorties de zones, culling par chunks avec bounds statiques précalculés, chemin direct des packets statiques visibles et culling géométrique dynamique, lit optionnellement un ReplayDocument par frame, vérifie les checkpoints quantifiés, persiste ProgressSave via SDL_GetPrefPath, mixe et joue les WAV PCM, exécute Box2D à pas fixe et rend le Preview Runtime")
-        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise des artworks vectoriels, vues raster non destructives, compositions par calques, composants paramétriques, chemins texturés, matériaux, entités, animations et InputDocument v1")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre, applique leurs actions et transformations atomiques, puis exécute animation, physique, triggers, audio, caméra et rendu")
+        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Crée et personnalise assets, entités, InputDocument physiques, BehaviorGraph génériques et politiques de transformation ; prévisualise signaux et actions pas à pas")
         Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Compose les maps, leurs prefabs et graphes mécaniques ; édite les paramètres de mécanique par overrides typés et inspecte leur simulation avant publication portable")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
-        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Manifest projet, MapPackageManifest v1, textures, documents vectoriels et graphe de ressources")
-        Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées par les studios, prompts typés, règles testables de sélection, gizmos et crop raster borné, historique réversible, autosave, preview et publication")
+        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
+        Container(editorlib, "fabric_editor", "C++20 static library", "Sessions et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération et journal de preview borné")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
         Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
@@ -134,3 +134,10 @@ le runtime : contrat partagé, commande d'authoring, preview du studio,
 sauvegarde dans le projet, composition dans Map Studio, puis chargement du
 paquet de map. Une capacité disponible uniquement dans le runtime ne ferme pas
 son gate produit.
+
+`InputDocument` reste un contrat de périphériques : il convertit clavier,
+gamepad et axes en identifiants d'actions libres. `BehaviorGraph` consomme ces
+identifiants comme n'importe quel autre signal. Le graphe persistant, ses ports
+et paramètres sont validés dans `fabric_project`; l'état éphémère des délais,
+cooldowns et états appartient à un évaluateur par instance dans
+`fabric_runtime`. Asset Studio pilote le même évaluateur pour sa preview.

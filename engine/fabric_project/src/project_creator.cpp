@@ -87,7 +87,7 @@ ManifestResult create_project(const std::filesystem::path& project_root,
     }
 
     for (const auto* asset_directory :
-         {"textures", "vectors", "animations", "materials"}) {
+         {"textures", "vectors", "animations", "materials", "behaviors"}) {
         filesystem_error.clear();
         std::filesystem::create_directories(
             project_root / directories.assets / asset_directory,

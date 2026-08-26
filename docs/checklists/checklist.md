@@ -184,23 +184,23 @@ Une validation technique verte ne ferme pas un gate UX.
 
 ## 0 — Verrouiller les parcours et le vocabulaire
 
-- [ ] Décrire les parcours de référence avant toute modification de code.
-- [ ] Définir le parcours « sélectionner une ressource interne ».
-- [ ] Définir le parcours « créer une ressource sans perdre le document actif ».
-- [ ] Définir le parcours « dupliquer une ressource et ses dépendances choisies ».
-- [ ] Définir le parcours « supprimer une ressource après analyse des références ».
-- [ ] Définir le parcours « créer une entité avec plusieurs artworks ».
-- [ ] Définir le parcours « ajouter ou remplacer un artwork après création ».
-- [ ] Définir le parcours « créer une animation pour une entité explicite ».
-- [ ] Définir le parcours « programmer un joueur et un monstre avec le même
+- [x] Décrire les parcours de référence avant toute modification de code.
+- [x] Définir le parcours « sélectionner une ressource interne ».
+- [x] Définir le parcours « créer une ressource sans perdre le document actif ».
+- [x] Définir le parcours « dupliquer une ressource et ses dépendances choisies ».
+- [x] Définir le parcours « supprimer une ressource après analyse des références ».
+- [x] Définir le parcours « créer une entité avec plusieurs artworks ».
+- [x] Définir le parcours « ajouter ou remplacer un artwork après création ».
+- [x] Définir le parcours « créer une animation pour une entité explicite ».
+- [x] Définir le parcours « programmer un joueur et un monstre avec le même
   système logique ».
-- [ ] Définir le parcours « transformer une instance d'une entité vers une
+- [x] Définir le parcours « transformer une instance d'une entité vers une
   autre ».
-- [ ] Définir le parcours « créer et modifier intégralement un artwork
+- [x] Définir le parcours « créer et modifier intégralement un artwork
   vectoriel natif ».
-- [ ] Employer `Input bindings` uniquement pour les périphériques physiques.
-- [ ] Employer `Behavior` pour la logique d'une entité, humaine ou non.
-- [ ] Employer `Transformation` pour un remplacement d'entité avec transfert
+- [x] Employer `Input bindings` uniquement pour les périphériques physiques.
+- [x] Employer `Behavior` pour la logique d'une entité, humaine ou non.
+- [x] Employer `Transformation` pour un remplacement d'entité avec transfert
   d'état explicite.
 
 Gate : chaque parcours possède des entrées, sorties, erreurs, annulation et
@@ -208,52 +208,52 @@ critères de succès observables.
 
 ## 1 — Architecture de logique d'entité
 
-- [ ] Mettre à jour le C4 Context pour inclure l'authoring de comportements.
-- [ ] Mettre à jour le C4 Container avant d'ajouter le nouveau contrat.
-- [ ] Ajouter un diagramme de composants pour l'éditeur et l'évaluateur de
+- [x] Mettre à jour le C4 Context pour inclure l'authoring de comportements.
+- [x] Mettre à jour le C4 Container avant d'ajouter le nouveau contrat.
+- [x] Ajouter un diagramme de composants pour l'éditeur et l'évaluateur de
   comportements.
-- [ ] Ajouter un diagramme de séquence input/IA/événement → comportement →
+- [x] Ajouter un diagramme de séquence input/IA/événement → comportement →
   action → runtime.
-- [ ] Écrire un ADR pour `BehaviorGraph v1`.
-- [ ] Définir un document de comportement générique attachable à une entité.
-- [ ] Utiliser des identifiants stables pour nœuds, ports, paramètres et
+- [x] Écrire un ADR pour `BehaviorGraph v1`.
+- [x] Définir un document de comportement générique attachable à une entité.
+- [x] Utiliser des identifiants stables pour nœuds, ports, paramètres et
   connexions.
-- [ ] Définir des ports et propriétés strictement typés.
-- [ ] Refuser les références absentes, types incompatibles et cycles interdits.
-- [ ] Définir les sources de signaux suivantes :
-  - [ ] action joueur ;
-  - [ ] décision IA ;
-  - [ ] événement map ;
-  - [ ] capteur ou trigger ;
-  - [ ] timer ;
-  - [ ] état ou propriété d'entité.
-- [ ] Définir les nœuds de contrôle suivants :
-  - [ ] condition ;
-  - [ ] branche ;
-  - [ ] séquence ;
-  - [ ] délai ;
-  - [ ] cooldown ;
-  - [ ] état ;
-  - [ ] transition.
-- [ ] Définir les actions suivantes :
-  - [ ] écrire une propriété ;
-  - [ ] émettre un événement ;
-  - [ ] lancer ou changer une animation ;
-  - [ ] appliquer un mouvement ou une impulsion ;
-  - [ ] activer une mécanique ;
-  - [ ] demander une transformation d'entité.
-- [ ] Ne coder aucune branche spéciale `player` ou `monster` dans l'évaluateur.
-- [ ] Permettre à une même action sémantique d'être produite par un joueur, une
+- [x] Définir des ports et propriétés strictement typés.
+- [x] Refuser les références absentes, types incompatibles et cycles interdits.
+- [x] Définir les sources de signaux suivantes :
+  - [x] action joueur ;
+  - [x] décision IA ;
+  - [x] événement map ;
+  - [x] capteur ou trigger ;
+  - [x] timer ;
+  - [x] état ou propriété d'entité.
+- [x] Définir les nœuds de contrôle suivants :
+  - [x] condition ;
+  - [x] branche ;
+  - [x] séquence ;
+  - [x] délai ;
+  - [x] cooldown ;
+  - [x] état ;
+  - [x] transition.
+- [x] Définir les actions suivantes :
+  - [x] écrire une propriété ;
+  - [x] émettre un événement ;
+  - [x] lancer ou changer une animation ;
+  - [x] appliquer un mouvement ou une impulsion ;
+  - [x] activer une mécanique ;
+  - [x] demander une transformation d'entité.
+- [x] Ne coder aucune branche spéciale `player` ou `monster` dans l'évaluateur.
+- [x] Permettre à une même action sémantique d'être produite par un joueur, une
   IA ou un événement.
-- [ ] Ajouter la sérialisation, le parseur strict et les migrations prévues.
-- [ ] Ajouter la résolution au graphe de ressources et aux paquets de map.
+- [x] Ajouter la sérialisation, le parseur strict et les migrations prévues.
+- [x] Ajouter la résolution au graphe de ressources et aux paquets de map.
 - [ ] Ajouter une session d'édition avec CommandStack et sauvegarde atomique.
 - [ ] Ajouter un éditeur de graphe dans Asset Studio.
 - [ ] Ajouter une preview pas-à-pas avec journal borné des signaux et actions.
 - [ ] Évaluer le même graphe dans Preview Runtime.
-- [ ] Tester un comportement piloté par le joueur.
-- [ ] Tester le même comportement piloté par une IA de monstre.
-- [ ] Tester le même comportement piloté par un événement de map.
+- [x] Tester un comportement piloté par le joueur.
+- [x] Tester le même comportement piloté par une IA de monstre.
+- [x] Tester le même comportement piloté par un événement de map.
 - [ ] Tester le déterminisme après sauvegarde, reload et replay.
 
 Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
@@ -570,7 +570,7 @@ automatiquement sur les trois plateformes.
 
 ## 13 — Documentation et fermeture
 
-- [ ] Mettre à jour `docs/00-project-brief.md` si le périmètre BehaviorGraph et
+- [x] Mettre à jour `docs/00-project-brief.md` si le périmètre BehaviorGraph et
   transformations change les critères de succès.
 - [ ] Mettre à jour C4 Context et Container avant chaque changement structurel.
 - [ ] Ajouter ou mettre à jour les diagrammes de composants concernés.

@@ -18,7 +18,7 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_entity_schema_version = 2;
+inline constexpr std::uint32_t current_entity_schema_version = 3;
 
 enum class EntityDrawableKind { none, vector, texture, visual_component };
 [[nodiscard]] std::string_view to_string(EntityDrawableKind) noexcept;
@@ -46,6 +46,7 @@ struct EntityDefinition {
         .schema_version = current_entity_schema_version,
         .type = "entity",
     };
+    std::optional<ResourceReference> behavior;
     std::vector<EntityNode> nodes;
     std::vector<AnimationConstraint> constraints;
     std::optional<DeformationMesh> deformation_mesh;

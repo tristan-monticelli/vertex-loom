@@ -2,6 +2,7 @@
 #include "fabric/project/entity.hpp"
 #include "fabric/project/input.hpp"
 #include "fabric/project/animation.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/mechanic_graph.hpp"
@@ -447,6 +448,11 @@ ManifestResult load_project(const std::filesystem::path& project_root) {
         loaded.manifest->directories.assets, "mechanics",
         ".mechanic.json", "assets.mechanics", load_mechanic_graph,
         mechanic_graph_resource_references, registry, result.errors);
+    inspect_asset_documents(
+        project_root, *loaded.manifest, canonical_root,
+        loaded.manifest->directories.assets, "behaviors",
+        ".behavior.json", "assets.behaviors", load_behavior_graph,
+        behavior_graph_resource_references, registry, result.errors);
     validate_composition_raster_views(
         project_root, *loaded.manifest, result.errors);
     validate_visual_component_bindings(

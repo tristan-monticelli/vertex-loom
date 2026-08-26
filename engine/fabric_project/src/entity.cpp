@@ -62,13 +62,18 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
     ValidationReport r;
     if (a.document.schema_version != current_entity_schema_version)
         error(r.errors, ErrorCode::unsupported_schema_version, "schemaVersion",
-              "only entity schema version 2 is supported");
+              "only entity schema version 3 is supported");
     if (a.document.type != "entity")
         error(r.errors, ErrorCode::invalid_asset, "type", "must be entity");
     if (!core::ResourceId::is_valid(a.document.id.value))
         error(r.errors, ErrorCode::invalid_resource_id, "id", "must be valid");
     if (a.document.name.empty())
         error(r.errors, ErrorCode::invalid_asset, "name", "must not be empty");
+    if (a.behavior &&
+        (!core::ResourceId::is_valid(a.behavior->id.value) ||
+         a.behavior->expected_type != "behavior"))
+        error(r.errors, ErrorCode::resource_type_mismatch, "behavior",
+              "must reference a behavior resource");
     std::set<std::string> ids;
     for (std::size_t index = 0; index < a.nodes.size(); ++index) {
         const auto& node = a.nodes[index];
@@ -224,8 +229,8 @@ ValidationReport validate_entity(const ProjectManifest&, const EntityDefinition&
     }
     return r;
 }
-std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);if(n.drawable.component_instance)for(const auto& item:n.drawable.component_instance->overrides)if(const auto* ref=std::get_if<ResourceReference>(&item.value))r.push_back(*ref);}if(a.animation_state_machine)for(const auto& state:a.animation_state_machine->states)r.push_back(state.clip);return r;}
-std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)},{"ikChains",Json::array()},{"animationStateMachine",a.animation_state_machine?state_machine_json(*a.animation_state_machine):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);if(n.drawable.component_instance)d["componentInstance"]=component_instance_json(*n.drawable.component_instance);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));for(const auto& chain:a.ik_chains)j["ikChains"].push_back(ik_chain_json(chain));return j.dump(2)+"\n";}
+std::vector<ResourceReference> entity_resource_references(const EntityDefinition& a){std::vector<ResourceReference> r;if(a.behavior)r.push_back(*a.behavior);for(const auto& n:a.nodes){if(n.drawable.resource)r.push_back(*n.drawable.resource);if(n.drawable.material)r.push_back(*n.drawable.material);if(n.drawable.component_instance)for(const auto& item:n.drawable.component_instance->overrides)if(const auto* ref=std::get_if<ResourceReference>(&item.value))r.push_back(*ref);}if(a.animation_state_machine)for(const auto& state:a.animation_state_machine->states)r.push_back(state.clip);return r;}
+std::string serialize_entity(const EntityDefinition& a){Json j={{"schemaVersion",a.document.schema_version},{"type",a.document.type},{"id",a.document.id.value},{"name",a.document.name},{"behavior",a.behavior?ref_json(*a.behavior):Json(nullptr)},{"nodes",Json::array()},{"constraints",Json::array()},{"deformationMesh",a.deformation_mesh?deformation_mesh_json(*a.deformation_mesh):Json(nullptr)},{"xpbd",a.xpbd?xpbd_json(*a.xpbd):Json(nullptr)},{"ikChains",Json::array()},{"animationStateMachine",a.animation_state_machine?state_machine_json(*a.animation_state_machine):Json(nullptr)}};for(const auto& n:a.nodes){Json d={{"kind",std::string(to_string(n.drawable.kind))}};if(n.drawable.resource)d["resource"]=ref_json(*n.drawable.resource);if(n.drawable.material)d["material"]=ref_json(*n.drawable.material);if(n.drawable.component_instance)d["componentInstance"]=component_instance_json(*n.drawable.component_instance);j["nodes"].push_back({{"id",n.id},{"name",n.name},{"transform",transform(n.transform)},{"zOrder",n.z_order},{"drawable",d}});if(n.parent)j["nodes"].back()["parent"]=*n.parent;}for(const auto& c:a.constraints)j["constraints"].push_back(constraint_json(c));for(const auto& chain:a.ik_chains)j["ikChains"].push_back(ik_chain_json(chain));return j.dump(2)+"\n";}
 EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     EntityResult r;
     Json j;
@@ -240,6 +245,8 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     text(j, "type", a.document.type, r.errors);
     text(j, "id", a.document.id.value, r.errors);
     text(j, "name", a.document.name, r.errors);
+    if (source_schema >= 3)
+        ref_read(j, "behavior", a.behavior, r.errors);
     const auto ns = j.find("nodes");
     if (ns == j.end() || !ns->is_array()) error(r.errors, ErrorCode::invalid_asset, "nodes", "expected an array");
     else for (const auto& x : *ns) {
@@ -314,7 +321,8 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
                 a.animation_state_machine = std::move(machine);
         }
     }
-    if (source_schema == 1) a.document.schema_version = 2;
+    if (source_schema == 1 || source_schema == 2)
+        a.document.schema_version = current_entity_schema_version;
     if (!r.errors.empty()) return r;
     auto v = validate_entity(m, a);
     if (!v.ok()) { r.errors = std::move(v.errors); return r; }
@@ -322,5 +330,5 @@ EntityResult parse_entity(const ProjectManifest& m, std::string_view s) {
     return r;
 }
 EntityResult load_entity(const std::filesystem::path& root,const ProjectManifest& m,const std::filesystem::path& path){auto s=load_document(root,path,[&](std::string_view v){return parse_validation(m,v);});EntityResult r;r.errors=std::move(s.errors);if(s.contents)r=parse_entity(m,*s.contents);if(r.ok()&&path!=entity_document_path(m,r.entity->document.id)){r.entity.reset();error(r.errors,ErrorCode::invalid_path,"document","document filename does not match its id");}return r;}
-EntityResult publish_entity(const std::filesystem::path& root,const ProjectManifest& m,const EntityDefinition& a){EntityResult r;auto migrated=a;if(migrated.document.schema_version==1)migrated.document.schema_version=current_entity_schema_version;auto v=validate_entity(m,migrated);if(!v.ok()){r.errors=std::move(v.errors);return r;}auto p=entity_document_path(m,migrated.document.id);auto s=save_document_atomic(root,p,serialize_entity(migrated),[&](std::string_view x){return parse_validation(m,x);});if(!s.ok()){r.errors=std::move(s.errors);return r;}return load_entity(root,m,p);}
+EntityResult publish_entity(const std::filesystem::path& root,const ProjectManifest& m,const EntityDefinition& a){EntityResult r;auto migrated=a;if(migrated.document.schema_version==1||migrated.document.schema_version==2)migrated.document.schema_version=current_entity_schema_version;auto v=validate_entity(m,migrated);if(!v.ok()){r.errors=std::move(v.errors);return r;}auto p=entity_document_path(m,migrated.document.id);auto s=save_document_atomic(root,p,serialize_entity(migrated),[&](std::string_view x){return parse_validation(m,x);});if(!s.ok()){r.errors=std::move(s.errors);return r;}return load_entity(root,m,p);}
 }

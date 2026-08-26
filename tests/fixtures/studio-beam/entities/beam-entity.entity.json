@@ -1,5 +1,6 @@
 {
   "animationStateMachine": null,
+  "behavior": null,
   "constraints": [],
   "deformationMesh": null,
   "id": "beam-entity",
@@ -37,7 +38,7 @@
       "zOrder": 0.0
     }
   ],
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "type": "entity",
   "xpbd": null
 }

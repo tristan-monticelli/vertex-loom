@@ -56,6 +56,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/animation_constraints.cpp
     engine/fabric_project/src/animation_ik.cpp
     engine/fabric_project/src/animation_state_machine.cpp
+    engine/fabric_project/src/behavior_graph.cpp
     engine/fabric_project/src/document_storage.cpp
     engine/fabric_project/src/entity.cpp
     engine/fabric_project/src/input.cpp
@@ -165,6 +166,7 @@ target_link_libraries(fabric_render PUBLIC fabric_project OpenGL::GL PRIVATE
 )
 
 add_library(fabric_runtime STATIC
+    engine/fabric_runtime/src/behavior_evaluator.cpp
     engine/fabric_runtime/src/character_controller.cpp
     engine/fabric_runtime/src/audio_mixer.cpp
     engine/fabric_runtime/src/camera2d.cpp
@@ -337,6 +339,26 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_mechanic_graph_tests
              COMMAND fabric_mechanic_graph_tests)
+
+    add_executable(fabric_behavior_graph_tests
+        tests/cpp/behavior_graph_tests.cpp
+    )
+    target_link_libraries(fabric_behavior_graph_tests PRIVATE
+        fabric_project
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_behavior_graph_tests
+             COMMAND fabric_behavior_graph_tests)
+
+    add_executable(fabric_behavior_evaluator_tests
+        tests/cpp/behavior_evaluator_tests.cpp
+    )
+    target_link_libraries(fabric_behavior_evaluator_tests PRIVATE
+        fabric_runtime
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_behavior_evaluator_tests
+             COMMAND fabric_behavior_evaluator_tests)
 
     add_executable(fabric_textured_path_geometry_tests
         tests/cpp/textured_path_geometry_tests.cpp

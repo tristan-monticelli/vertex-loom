@@ -1,6 +1,7 @@
 #include "fabric/project/map_package.hpp"
 
 #include "fabric/project/animation.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/input.hpp"
 #include "fabric/project/map.hpp"
@@ -203,6 +204,13 @@ std::optional<ResolvedPackageResource> resolve_package_resource(
         if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
         return result(loaded.asset->document, path,
                       mechanic_graph_resource_references(*loaded.asset));
+    }
+    if (reference.expected_type == "behavior") {
+        const auto path = behavior_graph_document_path(manifest, reference.id);
+        const auto loaded = load_behavior_graph(root, manifest, path);
+        if (!loaded.ok()) { append_errors(errors, loaded.errors); return {}; }
+        return result(loaded.asset->document, path,
+                      behavior_graph_resource_references(*loaded.asset));
     }
     if (reference.expected_type == "animation") {
         const auto path = animation_document_path(manifest, reference.id);
