@@ -157,7 +157,8 @@ C4Component
 - Le canvas d’entité affiche un gizmo de translation pour le nœud sélectionné ;
   un drag convertit le delta écran en unités monde et passe par
   `set_selected_entity_node`. Les nœuds verrouillés restent non éditables ;
-  le parcours E2E du drag reste à ajouter.
+  le parcours `asset_studio_entity_e2e` injecte désormais ce drag SDL puis
+  vérifie la position après sauvegarde et reload.
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.

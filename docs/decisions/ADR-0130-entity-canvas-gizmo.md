@@ -22,4 +22,5 @@ sélection directe par hit-test sur le canvas.
 - Le gizmo respecte le verrouillage et ne modifie pas directement les draw
   packets temporaires.
 - Le canvas et l’inspecteur partagent la même mutation undoable.
-- Un E2E SDL de drag est requis avant de fermer la case UX correspondante.
+- `asset_studio_entity_e2e` injecte un clic/drag SDL sur le gizmo, puis vérifie
+  la position après sauvegarde et reload.

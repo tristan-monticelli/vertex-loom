@@ -524,7 +524,9 @@ publication.
   `visualComponent` vers `none`, texture ou vector, et l’annulation conserve le
   nœud ; les E2E entité/animation et les tests de session passent.
 - [x] Exposer transform, pivot, Z, visibilité et verrouillage du nœud.
-- [ ] Ajouter sélection et gizmos de nœud dans le canvas d'entité.
+- [x] Ajouter sélection et gizmos de nœud dans le canvas d'entité. L’arbre
+  sélectionne le nœud, le canvas expose son gizmo de translation et
+  `asset_studio_entity_e2e` vérifie le drag SDL, la sauvegarde et le reload.
 - [ ] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
   - [ ] un nœud existant ;
   - [ ] un nouveau nœud racine ;

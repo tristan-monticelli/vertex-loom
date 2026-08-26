@@ -192,6 +192,7 @@ struct CanvasUiState {
     fabric::project::VectorNode drag_start_node;
     bool entity_gizmo_dragging{};
     ImVec2 entity_gizmo_start_mouse{};
+    ImVec2 entity_gizmo_screen{};
     fabric::core::Transform entity_gizmo_start_transform;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;
@@ -2440,6 +2441,7 @@ void draw_packet_preview_canvas(CanvasUiState& canvas,
         const auto& node = editable_session->selected_entity()->nodes[
             canvas.selected_node];
         const auto gizmo = to_screen(node.transform.position);
+        canvas.entity_gizmo_screen = gizmo;
         auto* draw_list = ImGui::GetWindowDrawList();
         draw_list->AddLine({gizmo.x - 12.0F, gizmo.y},
                            {gizmo.x + 12.0F, gizmo.y},
@@ -6932,6 +6934,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (!entity_e2e_complete)
             std::cerr << "Asset Studio Entity E2E failed\n";
     }
+    bool entity_gizmo_e2e_active = false;
+    std::size_t entity_gizmo_e2e_frame = 0U;
+    fabric::core::Vec2 entity_gizmo_e2e_initial_position{};
+    if (entity_e2e && entity_e2e_complete && session.selected_entity() &&
+        session.selected_entity()->nodes.size() > 1U) {
+        canvas.selected_node = 1U;
+        entity_gizmo_e2e_initial_position =
+            session.selected_entity()->nodes[1].transform.position;
+        entity_gizmo_e2e_active = true;
+    }
 
     bool animation_e2e_complete = false;
     if (animation_e2e && session.has_project()) {
@@ -7097,6 +7109,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 event.button.y = mouse_y;
                 static_cast<void>(SDL_PushEvent(&event));
             }
+        }
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 1U &&
+            entity_gizmo_e2e_frame < 4U) {
+            const auto start = canvas.entity_gizmo_screen;
+            const auto moved = entity_gizmo_e2e_frame >= 2U;
+            const int mouse_x = static_cast<int>(start.x) + (moved ? 36 : 0);
+            const int mouse_y = static_cast<int>(start.y);
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = mouse_x;
+            motion.motion.y = mouse_y;
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = entity_gizmo_e2e_frame == 3U
+                ? SDL_MOUSEBUTTONUP : SDL_MOUSEBUTTONDOWN;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = mouse_x;
+            button.button.y = mouse_y;
+            if (entity_gizmo_e2e_frame != 2U)
+                static_cast<void>(SDL_PushEvent(&button));
         }
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
@@ -7477,9 +7511,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 running = false;
             }
         }
+        if (entity_gizmo_e2e_active) {
+            ++entity_gizmo_e2e_frame;
+            if (entity_gizmo_e2e_frame == 4U) {
+                const bool saved = session.save();
+                fabric::editor::ProjectSession reloaded;
+                const bool reopened = saved && reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::entity,
+                        {.value = "rotating-platform-entity"});
+                entity_e2e_complete = entity_e2e_complete && reopened &&
+                    reloaded.selected_entity()->nodes.size() > 1U &&
+                    reloaded.selected_entity()->nodes[1].transform.position.x !=
+                        entity_gizmo_e2e_initial_position.x;
+                if (!entity_e2e_complete)
+                    std::cerr << "Asset Studio Entity Gizmo E2E failed: initial="
+                              << entity_gizmo_e2e_initial_position.x << "\n";
+                running = false;
+            }
+        }
         if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
             texture_e2e || vector_e2e)
-            running = false;
+            running = running && entity_gizmo_e2e_active;
     }
 
     if (preview.texture != 0U) {
