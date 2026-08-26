@@ -2569,7 +2569,22 @@ int run(const std::filesystem::path& project_root,
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputText("New trigger id", &trigger_id);
             ImGui::SetNextItemWidth(180.0F);
-            ImGui::InputText("Trigger event id", &trigger_event_id);
+            if (map.events.empty()) {
+                ImGui::TextDisabled("Trigger event: declare an event first");
+                trigger_event_id.clear();
+            } else {
+                std::vector<const char*> event_labels;
+                event_labels.reserve(map.events.size());
+                for (const auto& event : map.events)
+                    event_labels.push_back(event.id.value.c_str());
+                int selected_event = 0;
+                for (std::size_t index = 0; index < map.events.size(); ++index)
+                    if (map.events[index].id.value == trigger_event_id)
+                        selected_event = static_cast<int>(index);
+                if (ImGui::Combo("Trigger event", &selected_event,
+                                event_labels.data(), static_cast<int>(event_labels.size())))
+                    trigger_event_id = map.events[static_cast<std::size_t>(selected_event)].id.value;
+            }
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputInt("Collision index", &trigger_collision_index);
             const auto valid_trigger_collision = [&](const int index) {
@@ -2610,7 +2625,21 @@ int run(const std::filesystem::path& project_root,
                 ImGui::SeparatorText("Selected trigger");
                 ImGui::Text("Id: %s", trigger_editor.id.c_str());
                 ImGui::SetNextItemWidth(220.0F);
-                ImGui::InputText("Event id", &trigger_editor.event_id.value);
+                if (map.events.empty()) {
+                    ImGui::TextDisabled("Event: no declared events");
+                } else {
+                    std::vector<const char*> event_labels;
+                    event_labels.reserve(map.events.size());
+                    for (const auto& event : map.events)
+                        event_labels.push_back(event.id.value.c_str());
+                    int selected_event = 0;
+                    for (std::size_t index = 0; index < map.events.size(); ++index)
+                        if (map.events[index].id == trigger_editor.event_id)
+                            selected_event = static_cast<int>(index);
+                    if (ImGui::Combo("Event", &selected_event, event_labels.data(),
+                                    static_cast<int>(event_labels.size())))
+                        trigger_editor.event_id = map.events[static_cast<std::size_t>(selected_event)].id;
+                }
                 ImGui::SetNextItemWidth(220.0F);
                 ImGui::InputInt("Collision index", &trigger_editor_collision_index);
                 const auto event_definition = std::find_if(
