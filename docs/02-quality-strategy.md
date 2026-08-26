@@ -140,6 +140,9 @@ plateformes.
 Les actions Map Studio valident la version courante de la session : une map
 dirty est sauvegardée avant `Validate` ou `Publish`, et l'action est annulée si
 la sauvegarde échoue.
+Les actions principales désactivées de Map Studio affichent aussi leur
+précondition au survol ; cette couverture reste partielle tant que les
+contrôles secondaires d’Asset Studio ne sont pas harmonisés.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime

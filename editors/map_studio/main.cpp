@@ -466,10 +466,14 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::BeginDisabled(!session.can_undo());
     if (ImGui::Button("Undo scene")) static_cast<void>(session.undo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!session.can_undo(),
+                         "No scene changes are available to undo.");
     ImGui::SameLine();
     ImGui::BeginDisabled(!session.can_redo());
     if (ImGui::Button("Redo scene")) static_cast<void>(session.redo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!session.can_redo(),
+                         "No undone scene changes are available to redo.");
 
     ImGui::SeparatorText("Mounted maps");
     draw_resource_picker("Maps:", maps_directory, ".map.json", state.map_id);
@@ -493,6 +497,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         }
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.map_id.empty() || state.mount_id.empty(),
+                         "Choose a map and enter a mount layer id.");
     for (std::size_t index = 0; index < session.scene()->maps.size(); ++index) {
         const auto map = session.scene()->maps[index];
         ImGui::PushID(static_cast<int>(index));
@@ -578,6 +584,10 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         status = applied ? "Transition changed" : "Transition rejected";
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.transition_id.empty() ||
+                             state.target_scene_id.empty() ||
+                             state.entry_point.empty(),
+                         "Enter a transition id, target scene and entry point.");
     ImGui::SameLine();
     if (ImGui::SmallButton("New transition")) {
         state.selected_transition = -1;
@@ -752,6 +762,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         state.selected_node.clear();
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.open_id.empty(),
+                         "Choose an existing mechanic graph first.");
     ImGui::SetNextItemWidth(140.0F);
     ImGui::InputText("New id", &state.new_id);
     ImGui::SameLine();
@@ -773,6 +785,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         }
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.new_id.empty() || state.new_name.empty(),
+                         "Enter both a mechanic id and a mechanic name.");
 
     ImGui::SeparatorText("Rotating platform preset");
     ImGui::SetNextItemWidth(150.0F);
@@ -893,10 +907,14 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::BeginDisabled(!session.can_undo());
     if (ImGui::Button("Undo graph")) static_cast<void>(session.undo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!session.can_undo(),
+                         "No mechanic changes are available to undo.");
     ImGui::SameLine();
     ImGui::BeginDisabled(!session.can_redo());
     if (ImGui::Button("Redo graph")) static_cast<void>(session.redo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!session.can_redo(),
+                         "No undone mechanic changes are available to redo.");
 
     ImGui::Columns(2, "mechanic-columns", true);
     ImGui::SeparatorText("Graph");
@@ -919,6 +937,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         }
     }
     ImGui::EndDisabled();
+    draw_disabled_reason(state.new_node_id.empty(),
+                         "Enter a unique node id before adding a node.");
 
     ImGui::SeparatorText("Connections");
     for (std::size_t index = 0; index < graph.connections.size(); ++index) {
@@ -2260,10 +2280,14 @@ int run(const std::filesystem::path& project_root,
             ImGui::BeginDisabled(!session.can_undo());
             if (ImGui::Button("Undo")) static_cast<void>(session.undo());
             ImGui::EndDisabled();
+            draw_disabled_reason(!session.can_undo(),
+                                 "No map changes are available to undo.");
             ImGui::SameLine();
             ImGui::BeginDisabled(!session.can_redo());
             if (ImGui::Button("Redo")) static_cast<void>(session.redo());
             ImGui::EndDisabled();
+            draw_disabled_reason(!session.can_redo(),
+                                 "No undone map changes are available to redo.");
             ImGui::Separator();
             ImGui::Columns(2, "map-studio-columns", true);
             ImGui::Text("Layers (%zu)", map.layers.size());
@@ -2293,6 +2317,8 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(new_layer_id.empty() || new_layer_name.empty(),
+                                 "Enter both a layer id and a layer name.");
             bool layer_changed = false;
             for (std::size_t layer_index = 0; layer_index < map.layers.size(); ++layer_index) {
                 const auto layer = map.layers[layer_index];
@@ -2361,6 +2387,8 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(selected_instances.empty(),
+                                 "Select at least one instance first.");
             ImGui::BeginDisabled(selected_instances.empty() || active_layer_id.empty());
             if (ImGui::Button("Move selected to active layer")) {
                 std::vector<fabric::core::ResourceId> ids;
@@ -2370,6 +2398,8 @@ int run(const std::filesystem::path& project_root,
                     : "Layer move rejected (locked or invalid)";
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(selected_instances.empty() || active_layer_id.empty(),
+                                 "Select an instance and an active layer first.");
             ImGui::SeparatorText("Placement");
             ImGui::SetNextItemWidth(180.0F);
             ImGui::InputText("New instance id", &placement_id);
@@ -2389,6 +2419,9 @@ int run(const std::filesystem::path& project_root,
             if (ImGui::Button(placement_mode ? "Cancel placement" : "Place in canvas"))
                 placement_mode = !placement_mode;
             ImGui::EndDisabled();
+            draw_disabled_reason(placement_id.empty() || placement_resource_id.empty() ||
+                                     active_layer_id.empty(),
+                                 "Enter an instance id, choose a resource and select an active layer.");
             ImGui::Checkbox("Play visual animation", &preview_playing);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(180.0F);
@@ -2478,6 +2511,9 @@ int run(const std::filesystem::path& project_root,
                         session.map()->collisions.size() - 1U);
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(new_collision_layer.empty() ||
+                                     new_collision_radius <= 0.0F,
+                                 "Choose a collision layer and enter a positive radius.");
             for (std::size_t collision_index = 0; collision_index < map.collisions.size();
                  ++collision_index) {
                 const auto& collision = map.collisions[collision_index];
@@ -2532,6 +2568,8 @@ int run(const std::filesystem::path& project_root,
                     ImGui::BeginDisabled(collision_editor.points.size() <= minimum_points);
                     if (ImGui::Button("Remove last point")) collision_editor.points.pop_back();
                     ImGui::EndDisabled();
+                    draw_disabled_reason(collision_editor.points.size() <= minimum_points,
+                                         "The shape must keep its minimum number of points.");
                     ImGui::SameLine();
                     if (ImGui::Button("Add point")) collision_editor.points.push_back({});
                 }
@@ -2557,6 +2595,8 @@ int run(const std::filesystem::path& project_root,
                 } else status = "Event declaration rejected";
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(event_id.empty(),
+                                 "Enter an event id before declaring it.");
             for (const auto& event_definition : map.events) {
                 const auto selected = selected_event_id == event_definition.id.value;
                 if (ImGui::Selectable(event_definition.id.value.c_str(), selected))

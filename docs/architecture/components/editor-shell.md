@@ -72,9 +72,13 @@ C4Component
 - `MechanicSession` applique la même sauvegarde automatique avant de créer ou
   d'ouvrir un autre graphe, y compris lors de l'ouverture d'une configuration
   de prefab ou d'instance.
-- `MapSession` sauvegarde également la map dirty avant de créer ou d'ouvrir une
+- `MapSession` sauvegarde également la map dirty avant de créer ou d’ouvrir une
   autre map ; une cible invalide est chargée et validée avant de toucher à la
   session courante.
+- Les principales actions désactivées de Map Studio exposent désormais leur
+  précondition au survol (sélection, identifiant manquant, couche active,
+  historique ou minimum géométrique) ; les contrôles secondaires d’Asset
+  Studio restent à harmoniser.
 - `SceneSession` applique le même shell de document aux scènes. Map Studio
   expose création et ouverture, références de maps avec mount stable, map
   d'entrée, transitions événementielles, undo/redo, autosave, récupération,
