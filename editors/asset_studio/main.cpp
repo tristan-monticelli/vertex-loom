@@ -5419,6 +5419,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
+        for (std::size_t action_index = 0; action_index < creation.input.actions.size(); ++action_index) {
+            draw_prompt_error(validation, "actions[" + std::to_string(action_index) + "]");
+            draw_prompt_error(validation, "actions[" + std::to_string(action_index) + "].id");
+        }
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Create input bindings", {180.0F, 0.0F})) {
