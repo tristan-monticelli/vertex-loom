@@ -374,8 +374,8 @@ même rail sans saisie manuelle d'identifiants.
 - [ ] Ajouter `Open in Resource Explorer` depuis chaque référence texture.
 - [x] Conserver la source PNG byte-for-byte.
 - [x] Garder crop, pivot, transform et filtrage non destructifs.
-- [ ] Rendre tous les paramètres de `RasterView` éditables après import.
-- [ ] Afficher simultanément source complète, crop actif et résultat final.
+- [x] Rendre tous les paramètres de `RasterView` éditables après import.
+- [x] Afficher simultanément source complète, crop actif et résultat final.
 - [ ] Tester navigation avec beaucoup de textures et noms similaires.
 - [ ] Tester changement de texture avec undo, redo, save et reload.
 
