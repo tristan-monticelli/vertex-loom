@@ -461,7 +461,7 @@ et ne dépend jamais de l'ordre antérieur des clics.
 ## 9 — Inputs physiques réellement personnalisables
 
 - [ ] Conserver `InputDocument` séparé du BehaviorGraph.
-- [ ] Ajouter des noms lisibles de touches et boutons à la place des seuls codes.
+- [x] Ajouter des noms lisibles de touches et boutons à côté des codes persistés.
 - [x] Permettre un nombre quelconque d'actions et de bindings.
 - [x] Ajouter Add, Duplicate, Reorder et Remove dans la modale de création.
 - [x] Générer des identifiants uniques au lieu de répéter `action`.

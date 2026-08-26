@@ -55,6 +55,14 @@ constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
 
+std::string input_binding_label(const fabric::project::InputBinding& binding) {
+    if (binding.device == fabric::project::InputDevice::keyboard) {
+        const auto* name = SDL_GetKeyName(static_cast<SDL_Keycode>(binding.code));
+        return (name != nullptr && *name != '\0') ? std::string(name) : "Unknown key";
+    }
+    return "Gamepad button " + std::to_string(binding.code);
+}
+
 struct CreationUiState {
     struct BehaviorFields {
         std::string name{"Entity behavior"};
@@ -4112,6 +4120,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         status = "Input binding rejected; inspect diagnostics.";
                     }
                     ImGui::SameLine();
+                    ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
+                    ImGui::SameLine();
                     if (ImGui::SmallButton("Remove binding")) {
                         action_removed = session.remove_selected_input_binding(
                             action_index, binding_index);
@@ -5379,6 +5389,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(130.0F);
                 ImGui::InputInt("Code", &binding.code);
+                ImGui::SameLine();
+                ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
                 ImGui::PopID();
             }
             if (ImGui::Button("Add binding"))
