@@ -5,7 +5,9 @@
 namespace {
 
 fabric::project::AnimationClip clip() {
-    return {.document = {.schema_version = 1,
+    return {.document = {
+                         .schema_version =
+                             fabric::project::current_animation_schema_version,
                          .type = "animation",
                          .id = {.value = "timeline"},
                          .name = "Timeline"},

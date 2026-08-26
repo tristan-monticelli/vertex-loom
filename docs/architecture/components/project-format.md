@@ -122,9 +122,11 @@ C4Component
   en mémoire avec un nœud visible et déverrouillé. Les
   contraintes référencent uniquement des nœuds de la même entité et sont
   validées contre les cycles, doublons d’ordre et nœuds manquants.
-- `AnimationClip v1` est stocké sous
+- `AnimationClip v2` est stocké sous
   `assets/animations/<id>.animation.json`. Il porte une durée, une boucle,
-  des markers et des pistes liées par `nodeId + componentId + propertyId`.
+  une cible d'entité de prévisualisation optionnelle, des markers et des pistes
+  liées par `nodeId + componentId + propertyId`. La v1 devient explicitement
+  générique à la lecture.
   Les valeurs v1 sont scalaire, `Vec2`, couleur, booléen ou référence de
   ressource ; les interpolations disponibles sont step, linear et cubic.
   Chaque piste porte aussi une composition `replace` ou `additive` ; le champ

@@ -12,7 +12,7 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_animation_schema_version = 1;
+inline constexpr std::uint32_t current_animation_schema_version = 2;
 
 using AnimationValue = std::variant<float, core::Vec2, core::Color, bool,
                                      ResourceReference>;
@@ -63,6 +63,7 @@ struct AnimationClip {
         .schema_version = current_animation_schema_version,
         .type = "animation",
     };
+    std::optional<ResourceReference> preview_entity;
     float duration{};
     bool loop{};
     std::vector<AnimationMarker> markers;

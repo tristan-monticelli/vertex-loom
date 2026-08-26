@@ -628,8 +628,12 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     write_project(project.path());
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
+    fabric::editor::CreateEntityPrompt entity_prompt;
+    entity_prompt.name = "Animated hero";
+    REQUIRE(session.create_entity(entity_prompt));
     fabric::editor::CreateAnimationPrompt prompt;
     prompt.name = "Walk cycle";
+    prompt.preview_entity_id = "animated-hero";
     prompt.duration = 2.0;
     prompt.marker_id = "loop-point";
     prompt.marker_time = 1.5;
@@ -638,6 +642,10 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_resource()->kind ==
           fabric::editor::StudioResourceKind::animation);
     REQUIRE(session.selected_animation().has_value());
+    REQUIRE(session.selected_animation()->preview_entity.has_value());
+    CHECK(session.selected_animation()->preview_entity->id.value ==
+          "animated-hero");
+    REQUIRE(session.selected_entity().has_value());
     CHECK(session.selected_animation()->duration == 2.0F);
     REQUIRE(session.selected_animation()->markers.size() == 1U);
     CHECK(session.selected_animation()->markers.front().id == "loop-point");
@@ -653,6 +661,10 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_animation()->tracks.empty());
     REQUIRE(session.redo(start));
     REQUIRE(session.selected_animation()->tracks.size() == 1U);
+    REQUIRE(session.set_selected_animation_preview_entity(std::nullopt, start));
+    CHECK_FALSE(session.selected_entity().has_value());
+    REQUIRE(session.undo(start));
+    REQUIRE(session.selected_entity().has_value());
     REQUIRE(session.insert_selected_animation_key(
         {.node_id = "root", .component_id = "transform",
          .property_id = "position"},
@@ -702,15 +714,16 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     REQUIRE(recovered.selected_animation()->tracks.size() == 1U);
     REQUIRE(recovered.save());
     REQUIRE(session.save());
-    fabric::editor::CreateEntityPrompt entity_prompt;
-    entity_prompt.name = "Preview target";
-    entity_prompt.node_name = "Root";
-    REQUIRE(session.create_entity(entity_prompt));
+    fabric::editor::CreateEntityPrompt other_entity_prompt;
+    other_entity_prompt.name = "Unrelated selection";
+    other_entity_prompt.node_name = "Root";
+    REQUIRE(session.create_entity(other_entity_prompt));
     REQUIRE(session.selected_entity().has_value());
     REQUIRE(session.select_resource(
         fabric::editor::StudioResourceKind::animation, {.value = "walk-cycle"}));
     REQUIRE(session.selected_animation().has_value());
-    CHECK(session.selected_entity().has_value());
+    REQUIRE(session.selected_entity().has_value());
+    CHECK(session.selected_entity()->document.id.value == "animated-hero");
     const auto loaded = fabric::project::load_animation(
         project.path(), *session.manifest(),
         fabric::project::animation_document_path(
@@ -905,6 +918,7 @@ TEST_CASE("animation session accepts scalar and color key values") {
     REQUIRE(session.open(project.path()));
     fabric::editor::CreateAnimationPrompt prompt;
     prompt.name = "Typed animation";
+    prompt.generic_preview = true;
     prompt.duration = 1.0;
     REQUIRE(session.create_animation(prompt));
     const fabric::editor::AutosaveScheduler::Clock::time_point start{};

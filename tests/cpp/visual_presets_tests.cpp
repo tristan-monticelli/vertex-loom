@@ -172,6 +172,7 @@ void create_studio_beam_fixture(const std::filesystem::path& root) {
 
     fabric::editor::CreateAnimationPrompt animation;
     animation.name = "Beam Scroll";
+    animation.preview_entity_id = "beam-entity";
     animation.duration = 1.0;
     animation.loop = true;
     REQUIRE(studio.create_animation(animation));
@@ -220,6 +221,7 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
 
     fabric::editor::CreateAnimationPrompt animation;
     animation.name = "Beam Scroll";
+    animation.preview_entity_id = "textile-head-entity";
     animation.duration = 1.0;
     animation.loop = true;
     REQUIRE(studio.create_animation(animation));
@@ -486,7 +488,9 @@ TEST_CASE("Beam texture offset uses a generic component animation property") {
     REQUIRE(offset_binding != bindings.end());
 
     fabric::project::AnimationClip clip{
-        .document = {.type = "animation",
+        .document = {.schema_version =
+                         fabric::project::current_animation_schema_version,
+                     .type = "animation",
                      .id = {.value = "beam-scroll"},
                      .name = "Beam Scroll"},
         .duration = 1.0F,

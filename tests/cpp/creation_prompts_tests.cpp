@@ -249,6 +249,13 @@ TEST_CASE("animation prompt validates clip timing and marker") {
     TemporaryDirectory project;
     fabric::editor::CreateAnimationPrompt prompt;
     prompt.name = "Walk cycle";
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("previewEntity").has_value());
+    prompt.preview_entity_id = "missing-entity";
+    CHECK(prompt.validate(project.path(), manifest())
+              .error_for("previewEntity").has_value());
+    prompt.preview_entity_id.clear();
+    prompt.generic_preview = true;
     prompt.duration = 2.0;
     prompt.marker_id = "loop-point";
     prompt.marker_time = 1.25;
@@ -263,6 +270,7 @@ TEST_CASE("animation prompt validates clip timing and marker") {
     prompt.reset();
     CHECK(prompt.duration == 1.0);
     CHECK(prompt.loop);
+    CHECK_FALSE(prompt.generic_preview);
 }
 
 TEST_CASE("project and artwork prompt states are isolated and cancellable") {

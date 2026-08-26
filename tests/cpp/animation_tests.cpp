@@ -18,7 +18,7 @@ fabric::project::ProjectManifest manifest() {
 fabric::project::AnimationClip clip() {
     using namespace fabric::project;
     return {
-        .document = {.schema_version = 1,
+        .document = {.schema_version = current_animation_schema_version,
                      .type = "animation",
                      .id = {.value = "idle"},
                      .name = "Idle"},
@@ -41,6 +41,21 @@ fabric::project::AnimationClip clip() {
              .keys = {{0.0F, ResourceReference{{.value = "hero"}, "texture"}}}},
         },
     };
+}
+
+TEST_CASE("animation v1 migrates to an explicit generic v2 clip") {
+    auto source = clip();
+    source.document.schema_version = 1;
+    auto serialized = fabric::project::serialize_animation(source);
+    const auto preview = serialized.find("  \"previewEntity\"");
+    REQUIRE(preview != std::string::npos);
+    const auto line_end = serialized.find('\n', preview);
+    serialized.erase(preview, line_end - preview + 1U);
+    const auto parsed = fabric::project::parse_animation(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->document.schema_version ==
+          fabric::project::current_animation_schema_version);
+    CHECK_FALSE(parsed.asset->preview_entity.has_value());
 }
 
 TEST_CASE("animation clips round-trip and publish atomically") {

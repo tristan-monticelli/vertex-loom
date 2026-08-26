@@ -731,6 +731,11 @@ bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
             .id = prompt.resource_id_for_document(project_root_, *manifest_),
             .name = prompt.name,
         },
+        .preview_entity = prompt.generic_preview
+            ? std::optional<project::ResourceReference>{}
+            : std::optional<project::ResourceReference>{
+                project::ResourceReference{
+                    {.value = prompt.preview_entity_id}, "entity"}},
         .duration = static_cast<float>(prompt.duration),
         .loop = prompt.loop,
     };
@@ -1344,12 +1349,26 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
             errors_ = std::move(loaded.errors);
             return false;
         }
+        std::optional<project::EntityDefinition> preview_entity;
+        if (loaded.asset->preview_entity) {
+            auto target = project::load_entity(
+                project_root_, *manifest_, project::entity_document_path(
+                    *manifest_, loaded.asset->preview_entity->id));
+            if (!target.ok()) {
+                errors_ = std::move(target.errors);
+                return false;
+            }
+            preview_entity = std::move(*target.entity);
+        }
         imported_texture_.reset();
         selected_texture_document_path_.clear();
         recovery_texture_.reset();
         imported_vector_.reset();
         created_vector_.reset();
         selected_material_.reset();
+        selected_entity_ = std::move(preview_entity);
+        selected_entity_document_path_.clear();
+        recovery_entity_.reset();
         selected_animation_ = std::move(*loaded.asset);
         selected_vector_document_path_.clear();
         recovery_vector_.reset();
@@ -1973,6 +1992,21 @@ bool ProjectSession::prepare_animation_edit(
     return true;
 }
 
+bool ProjectSession::sync_animation_preview_entity() {
+    selected_entity_.reset();
+    if (!selected_animation_ || !selected_animation_->preview_entity)
+        return true;
+    auto loaded = project::load_entity(
+        project_root_, *manifest_, project::entity_document_path(
+            *manifest_, selected_animation_->preview_entity->id));
+    if (!loaded.ok()) {
+        errors_ = std::move(loaded.errors);
+        return false;
+    }
+    selected_entity_ = std::move(*loaded.entity);
+    return true;
+}
+
 bool ProjectSession::prepare_input_edit(
     const AutosaveScheduler::Clock::time_point now) {
     if (!selected_input_) {
@@ -2188,6 +2222,38 @@ bool ProjectSession::set_selected_animation_loop(
     return true;
 }
 
+bool ProjectSession::set_selected_animation_preview_entity(
+    std::optional<project::ResourceReference> entity,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    std::optional<project::EntityDefinition> preview_entity;
+    if (entity) {
+        auto loaded = project::load_entity(
+            project_root_, *manifest_,
+            project::entity_document_path(*manifest_, entity->id));
+        if (!loaded.ok()) {
+            errors_ = std::move(loaded.errors);
+            return false;
+        }
+        preview_entity = std::move(*loaded.entity);
+    }
+    auto candidate = *selected_animation_;
+    candidate.preview_entity = std::move(entity);
+    const auto validation = project::validate_animation(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(std::make_unique<ReplaceValueCommand<
+            project::AnimationClip>>(*selected_animation_, std::move(candidate))))
+        return false;
+    dirty_document_ = DirtyDocument::animation;
+    selected_entity_ = std::move(preview_entity);
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::insert_selected_animation_key(
     project::PropertyBinding binding, const float time,
     project::AnimationValue value,
@@ -2295,6 +2361,8 @@ bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.undo()) {
         return false;
     }
+    if (dirty_document_ == DirtyDocument::animation &&
+        !sync_animation_preview_entity()) return false;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -2304,6 +2372,8 @@ bool ProjectSession::redo(const AutosaveScheduler::Clock::time_point now) {
     if (!commands_.redo()) {
         return false;
     }
+    if (dirty_document_ == DirtyDocument::animation &&
+        !sync_animation_preview_entity()) return false;
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -2638,6 +2708,7 @@ bool ProjectSession::accept_recovery(
     if (recovery_animation_) {
         selected_animation_ = std::move(recovery_animation_);
         recovery_animation_.reset();
+        if (!sync_animation_preview_entity()) return false;
         commands_.clear();
         commands_.mark_dirty();
         dirty_document_ = DirtyDocument::animation;

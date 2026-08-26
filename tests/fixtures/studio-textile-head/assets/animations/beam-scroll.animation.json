@@ -4,7 +4,11 @@
   "loop": true,
   "markers": [],
   "name": "Beam Scroll",
-  "schemaVersion": 1,
+  "previewEntity": {
+    "expectedType": "entity",
+    "id": "textile-head-entity"
+  },
+  "schemaVersion": 2,
   "tracks": [
     {
       "binding": {

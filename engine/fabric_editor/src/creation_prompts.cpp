@@ -598,6 +598,20 @@ PromptValidation CreateAnimationPrompt::validate(
         add_error(validation, "duration",
                   "Duration must be finite and greater than zero.");
     }
+    if (generic_preview && !preview_entity_id.empty()) {
+        add_error(validation, "previewEntity",
+                  "A generic clip cannot keep a preview entity.");
+    } else if (!generic_preview) {
+        if (!core::ResourceId::is_valid(preview_entity_id)) {
+            add_error(validation, "previewEntity",
+                      "Choose an entity or explicitly create a generic clip.");
+        } else if (!std::filesystem::is_regular_file(
+                       project_root / project::entity_document_path(
+                           manifest, {.value = preview_entity_id}))) {
+            add_error(validation, "previewEntity",
+                      "The selected preview entity does not exist.");
+        }
+    }
     if (!marker_id.empty()) {
         if (!core::ResourceId::is_valid(marker_id)) {
             add_error(validation, "marker", "Marker id must be valid.");
@@ -611,8 +625,10 @@ PromptValidation CreateAnimationPrompt::validate(
     validation.destination = project_root /
         project::animation_document_path(manifest, id);
     validation.summary = {
-        "Create AnimationClip v1: " + name,
+        "Create AnimationClip v2: " + name,
         "Id: " + id.value,
+        generic_preview ? "Preview: generic"
+                        : "Preview entity: " + preview_entity_id,
         "Destination: " + validation.destination.generic_string(),
         "Duration: " + std::to_string(duration) + " seconds",
         std::string{"Loop: "} + (loop ? "yes" : "no"),

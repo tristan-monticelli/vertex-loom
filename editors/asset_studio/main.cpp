@@ -3034,6 +3034,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.selected_entity()) {
             const auto entity = *session.selected_entity();
             ImGui::SeparatorText("Entity behavior");
+            if (ImGui::Button("Add animation clip...")) {
+                creation.request_animation = true;
+                status = "Create a clip targeted at this entity.";
+            }
             std::string behavior_id = entity.behavior
                 ? entity.behavior->id.value : std::string{};
             if (draw_project_resource_picker(
@@ -3557,6 +3561,23 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.selected_animation()) {
             auto& clip = *session.selected_animation();
             ImGui::SeparatorText("Animation timeline");
+            std::string preview_entity_id = clip.preview_entity
+                ? clip.preview_entity->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Preview entity (empty = generic)", session.resources(),
+                    fabric::editor::StudioResourceKind::entity,
+                    preview_entity_id, true)) {
+                const auto target = preview_entity_id.empty()
+                    ? std::optional<fabric::project::ResourceReference>{}
+                    : std::optional<fabric::project::ResourceReference>{
+                        fabric::project::ResourceReference{
+                            {.value = preview_entity_id}, "entity"}};
+                status = session.set_selected_animation_preview_entity(target)
+                    ? "Animation preview target changed."
+                    : "Animation target rejected; inspect diagnostics.";
+            }
+            if (!clip.preview_entity)
+                ImGui::TextDisabled("Generic clip: no entity preview.");
             float duration = clip.duration;
             if (ImGui::InputFloat("Duration", &duration, 0.1F, 1.0F, "%.2f s")) {
                 if (!session.set_selected_animation_duration(duration)) {
@@ -3635,7 +3656,29 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::SeparatorText("Set key");
-            ImGui::InputText("Node id", &animation_ui.node_id);
+            if (session.selected_entity() &&
+                !session.selected_entity()->nodes.empty()) {
+                const auto& target_nodes = session.selected_entity()->nodes;
+                const auto selected_node = std::ranges::find(
+                    target_nodes, animation_ui.node_id,
+                    &fabric::project::EntityNode::id);
+                const char* node_label = selected_node == target_nodes.end()
+                    ? "Choose target node..." : selected_node->name.c_str();
+                if (ImGui::BeginCombo("Target node", node_label)) {
+                    for (const auto& target_node : target_nodes) {
+                        if (ImGui::Selectable(target_node.name.c_str(),
+                                target_node.id == animation_ui.node_id))
+                            animation_ui.node_id = target_node.id;
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s", target_node.id.c_str());
+                    }
+                    ImGui::EndCombo();
+                }
+            } else {
+                ImGui::TextDisabled(
+                    "Choose a preview entity to bind one of its nodes.");
+                animation_ui.node_id.clear();
+            }
             const char* binding_presets[] = {
                 "Custom", "Transform / Position", "Transform / Rotation",
                 "Transform / Scale", "Material / Opacity", "Material / Color"};
@@ -3986,6 +4029,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (creation.request_animation && session.has_project()) {
         creation.animation.reset();
+        if (session.selected_resource() &&
+            session.selected_resource()->kind ==
+                fabric::editor::StudioResourceKind::entity &&
+            session.selected_entity())
+            creation.animation.preview_entity_id =
+                session.selected_entity()->document.id.value;
         ImGui::OpenPopup("Create animation");
         creation.request_animation = false;
     }
@@ -4660,11 +4709,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create animation", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create an AnimationClip v1");
+        ImGui::TextUnformatted("Create an AnimationClip v2");
         ImGui::TextDisabled(
             "The validated clip is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &creation.animation.name);
+        if (ImGui::Checkbox("Generic clip (no preview entity)",
+                            &creation.animation.generic_preview) &&
+            creation.animation.generic_preview)
+            creation.animation.preview_entity_id.clear();
+        if (!creation.animation.generic_preview)
+            static_cast<void>(draw_project_resource_picker(
+                "Preview entity", session.resources(),
+                fabric::editor::StudioResourceKind::entity,
+                creation.animation.preview_entity_id, false));
         ImGui::SetNextItemWidth(220.0F);
         ImGui::InputDouble("Duration (seconds)", &creation.animation.duration,
                            0.1, 1.0, "%.2f");
@@ -4681,6 +4739,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
         draw_prompt_error(validation, "duration");
+        draw_prompt_error(validation, "previewEntity");
         draw_prompt_error(validation, "marker");
         draw_prompt_error(validation, "markerTime");
         draw_prompt_summary(validation);
@@ -4848,7 +4907,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool behavior_e2e = false,
                      const bool transformation_e2e = false,
-                     const bool entity_e2e = false) {
+                     const bool entity_e2e = false,
+                     const bool animation_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -4875,7 +4935,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
-            ((behavior_e2e || transformation_e2e || entity_e2e)
+            ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -5084,6 +5144,32 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             !visual.packets.empty();
         if (!entity_e2e_complete)
             std::cerr << "Asset Studio Entity E2E failed\n";
+    }
+
+    bool animation_e2e_complete = false;
+    if (animation_e2e && session.has_project()) {
+        fabric::editor::CreateAnimationPrompt prompt;
+        prompt.name = "Targeted Animation E2E";
+        prompt.preview_entity_id = "textile-head-entity";
+        prompt.duration = 2.0;
+        const bool authored = session.create_animation(prompt) &&
+            session.set_selected_animation_preview_entity(std::nullopt) &&
+            session.undo() && session.save();
+        fabric::editor::ProjectSession reloaded;
+        const bool reopened = authored && reloaded.open(initial_project) &&
+            reloaded.select_resource(
+                fabric::editor::StudioResourceKind::animation,
+                {.value = "targeted-animation-e2e"});
+        const auto visual = reopened
+            ? build_entity_preview(reloaded)
+            : EntityPreviewResult{};
+        animation_e2e_complete = reopened &&
+            reloaded.selected_animation()->preview_entity &&
+            reloaded.selected_animation()->preview_entity->id.value ==
+                "textile-head-entity" &&
+            reloaded.selected_entity() && !visual.packets.empty();
+        if (!animation_e2e_complete)
+            std::cerr << "Asset Studio Animation E2E failed\n";
     }
 
     bool running = true;
@@ -5401,7 +5487,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
-        if (behavior_e2e || transformation_e2e || entity_e2e) running = false;
+        if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
+            running = false;
     }
 
     if (preview.texture != 0U) {
@@ -5423,7 +5510,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_Quit();
     return (behavior_e2e && !behavior_e2e_complete) ||
             (transformation_e2e && !transformation_e2e_complete) ||
-            (entity_e2e && !entity_e2e_complete)
+            (entity_e2e && !entity_e2e_complete) ||
+            (animation_e2e && !animation_e2e_complete)
         ? 1 : 0;
 }
 
@@ -5436,19 +5524,22 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-transformation";
     const bool entity_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-entity";
+    const bool animation_e2e = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--e2e-animation";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
-        !entity_e2e) {
+        !entity_e2e && !animation_e2e) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
-                     "       asset_studio --e2e-entity project-directory\n";
+                     "       asset_studio --e2e-entity project-directory\n"
+                     "       asset_studio --e2e-animation project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
-        (behavior_e2e || transformation_e2e || entity_e2e)
+        (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
-                            entity_e2e);
+                            entity_e2e, animation_e2e);
 }

@@ -109,8 +109,9 @@ C4Component
 - Le hub propose aussi `New entity...`. Le prompt crée un nœud racine avec
   drawable, matériau optionnel et transform, valide les références locales,
   publie atomiquement dans `entities`, puis réindexe l’entité.
-- Le hub propose `New animation...`. Le prompt crée un `AnimationClip v1`
-  avec durée, boucle et marker optionnel, le publie atomiquement dans
+- Le hub propose `New animation...`. Le prompt crée un `AnimationClip v2`
+  avec cible d'entité explicite ou mode générique, durée, boucle et marker
+  optionnel, le publie atomiquement dans
   `assets/animations`, puis le réindexe sans imposer de piste métier.
 - Le hub propose `New input bindings...`. Le prompt édite le nom, les actions
   et les couples périphérique/code, refuse les identifiants et bindings

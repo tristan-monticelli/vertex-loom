@@ -93,9 +93,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   l'inspecteur d'édition.
 - [x] Rendre le drawable d'un nœud d'entité modifiable après création : kind,
   ressource, matériau, composant, variante, overrides, visibilité et verrou.
-- [ ] Ajouter explicitement une entité cible lors de la création d'une
+- [x] Ajouter explicitement une entité cible lors de la création d'une
   animation et permettre de changer cette cible depuis l'inspecteur.
-- [ ] Ne plus utiliser la dernière entité sélectionnée comme cible implicite de
+- [x] Ne plus utiliser la dernière entité sélectionnée comme cible implicite de
   preview d'une animation.
 - [ ] Transformer le Project tree en explorateur de ressources administrable.
   Il reste une liste plate à gauche sans Duplicate, Rename, Reveal, Copy ID,
@@ -432,26 +432,26 @@ rail droit sans recréation ni édition JSON.
 
 ## 8 — Animations avec cible explicite
 
-- [ ] Écrire un ADR remplaçant la cible implicite issue de l'ancienne sélection.
-- [ ] Ajouter un sélecteur d'entité au prompt de création d'animation.
-- [ ] Permettre une animation générique sans cible uniquement comme choix
+- [x] Écrire un ADR remplaçant la cible implicite issue de l'ancienne sélection.
+- [x] Ajouter un sélecteur d'entité au prompt de création d'animation.
+- [x] Permettre une animation générique sans cible uniquement comme choix
   explicite.
-- [ ] Persister une cible de preview ou une association versionnée adaptée.
-- [ ] Afficher et modifier la cible dans l'inspecteur du clip.
-- [ ] Ne jamais conserver silencieusement une entité sélectionnée précédemment.
-- [ ] Lister les nœuds réels de l'entité cible au lieu de demander `Node id` en
+- [x] Persister une cible de preview ou une association versionnée adaptée.
+- [x] Afficher et modifier la cible dans l'inspecteur du clip.
+- [x] Ne jamais conserver silencieusement une entité sélectionnée précédemment.
+- [x] Lister les nœuds réels de l'entité cible au lieu de demander `Node id` en
   texte libre.
 - [ ] Construire les propriétés depuis le registre de descripteurs de la cible.
 - [ ] Exposer transform, matériau, fill, image fill et paramètres de composant.
 - [ ] Signaler immédiatement les bindings devenus invalides.
 - [ ] Ajouter une action pour réparer ou remplacer un binding invalide.
-- [ ] Permettre de créer le clip depuis l'entité sélectionnée.
-- [ ] Permettre d'ajouter un clip à l'entité depuis son rail.
+- [x] Permettre de créer le clip depuis l'entité sélectionnée.
+- [x] Permettre d'ajouter un clip à l'entité depuis son rail.
 - [ ] Implémenter le geste valeur A au temps A → valeur B au temps B.
 - [ ] Ajouter sélection multiple, copier/coller et snapping de clés.
 - [ ] Ajouter tangentes et easing après décision de contrat.
-- [ ] Prévisualiser le clip sur l'entité dès sa création.
-- [ ] Tester création ciblée, changement de cible et cible absente.
+- [x] Prévisualiser le clip sur l'entité dès sa création.
+- [x] Tester création ciblée, changement de cible et cible absente.
 - [ ] Tester changements de fill et transform d'image dans la timeline.
 - [ ] Tester sauvegarde, reload, state machine et runtime.
 
@@ -595,7 +595,7 @@ automatiquement sur les trois plateformes.
 - [ ] Lot 1 : transition uniforme entre documents.
 - [ ] Lot 2 : Resource Explorer et duplication générique.
 - [ ] Lot 3 : textures, matériaux et édition complète des drawables d'entité.
-- [ ] Lot 4 : cible explicite des animations.
+- [x] Lot 4 : cible explicite des animations.
 - [ ] Lot 5 : BehaviorGraph et inputs physiques séparés.
 - [ ] Lot 6 : transformation d'entité.
 - [ ] Lot 7 : personnalisateur vectoriel complet.

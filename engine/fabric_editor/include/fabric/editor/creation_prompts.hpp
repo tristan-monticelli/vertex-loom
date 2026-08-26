@@ -161,6 +161,8 @@ struct CreateEntityPrompt {
 
 struct CreateAnimationPrompt {
     std::string name;
+    std::string preview_entity_id;
+    bool generic_preview{};
     double duration{1.0};
     bool loop{true};
     std::string marker_id;

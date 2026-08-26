@@ -164,6 +164,10 @@ public:
         bool loop,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_animation_preview_entity(
+        std::optional<project::ResourceReference> entity,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool insert_selected_animation_key(
         project::PropertyBinding binding, float time,
         project::AnimationValue value, project::AnimationInterpolation interpolation,
@@ -323,6 +327,7 @@ private:
 
     [[nodiscard]] bool prepare_animation_edit(
         AutosaveScheduler::Clock::time_point now);
+    [[nodiscard]] bool sync_animation_preview_entity();
     [[nodiscard]] bool prepare_texture_edit(
         AutosaveScheduler::Clock::time_point now);
     [[nodiscard]] bool prepare_input_edit(
