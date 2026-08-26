@@ -414,7 +414,7 @@ std::vector<std::filesystem::path> fixture_files(
     std::vector<std::filesystem::path> result;
     for (const auto& entry :
          std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file())
+        if (entry.is_regular_file() && entry.path().filename() != ".keep")
             result.push_back(entry.path().lexically_relative(root));
     }
     std::ranges::sort(result);
