@@ -265,3 +265,6 @@ et fusionne les positions continues.
 Les règles de canvas couvrent aussi le hit-test après translation, rotation et
 échelle, l'ordre de sélection du dessus vers le dessous et le prolongement de
 la poignée de rotation dans l'orientation locale du nœud.
+Les prompts graphiques de matériau et d'entité sélectionnent leurs références
+depuis l'index typé de la session ; les validateurs headless restent la barrière
+finale contre une référence absente ou incompatible.

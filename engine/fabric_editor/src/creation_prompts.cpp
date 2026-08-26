@@ -515,7 +515,7 @@ PromptValidation CreateEntityPrompt::validate(
     validation.destination = project_root /
         project::entity_document_path(manifest, id);
     validation.summary = {
-        "Create EntityDefinition v1: " + name,
+        "Create EntityDefinition v2: " + name,
         "Id: " + id.value,
         "Destination: " + validation.destination.generic_string(),
         "Root node: " + node_name,

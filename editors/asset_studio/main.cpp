@@ -30,7 +30,9 @@
 #include <limits>
 #include <numbers>
 #include <optional>
+#include <span>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -719,6 +721,82 @@ void draw_prompt_summary(const fabric::editor::PromptValidation& validation) {
     for (const auto& line : validation.summary) {
         ImGui::TextWrapped("%s", line.c_str());
     }
+}
+
+bool text_contains_ascii_insensitive(const std::string_view text,
+                                     const std::string_view query) {
+    if (query.empty()) return true;
+    const auto fold = [](const char value) {
+        return value >= 'A' && value <= 'Z'
+            ? static_cast<char>(value - 'A' + 'a') : value;
+    };
+    for (std::size_t start = 0; start + query.size() <= text.size(); ++start) {
+        bool matches = true;
+        for (std::size_t offset = 0; offset < query.size(); ++offset) {
+            if (fold(text[start + offset]) != fold(query[offset])) {
+                matches = false;
+                break;
+            }
+        }
+        if (matches) return true;
+    }
+    return false;
+}
+
+bool draw_project_resource_picker(
+    const char* label,
+    const std::span<const fabric::editor::StudioResource> resources,
+    const fabric::editor::StudioResourceKind expected_kind,
+    std::string& selected_id, const bool optional) {
+    const auto selected = std::ranges::find_if(
+        resources, [&](const auto& resource) {
+            return resource.kind == expected_kind &&
+                resource.id.value == selected_id;
+        });
+    const std::string preview = selected != resources.end()
+        ? selected->name
+        : selected_id.empty() ? std::string{"Choose a project resource..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(420.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##resource-search", "Search by name or id...",
+                                 &filter);
+        if (optional && ImGui::Selectable("Clear selection", selected_id.empty())) {
+            selected_id.clear();
+            changed = true;
+        }
+        if (optional) ImGui::Separator();
+        bool found = false;
+        for (const auto& resource : resources) {
+            if (resource.kind != expected_kind ||
+                (!text_contains_ascii_insensitive(resource.name, filter) &&
+                 !text_contains_ascii_insensitive(resource.id.value, filter))) {
+                continue;
+            }
+            found = true;
+            const bool is_selected = resource.id.value == selected_id;
+            const std::string item_label = resource.name + "##resource-" +
+                resource.id.value;
+            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                selected_id = resource.id.value;
+                changed = true;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", resource.id.value.c_str());
+        }
+        if (!found) ImGui::TextDisabled("No matching project resource.");
+        ImGui::EndCombo();
+    }
+    if (selected != resources.end()) {
+        ImGui::TextDisabled("%s",
+                            selected->document_path.generic_string().c_str());
+    }
+    return changed;
 }
 
 ImU32 color_to_u32(const fabric::core::Color& color) {
@@ -3356,11 +3434,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::EndCombo();
         }
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Texture id (optional)", &creation.material.texture_id);
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Vector pattern id (optional)",
-                         &creation.material.vector_pattern_id);
+        static_cast<void>(draw_project_resource_picker(
+            "Texture (optional)##material-texture", session.resources(),
+            fabric::editor::StudioResourceKind::texture,
+            creation.material.texture_id, true));
+        static_cast<void>(draw_project_resource_picker(
+            "Vector pattern (optional)##material-vector", session.resources(),
+            fabric::editor::StudioResourceKind::vector,
+            creation.material.vector_pattern_id, true));
         float uv_position[] = {creation.material.uv_transform.position.x,
                                creation.material.uv_transform.position.y};
         if (ImGui::InputFloat2("UV offset", uv_position)) {
@@ -3404,7 +3485,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create entity", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create a reusable EntityDefinition v1");
+        ImGui::TextUnformatted("Create a reusable EntityDefinition v2");
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);
@@ -3422,7 +3503,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 const bool selected = creation.entity.drawable == drawable;
                 const auto option = std::string(fabric::project::to_string(drawable));
                 if (ImGui::Selectable(option.c_str(), selected)) {
+                    if (creation.entity.drawable != drawable) {
+                        creation.entity.resource_id.clear();
+                    }
                     creation.entity.drawable = drawable;
+                    if (drawable ==
+                        fabric::project::EntityDrawableKind::visual_component) {
+                        creation.entity.material_id.clear();
+                    }
                 }
                 if (selected) ImGui::SetItemDefaultFocus();
             }
@@ -3430,11 +3518,31 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         if (creation.entity.drawable !=
             fabric::project::EntityDrawableKind::none) {
-            ImGui::SetNextItemWidth(360.0F);
-            ImGui::InputText("Drawable resource id", &creation.entity.resource_id);
+            const auto resource_kind = creation.entity.drawable ==
+                    fabric::project::EntityDrawableKind::texture
+                ? fabric::editor::StudioResourceKind::texture
+                : creation.entity.drawable ==
+                      fabric::project::EntityDrawableKind::visual_component
+                ? fabric::editor::StudioResourceKind::visual_component
+                : fabric::editor::StudioResourceKind::vector;
+            static_cast<void>(draw_project_resource_picker(
+                "Drawable resource", session.resources(), resource_kind,
+                creation.entity.resource_id, false));
+        } else {
+            creation.entity.resource_id.clear();
+            ImGui::TextDisabled(
+                "Choose a drawable to attach an existing project resource.");
         }
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Material id (optional)", &creation.entity.material_id);
+        if (creation.entity.drawable !=
+            fabric::project::EntityDrawableKind::visual_component) {
+            static_cast<void>(draw_project_resource_picker(
+                "Material (optional)", session.resources(),
+                fabric::editor::StudioResourceKind::material,
+                creation.entity.material_id, true));
+        } else {
+            ImGui::TextDisabled(
+                "The selected visual component owns its composed materials.");
+        }
         float position[] = {creation.entity.transform.position.x,
                             creation.entity.transform.position.y};
         if (ImGui::InputFloat2("Position", position)) {

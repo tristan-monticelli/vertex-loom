@@ -6,7 +6,7 @@
 ## Décision
 
 Asset Studio expose `New entity...` comme une création distincte. Le prompt
-produit un `EntityDefinition v1` avec un nœud racine stable, son transform, sa
+produit un `EntityDefinition v2` avec un nœud racine stable, son transform, sa
 profondeur, un drawable `none`, `vector` ou `texture`, ainsi qu’une référence
 de matériau optionnelle.
 
