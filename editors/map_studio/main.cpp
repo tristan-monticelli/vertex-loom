@@ -1926,17 +1926,14 @@ int run(const std::filesystem::path& project_root,
     std::string new_map_name;
     std::string open_map_id;
     std::vector<fabric::project::Error> package_errors;
+    const auto save_dirty_documents = [&] {
+        return (!mechanic_session.dirty() || mechanic_session.save()) &&
+            (!session.dirty() || session.save()) &&
+            (!scene_session.dirty() || scene_session.save());
+    };
     const auto prepare_package = [&] {
-        if (mechanic_session.dirty() && !mechanic_session.save()) {
-            status = "Mechanic save failed; package action cancelled";
-            return false;
-        }
-        if (session.dirty() && !session.save()) {
-            status = "Save failed; package action cancelled";
-            return false;
-        }
-        if (scene_session.dirty() && !scene_session.save()) {
-            status = "Scene save failed; package action cancelled";
+        if (!save_dirty_documents()) {
+            status = "A document save failed; package action cancelled";
             return false;
         }
         return true;
@@ -3212,23 +3209,18 @@ int run(const std::filesystem::path& project_root,
                 e2e_modal_handled = true;
                 ImGui::CloseCurrentPopup();
             }
-            if (ImGui::Button("Save and continue", {150.0F, 0.0F})) {
-                bool saved = true;
-                if (mechanic_session.dirty()) saved = mechanic_session.save();
-                if (saved && session.dirty()) saved = session.save();
-                if (saved && scene_session.dirty())
-                    saved = scene_session.save();
-                if (saved) {
+            if (ImGui::Button("Retry save and continue", {170.0F, 0.0F})) {
+                if (save_dirty_documents()) {
                     ImGui::CloseCurrentPopup();
                     if (transition_guard.resolve(
-                            fabric::editor::UnsavedDecision::save) ==
+                        fabric::editor::UnsavedDecision::save) ==
                         fabric::editor::SessionAction::quit) {
                         running = false;
                     }
                 } else {
                     static_cast<void>(transition_guard.resolve(
                         fabric::editor::UnsavedDecision::save, false));
-                    status = "Save failed; Map Studio remains open";
+                    status = "Save failed; retry or discard the changes";
                 }
             }
             ImGui::SameLine();
