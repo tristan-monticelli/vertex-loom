@@ -563,7 +563,11 @@ rail droit sans recréation ni édition JSON.
 - [x] Prévisualiser le clip sur l'entité dès sa création.
 - [x] Tester création ciblée, changement de cible et cible absente.
 - [ ] Tester changements de fill et transform d'image dans la timeline.
-- [ ] Tester sauvegarde, reload, state machine et runtime.
+- [x] Tester sauvegarde, reload, state machine et runtime. `fabric_project_
+  session_editing_tests` couvre publication, autosave, récupération et reload
+  d’un clip ; `fabric_animation_state_machine_tests`,
+  `fabric_preview_runtime_tests` et les E2E animation couvrent la state machine
+  et l’évaluation runtime.
 
 Gate : créer une animation avec une entité affiche immédiatement cette entité
 et ne dépend jamais de l'ordre antérieur des clics.
