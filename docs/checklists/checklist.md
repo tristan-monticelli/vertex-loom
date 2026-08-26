@@ -26,9 +26,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 
 - [x] Runtime projet : rendre personnage, spawn, caméra, limites et audio
   authorables depuis les documents, puis les consommer dans Preview Runtime.
-- [ ] Transitions documentaires : centraliser le dirty guard, couvrir ouvrir/
+- [x] Transitions documentaires : centraliser le dirty guard, couvrir ouvrir/
   créer/fermer projet, garantir l'atomicité avant publication et tester clean,
-  dirty valide/invalide, erreur disque et conservation du document.
+  dirty valide/invalide, erreur disque et conservation du document. La suite
+  `project transitions save valid edits and preserve invalid ones`, les tests
+  de sélection/import/duplication et les E2E de fermeture couvrent ces chemins.
 - [ ] Suppressions et dépendances : confirmations avec analyse d'impact pour
   nœuds/map/ressources, remplacement de références, cascade explicitée,
   duplication superficielle/profonde, réécriture sélective et tests collisions,
