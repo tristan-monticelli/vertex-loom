@@ -21,6 +21,7 @@
 #include <imgui_stdlib.h>
 #include <nfd.h>
 #include <nfd_sdl2.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -28,6 +29,7 @@
 #include <cstdio>
 #include <cstddef>
 #include <filesystem>
+#include <fstream>
 #include <functional>
 #include <iostream>
 #include <limits>
@@ -776,26 +778,44 @@ bool duplicate_project_resource(
 std::vector<fabric::editor::StudioResource> direct_duplication_candidates(
     fabric::editor::ProjectSession& session,
     const fabric::editor::StudioResource& resource) {
+    using Json = nlohmann::json;
     std::vector<fabric::project::ResourceReference> references;
-    if (resource.kind == fabric::editor::StudioResourceKind::entity) {
-        const auto loaded = fabric::project::load_entity(
-            session.project_root(), *session.manifest(), resource.document_path);
-        if (loaded.ok()) references = fabric::project::entity_resource_references(
-            *loaded.entity);
-    } else if (resource.kind == fabric::editor::StudioResourceKind::vector) {
-        const auto loaded = fabric::project::load_vector_asset(
-            session.project_root(), *session.manifest(), resource.document_path);
-        if (loaded.ok()) references = fabric::project::vector_resource_references(
-            *loaded.asset);
+    std::ifstream input(resource.document_path);
+    if (!input) return {};
+    try {
+        const auto document = Json::parse(input);
+        const std::function<void(const Json&)> collect = [&](const Json& value) {
+            if (value.is_object()) {
+                const auto id = value.find("id");
+                const auto type = value.find("expectedType");
+                if (id != value.end() && type != value.end() &&
+                    id->is_string() && type->is_string())
+                    references.push_back({
+                        {.value = id->get<std::string>()},
+                        type->get<std::string>()});
+                for (const auto& [_, child] : value.items()) collect(child);
+            } else if (value.is_array()) {
+                for (const auto& child : value) collect(child);
+            }
+        };
+        collect(document);
+    } catch (const nlohmann::json::exception&) {
+        return {};
     }
     std::vector<fabric::editor::StudioResource> candidates;
     for (const auto& reference : references) {
         const auto candidate = std::ranges::find_if(
             session.resources(), [&](const auto& value) {
-                const bool type_matches =
-                    (reference.expected_type == "visualComponent" &&
-                     value.kind == fabric::editor::StudioResourceKind::visual_component) ||
-                    studio_resource_kind_label(value.kind) == reference.expected_type;
+                const auto expected_type = [&] {
+                    using Kind = fabric::editor::StudioResourceKind;
+                    switch (value.kind) {
+                    case Kind::textured_path: return std::string_view{"texturedPath"};
+                    case Kind::visual_composition: return std::string_view{"visualComposition"};
+                    case Kind::visual_component: return std::string_view{"visualComponent"};
+                    default: return studio_resource_kind_label(value.kind);
+                    }
+                }();
+                const bool type_matches = expected_type == reference.expected_type;
                 return type_matches &&
                     value.id == reference.id;
             });

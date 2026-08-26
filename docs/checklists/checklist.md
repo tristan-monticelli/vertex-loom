@@ -448,9 +448,12 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 - [x] Ajouter les mêmes actions dans un menu contextuel.
 - [x] Définir une commande générique de duplication par type de ressource.
 - [x] Générer un nouvel identifiant stable et un nouveau chemin à la duplication.
-- [ ] Permettre de choisir la copie superficielle ou la duplication de certaines
-  dépendances.
-- [ ] Réécrire uniquement les références internes choisies dans la copie.
+- [x] Permettre de choisir la copie superficielle ou la duplication de certaines
+  dépendances. Le menu de duplication propose une copie simple ou une sélection
+  des références persistées du document.
+- [x] Réécrire uniquement les références internes choisies dans la copie. Le
+  test `resource duplication rewrites only selected dependencies` vérifie qu’un
+  artwork sélectionné est réécrit tandis que le matériau partagé reste inchangé.
 - [x] Analyser les références entrantes avant suppression.
 - [x] Bloquer la suppression lorsqu'elle casserait le projet sans stratégie
   choisie.

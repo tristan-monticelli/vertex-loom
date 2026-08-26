@@ -29,5 +29,6 @@ retournées par le même contrat que les duplications classiques.
 - La copie superficielle reste le comportement par défaut.
 - Une copie profonde partielle est déterministe et utilise le même garde de
   transition que les duplications classiques.
-- L’interface doit encore proposer la sélection visuelle des dépendances avant
-  de fermer les cases UX correspondantes.
+- L’interface propose la sélection visuelle des dépendances détectées dans le
+  document JSON ; les types sans référence affichent explicitement qu’il n’y a
+  rien à cloner.
