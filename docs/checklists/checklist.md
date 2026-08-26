@@ -471,8 +471,8 @@ et ne dépend jamais de l'ordre antérieur des clics.
 - [x] Ajouter combinaisons et modificateurs.
 - [ ] Ajouter contextes ou profils si leur besoin est confirmé par ADR.
 - [ ] Afficher les BehaviorGraph qui consomment chaque action sémantique.
-- [ ] Permettre le remapping sans changer le comportement de l'entité.
-- [ ] Tester plusieurs bindings par action et plusieurs documents d'input.
+- [x] Permettre le remapping sans changer le comportement de l'entité.
+- [x] Tester plusieurs bindings par action et plusieurs documents d'input.
 - [x] Tester clavier, gamepad, axes, modificateurs, duplication et suppression.
 
 Gate : l'utilisateur définit librement ses actions physiques, puis les branche
