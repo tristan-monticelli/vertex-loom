@@ -307,12 +307,12 @@ reload et dans Preview Runtime.
   - [ ] fermer le Studio.
 - [x] Sauvegarder automatiquement le document courant lorsqu'il est valide.
 - [x] Continuer automatiquement lorsque la sauvegarde réussit.
-- [ ] Ne jamais bloquer silencieusement après remplissage d'une modale.
+- [x] Ne jamais bloquer silencieusement après remplissage d'une modale.
 - [x] En cas d'échec, proposer `Retry`, `Discard` et `Cancel`.
-- [ ] Garder le document courant et son historique lorsque l'utilisateur annule.
+- [x] Garder le document courant et son historique lorsque l'utilisateur annule.
 - [ ] Ne jamais publier partiellement la nouvelle ressource avant la résolution
   de la transition.
-- [ ] Afficher la ressource et le chemin concernés dans la confirmation.
+- [x] Afficher la ressource et le chemin concernés dans la confirmation.
 - [ ] Tester chaque action avec document clean, dirty valide et dirty invalide.
 - [ ] Tester l'échec d'écriture et la conservation du document principal.
 - [x] Tester la création immédiatement après une édition non sauvegardée.
