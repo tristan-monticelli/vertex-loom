@@ -294,14 +294,14 @@ reload et dans Preview Runtime.
 
 ## 3 — Transition uniforme entre documents
 
-- [ ] Écrire un ADR pour la politique de changement de document actif.
+- [x] Écrire un ADR pour la politique de changement de document actif.
 - [ ] Remplacer les contrôles dispersés de `commands_.dirty()` par un service
   commun de transition.
 - [ ] Couvrir les actions suivantes :
   - [x] sélectionner une autre ressource ;
   - [x] créer une ressource ;
   - [x] importer une ressource ;
-  - [ ] dupliquer une ressource ;
+  - [x] dupliquer une ressource ;
   - [ ] ouvrir un projet ;
   - [ ] créer un projet ;
   - [ ] fermer le Studio.
