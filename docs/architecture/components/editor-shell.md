@@ -288,6 +288,9 @@ C4Component
 - Asset Studio expose un parcours SDL caché de texture qui importe une source,
   persiste son crop non destructif avant de créer une autre ressource, puis
   revalide le projet publié.
+- L’inspecteur d’animation propose une commande A→B qui crée ou remplace deux
+  clés de même type dans une seule opération de timeline undoable ; les temps
+  doivent être strictement ordonnés et le clip est revalidé avant publication.
 - Map Studio liste les `MechanicGraph` du projet et ouvre un seul graphe à la
   fois dans `MechanicSession`. L'inspecteur peut ajouter ou retirer un nœud
   depuis les sept schémas intégrés, modifier ses propriétés typées et connecter

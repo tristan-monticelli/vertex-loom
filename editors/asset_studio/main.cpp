@@ -203,6 +203,18 @@ struct AnimationUiState {
     bool key_boolean{};
     bool auto_key{};
     std::string key_resource_id;
+    float segment_start_time{};
+    float segment_end_time{1.0F};
+    float segment_start_value[2]{};
+    float segment_end_value[2]{1.0F, 1.0F};
+    float segment_start_scalar{};
+    float segment_end_scalar{1.0F};
+    float segment_start_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
+    float segment_end_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
+    bool segment_start_boolean{};
+    bool segment_end_boolean{true};
+    std::string segment_start_resource_id;
+    std::string segment_end_resource_id;
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
     fabric::project::AnimationComposition composition{
@@ -4711,6 +4723,109 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::EndCombo();
                 }
             }
+            ImGui::SeparatorText("A → B segment");
+            animation_ui.segment_start_time = std::clamp(
+                animation_ui.segment_start_time, 0.0F,
+                std::max(0.0F, clip.duration));
+            animation_ui.segment_end_time = std::clamp(
+                animation_ui.segment_end_time, 0.0F,
+                std::max(0.0F, clip.duration));
+            ImGui::InputFloat("A time", &animation_ui.segment_start_time,
+                              0.1F, 1.0F, "%.2f s");
+            ImGui::InputFloat("B time", &animation_ui.segment_end_time,
+                              0.1F, 1.0F, "%.2f s");
+            if (animation_ui.key_kind == 0) {
+                ImGui::InputFloat2("A value", animation_ui.segment_start_value);
+                ImGui::InputFloat2("B value", animation_ui.segment_end_value);
+            } else if (animation_ui.key_kind == 1) {
+                ImGui::InputFloat("A value", &animation_ui.segment_start_scalar);
+                ImGui::InputFloat("B value", &animation_ui.segment_end_scalar);
+            } else if (animation_ui.key_kind == 2) {
+                ImGui::ColorEdit4("A value", animation_ui.segment_start_color);
+                ImGui::ColorEdit4("B value", animation_ui.segment_end_color);
+            } else if (animation_ui.key_kind == 3) {
+                ImGui::Checkbox("A value", &animation_ui.segment_start_boolean);
+                ImGui::Checkbox("B value", &animation_ui.segment_end_boolean);
+            } else {
+                const auto draw_segment_resource = [&](const char* label,
+                                                       std::string& value) {
+                    const auto selected = std::ranges::find_if(
+                        session.resources(), [&](const auto& resource) {
+                            return resource.id.value == value;
+                        });
+                    const char* preview = selected == session.resources().end()
+                        ? (value.empty() ? "Choose a resource..." : "Missing resource")
+                        : selected->name.c_str();
+                    if (ImGui::BeginCombo(label, preview)) {
+                        for (const auto& resource : session.resources()) {
+                            if (ImGui::Selectable(resource.name.c_str(),
+                                                  resource.id.value == value))
+                                value = resource.id.value;
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("%s", resource.id.value.c_str());
+                        }
+                        ImGui::EndCombo();
+                    }
+                };
+                draw_segment_resource("A resource", animation_ui.segment_start_resource_id);
+                draw_segment_resource("B resource", animation_ui.segment_end_resource_id);
+            }
+            ImGui::BeginDisabled(animation_ui.node_id.empty() ||
+                                 animation_ui.component_id.empty() ||
+                                 animation_ui.property_id.empty() ||
+                                 animation_ui.segment_start_time >=
+                                     animation_ui.segment_end_time ||
+                                 (animation_ui.key_kind == 4 &&
+                                  (animation_ui.segment_start_resource_id.empty() ||
+                                   animation_ui.segment_end_resource_id.empty())));
+            if (ImGui::Button("Create A → B keys")) {
+                const auto segment_value = [&](const bool start) {
+                    if (animation_ui.key_kind == 0)
+                        return fabric::project::AnimationValue{
+                            fabric::core::Vec2{
+                                (start ? animation_ui.segment_start_value
+                                       : animation_ui.segment_end_value)[0],
+                                (start ? animation_ui.segment_start_value
+                                       : animation_ui.segment_end_value)[1]}};
+                    if (animation_ui.key_kind == 1)
+                        return fabric::project::AnimationValue{
+                            start ? animation_ui.segment_start_scalar
+                                  : animation_ui.segment_end_scalar};
+                    if (animation_ui.key_kind == 2)
+                        return fabric::project::AnimationValue{
+                            fabric::core::Color{
+                                (start ? animation_ui.segment_start_color
+                                       : animation_ui.segment_end_color)[0],
+                                (start ? animation_ui.segment_start_color
+                                       : animation_ui.segment_end_color)[1],
+                                (start ? animation_ui.segment_start_color
+                                       : animation_ui.segment_end_color)[2],
+                                (start ? animation_ui.segment_start_color
+                                       : animation_ui.segment_end_color)[3]}};
+                    if (animation_ui.key_kind == 3)
+                        return fabric::project::AnimationValue{
+                            start ? animation_ui.segment_start_boolean
+                                  : animation_ui.segment_end_boolean};
+                    return fabric::project::AnimationValue{
+                        fabric::project::ResourceReference{
+                            {.value = start
+                                ? animation_ui.segment_start_resource_id
+                                : animation_ui.segment_end_resource_id},
+                            "resource"}};
+                };
+                const bool created = session.set_selected_animation_segment(
+                    {.node_id = animation_ui.node_id,
+                     .component_id = animation_ui.component_id,
+                     .property_id = animation_ui.property_id},
+                    animation_ui.segment_start_time,
+                    segment_value(true), animation_ui.segment_end_time,
+                    segment_value(false), animation_ui.interpolation,
+                    fabric::editor::AutosaveScheduler::Clock::now(),
+                    animation_ui.composition);
+                status = created ? "Animation A → B segment created."
+                                 : "Animation segment rejected; inspect diagnostics.";
+            }
+            ImGui::EndDisabled();
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
             if (ImGui::BeginCombo("Interpolation", interpolation_label.c_str())) {

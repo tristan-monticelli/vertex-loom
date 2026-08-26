@@ -3131,6 +3131,28 @@ bool ProjectSession::set_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::set_selected_animation_segment(
+    project::PropertyBinding binding, const float start_time,
+    project::AnimationValue start_value, const float end_time,
+    project::AnimationValue end_value,
+    const project::AnimationInterpolation interpolation,
+    const AutosaveScheduler::Clock::time_point now,
+    const project::AnimationComposition composition) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.set_segment(std::move(binding), start_time,
+                              std::move(start_value), end_time,
+                              std::move(end_value), interpolation, composition)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys",
+                    "animation segment requires ordered times and matching value types"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::remove_selected_animation_key(
     project::PropertyBinding binding, const std::size_t key_index,
     const AutosaveScheduler::Clock::time_point now) {

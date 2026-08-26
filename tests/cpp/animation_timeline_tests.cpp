@@ -108,4 +108,27 @@ TEST_CASE("animation timeline preserves composition and rejects mismatches") {
           fabric::core::Vec2{4.0F, 5.0F});
 }
 
+TEST_CASE("animation timeline creates an undoable A to B segment") {
+    auto source = clip();
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(source, commands);
+    const fabric::project::PropertyBinding binding{"root", "transform", "opacity"};
+
+    REQUIRE(timeline.set_segment(
+        binding, 0.25F, 0.0F, 1.5F, 1.0F,
+        fabric::project::AnimationInterpolation::linear));
+    REQUIRE(source.tracks.size() == 1U);
+    REQUIRE(source.tracks.front().keys.size() == 2U);
+    CHECK(source.tracks.front().keys.front().time == 0.25F);
+    CHECK(source.tracks.front().keys.back().time == 1.5F);
+    CHECK(commands.size() == 1U);
+    REQUIRE(commands.undo());
+    CHECK(source.tracks.empty());
+    REQUIRE(commands.redo());
+    CHECK(source.tracks.front().keys.size() == 2U);
+    CHECK_FALSE(timeline.set_segment(
+        binding, 1.0F, 0.0F, 1.0F, 1.0F,
+        fabric::project::AnimationInterpolation::linear));
+}
+
 } // namespace

@@ -27,6 +27,14 @@ public:
                                project::AnimationInterpolation interpolation,
                                project::AnimationComposition composition =
                                    project::AnimationComposition::replace);
+    [[nodiscard]] bool set_segment(const project::PropertyBinding& binding,
+                                   float start_time,
+                                   project::AnimationValue start_value,
+                                   float end_time,
+                                   project::AnimationValue end_value,
+                                   project::AnimationInterpolation interpolation,
+                                   project::AnimationComposition composition =
+                                       project::AnimationComposition::replace);
     [[nodiscard]] bool move_key(const project::PropertyBinding& binding,
                                 std::size_t key_index, float time);
     [[nodiscard]] bool remove_key(const project::PropertyBinding& binding,

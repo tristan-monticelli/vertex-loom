@@ -541,7 +541,7 @@ rail droit sans recréation ni édition JSON.
 - [x] Ajouter une action pour réparer ou remplacer un binding invalide.
 - [x] Permettre de créer le clip depuis l'entité sélectionnée.
 - [x] Permettre d'ajouter un clip à l'entité depuis son rail.
-- [ ] Implémenter le geste valeur A au temps A → valeur B au temps B.
+- [x] Implémenter le geste valeur A au temps A → valeur B au temps B.
 - [ ] Ajouter sélection multiple, copier/coller et snapping de clés.
 - [ ] Ajouter tangentes et easing après décision de contrat.
 - [x] Prévisualiser le clip sur l'entité dès sa création.

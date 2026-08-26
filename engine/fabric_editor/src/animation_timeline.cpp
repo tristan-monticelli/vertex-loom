@@ -137,6 +137,47 @@ bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
     return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
+bool AnimationTimeline::set_segment(
+    const project::PropertyBinding& binding, const float start_time,
+    project::AnimationValue start_value, const float end_time,
+    project::AnimationValue end_value,
+    const project::AnimationInterpolation interpolation,
+    const project::AnimationComposition composition) {
+    if (!(start_time < end_time) || !same_value_type(start_value, end_value))
+        return false;
+    auto next = clip_;
+    auto* track = find_track(next, binding);
+    if (!track) {
+        next.tracks.push_back({binding, interpolation,
+                               {{start_time, std::move(start_value)},
+                                {end_time, std::move(end_value)}},
+                               composition});
+    } else {
+        if (track->interpolation != interpolation ||
+            track->composition != composition ||
+            (!track->keys.empty() &&
+             (!same_value_type(track->keys.front().value, start_value) ||
+              !same_value_type(track->keys.front().value, end_value))))
+            return false;
+        const auto set_or_add = [&](const float time,
+                                    project::AnimationValue value) {
+            const auto existing = std::ranges::find_if(
+                track->keys, [&](const auto& key) { return key.time == time; });
+            if (existing == track->keys.end())
+                track->keys.push_back({time, std::move(value)});
+            else existing->value = std::move(value);
+        };
+        set_or_add(start_time, std::move(start_value));
+        set_or_add(end_time, std::move(end_value));
+        std::stable_sort(track->keys.begin(), track->keys.end(),
+                         [](const auto& left, const auto& right) {
+                             return left.time < right.time;
+                         });
+    }
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
 bool AnimationTimeline::move_key(const project::PropertyBinding& binding,
                                  std::size_t key_index, float time) {
     auto next = clip_;
