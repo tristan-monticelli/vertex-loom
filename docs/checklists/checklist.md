@@ -89,7 +89,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   y compris transform, matériau, fill, image fill et composants.
 - [ ] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné.
-- [ ] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
+- [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
   suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
   symétriques et libres.
 - [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
@@ -592,7 +592,7 @@ sur un comportement sans modifier le runtime.
   - [x] convertir courbe en ligne ;
   - [x] ouvrir un contour ;
   - [x] fermer un contour.
-- [ ] Afficher et modifier les poignées Bézier directement sur le canvas.
+- [x] Afficher et modifier les poignées Bézier directement sur le canvas.
 - [x] Supporter poignées liées, symétriques et libres.
 - [x] Ajouter sélection simple et multiple de points.
 - [x] Ajouter déplacement, rotation et échelle d'une sélection de points.

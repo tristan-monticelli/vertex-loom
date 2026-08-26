@@ -6799,6 +6799,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t vector_canvas_e2e_frame = 0U;
     std::size_t vector_canvas_e2e_initial_path_size = 0U;
     fabric::core::Vec2 vector_canvas_e2e_initial_anchor{};
+    fabric::core::Vec2 vector_canvas_e2e_initial_control1{};
     if (vector_canvas_e2e && session.has_project()) {
         const fabric::core::ResourceId vector_id{.value =
             "head-button-artwork"};
@@ -6816,6 +6817,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 vector_canvas_e2e_initial_path_size = node.shape.path.size();
                 if (node.shape.path.size() > 1U)
                     vector_canvas_e2e_initial_anchor = node.shape.path[1].point;
+                if (node.shape.path.size() > 1U)
+                    vector_canvas_e2e_initial_control1 =
+                        node.shape.path[1].control1;
                 vector_canvas_e2e_complete =
                     session.set_selected_vector_node(0U, std::move(node));
                 canvas.selected_node = 0U;
@@ -6837,17 +6841,29 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     while (running) {
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 6U)
             canvas.tool = CanvasUiState::Tool::move;
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 9U) {
+            canvas.tool = CanvasUiState::Tool::move;
+            canvas.bezier_handle_mode = fabric::editor::BezierHandleMode::free;
+        }
         const bool pen_click = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 2U && vector_canvas_e2e_frame < 6U;
         const bool move_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 6U && vector_canvas_e2e_frame < 9U;
-        if (pen_click || move_gesture) {
+        const bool handle_gesture = vector_canvas_e2e &&
+            vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
+        if (pen_click || move_gesture || handle_gesture) {
             const auto frame = vector_canvas_e2e_frame;
-            const bool button_event = pen_click || frame == 6U || frame == 8U;
-            const bool button_down = pen_click ? frame % 2U == 0U : frame == 6U;
+            const bool button_event = pen_click || frame == 6U || frame == 8U ||
+                frame == 9U || frame == 11U;
+            const bool button_down = pen_click
+                ? frame % 2U == 0U
+                : (move_gesture ? frame == 6U : frame == 9U);
             const bool right_click = frame == 4U || frame == 5U;
-            const int mouse_x = move_gesture && frame >= 7U ? 730 : 705;
-            const int mouse_y = 135;
+            const int mouse_x = handle_gesture
+                ? (frame >= 10U ? 1015 : 1035)
+                : (move_gesture && frame >= 7U ? 730 : 705);
+            const int mouse_y = handle_gesture
+                ? (frame >= 10U ? 262 : 282) : 135;
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
@@ -7213,15 +7229,23 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     session.created_vector()->native &&
                     session.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size;
-            } else if (vector_canvas_e2e_frame == 9U) {
-                vector_canvas_e2e_complete =
-                    vector_canvas_e2e_complete && session.created_vector() &&
-                    session.created_vector()->native &&
-                    !session.created_vector()->native->nodes.empty() &&
-                    session.created_vector()->native->nodes.front().shape.path.size() ==
+            } else if (vector_canvas_e2e_frame == 12U) {
+                const bool saved = session.save();
+                fabric::editor::ProjectSession reloaded;
+                const auto reloaded_ok = saved && reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::vector,
+                        {.value = "head-button-artwork"}) &&
+                    reloaded.created_vector() && reloaded.created_vector()->native &&
+                    !reloaded.created_vector()->native->nodes.empty();
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    reloaded_ok &&
+                    reloaded.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size &&
-                    session.created_vector()->native->nodes.front().shape.path[1].point.x !=
-                        vector_canvas_e2e_initial_anchor.x && session.save();
+                    reloaded.created_vector()->native->nodes.front().shape.path[1].point.x !=
+                        vector_canvas_e2e_initial_anchor.x &&
+                    reloaded.created_vector()->native->nodes.front().shape.path[1].control1.x !=
+                        vector_canvas_e2e_initial_control1.x;
                 if (!vector_canvas_e2e_complete) {
                     const auto current_size = session.created_vector() &&
                             session.created_vector()->native &&
