@@ -646,8 +646,9 @@ utilisées pour tous les types de ressources.
   (CTest avec fenêtres SDL cachées).
 - [x] Mettre à jour `docs/02-quality-strategy.md` avec la commande réelle.
 - [ ] Ajouter un mode de test avec IDs de widgets stables.
-- [ ] Ajouter une fixture de projet contenant plusieurs ressources de chaque
-  type.
+- [x] Ajouter une fixture de projet contenant plusieurs ressources de chaque
+  type : `tests/fixtures/studio-textile-head` couvre désormais les ressources
+  indexées, y compris input, behavior, matériau, audio et scène.
 - [ ] Automatiser les parcours suivants :
   - [ ] parcourir et sélectionner une texture ;
   - [ ] modifier un crop puis créer une autre ressource ;

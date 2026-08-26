@@ -165,6 +165,9 @@ mi-largeur. Elle crée
 aussi son entité et sa map par les sessions Studio ; Preview Runtime charge
 cette map et chaque packet est apparié par identifiant stable pour comparer
 géométrie, UV, indices, couleurs et texture au résultat du resolver direct.
+Elle contient également une ressource input, un BehaviorGraph, un matériau,
+un document audio et une scène afin de fournir une fixture multi-ressources au
+Resource Explorer et aux futurs parcours UX.
 La scène conserve également une plateforme tournante créée par Map Studio,
 son prefab, son capteur et l'événement `platform-activate`; le graphe est
 validé dans la même fixture afin que la suite puisse ajouter la simulation et

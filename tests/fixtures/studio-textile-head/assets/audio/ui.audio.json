@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "type": "audio",
+  "id": "ui",
+  "name": "UI audio",
+  "events": [
+    {"id": "confirm", "source": "assets/audio/confirm.wav", "volume": 0.8, "loop": false}
+  ]
+}

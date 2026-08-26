@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "type": "scene",
+  "id": "preview",
+  "name": "Preview scene",
+  "maps": [
+    {"map": {"id": "textile-head-preview", "expectedType": "map"}, "layer": "world"}
+  ],
+  "entryMap": {"id": "textile-head-preview", "expectedType": "map"},
+  "transitions": []
+}
