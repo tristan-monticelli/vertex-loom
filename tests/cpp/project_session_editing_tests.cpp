@@ -181,7 +181,7 @@ TEST_CASE("runtime settings are editable and survive save and reload") {
     CHECK(*reloaded.manifest()->runtime == settings);
 }
 
-TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
+TEST_CASE("resource index administers every directly creatable resource") {
     const TemporaryDirectory project;
     write_project(project.path());
     const auto manifest = load_manifest_or_fail(project.path());
@@ -214,7 +214,30 @@ TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
 
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt vector_prompt;
+    vector_prompt.name = "Indexed Vector";
+    REQUIRE(session.create_vector_artwork(vector_prompt));
+    fabric::editor::CreateMaterialPrompt material_prompt;
+    material_prompt.name = "Indexed Material";
+    REQUIRE(session.create_material(material_prompt));
+    fabric::editor::CreateEntityPrompt entity_prompt;
+    entity_prompt.name = "Indexed Entity";
+    REQUIRE(session.create_entity(entity_prompt));
+    fabric::editor::CreateAnimationPrompt animation_prompt;
+    animation_prompt.name = "Indexed Animation";
+    animation_prompt.generic_preview = true;
+    REQUIRE(session.create_animation(animation_prompt));
+    fabric::editor::CreateInputPrompt input_prompt;
+    input_prompt.name = "Indexed Input";
+    REQUIRE(session.create_input(input_prompt));
+
     for (const auto kind : {
+             fabric::editor::StudioResourceKind::vector,
+             fabric::editor::StudioResourceKind::material,
+             fabric::editor::StudioResourceKind::entity,
+             fabric::editor::StudioResourceKind::animation,
+             fabric::editor::StudioResourceKind::input,
              fabric::editor::StudioResourceKind::map,
              fabric::editor::StudioResourceKind::scene,
              fabric::editor::StudioResourceKind::mechanic,
