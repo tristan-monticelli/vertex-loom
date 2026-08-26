@@ -18,6 +18,44 @@ moteur n'est pas encore cohérent de bout en bout. Des fonctions déclarées dan
 les contrats ou les ADR ne sont pas consommées par le runtime, et plusieurs
 parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
+### Backlog restant — état de référence
+
+Cette section regroupe toutes les cases encore ouvertes. Une case ne doit être
+cochée qu'après implémentation, test et preuve documentaire ; les sections
+détaillées plus bas restent la source de suivi par fichier et par parcours.
+
+- [ ] Runtime projet : rendre personnage, spawn, caméra, limites et audio
+  authorables depuis les documents, puis les consommer dans Preview Runtime.
+- [ ] Transitions documentaires : centraliser le dirty guard, couvrir ouvrir/
+  créer/fermer projet, garantir l'atomicité avant publication et tester clean,
+  dirty valide/invalide, erreur disque et conservation du document.
+- [ ] Suppressions et dépendances : confirmations avec analyse d'impact pour
+  nœuds/map/ressources, remplacement de références, cascade explicitée,
+  duplication superficielle/profonde, réécriture sélective et tests collisions,
+  cycles, fichiers absents et erreurs disque.
+- [ ] Textures : tests de navigation à grande échelle et vérification complète
+  des performances de recherche et des noms similaires.
+- [ ] Entités : confirmation des overrides incompatibles, gizmos de nœuds,
+  glisser-déposer artwork vers nœud existant/racine/enfant, sections éditables
+  contraintes/IK/déformation/XPBD/state machine.
+- [ ] Animations : descripteurs transform/matériau/fill/image-fill/composants,
+  geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
+  tests fill/image-fill, sauvegarde/reload/state-machine/runtime.
+- [ ] Input et comportements : décider par ADR les contextes/profils et afficher
+  les BehaviorGraph consommateurs de chaque action.
+- [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
+  poignées liées/symétriques/libres, sélection et transform multi-points,
+  transform fill indépendante, clips imbriqués, registre animable, CommandStack,
+  géométrie, E2E canvas et comparaison des draw packets.
+- [ ] Inspecteur : mêmes formulaires création/édition, raisons des boutons
+  désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
+  tailles minimales, navigation clavier et contraste.
+- [ ] UX E2E : IDs widgets stables, fixture multi-ressources, parcours texture/
+  crop/input/joueur/monstre/path Bézier, diagnostics/screenshots et exécution
+  macOS/Windows/Linux.
+- [ ] Documentation et clôture : retirer les gates non prouvés UX, confirmer le
+  résultat visuel/fonctionnel, puis cocher les lots 1–3, 5, 6, 7 et 8.
+
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
 
 - [x] **Empêcher l'écrasement destructif des sauvegardes de progression.**
