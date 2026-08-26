@@ -4110,6 +4110,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::PushID(static_cast<int>(binding_index));
                     int device = static_cast<int>(binding.device);
                     int code = binding.code;
+                    auto edited_binding = binding;
                     const char* devices[] = {"keyboard", "gamepad"};
                     bool changed = false;
                     ImGui::SetNextItemWidth(130.0F);
@@ -4117,9 +4118,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(130.0F);
                     if (ImGui::InputInt("Code", &code)) changed = true;
+                    edited_binding.device = static_cast<fabric::project::InputDevice>(device);
+                    edited_binding.code = code;
+                    int binding_kind = static_cast<int>(binding.kind);
+                    const char* binding_kinds[] = {"button", "axis"};
+                    if (ImGui::Combo("Kind", &binding_kind, binding_kinds, 2)) changed = true;
+                    edited_binding.kind = static_cast<fabric::project::InputBindingKind>(binding_kind);
+                    if (edited_binding.kind == fabric::project::InputBindingKind::axis) {
+                        if (ImGui::InputFloat("Threshold", &edited_binding.threshold, 0.05F, 0.1F, "%.2f")) changed = true;
+                        if (ImGui::InputFloat("Dead zone", &edited_binding.dead_zone, 0.05F, 0.1F, "%.2f")) changed = true;
+                    }
+                    if (ImGui::Checkbox("Ctrl", &edited_binding.ctrl)) changed = true;
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Shift", &edited_binding.shift)) changed = true;
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Alt", &edited_binding.alt)) changed = true;
+                    ImGui::SameLine();
+                    if (ImGui::Checkbox("Super", &edited_binding.super)) changed = true;
                     if (changed && !session.set_selected_input_binding(
                             action_index, binding_index,
-                            {static_cast<fabric::project::InputDevice>(device), code})) {
+                            edited_binding)) {
                         status = "Input binding rejected; inspect diagnostics.";
                     }
                     ImGui::SameLine();
