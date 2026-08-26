@@ -199,6 +199,7 @@ endif()
 add_library(fabric_editor STATIC
     engine/fabric_editor/src/animation_timeline.cpp
     engine/fabric_editor/src/autosave_scheduler.cpp
+    engine/fabric_editor/src/canvas_interaction.cpp
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/map_session.cpp
@@ -541,6 +542,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     )
     add_test(NAME fabric_editor_foundations_tests
              COMMAND fabric_editor_foundations_tests)
+
+    add_executable(fabric_canvas_interaction_tests
+        tests/cpp/canvas_interaction_tests.cpp
+    )
+    target_link_libraries(fabric_canvas_interaction_tests PRIVATE
+        fabric_editor
+        Catch2::Catch2WithMain
+    )
+    add_test(NAME fabric_canvas_interaction_tests
+             COMMAND fabric_canvas_interaction_tests)
 
     add_executable(fabric_creation_prompts_tests
         tests/cpp/creation_prompts_tests.cpp

@@ -262,3 +262,6 @@ Save/Discard/Cancel avant remplacement de session ; les raccourcis et la mise
 en page restent dans le smoke test visuel multiplateforme. Le déplacement par
 glisser du nœud sélectionné réutilise le même chemin de commande que l’inspecteur
 et fusionne les positions continues.
+Les règles de canvas couvrent aussi le hit-test après translation, rotation et
+échelle, l'ordre de sélection du dessus vers le dessous et le prolongement de
+la poignée de rotation dans l'orientation locale du nœud.

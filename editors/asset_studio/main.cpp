@@ -1,3 +1,4 @@
+#include "fabric/editor/canvas_interaction.hpp"
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/session_transition.hpp"
@@ -115,12 +116,21 @@ struct CanvasUiState {
         pivot,
     };
 
+    enum class DragOperation {
+        none,
+        move,
+        rotate,
+        scale,
+        pivot,
+    };
+
     float zoom{1.0F};
     ImVec2 pan{};
     std::size_t selected_node{};
     bool native_canvas{};
     Tool tool{Tool::move};
     bool dragging{};
+    DragOperation drag_operation{DragOperation::none};
     ImVec2 drag_start_mouse{};
     fabric::core::Transform drag_start_transform;
     ImVec2 native_origin{};
@@ -816,6 +826,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             ? &asset.native->nodes[canvas.selected_node]
             : nullptr;
     ImVec2 rotate_handle{};
+    ImVec2 rotate_anchor{};
     ImVec2 scale_handle{};
     ImVec2 pivot_handle{};
     ImVec2 transform_center{};
@@ -834,30 +845,58 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
              bounds.origin.y});
         transform_center = to_screen(world_center);
         const ImVec2 top = to_screen(world_top);
-        rotate_handle = {top.x, top.y - 30.0F};
+        rotate_anchor = top;
+        const auto extended = fabric::editor::extend_canvas_handle(
+            {transform_center.x, transform_center.y}, {top.x, top.y}, 30.0F);
+        rotate_handle = {extended.x, extended.y};
         scale_handle = to_screen(world_bottom_right);
         pivot_handle = to_screen(
             transform_point(*selected_node, selected_node->transform.pivot));
     }
-    if (hovered && selected_node != nullptr && !selected_node->locked &&
-        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 mouse = io.MousePos;
         const auto distance = [](const ImVec2 left, const ImVec2 right) {
             return std::hypot(left.x - right.x, left.y - right.y);
         };
-        if (distance(mouse, rotate_handle) <= 12.0F) {
-            canvas.tool = CanvasUiState::Tool::rotate;
-        } else if (distance(mouse, scale_handle) <= 12.0F) {
-            canvas.tool = CanvasUiState::Tool::scale;
-        } else if (distance(mouse, pivot_handle) <= 12.0F) {
-            canvas.tool = CanvasUiState::Tool::pivot;
+        CanvasUiState::DragOperation operation =
+            CanvasUiState::DragOperation::none;
+        if (selected_node != nullptr && !selected_node->locked) {
+            if (canvas.tool == CanvasUiState::Tool::rotate &&
+                distance(mouse, rotate_handle) <= 12.0F) {
+                operation = CanvasUiState::DragOperation::rotate;
+            } else if (canvas.tool == CanvasUiState::Tool::scale &&
+                       distance(mouse, scale_handle) <= 12.0F) {
+                operation = CanvasUiState::DragOperation::scale;
+            } else if (canvas.tool == CanvasUiState::Tool::pivot &&
+                       distance(mouse, pivot_handle) <= 12.0F) {
+                operation = CanvasUiState::DragOperation::pivot;
+            }
         }
-        canvas.dragging = true;
-        canvas.drag_start_mouse = mouse;
-        canvas.drag_start_transform = selected_node->transform;
+        if (operation == CanvasUiState::DragOperation::none) {
+            const auto world = to_world(mouse);
+            const auto hit_node = fabric::editor::topmost_vector_node_at(
+                asset.native->nodes, world, 8.0F / pixels_per_unit);
+            if (hit_node) {
+                if (*hit_node == canvas.selected_node && selected_node != nullptr &&
+                    !selected_node->locked &&
+                    canvas.tool == CanvasUiState::Tool::move) {
+                    operation = CanvasUiState::DragOperation::move;
+                } else {
+                    canvas.selected_node = *hit_node;
+                }
+            }
+        }
+        if (operation != CanvasUiState::DragOperation::none &&
+            selected_node != nullptr) {
+            canvas.dragging = true;
+            canvas.drag_operation = operation;
+            canvas.drag_start_mouse = mouse;
+            canvas.drag_start_transform = selected_node->transform;
+        }
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         canvas.dragging = false;
+        canvas.drag_operation = CanvasUiState::DragOperation::none;
     }
     if (hovered && canvas.dragging && selected_node != nullptr &&
         !selected_node->locked &&
@@ -867,11 +906,11 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         const auto& start = canvas.drag_start_transform;
         const auto start_mouse = to_world(canvas.drag_start_mouse);
         const auto current_mouse = to_world(io.MousePos);
-        if (canvas.tool == CanvasUiState::Tool::move) {
+        if (canvas.drag_operation == CanvasUiState::DragOperation::move) {
             changed.transform.position = {
                 start.position.x + current_mouse.x - start_mouse.x,
                 start.position.y + current_mouse.y - start_mouse.y};
-        } else if (canvas.tool == CanvasUiState::Tool::rotate) {
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::rotate) {
             const auto start_vector = fabric::core::Vec2{
                 start_mouse.x - (start.position.x + start.pivot.x),
                 start_mouse.y - (start.position.y + start.pivot.y)};
@@ -885,7 +924,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 start.rotation_degrees +
                 (current_angle - start_angle) * 180.0F /
                     std::numbers::pi_v<float>;
-        } else if (canvas.tool == CanvasUiState::Tool::scale) {
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::scale) {
             const auto local_from_world = [&](const fabric::core::Vec2 world) {
                 const float angle = -start.rotation_degrees *
                     std::numbers::pi_v<float> / 180.0F;
@@ -912,7 +951,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                               start.scale.x),
                 std::copysign(std::max(0.01F, std::abs(start.scale.y * ratio_y)),
                               start.scale.y)};
-        } else if (canvas.tool == CanvasUiState::Tool::pivot) {
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::pivot) {
             const fabric::core::Vec2 next_pivot{
                 current_mouse.x - start.position.x,
                 current_mouse.y - start.position.y};
@@ -1078,23 +1117,28 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             stroke_width);
     }
     if (selected_node != nullptr && !selected_node->locked) {
-        draw_list->AddLine(transform_center, rotate_handle,
-                           IM_COL32(236, 180, 75, 220), 1.5F);
-        draw_list->AddCircleFilled(rotate_handle, 6.0F,
-                                   IM_COL32(236, 180, 75, 255));
-        draw_list->AddRectFilled({scale_handle.x - 6.0F, scale_handle.y - 6.0F},
-                                 {scale_handle.x + 6.0F, scale_handle.y + 6.0F},
-                                 IM_COL32(98, 180, 240, 255));
-        draw_list->AddLine({pivot_handle.x - 7.0F, pivot_handle.y},
-                           {pivot_handle.x + 7.0F, pivot_handle.y},
-                           IM_COL32(180, 110, 235, 255), 2.0F);
-        draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
-                           {pivot_handle.x, pivot_handle.y + 7.0F},
-                           IM_COL32(180, 110, 235, 255), 2.0F);
+        if (canvas.tool == CanvasUiState::Tool::rotate) {
+            draw_list->AddLine(rotate_anchor, rotate_handle,
+                               IM_COL32(236, 180, 75, 220), 1.5F);
+            draw_list->AddCircleFilled(rotate_handle, 6.0F,
+                                       IM_COL32(236, 180, 75, 255));
+        } else if (canvas.tool == CanvasUiState::Tool::scale) {
+            draw_list->AddRectFilled(
+                {scale_handle.x - 6.0F, scale_handle.y - 6.0F},
+                {scale_handle.x + 6.0F, scale_handle.y + 6.0F},
+                IM_COL32(98, 180, 240, 255));
+        } else if (canvas.tool == CanvasUiState::Tool::pivot) {
+            draw_list->AddLine({pivot_handle.x - 7.0F, pivot_handle.y},
+                               {pivot_handle.x + 7.0F, pivot_handle.y},
+                               IM_COL32(180, 110, 235, 255), 2.0F);
+            draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
+                               {pivot_handle.x, pivot_handle.y + 7.0F},
+                               IM_COL32(180, 110, 235, 255), 2.0F);
+        }
     }
     draw_list->PopClipRect();
     if (hovered) {
-        ImGui::SetTooltip("Drag shape to move, orange dot to rotate, blue square to scale, purple cross to move pivot | Middle drag: pan | Wheel: zoom %.0f%%",
+        ImGui::SetTooltip("Click a shape to select it. Move drags the selected shape; Rotate, Scale and Pivot drag only their active handle. Middle drag: pan | Wheel: zoom %.0f%%",
                           canvas.zoom * 100.0F);
     }
 }
