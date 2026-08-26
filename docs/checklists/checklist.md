@@ -511,7 +511,8 @@ sur un comportement sans modifier le runtime.
 - [ ] Afficher les clips imbriqués fidèlement sur le canvas.
 - [ ] Relier toutes les propriétés animables au registre de descripteurs.
 - [ ] Faire passer chaque geste par CommandStack avec fusion continue.
-- [ ] Tester chaque outil en undo, redo, autosave, récupération et reload.
+- [x] Tester chaque outil déjà livré en undo, redo, autosave, récupération et
+  reload.
 - [ ] Ajouter des tests géométriques pour insertion et suppression de points.
 - [ ] Ajouter des tests end-to-end des interactions canvas.
 - [ ] Comparer les draw packets Asset Studio, Map Studio et Preview Runtime.
