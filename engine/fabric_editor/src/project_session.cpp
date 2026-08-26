@@ -945,6 +945,27 @@ bool ProjectSession::create_input(const CreateInputPrompt& prompt) {
     return select_resource(StudioResourceKind::input, created_id);
 }
 
+bool ProjectSession::set_selected_audio_event(const std::size_t event_index,
+                                              project::AudioEvent event) {
+    const auto* selected = selected_resource();
+    if (selected == nullptr || selected->kind != StudioResourceKind::audio)
+        return false;
+    auto loaded = project::load_audio(project_root_, *manifest_, selected->document_path);
+    if (!loaded.ok() || event_index >= loaded.audio->events.size()) {
+        errors_ = loaded.errors;
+        return false;
+    }
+    auto candidate = *loaded.audio;
+    candidate.events[event_index] = std::move(event);
+    const auto validation = project::validate_audio(*manifest_, candidate);
+    if (!validation.ok()) { errors_ = validation.errors; return false; }
+    const auto published = project::publish_audio(project_root_, *manifest_, candidate);
+    if (!published.ok()) { errors_ = published.errors; return false; }
+    errors_.clear();
+    return refresh_resources() && select_resource(StudioResourceKind::audio,
+                                                  candidate.document.id);
+}
+
 bool ProjectSession::create_visual_preset(
     const VisualPresetRequest& request) {
     if (!has_project()) {

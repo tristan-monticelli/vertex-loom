@@ -4106,10 +4106,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                                        error.field.c_str(), error.message.c_str());
             } else {
-                for (const auto& event : loaded.audio->events)
-                    ImGui::BulletText("%s — %s — volume %.2f — %s",
-                                      event.id.c_str(), event.source.c_str(),
-                                      event.volume, event.loop ? "loop" : "one-shot");
+                for (std::size_t event_index = 0; event_index < loaded.audio->events.size(); ++event_index) {
+                    auto event = loaded.audio->events[event_index];
+                    ImGui::PushID(static_cast<int>(event_index));
+                    ImGui::InputText("Event id", &event.id);
+                    ImGui::InputText("Source", &event.source);
+                    ImGui::SliderFloat("Volume", &event.volume, 0.0F, 1.0F);
+                    ImGui::Checkbox("Loop", &event.loop);
+                    if (ImGui::Button("Save event") &&
+                        !session.set_selected_audio_event(event_index, std::move(event)))
+                        status = "Audio event rejected; inspect diagnostics.";
+                    ImGui::PopID();
+                }
                 if (loaded.audio->events.empty())
                     ImGui::TextDisabled("No audio events defined.");
             }
