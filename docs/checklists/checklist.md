@@ -115,8 +115,8 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 - [x] Le prompt Input permet maintenant d'ajouter plusieurs actions et
   plusieurs bindings.
-- [ ] Ajouter Remove et Duplicate dans ce même prompt ; la suppression n'est
-  disponible qu'après création.
+- [x] Ajouter Remove et Duplicate dans ce même prompt ; la suppression reste
+  protégée lorsqu'il ne reste qu'une action.
 - [ ] Remplacer les codes numériques de touches par capture interactive et
   libellés lisibles ; ajouter axes, dead zones et seuils gamepad.
 - [x] Un vectoriel natif sélectionné expose nom, parent, clip, transform et une
@@ -462,9 +462,9 @@ et ne dépend jamais de l'ordre antérieur des clics.
 
 - [ ] Conserver `InputDocument` séparé du BehaviorGraph.
 - [ ] Ajouter des noms lisibles de touches et boutons à la place des seuls codes.
-- [ ] Permettre un nombre quelconque d'actions et de bindings.
-- [ ] Ajouter Add, Duplicate, Reorder et Remove dans la modale de création.
-- [ ] Générer des identifiants uniques au lieu de répéter `action`.
+- [x] Permettre un nombre quelconque d'actions et de bindings.
+- [x] Ajouter Add, Duplicate, Reorder et Remove dans la modale de création.
+- [x] Générer des identifiants uniques au lieu de répéter `action`.
 - [ ] Empêcher qu'un nouvel item invalide rende toute la modale incompréhensible.
 - [ ] Ajouter capture interactive de la prochaine touche ou du prochain bouton.
 - [ ] Ajouter axes, seuils et dead zones.
