@@ -2,6 +2,10 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
+#include "fabric/project/map.hpp"
+#include "fabric/project/mechanic_graph.hpp"
+#include "fabric/project/replay.hpp"
+#include "fabric/project/scene.hpp"
 #include "fabric/render/textured_path_geometry.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -90,6 +94,53 @@ TEST_CASE("project manifest edits use command history and explicit save") {
     REQUIRE(session.save());
     CHECK_FALSE(session.dirty());
     CHECK(load_manifest_or_fail(project.path()).pixels_per_unit == 64.0);
+}
+
+TEST_CASE("resource index includes maps scenes mechanics and replays") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    REQUIRE(fabric::project::publish_map(project.path(), manifest, {
+        .document = {.schema_version = fabric::project::current_map_schema_version,
+                     .type = "map", .id = {.value = "indexed-map"},
+                     .name = "Indexed Map"}}).ok());
+    REQUIRE(fabric::project::publish_scene(project.path(), manifest, {
+        .document = {.schema_version = fabric::project::current_scene_schema_version,
+                     .type = "scene", .id = {.value = "indexed-scene"},
+                     .name = "Indexed Scene"}}).ok());
+    REQUIRE(fabric::project::publish_mechanic_graph(project.path(), manifest, {
+        .document = {
+            .schema_version = fabric::project::current_mechanic_graph_schema_version,
+            .type = "mechanic", .id = {.value = "indexed-mechanic"},
+            .name = "Indexed Mechanic"}}).ok());
+    REQUIRE(fabric::project::publish_replay(project.path(), manifest, {
+        .document = {.schema_version = fabric::project::current_replay_schema_version,
+                     .type = "replay", .id = {.value = "indexed-replay"},
+                     .name = "Indexed Replay"},
+        .build = "test-build"}).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    for (const auto kind : {
+             fabric::editor::StudioResourceKind::map,
+             fabric::editor::StudioResourceKind::scene,
+             fabric::editor::StudioResourceKind::mechanic,
+             fabric::editor::StudioResourceKind::replay}) {
+        const auto found = std::ranges::find(session.resources(), kind,
+                                             &fabric::editor::StudioResource::kind);
+        REQUIRE(found != session.resources().end());
+        REQUIRE(session.select_resource(found->kind, found->id));
+        CHECK(session.selected_resource()->document_path == found->document_path);
+        const auto source_id = found->id;
+        const fabric::core::ResourceId copy_id{
+            .value = source_id.value + "-copy"};
+        REQUIRE(session.duplicate_resource(kind, source_id, copy_id,
+                                           "Indexed Copy"));
+        REQUIRE(session.selected_resource() != nullptr);
+        CHECK(session.selected_resource()->id == copy_id);
+        CHECK_FALSE(session.duplicate_resource(kind, source_id, copy_id,
+                                               "Collision"));
+    }
 }
 
 TEST_CASE("vector artwork prompt publishes a reloadable native document") {

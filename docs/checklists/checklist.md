@@ -100,7 +100,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [ ] Transformer le Project tree en explorateur de ressources administrable.
   Il reste une liste plate à gauche sans Duplicate, Rename, Reveal, Copy ID,
   analyse des références ni Delete sécurisé.
-- [ ] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
+- [x] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
 - [ ] Remplacer les identifiants texte libres de Map Studio par des pickers
   typés et recherchables pour entités, prefabs, mécaniques et événements.
 - [ ] Permettre d'ouvrir et de créer une map depuis Map Studio. Sans arguments
@@ -322,25 +322,25 @@ si elle est valide et ne perd jamais les changements en cas d'échec.
 
 ## 4 — Resource Explorer unifié
 
-- [ ] Déplacer ou reproduire l'explorateur dans le rail droit selon la maquette
+- [x] Déplacer ou reproduire l'explorateur dans le rail droit selon la maquette
   validée.
 - [ ] Garder un seul composant de navigation réutilisable dans tous les prompts.
-- [ ] Afficher dossiers logiques, types, noms, identifiants et états dirty.
-- [ ] Ajouter recherche insensible à la casse et filtres par type.
-- [ ] Ajouter navigation clavier et sélection persistante.
+- [x] Afficher dossiers logiques, types, noms, identifiants et états dirty.
+- [x] Ajouter recherche insensible à la casse et filtres par type.
+- [x] Ajouter navigation clavier et sélection persistante.
 - [ ] Ajouter une barre d'actions contextuelle :
-  - [ ] New ;
-  - [ ] Import ;
-  - [ ] Duplicate ;
+  - [x] New ;
+  - [x] Import ;
+  - [x] Duplicate ;
   - [ ] Rename ;
   - [ ] Replace references ;
   - [ ] Reveal on disk ;
-  - [ ] Copy ID ;
-  - [ ] Copy path ;
+  - [x] Copy ID ;
+  - [x] Copy path ;
   - [ ] Delete.
 - [ ] Ajouter les mêmes actions dans un menu contextuel.
-- [ ] Définir une commande générique de duplication par type de ressource.
-- [ ] Générer un nouvel identifiant stable et un nouveau chemin à la duplication.
+- [x] Définir une commande générique de duplication par type de ressource.
+- [x] Générer un nouvel identifiant stable et un nouveau chemin à la duplication.
 - [ ] Permettre de choisir la copie superficielle ou la duplication de certaines
   dépendances.
 - [ ] Réécrire uniquement les références internes choisies dans la copie.

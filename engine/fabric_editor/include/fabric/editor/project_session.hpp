@@ -42,6 +42,10 @@ enum class StudioResourceKind {
     textured_path,
     visual_composition,
     visual_component,
+    map,
+    scene,
+    mechanic,
+    replay,
 };
 
 struct StudioResource {
@@ -215,6 +219,10 @@ public:
     [[nodiscard]] bool refresh_resources();
     [[nodiscard]] bool select_resource(StudioResourceKind kind,
                                        const core::ResourceId& id);
+    [[nodiscard]] bool duplicate_resource(StudioResourceKind kind,
+                                          const core::ResourceId& id,
+                                          const core::ResourceId& copy_id,
+                                          std::string copy_name);
 
     [[nodiscard]] bool has_project() const noexcept;
     [[nodiscard]] bool dirty() const noexcept;

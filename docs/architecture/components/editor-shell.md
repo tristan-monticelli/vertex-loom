@@ -7,12 +7,12 @@ C4Component
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
-        Component(browser, "Resource browser", "Dear ImGui", "Indexe, filtre et sélectionne les documents du projet")
+        Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; expose les opérations administratives sûres")
         Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite rectangles, ellipses, lignes et chemins, avec fill, contour, clip, ordre de dessin, hiérarchie et propriétés animables")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve les documents validés et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
+        Component(session, "ProjectSession", "C++20", "Conserve les documents validés, l'index unifié et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
         Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph ou prévisualise sa configuration de prefab, puis pilote Box2D, le personnage de test et les overlays de cycle de vie")
         Component(scene_session, "SceneSession", "C++20", "Édite maps montées, map d'entrée et transitions d'un SceneDocument avec historique et récupération")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")

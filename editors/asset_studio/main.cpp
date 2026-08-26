@@ -664,6 +664,30 @@ bool select_and_preview_resource(fabric::editor::ProjectSession& session,
     return true;
 }
 
+bool duplicate_project_resource(
+    fabric::editor::ProjectSession& session,
+    const fabric::editor::StudioResource& resource,
+    AssetPreview& preview, std::string& status) {
+    const auto base = resource.id.value + "-copy";
+    auto candidate = base;
+    for (std::size_t suffix = 2U;
+         std::ranges::any_of(session.resources(), [&](const auto& existing) {
+             return existing.kind == resource.kind &&
+                 existing.id.value == candidate;
+         }); ++suffix)
+        candidate = base + "-" + std::to_string(suffix);
+    const auto copy_name = resource.name + " Copy";
+    if (!session.duplicate_resource(resource.kind, resource.id,
+                                    {.value = candidate}, copy_name)) {
+        status = "Resource duplication failed; inspect diagnostics.";
+        return false;
+    }
+    const auto* selected = session.selected_resource();
+    return selected != nullptr &&
+        select_and_preview_resource(session, *selected, preview, status,
+                                    "Duplicated: ");
+}
+
 std::string_view studio_resource_kind_label(
     const fabric::editor::StudioResourceKind kind) {
     using Kind = fabric::editor::StudioResourceKind;
@@ -679,6 +703,10 @@ std::string_view studio_resource_kind_label(
     case Kind::textured_path: return "textured path";
     case Kind::visual_composition: return "composition";
     case Kind::visual_component: return "component";
+    case Kind::map: return "map";
+    case Kind::scene: return "scene";
+    case Kind::mechanic: return "mechanic";
+    case Kind::replay: return "replay";
     }
     return "resource";
 }
@@ -694,11 +722,47 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
 
     static ImGuiTextFilter filter;
     filter.Draw("Search", -1.0F);
+    static int kind_filter{};
+    const char* kind_filters[] = {
+        "All types", "Textures", "Vector artworks", "Materials / fills",
+        "Entities", "Animations", "Input bindings", "Behaviors",
+        "Transformations", "Textured paths", "Visual compositions",
+        "Visual components", "Maps", "Scenes", "Mechanics", "Replays"};
+    ImGui::SetNextItemWidth(-1.0F);
+    ImGui::Combo("##resource-kind-filter", &kind_filter, kind_filters,
+                 static_cast<int>(std::size(kind_filters)));
+    if (const auto* selected = session.selected_resource()) {
+        if (ImGui::Button("Duplicate")) {
+            const auto resource = *selected;
+            duplicate_project_resource(session, resource, preview, status);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Copy ID")) {
+            SDL_SetClipboardText(selected->id.value.c_str());
+            status = "Resource ID copied.";
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Copy path")) {
+            const auto path = selected->document_path.generic_string();
+            SDL_SetClipboardText(path.c_str());
+            status = "Resource path copied.";
+        }
+    }
     ImGui::Spacing();
     const auto draw_kind = [&](const char* label,
-                               const fabric::editor::StudioResourceKind kind) {
-        ImGui::SeparatorText(label);
+                               const fabric::editor::StudioResourceKind kind,
+                               const int filter_index) {
+        if (kind_filter != 0 && kind_filter != filter_index) return;
         bool any = false;
+        for (const auto& resource : session.resources())
+            if (resource.kind == kind &&
+                filter.PassFilter(resource.name.c_str(),
+                                  resource.id.value.c_str())) any = true;
+        if (!any && kind_filter == 0) return;
+        const auto flags = ImGuiTreeNodeFlags_DefaultOpen |
+            ImGuiTreeNodeFlags_SpanAvailWidth;
+        if (!ImGui::TreeNodeEx(label, flags)) return;
+        std::optional<fabric::editor::StudioResource> duplicate_request;
         for (const auto& resource : session.resources()) {
             if (resource.kind != kind ||
                 !filter.PassFilter(resource.name.c_str(),
@@ -714,30 +778,59 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
             }
+            if (ImGui::BeginPopupContextItem()) {
+                if (ImGui::MenuItem("Duplicate")) {
+                    duplicate_request = resource;
+                }
+                if (ImGui::MenuItem("Copy ID")) {
+                    SDL_SetClipboardText(resource.id.value.c_str());
+                    status = "Resource ID copied.";
+                }
+                if (ImGui::MenuItem("Copy path")) {
+                    const auto path = resource.document_path.generic_string();
+                    SDL_SetClipboardText(path.c_str());
+                    status = "Resource path copied.";
+                }
+                ImGui::EndPopup();
+            }
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s%s", resource.id.value.c_str(),
+                                is_selected && session.dirty() ? "  •" : "");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s",
+                    resource.document_path.generic_string().c_str());
             if (resource.native) {
                 ImGui::SameLine();
                 ImGui::TextDisabled("native");
             }
         }
+        if (duplicate_request)
+            duplicate_project_resource(
+                session, *duplicate_request, preview, status);
         if (!any) {
             ImGui::TextDisabled("None");
         }
+        ImGui::TreePop();
     };
-    draw_kind("Textures", fabric::editor::StudioResourceKind::texture);
-    draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector);
-    draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material);
-    draw_kind("Entities", fabric::editor::StudioResourceKind::entity);
-    draw_kind("Animations", fabric::editor::StudioResourceKind::animation);
-    draw_kind("Input bindings", fabric::editor::StudioResourceKind::input);
-    draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior);
+    draw_kind("Textures", fabric::editor::StudioResourceKind::texture, 1);
+    draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector, 2);
+    draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material, 3);
+    draw_kind("Entities", fabric::editor::StudioResourceKind::entity, 4);
+    draw_kind("Animations", fabric::editor::StudioResourceKind::animation, 5);
+    draw_kind("Input bindings", fabric::editor::StudioResourceKind::input, 6);
+    draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior, 7);
     draw_kind("Transformations",
-              fabric::editor::StudioResourceKind::transformation);
+              fabric::editor::StudioResourceKind::transformation, 8);
     draw_kind("Textured paths",
-              fabric::editor::StudioResourceKind::textured_path);
+              fabric::editor::StudioResourceKind::textured_path, 9);
     draw_kind("Visual compositions",
-              fabric::editor::StudioResourceKind::visual_composition);
+              fabric::editor::StudioResourceKind::visual_composition, 10);
     draw_kind("Visual components",
-              fabric::editor::StudioResourceKind::visual_component);
+              fabric::editor::StudioResourceKind::visual_component, 11);
+    draw_kind("Maps", fabric::editor::StudioResourceKind::map, 12);
+    draw_kind("Scenes", fabric::editor::StudioResourceKind::scene, 13);
+    draw_kind("Mechanics", fabric::editor::StudioResourceKind::mechanic, 14);
+    draw_kind("Replays", fabric::editor::StudioResourceKind::replay, 15);
 }
 
 void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
@@ -1895,8 +1988,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const float right_width = std::clamp(viewport->Size.x * 0.24F, 270.0F, 360.0F);
     const float content_height = viewport->Size.y - menu_height - status_height;
 
-    ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
-    ImGui::SetNextWindowSize({left_width, content_height});
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
+                             viewport->Pos.y + menu_height});
+    ImGui::SetNextWindowSize({right_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
     draw_project_tree(session, preview, status);
     if (!session.has_project()) {
@@ -2093,9 +2187,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     ImGui::End();
 
-    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
-                             viewport->Pos.y + menu_height});
-    ImGui::SetNextWindowSize({right_width, content_height});
+    ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
+    ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Inspector", nullptr, fixed_panel_flags);
     if (session.has_project()) {
         const auto* selected = session.selected_resource();
