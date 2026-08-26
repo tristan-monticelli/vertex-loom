@@ -53,6 +53,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/asset_storage.cpp
     engine/fabric_project/src/atomic_save.cpp
     engine/fabric_project/src/animation.cpp
+    engine/fabric_project/src/audio.cpp
     engine/fabric_project/src/animation_constraints.cpp
     engine/fabric_project/src/animation_ik.cpp
     engine/fabric_project/src/animation_state_machine.cpp

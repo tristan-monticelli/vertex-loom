@@ -76,8 +76,8 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   avec politique explicite de transfert d'état.
 - [ ] Rendre personnage, spawn, caméra, limites et audio authorables dans le
   projet. Ils sont aujourd'hui principalement injectés par options CLI.
-- [ ] Définir un contrat audio projet avec ressources, événements, volume,
-  boucle et mixage ; `--audio <wav>` ne représente pas un pipeline de jeu.
+- [x] Définir un contrat audio projet avec ressources, événements, volume et
+  boucle ; le mixage runtime reste séparé du document.
 - [x] Donner un contenu réel aux couches supportées (`visual`, `instances`,
   `collision`, `triggers`) et retirer de l'interface les couches `tiles` et
   `gameplay` tant qu'elles n'ont pas de stockage spécialisé.
