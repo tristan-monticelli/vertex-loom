@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace fabric::render {
 namespace {
@@ -909,32 +911,57 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 ++packet_index;
                 continue;
             }
-            const auto clip = packets_by_id.find(*packet.clip_node_id);
-            if (clip == packets_by_id.end()) {
-                stats.errors.push_back("OpenGL clip node could not be resolved: " +
-                                       *packet.clip_node_id);
+            std::vector<const VectorDrawPacket*> clip_chain;
+            std::unordered_set<std::string> visited_clips;
+            auto next_clip_id = packet.clip_node_id;
+            bool clip_chain_valid = true;
+            while (next_clip_id.has_value()) {
+                if (!visited_clips.insert(*next_clip_id).second) {
+                    stats.errors.push_back("OpenGL vector clip cycle detected at: " +
+                                           *next_clip_id);
+                    clip_chain_valid = false;
+                    break;
+                }
+                const auto clip = packets_by_id.find(*next_clip_id);
+                if (clip == packets_by_id.end()) {
+                    stats.errors.push_back("OpenGL clip node could not be resolved: " +
+                                           *next_clip_id);
+                    clip_chain_valid = false;
+                    break;
+                }
+                clip_chain.push_back(clip->second);
+                next_clip_id = clip->second->clip_node_id;
+            }
+            if (!clip_chain_valid || clip_chain.empty()) {
                 ++packet_index;
                 continue;
             }
-            if (clip->second->clip_node_id.has_value()) {
-                stats.errors.push_back("nested OpenGL vector clips are unsupported");
-                ++packet_index;
-                continue;
-            }
+            std::ranges::reverse(clip_chain);
             glClearStencil(0);
             glClear(GL_STENCIL_BUFFER_BIT);
-            glStencilFunc(GL_ALWAYS, 1, 0xffU);
-            glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
             glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-            const bool clip_drawn = draw_fill(*clip->second, true, false);
+            bool clip_drawn = true;
+            for (std::size_t level = 0; level < clip_chain.size(); ++level) {
+                const auto reference = static_cast<GLint>(level + 1U);
+                if (level == 0U) {
+                    glStencilFunc(GL_ALWAYS, reference, 0xffU);
+                } else {
+                    glStencilFunc(GL_EQUAL, static_cast<GLint>(level), 0xffU);
+                }
+                glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
+                clip_drawn = draw_fill(*clip_chain[level], true, false) &&
+                    clip_drawn;
+                if (!clip_drawn) break;
+            }
             glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
             if (!clip_drawn) {
                 stats.errors.push_back("OpenGL clip node has no fill geometry: " +
-                                       *packet.clip_node_id);
+                                       clip_chain.back()->node_id);
                 ++packet_index;
                 continue;
             }
-            glStencilFunc(GL_EQUAL, 1, 0xffU);
+            glStencilFunc(GL_EQUAL,
+                          static_cast<GLint>(clip_chain.size()), 0xffU);
             glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
         }
         packet_drawn = draw_fill(packet, false, true) || packet_drawn;

@@ -127,6 +127,33 @@ int main() {
         (clipped_stats.ok() && clipped_stats.packets_drawn == 1U &&
          clipped_stats.triangles_drawn == 2U && clipped_inside[1] > 200U &&
          clipped_outside[1] < 40U);
+    const fabric::render::VectorDrawPacket nested_clip{
+        .node_id = "nested-clip",
+        .outline = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}},
+        .fill_vertices = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}},
+        .fill_indices = {0U, 1U, 2U},
+        .clip_node_id = std::string{"clip"},
+        .closed_outline = true,
+    };
+    auto nested_clipped = clipped;
+    nested_clipped.node_id = "nested-clipped";
+    nested_clipped.clip_node_id = std::string{"nested-clip"};
+    const std::array nested_packets{clip, nested_clip, nested_clipped};
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto nested_stats = renderer.draw(
+        std::span<const fabric::render::VectorDrawPacket>(nested_packets),
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {0.0F, 0.0F}, .size = {1.0F, 1.0F}}});
+    glFinish();
+    std::array<std::uint8_t, 4> nested_inside{};
+    std::array<std::uint8_t, 4> nested_outside{};
+    glReadPixels(48, 16, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nested_inside.data());
+    glReadPixels(8, 56, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nested_outside.data());
+    const bool nested_clipping = stencil_bits == 0 ||
+        (nested_stats.ok() && nested_stats.packets_drawn == 1U &&
+         nested_stats.triangles_drawn == 2U && nested_inside[1] > 200U &&
+         nested_outside[1] < 40U);
     GLuint texture = 0U;
     glGenTextures(1, &texture);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -220,8 +247,8 @@ int main() {
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    if (!rendered || !clipping || !raster_crop || !texture_tint ||
-        !texture_repeat) {
+    if (!rendered || !clipping || !nested_clipping || !raster_crop ||
+        !texture_tint || !texture_repeat) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "
                   << stats.packets_drawn << "/" << stats.triangles_drawn
                   << " pixel=" << static_cast<int>(pixel[0]) << ","
@@ -233,7 +260,10 @@ int main() {
                   << static_cast<int>(clipped_inside[1]) << " outside="
                   << static_cast<int>(clipped_outside[0]) << ","
                   << static_cast<int>(clipped_outside[1]) << " stencil="
-                  << stencil_bits << " raster="
+                  << stencil_bits << " nested=" << nested_stats.packets_drawn
+                  << "/" << nested_stats.triangles_drawn << " inside="
+                  << static_cast<int>(nested_inside[1]) << " outside="
+                  << static_cast<int>(nested_outside[1]) << " raster="
                   << raster_stats.packets_drawn << "/"
                   << static_cast<int>(raster_pixel[0]) << ","
                   << static_cast<int>(raster_pixel[1]) << ","

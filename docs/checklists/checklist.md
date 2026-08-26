@@ -621,7 +621,10 @@ sur un comportement sans modifier le runtime.
 - [x] Ajouter un stroke image (texture, répétition, UV, offset et échelle) et
   fournir un preset `beam` préexistant pour expliquer le résultat attendu.
 - [x] Exposer parent, clip, visibilité, verrouillage et ordre des nœuds.
-- [ ] Afficher les clips imbriqués fidèlement sur le canvas.
+- [x] Afficher les clips imbriqués fidèlement sur le canvas. Le renderer
+  OpenGL construit les niveaux stencil de toute la chaîne parent/enfant,
+  signale les cycles/références absentes et le smoke test
+  `fabric_render_gl_smoke` vérifie l’intersection rendue.
 - [x] Relier toutes les propriétés animables au registre de descripteurs.
 - [x] Faire passer chaque geste par CommandStack avec fusion continue.
 - [x] Tester chaque outil déjà livré en undo, redo, autosave, récupération et

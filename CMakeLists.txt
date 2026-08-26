@@ -760,6 +760,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_render
         SDL2::SDL2-static
     )
+    add_test(NAME fabric_render_gl_smoke COMMAND fabric_render_gl_smoke)
 
     add_test(
         NAME project_validator_accepts_valid_project

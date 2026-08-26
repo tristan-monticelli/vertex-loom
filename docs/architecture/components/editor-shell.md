@@ -266,7 +266,8 @@ C4Component
   l'inspecteur de nœud, avec validation et CommandStack. Sur un path
   sélectionné, le canvas rend les ancres et poignées, convertit leurs
   déplacements écran en coordonnées locales et les persiste par la session ;
-  la sélection multiple et les modes de poignées restent à compléter.
+  la sélection multiple et les trois modes de poignées suivent le même
+  CommandStack.
 - Le scénario CTest `asset_studio_vector_e2e` rejoue cette édition sur la
   fixture textile : conversion en path, déplacement d’une poignée, undo/redo,
   sauvegarde, reload et validation du projet.
@@ -274,7 +275,9 @@ C4Component
   extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
 - Les nœuds natifs peuvent référencer un parent et un clip par identifiants
   locaux ; le validateur refuse les références manquantes et les cycles avant
-  publication.
+  publication. Le renderer OpenGL construit une chaîne stencil par niveau pour
+  afficher les clips imbriqués ; les cycles et références absentes produisent
+  un diagnostic sans dessiner le packet invalide.
 - Un seul document porte des changements à la fois. Changer de ressource avec
   un vecteur dirty est refusé jusqu'à Save ou Undo ; les historiques propres
   sont neutralisés avant de changer de document.
