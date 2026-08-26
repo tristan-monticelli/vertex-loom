@@ -276,12 +276,12 @@ void apply_entity_material(fabric::render::VectorDrawPacket& packet,
 }
 
 EntityPreviewResult build_entity_preview(
-    const fabric::editor::ProjectSession& session,
+    const std::filesystem::path& project_root,
+    const fabric::project::ProjectManifest& manifest,
+    fabric::project::EntityDefinition entity,
     const fabric::project::AnimationClip* animation = nullptr,
     const float animation_time = 0.0F) {
     EntityPreviewResult result;
-    if (!session.selected_entity() || !session.manifest()) return result;
-    auto entity = *session.selected_entity();
     std::optional<fabric::project::EvaluationResult> evaluated_animation;
     if (animation != nullptr) {
         evaluated_animation = fabric::project::evaluate_animation(
@@ -332,9 +332,9 @@ EntityPreviewResult build_entity_preview(
         std::optional<fabric::project::MaterialDefinition> material;
         if (node.drawable.material) {
             const auto loaded = fabric::project::load_material(
-                session.project_root(), *session.manifest(),
+                project_root, manifest,
                 fabric::project::material_document_path(
-                    *session.manifest(), node.drawable.material->id));
+                    manifest, node.drawable.material->id));
             if (!loaded.ok()) {
                 for (const auto& error : loaded.errors) {
                     result.errors.push_back(error.field + ": " + error.message);
@@ -372,9 +372,9 @@ EntityPreviewResult build_entity_preview(
         if (node.drawable.kind == fabric::project::EntityDrawableKind::vector &&
             node.drawable.resource) {
             auto loaded = fabric::project::load_vector_asset(
-                session.project_root(), *session.manifest(),
+                project_root, manifest,
                 fabric::project::vector_document_path(
-                    *session.manifest(), node.drawable.resource->id));
+                    manifest, node.drawable.resource->id));
             if (!loaded.ok()) {
                 for (const auto& error : loaded.errors) {
                     result.errors.push_back(error.field + ": " + error.message);
@@ -384,7 +384,7 @@ EntityPreviewResult build_entity_preview(
             auto drawable = std::move(*loaded.asset);
             if (drawable.source_kind == fabric::project::VectorSourceKind::linked_svg) {
                 auto converted = fabric::render::convert_svg_to_native(
-                    session.project_root() / drawable.source,
+                    project_root / drawable.source,
                     drawable.document.id, drawable.document.name);
                 if (!converted.ok()) {
                     for (const auto& error : converted.errors) {
@@ -411,9 +411,9 @@ EntityPreviewResult build_entity_preview(
                        fabric::project::EntityDrawableKind::visual_component &&
                    node.drawable.resource) {
             auto loaded = fabric::project::load_visual_component(
-                session.project_root(), *session.manifest(),
+                project_root, manifest,
                 fabric::project::visual_component_document_path(
-                    *session.manifest(), node.drawable.resource->id));
+                    manifest, node.drawable.resource->id));
             if (!loaded.ok()) {
                 for (const auto& error : loaded.errors)
                     result.errors.push_back(error.field + ": " + error.message);
@@ -424,11 +424,11 @@ EntityPreviewResult build_entity_preview(
                     fabric::project::VisualComponentInstance{});
             auto visual = evaluated_animation && evaluated_animation->ok()
                 ? fabric::render::resolve_animated_visual_component(
-                      session.project_root(), *session.manifest(),
+                      project_root, manifest,
                       *loaded.asset, component_instance, node.id,
                       *evaluated_animation)
                 : fabric::render::resolve_visual_component(
-                      session.project_root(), *session.manifest(),
+                      project_root, manifest,
                       *loaded.asset, component_instance);
             result.errors.insert(result.errors.end(), visual.errors.begin(),
                                  visual.errors.end());
@@ -441,9 +441,9 @@ EntityPreviewResult build_entity_preview(
         } else if (node.drawable.kind == fabric::project::EntityDrawableKind::texture &&
                    node.drawable.resource) {
             const auto loaded = fabric::project::load_texture_asset(
-                session.project_root(), *session.manifest(),
+                project_root, manifest,
                 fabric::project::texture_document_path(
-                    *session.manifest(), node.drawable.resource->id));
+                    manifest, node.drawable.resource->id));
             if (!loaded.ok()) {
                 for (const auto& error : loaded.errors) {
                     result.errors.push_back(error.field + ": " + error.message);
@@ -456,7 +456,7 @@ EntityPreviewResult build_entity_preview(
                 .source_width = loaded.asset->width,
                 .source_height = loaded.asset->height,
                 .pixels_per_unit = static_cast<float>(
-                    session.manifest()->pixels_per_unit),
+                    manifest.pixels_per_unit),
                 .view = loaded.asset->view,
             });
             if (!geometry.ok()) {
@@ -491,6 +491,62 @@ EntityPreviewResult build_entity_preview(
                           std::max(2.0F * margin, max_y - min_y + 2.0F * margin)}};
     }
     return result;
+}
+
+EntityPreviewResult build_entity_preview(
+    const fabric::editor::ProjectSession& session,
+    const fabric::project::AnimationClip* animation = nullptr,
+    const float animation_time = 0.0F) {
+    if (!session.selected_entity() || !session.manifest()) return {};
+    return build_entity_preview(session.project_root(), *session.manifest(),
+                                *session.selected_entity(), animation,
+                                animation_time);
+}
+
+ImU32 color_to_u32(const fabric::core::Color& color);
+
+void draw_entity_preview_thumbnail(const char* id,
+                                   const EntityPreviewResult& preview,
+                                   const ImVec2 size) {
+    ImGui::InvisibleButton(id, size);
+    const auto origin = ImGui::GetItemRectMin();
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(origin, {origin.x + size.x, origin.y + size.y},
+                        IM_COL32(20, 24, 31, 255), 5.0F);
+    const auto bounds = preview.bounds;
+    const float scale = std::max(0.001F, std::min(
+        (size.x - 20.0F) / std::max(bounds.size.x, 0.001F),
+        (size.y - 20.0F) / std::max(bounds.size.y, 0.001F)));
+    const auto point = [&](const fabric::core::Vec2 value) {
+        return ImVec2{
+            origin.x + (value.x - bounds.origin.x) * scale + 10.0F,
+            origin.y + size.y - (value.y - bounds.origin.y) * scale - 10.0F};
+    };
+    for (const auto& packet : preview.packets) {
+        const auto color = packet.fill_color
+            ? color_to_u32(*packet.fill_color)
+            : IM_COL32(115, 170, 230, 220);
+        for (std::size_t index = 0; index + 2U < packet.fill_indices.size();
+             index += 3U) {
+            const auto a = packet.fill_indices[index];
+            const auto b = packet.fill_indices[index + 1U];
+            const auto c = packet.fill_indices[index + 2U];
+            if (a < packet.fill_vertices.size() &&
+                b < packet.fill_vertices.size() &&
+                c < packet.fill_vertices.size())
+                draw->AddTriangleFilled(point(packet.fill_vertices[a]),
+                                        point(packet.fill_vertices[b]),
+                                        point(packet.fill_vertices[c]), color);
+        }
+        if (packet.outline.size() > 1U)
+            for (std::size_t index = 1; index < packet.outline.size(); ++index)
+                draw->AddLine(point(packet.outline[index - 1U]),
+                              point(packet.outline[index]),
+                              IM_COL32(225, 232, 240, 255), 1.5F);
+    }
+    if (preview.packets.empty())
+        draw->AddText({origin.x + 10.0F, origin.y + 10.0F},
+                      IM_COL32(150, 160, 175, 255), "No drawable");
 }
 
 fabric::render::VisualCompositionDrawResult build_visual_preview(
@@ -1177,6 +1233,40 @@ void draw_transformation_editor(
                        "atomic replacement; failure keeps the source instance.",
                        current.source_entity.id.value.c_str(),
                        current.destination_entity.id.value.c_str());
+    if (project_session.manifest()) {
+        const auto source_entity = fabric::project::load_entity(
+            project_session.project_root(), *project_session.manifest(),
+            fabric::project::entity_document_path(
+                *project_session.manifest(), current.source_entity.id));
+        const auto destination_entity = fabric::project::load_entity(
+            project_session.project_root(), *project_session.manifest(),
+            fabric::project::entity_document_path(
+                *project_session.manifest(), current.destination_entity.id));
+        if (source_entity.ok() && destination_entity.ok()) {
+            const auto source_preview = build_entity_preview(
+                project_session.project_root(), *project_session.manifest(),
+                *source_entity.entity);
+            const auto destination_preview = build_entity_preview(
+                project_session.project_root(), *project_session.manifest(),
+                *destination_entity.entity);
+            if (ImGui::BeginTable("Transformation previews", 2,
+                                  ImGuiTableFlags_SizingStretchSame)) {
+                ImGui::TableNextColumn();
+                ImGui::Text("Source · %s",
+                            current.source_entity.id.value.c_str());
+                draw_entity_preview_thumbnail(
+                    "##transformation-source", source_preview,
+                    {ImGui::GetContentRegionAvail().x, 180.0F});
+                ImGui::TableNextColumn();
+                ImGui::Text("Destination · %s",
+                            current.destination_entity.id.value.c_str());
+                draw_entity_preview_thumbnail(
+                    "##transformation-destination", destination_preview,
+                    {ImGui::GetContentRegionAvail().x, 180.0F});
+                ImGui::EndTable();
+            }
+        }
+    }
     for (const auto& issue : transformation_session.errors())
         ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                            issue.field.c_str(), issue.message.c_str());

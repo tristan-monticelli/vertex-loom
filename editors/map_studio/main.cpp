@@ -3,11 +3,14 @@
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/editor/scene_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/editor/transformation_session.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/project/map_package.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
+#include "fabric/runtime/preview_runtime.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -38,6 +41,28 @@
 #include <vector>
 
 namespace {
+
+std::vector<fabric::project::EntityTransformation> load_transformations(
+    const std::filesystem::path& root,
+    const fabric::project::ProjectManifest& manifest) {
+    std::vector<fabric::project::EntityTransformation> result;
+    const auto directory = root / manifest.directories.assets / "transformations";
+    std::error_code error;
+    if (!std::filesystem::exists(directory, error) || error) return result;
+    for (std::filesystem::directory_iterator iterator{directory, error}, end;
+         !error && iterator != end; iterator.increment(error)) {
+        const auto filename = iterator->path().filename().string();
+        if (!iterator->is_regular_file(error) ||
+            !filename.ends_with(".transformation.json")) continue;
+        auto loaded = fabric::project::load_entity_transformation(
+            root, manifest, iterator->path().lexically_relative(root));
+        if (loaded.ok()) result.push_back(std::move(*loaded.asset));
+    }
+    std::ranges::sort(result, {}, [](const auto& value) {
+        return value.document.name;
+    });
+    return result;
+}
 
 enum class CloseE2eMode { window, system_shortcut, save_failure };
 
@@ -1725,7 +1750,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
 int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id,
         const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
-        const bool scene_e2e = false) {
+        const bool scene_e2e = false,
+        const bool transformation_e2e = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -1750,7 +1776,7 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        (e2e_mode || scene_e2e ? SDL_WINDOW_HIDDEN : 0U);
+        (e2e_mode || scene_e2e || transformation_e2e ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
         window_flags);
@@ -1878,6 +1904,46 @@ int run(const std::filesystem::path& project_root,
             }
         }
     }
+    bool transformation_e2e_complete = false;
+    if (transformation_e2e) {
+        if (!session.has_map()) {
+            fail_e2e("transformation fixture map could not be opened");
+        } else {
+            fabric::project::EntityTransformation transformation;
+            transformation.document.id = {.value = "map-transformation-e2e"};
+            transformation.document.name = "Map Transformation E2E";
+            transformation.source_entity = {
+                {.value = "rotating-platform-entity"}, "entity"};
+            transformation.destination_entity = {
+                {.value = "textile-head-entity"}, "entity"};
+            fabric::editor::TransformationSession transformation_session;
+            const bool authored = transformation_session.create(
+                    project_root, transformation) &&
+                transformation_session.save();
+            fabric::runtime::PreviewRuntime preview_runtime;
+            const bool loaded = authored && preview_runtime.load({
+                .project_root = project_root,
+                .map_id = map_id,
+                .mode = fabric::runtime::RuntimeMode::smoke_test});
+            const bool transformed = loaded && preview_runtime.transform_instance(
+                "rotating-platform-instance", transformation.document.id);
+            const auto destination = transformed
+                ? preview_runtime.instance_entity_id("rotating-platform-instance")
+                : std::nullopt;
+            const auto source_instance = std::ranges::find(
+                session.map()->instances, std::string{"rotating-platform-instance"},
+                &fabric::project::MapInstance::id);
+            transformation_e2e_complete = destination &&
+                destination->value == "textile-head-entity" &&
+                !preview_runtime.packet_order().empty() &&
+                source_instance != session.map()->instances.end() &&
+                source_instance->prefab &&
+                source_instance->prefab->id.value == "rotating-platform-prefab" &&
+                !session.dirty();
+            if (!transformation_e2e_complete)
+                fail_e2e("isolated transformation preview did not preserve the map");
+        }
+    }
     if (e2e_mode) {
         if (!session.has_map() || !session.manifest()) {
             fail_e2e("fixture map could not be opened");
@@ -1950,6 +2016,8 @@ int run(const std::filesystem::path& project_root,
     std::string instance_property_id;
     std::string instance_property_value;
     int instance_property_kind = 2;
+    std::string transformation_preview_id;
+    std::string transformation_preview_result;
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
     CanvasGizmoState canvas_gizmo;
@@ -2568,6 +2636,76 @@ int run(const std::filesystem::path& project_root,
             if (selected_instances.size() == 1U) {
                 const fabric::core::ResourceId selected_id{selected_instances.front()};
                 ImGui::SeparatorText("Selected instance properties");
+                const auto instance = std::ranges::find(
+                    map.instances, selected_id.value,
+                    &fabric::project::MapInstance::id);
+                std::optional<fabric::core::ResourceId> selected_entity;
+                if (instance != map.instances.end()) {
+                    if (instance->entity) selected_entity = instance->entity->id;
+                    else if (instance->prefab) {
+                        const auto prefab = std::ranges::find(
+                            map.prefabs, instance->prefab->id.value,
+                            &fabric::project::PrefabDefinition::id);
+                        if (prefab != map.prefabs.end())
+                            selected_entity = prefab->entity.id;
+                    }
+                }
+                const auto transformations = load_transformations(
+                    session.project_root(), *session.manifest());
+                const auto selected_transformation = std::ranges::find_if(
+                    transformations, [&](const auto& value) {
+                        return value.document.id.value == transformation_preview_id;
+                    });
+                const char* transformation_label =
+                    selected_transformation == transformations.end()
+                    ? "Choose a compatible transformation..."
+                    : selected_transformation->document.name.c_str();
+                if (ImGui::BeginCombo("Transformation preview",
+                                      transformation_label)) {
+                    for (const auto& value : transformations) {
+                        if (!selected_entity ||
+                            value.source_entity.id != *selected_entity) continue;
+                        if (ImGui::Selectable(value.document.name.c_str(),
+                                value.document.id.value ==
+                                    transformation_preview_id))
+                            transformation_preview_id = value.document.id.value;
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s -> %s",
+                            value.source_entity.id.value.c_str(),
+                            value.destination_entity.id.value.c_str());
+                    }
+                    ImGui::EndCombo();
+                }
+                const bool can_preview = !session.dirty() && selected_entity &&
+                    selected_transformation != transformations.end() &&
+                    selected_transformation->source_entity.id == *selected_entity;
+                ImGui::BeginDisabled(!can_preview);
+                if (ImGui::Button("Run atomic transformation preview")) {
+                    fabric::runtime::PreviewRuntime preview_runtime;
+                    const bool loaded = preview_runtime.load({
+                        .project_root = session.project_root(),
+                        .map_id = map.document.id,
+                        .mode = fabric::runtime::RuntimeMode::smoke_test});
+                    const bool transformed = loaded &&
+                        preview_runtime.transform_instance(
+                            selected_id.value,
+                            selected_transformation->document.id);
+                    const auto result_entity = transformed
+                        ? preview_runtime.instance_entity_id(selected_id.value)
+                        : std::nullopt;
+                    transformation_preview_result = transformed && result_entity
+                        ? "Preview: " + selected_entity->value + " -> " +
+                            result_entity->value + ", " +
+                            std::to_string(preview_runtime.packet_order().size()) +
+                            " draw packet(s). The map was not modified."
+                        : "Transformation preview failed; the source instance was kept.";
+                }
+                ImGui::EndDisabled();
+                if (session.dirty())
+                    ImGui::TextDisabled(
+                        "Save the map before running the isolated runtime preview.");
+                if (!transformation_preview_result.empty())
+                    ImGui::TextWrapped("%s", transformation_preview_result.c_str());
                 for (const auto& property : session.effective_instance_properties(selected_id))
                     ImGui::BulletText("%s = %s", property.id.c_str(),
                                       property_value_text(property.value).c_str());
@@ -2905,7 +3043,7 @@ int run(const std::filesystem::path& project_root,
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
-        if (scene_e2e) running = false;
+        if (scene_e2e || transformation_e2e) running = false;
     }
 
     for (const auto& [_, texture] : map_textures) {
@@ -2919,7 +3057,9 @@ int run(const std::filesystem::path& project_root,
     SDL_DestroyWindow(window);
     NFD_Quit();
     SDL_Quit();
-    return e2e_failed || (scene_e2e && !scene_e2e_complete) ? 1 : 0;
+    return e2e_failed || (scene_e2e && !scene_e2e_complete) ||
+            (transformation_e2e && !transformation_e2e_complete)
+        ? 1 : 0;
 }
 
 } // namespace
@@ -2928,19 +3068,27 @@ int main(int argc, char** argv) {
     const bool e2e = argc == 5 && std::string_view{argv[1]} == "--e2e-close";
     const bool scene_e2e = argc == 4 &&
         std::string_view{argv[1]} == "--e2e-scene";
+    const bool transformation_e2e = argc == 4 &&
+        std::string_view{argv[1]} == "--e2e-transformation";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
-    if ((argc != 1 && argc != 3 && !e2e && !scene_e2e) ||
+    if ((argc != 1 && argc != 3 && !e2e && !scene_e2e &&
+         !transformation_e2e) ||
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
                      "<window|shortcut|save-failure> project-directory map-id\n"
-                     "       map_studio --e2e-scene project-directory map-id\n";
+                     "       map_studio --e2e-scene project-directory map-id\n"
+                     "       map_studio --e2e-transformation "
+                     "project-directory map-id\n";
         return 64;
     }
     const std::filesystem::path project = e2e ? argv[3]
         : scene_e2e ? argv[2]
+        : transformation_e2e ? argv[2]
         : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
-        e2e ? argv[4] : scene_e2e ? argv[3] : argc == 3 ? argv[2] : ""};
-    return run(project, map_id, e2e_mode, scene_e2e);
+        e2e ? argv[4]
+        : scene_e2e || transformation_e2e ? argv[3]
+        : argc == 3 ? argv[2] : ""};
+    return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e);
 }

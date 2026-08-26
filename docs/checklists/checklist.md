@@ -72,7 +72,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   bindings physiques, puis l'utiliser pour le joueur comme pour les monstres.
 - [x] Retirer le couplage runtime aux trois actions codées en dur
   `move_left`, `move_right` et `jump`.
-- [ ] Ajouter les transformations atomiques d'une instance d'entité A vers B,
+- [x] Ajouter les transformations atomiques d'une instance d'entité A vers B,
   avec politique explicite de transfert d'état.
 - [ ] Rendre personnage, spawn, caméra, limites et audio authorables dans le
   projet. Ils sont aujourd'hui principalement injectés par options CLI.
@@ -156,7 +156,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Lot C : exécution runtime des mécaniques publiées.
 - [x] Lot D : scènes multi-maps, entry points et paquet de scènes.
 - [x] Lot E : triggers cohérents avec les formes et toutes les entités.
-- [ ] Lot F : BehaviorGraph, monstres et transformations d'entités.
+- [x] Lot F : BehaviorGraph, monstres et transformations d'entités.
 - [ ] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
 - [ ] Lot H : vectoriel complet, input avancé et tests UX end-to-end.
 
@@ -254,7 +254,7 @@ critères de succès observables.
 - [x] Tester un comportement piloté par le joueur.
 - [x] Tester le même comportement piloté par une IA de monstre.
 - [x] Tester le même comportement piloté par un événement de map.
-- [ ] Tester le déterminisme après sauvegarde, reload et replay.
+- [x] Tester le déterminisme après sauvegarde, reload et replay.
 
 Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
 à l'un des deux dans le runtime.
@@ -283,10 +283,10 @@ Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
 - [x] Exposer un formulaire typé dans Asset Studio.
 - [x] Permettre la sélection des entités source et destination depuis le
   Resource Explorer.
-- [ ] Prévisualiser la transformation dans Asset Studio et Map Studio.
-- [ ] Tester aller simple, aller-retour et chaîne de transformations.
-- [ ] Tester les références manquantes et cycles non autorisés.
-- [ ] Tester sauvegarde, reload, replay et publication de map.
+- [x] Prévisualiser la transformation dans Asset Studio et Map Studio.
+- [x] Tester aller simple, aller-retour et chaîne de transformations.
+- [x] Tester les références manquantes et cycles non autorisés.
+- [x] Tester sauvegarde, reload, replay et publication de map.
 
 Gate : une action configurée dans le Studio transforme une instance A vers B
 avec la politique de transfert choisie, puis produit le même résultat après

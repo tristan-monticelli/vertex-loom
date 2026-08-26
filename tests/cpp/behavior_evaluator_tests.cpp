@@ -1,4 +1,5 @@
 #include "fabric/runtime/behavior_evaluator.hpp"
+#include "fabric/runtime/replay_player.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -59,5 +60,53 @@ TEST_CASE("Behavior evaluation stays deterministic after save and reload") {
                                          "advance", {}};
     CHECK(first.evaluate(signal, 1.0F / 60.0F) ==
           second.evaluate(signal, 1.0F / 60.0F));
+    CHECK(first.trace() == second.trace());
+}
+
+TEST_CASE("Behavior evaluation stays deterministic through a reloaded replay") {
+    project::ProjectManifest manifest;
+    manifest.id = {.value = "test-project"};
+    manifest.name = "Test";
+    const auto parsed_graph = project::parse_behavior_graph(
+        manifest, project::serialize_behavior_graph(shared_graph()));
+    REQUIRE(parsed_graph.ok());
+    project::ReplayDocument replay;
+    replay.document.id = {.value = "behavior-replay"};
+    replay.document.name = "Behavior Replay";
+    replay.build = "test";
+    replay.inputs = {{0, "advance", true, false},
+                     {2, "advance", false, true},
+                     {4, "advance", true, false}};
+    const auto parsed_replay = project::parse_replay(
+        manifest, project::serialize_replay(replay));
+    REQUIRE(parsed_replay.ok());
+
+    runtime::BehaviorEvaluator first(shared_graph());
+    runtime::BehaviorEvaluator second(*parsed_graph.asset);
+    runtime::ReplayPlayer first_player(replay);
+    runtime::ReplayPlayer second_player(*parsed_replay.asset);
+    runtime::InputActionMap first_input;
+    runtime::InputActionMap second_input;
+    REQUIRE(first_input.define_action("advance"));
+    REQUIRE(second_input.define_action("advance"));
+    std::vector<runtime::BehaviorAction> first_actions;
+    std::vector<runtime::BehaviorAction> second_actions;
+    for (std::uint64_t frame = 0; frame < 6; ++frame) {
+        REQUIRE(first_player.advance(frame, first_input));
+        REQUIRE(second_player.advance(frame, second_input));
+        if (first_input.pressed("advance")) {
+            auto actions = first.evaluate(
+                {runtime::BehaviorSignalSource::action, "advance", {}},
+                1.0F / 60.0F);
+            first_actions.insert(first_actions.end(), actions.begin(), actions.end());
+        }
+        if (second_input.pressed("advance")) {
+            auto actions = second.evaluate(
+                {runtime::BehaviorSignalSource::action, "advance", {}},
+                1.0F / 60.0F);
+            second_actions.insert(second_actions.end(), actions.begin(), actions.end());
+        }
+    }
+    CHECK(first_actions == second_actions);
     CHECK(first.trace() == second.trace());
 }

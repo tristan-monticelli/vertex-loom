@@ -241,6 +241,28 @@ fabric::project::BehaviorGraph transformation_behavior() {
     return result;
 }
 
+fabric::project::BehaviorGraph replay_transformation_behavior() {
+    using Direction = fabric::project::BehaviorPortDirection;
+    using Type = fabric::project::BehaviorValueType;
+    fabric::project::BehaviorGraph result;
+    result.document.id = {.value = "replay-transformation-behavior"};
+    result.document.name = "Replay Transformation Behavior";
+    result.nodes = {
+        {.id = "morph", .type = "action_source",
+         .ports = {{"out", Direction::output, Type::signal}},
+         .properties = {{"semantic_id", std::string{"morph"}}}},
+        {.id = "transform", .type = "transform_entity",
+         .ports = {{"in", Direction::input, Type::signal},
+                   {"out", Direction::output, Type::signal}},
+         .properties = {{"transformation",
+             fabric::project::ResourceReference{
+                 {.value = "hero-to-beast"}, "transformation"}}}},
+    };
+    result.connections = {{.id = "morph-flow", .from_node = "morph",
+        .from_port = "out", .to_node = "transform", .to_port = "in"}};
+    return result;
+}
+
 fabric::project::MechanicValue mechanic_default_value(
     const fabric::project::MechanicValueType type,
     const std::string_view id) {
@@ -1584,6 +1606,114 @@ TEST_CASE("failed transformation leaves the complete source instance intact") {
     CHECK(runtime.instance_entity_id("hero") ==
           fabric::core::ResourceId{.value = "runtime-entity"});
     CHECK(runtime.packet_order().size() == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("runtime supports forward reverse and chained transformations") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-transformation-chain-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    for (const auto& [id, name] : {
+             std::pair{"entity-a", "Entity A"},
+             std::pair{"entity-b", "Entity B"},
+             std::pair{"entity-c", "Entity C"}}) {
+        auto value = entity();
+        value.document.id = {.value = id};
+        value.document.name = name;
+        REQUIRE(fabric::project::publish_entity(root, manifest(), value).ok());
+    }
+    const auto publish = [&](const char* id, const char* source,
+                             const char* destination) {
+        fabric::project::EntityTransformation value;
+        value.document.id = {.value = id};
+        value.document.name = id;
+        value.source_entity = {{.value = source}, "entity"};
+        value.destination_entity = {{.value = destination}, "entity"};
+        return fabric::project::publish_entity_transformation(
+            root, manifest(), value).ok();
+    };
+    REQUIRE(publish("a-to-b", "entity-a", "entity-b"));
+    REQUIRE(publish("b-to-a", "entity-b", "entity-a"));
+    REQUIRE(publish("b-to-c", "entity-b", "entity-c"));
+    auto source_map = map();
+    source_map.instances.push_back({
+        "actor", fabric::project::ResourceReference{
+            {.value = "entity-a"}, "entity"},
+        std::nullopt, "instances", {}, 0, 0, {}});
+    REQUIRE(fabric::project::publish_map(root, manifest(), source_map).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.transform_instance("actor", {.value = "a-to-b"}));
+    CHECK(runtime.instance_entity_id("actor") ==
+          fabric::core::ResourceId{.value = "entity-b"});
+    REQUIRE(runtime.transform_instance("actor", {.value = "b-to-a"}));
+    CHECK(runtime.instance_entity_id("actor") ==
+          fabric::core::ResourceId{.value = "entity-a"});
+    REQUIRE(runtime.transform_instance("actor", {.value = "a-to-b"}));
+    REQUIRE(runtime.transform_instance("actor", {.value = "b-to-c"}));
+    CHECK(runtime.instance_entity_id("actor") ==
+          fabric::core::ResourceId{.value = "entity-c"});
+    CHECK_FALSE(runtime.transform_instance("actor", {.value = "a-to-b"}));
+    CHECK(runtime.instance_entity_id("actor") ==
+          fabric::core::ResourceId{.value = "entity-c"});
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("reloaded replay deterministically triggers an entity transformation") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-transformation-replay-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), replay_transformation_behavior()).ok());
+    auto hero = entity();
+    hero.behavior = fabric::project::ResourceReference{
+        {.value = "replay-transformation-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), hero).ok());
+    auto beast = entity();
+    beast.document.id = {.value = "beast-entity"};
+    beast.document.name = "Beast Entity";
+    REQUIRE(fabric::project::publish_entity(root, manifest(), beast).ok());
+    fabric::project::EntityTransformation transformation;
+    transformation.document.id = {.value = "hero-to-beast"};
+    transformation.document.name = "Hero to Beast";
+    transformation.source_entity = {{.value = "runtime-entity"}, "entity"};
+    transformation.destination_entity = {{.value = "beast-entity"}, "entity"};
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), transformation).ok());
+    fabric::project::ReplayDocument replay;
+    replay.document.id = {.value = "transformation-replay"};
+    replay.document.name = "Transformation Replay";
+    replay.build = "test";
+    replay.inputs = {{0, "morph", true, false}};
+    REQUIRE(fabric::project::publish_replay(root, manifest(), replay).ok());
+    auto source_map = map();
+    source_map.instances.push_back({
+        "hero", fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"},
+        std::nullopt, "instances", {}, 0, 0, {}});
+    REQUIRE(fabric::project::publish_map(root, manifest(), source_map).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({
+        .project_root = root, .map_id = {.value = "preview"},
+        .replay_id = fabric::core::ResourceId{.value = "transformation-replay"},
+        .input_actions = {{"morph", {}}},
+        .mode = fabric::runtime::RuntimeMode::smoke_test, .frame_limit = 1U}));
+    REQUIRE(runtime.run());
+    CHECK(runtime.instance_entity_id("hero") ==
+          fabric::core::ResourceId{.value = "beast-entity"});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

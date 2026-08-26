@@ -544,6 +544,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-scene-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_scene_e2e.cmake
         )
+        add_test(
+            NAME map_studio_transformation_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-transformation-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_transformation_e2e.cmake
+        )
     endif()
 
     add_executable(fabric_audio_mixer_tests tests/cpp/audio_mixer_tests.cpp)

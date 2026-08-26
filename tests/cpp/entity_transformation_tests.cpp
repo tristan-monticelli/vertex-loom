@@ -1,5 +1,6 @@
 #include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/manifest.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -38,6 +39,23 @@ fabric::project::EntityDefinition entity(std::string id) {
     fabric::project::EntityDefinition value;
     value.document.id = {.value = std::move(id)};
     value.document.name = value.document.id.value;
+    return value;
+}
+
+fabric::project::BehaviorGraph behavior(std::string id,
+                                       std::string transformation_id) {
+    fabric::project::BehaviorGraph value;
+    value.document.id = {.value = std::move(id)};
+    value.document.name = value.document.id.value;
+    value.nodes.push_back({
+        .id = "transform", .type = "transform_entity",
+        .ports = {{"in", fabric::project::BehaviorPortDirection::input,
+                   fabric::project::BehaviorValueType::signal},
+                  {"out", fabric::project::BehaviorPortDirection::output,
+                   fabric::project::BehaviorValueType::signal}},
+        .properties = {{"transformation",
+            fabric::project::ResourceReference{
+                {.value = std::move(transformation_id)}, "transformation"}}}});
     return value;
 }
 }
@@ -97,6 +115,38 @@ TEST_CASE("project validation resolves both transformation endpoints") {
         root, manifest(), entity("beast")).ok());
     CHECK(fabric::project::validate_project(root).ok());
 
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("project validation rejects a transformation dependency cycle") {
+    const auto root = temporary_root();
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    auto hero = entity("hero");
+    hero.behavior = fabric::project::ResourceReference{
+        {.value = "hero-behavior"}, "behavior"};
+    auto beast = entity("beast");
+    beast.behavior = fabric::project::ResourceReference{
+        {.value = "beast-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), hero).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), beast).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), behavior("hero-behavior", "hero-to-beast")).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), behavior("beast-behavior", "beast-to-hero")).ok());
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), transformation()).ok());
+    auto reverse = transformation();
+    reverse.document.id = {.value = "beast-to-hero"};
+    reverse.document.name = "Beast to Hero";
+    std::swap(reverse.source_entity, reverse.destination_entity);
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), reverse).ok());
+    const auto report = fabric::project::validate_project(root);
+    CHECK_FALSE(report.ok());
+    CHECK(std::ranges::any_of(report.errors, [](const auto& issue) {
+        return issue.code == fabric::project::ErrorCode::resource_cycle;
+    }));
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
 }
