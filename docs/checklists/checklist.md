@@ -197,8 +197,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   déclarés des maps montées.
 - [x] Permettre d'ouvrir et de créer une map depuis Map Studio sans relancer
   l'outil avec des arguments CLI.
-- [ ] Ajouter confirmations et analyse d'impact avant les suppressions de
-  nœuds, collisions, triggers, événements et autres ressources.
+- [x] Ajouter confirmations et analyse d'impact avant les suppressions de
+  nœuds, collisions, triggers, événements et autres ressources. Les nœuds
+  vectoriels/entités et ressources ont déjà leur protection ; Map Studio
+  confirme désormais montages, transitions, collisions, événements et
+  triggers, bloque les références entrantes et teste l'undo de collision.
 - [x] Synchroniser les états dirty de la map et de la mécanique dans un shell
   de document explicite ; les trois sessions partagent désormais le garde de
   fermeture et la sauvegarde avant package.
