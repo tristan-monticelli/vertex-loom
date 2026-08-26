@@ -1646,7 +1646,8 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
 bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
                                         const core::ResourceId& id,
                                         const core::ResourceId& copy_id,
-                                        std::string copy_name) {
+                                        std::string copy_name,
+                                        ResourceDuplicationOptions options) {
     if (!has_project() || !core::ResourceId::is_valid(copy_id.value) ||
         copy_name.empty()) {
         errors_ = {{project::ErrorCode::invalid_resource_id, "duplicate",
@@ -1669,7 +1670,32 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
                     "the destination id already exists for this resource type"}};
         return false;
     }
+    const auto source_path = source->document_path;
     if (!save_before_document_transition()) return false;
+    for (const auto& dependency : options.dependencies) {
+        if (dependency.source_id == id ||
+            !core::ResourceId::is_valid(dependency.source_id.value) ||
+            !core::ResourceId::is_valid(dependency.destination_id.value) ||
+            dependency.destination_name.empty()) {
+            errors_ = {{project::ErrorCode::invalid_asset, "duplicate.dependencies",
+                        "dependency source, destination and name must be valid and distinct"}};
+            return false;
+        }
+        if (!duplicate_resource(dependency.kind, dependency.source_id,
+                                dependency.destination_id,
+                                dependency.destination_name))
+            return false;
+    }
+
+    const auto rewrite_reference = [&](project::ResourceReference& reference) {
+        for (const auto& dependency : options.dependencies) {
+            if (reference.id == dependency.source_id &&
+                expected_type(dependency.kind) == reference.expected_type) {
+                reference.id = dependency.destination_id;
+                return;
+            }
+        }
+    };
 
     const auto publish_copy = [&](auto loaded, auto publisher) {
         if (!loaded.ok()) {
@@ -1689,7 +1715,7 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
     switch (kind) {
     case StudioResourceKind::texture: {
         auto loaded = project::load_texture_asset(
-            project_root_, *manifest_, source->document_path);
+            project_root_, *manifest_, source_path);
         if (!loaded.ok()) {
             errors_ = std::move(loaded.errors);
             return false;
@@ -1708,10 +1734,17 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
     }
     case StudioResourceKind::vector: {
         auto loaded = project::load_vector_asset(
-            project_root_, *manifest_, source->document_path);
+            project_root_, *manifest_, source_path);
         if (!loaded.ok()) {
             errors_ = std::move(loaded.errors);
             return false;
+        }
+        if (loaded.asset->native) {
+            for (auto& node : loaded.asset->native->nodes) {
+                if (node.fill.image) rewrite_reference(node.fill.image->texture);
+                if (node.stroke && node.stroke->image)
+                    rewrite_reference(node.stroke->image->texture);
+            }
         }
         const auto source_path = project_root_ / loaded.asset->source;
         loaded.asset->document.id = copy_id;
@@ -1736,15 +1769,30 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
     }
     case StudioResourceKind::material:
         return publish_copy(
-            project::load_material(project_root_, *manifest_, source->document_path),
+            project::load_material(project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_material(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::entity: {
         auto loaded = project::load_entity(
-            project_root_, *manifest_, source->document_path);
+            project_root_, *manifest_, source_path);
         if (!loaded.ok()) {
             errors_ = std::move(loaded.errors);
             return false;
+        }
+        if (loaded.entity->behavior)
+            rewrite_reference(*loaded.entity->behavior);
+        for (auto& node : loaded.entity->nodes) {
+            if (node.drawable.resource)
+                rewrite_reference(*node.drawable.resource);
+            if (node.drawable.material)
+                rewrite_reference(*node.drawable.material);
+            if (node.drawable.component_instance) {
+                for (auto& override :
+                     node.drawable.component_instance->overrides)
+                    if (auto* reference = std::get_if<project::ResourceReference>(
+                            &override.value))
+                        rewrite_reference(*reference);
+            }
         }
         loaded.entity->document.id = copy_id;
         loaded.entity->document.name = std::move(copy_name);
@@ -1758,12 +1806,12 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
     }
     case StudioResourceKind::animation:
         return publish_copy(
-            project::load_animation(project_root_, *manifest_, source->document_path),
+            project::load_animation(project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_animation(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::input: {
         auto loaded = project::load_input(
-            project_root_, *manifest_, source->document_path);
+            project_root_, *manifest_, source_path);
         if (!loaded.ok()) {
             errors_ = std::move(loaded.errors);
             return false;
@@ -1781,57 +1829,57 @@ bool ProjectSession::duplicate_resource(const StudioResourceKind kind,
     case StudioResourceKind::behavior:
         return publish_copy(
             project::load_behavior_graph(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_behavior_graph(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::transformation:
         return publish_copy(
             project::load_entity_transformation(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_entity_transformation(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::textured_path:
         return publish_copy(
             project::load_textured_path(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_textured_path(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::visual_composition:
         return publish_copy(
             project::load_visual_composition(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_visual_composition(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::visual_component:
         return publish_copy(
             project::load_visual_component(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_visual_component(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::map:
         return publish_copy(
-            project::load_map(project_root_, *manifest_, source->document_path),
+            project::load_map(project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_map(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::scene:
         return publish_copy(
-            project::load_scene(project_root_, *manifest_, source->document_path),
+            project::load_scene(project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_scene(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::mechanic:
         return publish_copy(
             project::load_mechanic_graph(
-                project_root_, *manifest_, source->document_path),
+                project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_mechanic_graph(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::replay:
         return publish_copy(
-            project::load_replay(project_root_, *manifest_, source->document_path),
+            project::load_replay(project_root_, *manifest_, source_path),
             [&](auto value) { return project::publish_replay(
                 project_root_, *manifest_, value); });
     case StudioResourceKind::audio:
         {
-            auto loaded = project::load_audio(project_root_, *manifest_, source->document_path);
+            auto loaded = project::load_audio(project_root_, *manifest_, source_path);
             if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
             loaded.audio->document.id = copy_id;
             loaded.audio->document.name = std::move(copy_name);

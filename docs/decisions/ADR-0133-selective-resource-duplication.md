@@ -1,0 +1,31 @@
+# ADR-0133 — Duplication sélective des dépendances
+
+- Statut : accepté
+- Date : 2026-08-26
+
+## Contexte
+
+La duplication générique créait un nouveau document, mais conservait toutes ses
+références vers les mêmes ressources. Cela ne permettait pas de choisir quelles
+dépendances devaient devenir indépendantes.
+
+## Décision
+
+`ProjectSession::duplicate_resource` reçoit une liste optionnelle de
+`ResourceDuplicationDependency`. Chaque entrée décrit le type, l’identifiant
+source, l’identifiant destination et le nom de la copie. Les dépendances sont
+dupliquées avant le document principal. Les documents `EntityDefinition` et
+`VectorAsset` réécrivent uniquement les références sélectionnées, en vérifiant
+également leur `expected_type`.
+
+Une dépendance invalide ou cyclique avec la ressource principale est rejetée
+avant la publication de la copie principale ; les erreurs de publication sont
+retournées par le même contrat que les duplications classiques.
+
+## Conséquences
+
+- La copie superficielle reste le comportement par défaut.
+- Une copie profonde partielle est déterministe et utilise le même garde de
+  transition que les duplications classiques.
+- L’interface doit encore proposer la sélection visuelle des dépendances avant
+  de fermer les cases UX correspondantes.

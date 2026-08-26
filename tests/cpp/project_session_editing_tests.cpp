@@ -292,6 +292,40 @@ TEST_CASE("import and duplicate honor the transition guard") {
     }
 }
 
+TEST_CASE("resource duplication rewrites only selected dependencies") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Source Art";
+    REQUIRE(session.create_vector_artwork(artwork));
+    fabric::editor::CreateEntityPrompt entity;
+    entity.name = "Owner";
+    entity.node_name = "Root";
+    entity.drawable = fabric::project::EntityDrawableKind::vector;
+    entity.resource_id = "source-art";
+    REQUIRE(session.create_entity(entity));
+
+    fabric::editor::ResourceDuplicationOptions options;
+    options.dependencies.push_back({
+        .kind = fabric::editor::StudioResourceKind::vector,
+        .source_id = {.value = "source-art"},
+        .destination_id = {.value = "source-art-copy"},
+        .destination_name = "Source Art Copy"});
+    REQUIRE(session.duplicate_resource(
+        fabric::editor::StudioResourceKind::entity,
+        {.value = "owner"}, {.value = "owner-copy"}, "Owner Copy",
+        options));
+    REQUIRE(session.selected_entity());
+    REQUIRE(session.selected_entity()->nodes.front().drawable.resource);
+    CHECK(session.selected_entity()->nodes.front().drawable.resource->id.value ==
+          "source-art-copy");
+    CHECK(std::filesystem::is_regular_file(
+        project.path() / "assets/vectors/source-art-copy.vector.json"));
+}
+
 TEST_CASE("selection preserves an invalid dirty document") {
     const TemporaryDirectory project;
     write_project(project.path());

@@ -51,6 +51,17 @@ enum class StudioResourceKind {
     audio,
 };
 
+struct ResourceDuplicationDependency {
+    StudioResourceKind kind{StudioResourceKind::texture};
+    core::ResourceId source_id;
+    core::ResourceId destination_id;
+    std::string destination_name;
+};
+
+struct ResourceDuplicationOptions {
+    std::vector<ResourceDuplicationDependency> dependencies;
+};
+
 struct StudioResource {
     StudioResourceKind kind{StudioResourceKind::texture};
     core::ResourceId id;
@@ -266,7 +277,8 @@ public:
     [[nodiscard]] bool duplicate_resource(StudioResourceKind kind,
                                           const core::ResourceId& id,
                                           const core::ResourceId& copy_id,
-                                          std::string copy_name);
+                                          std::string copy_name,
+                                          ResourceDuplicationOptions options = {});
     [[nodiscard]] bool rename_resource(StudioResourceKind kind,
                                        const core::ResourceId& id,
                                        std::string name);
