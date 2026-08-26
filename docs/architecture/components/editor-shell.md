@@ -158,7 +158,9 @@ C4Component
   historique et le même parseur strict pour les évaluer et les sauvegarder.
   Des presets de binding transform/material accélèrent la création sans
   supprimer le mode `Custom`, et le scrubber affiche chaque valeur évaluée,
-  son binding et sa composition.
+  son binding et sa composition. Les clés peuvent être sélectionnées en
+  groupe, copiées puis collées avec un décalage relatif ; leur temps peut être
+  aimanté à un intervalle configurable avant de passer par `CommandStack`.
 - Le canvas et l'inspecteur dérivent uniquement de la sélection courante. Les
   réglages du manifeste vivent dans une fenêtre `Project settings` distincte.
 - Ouvrir, créer, fermer ou quitter avec un document dirty demande `Save`,

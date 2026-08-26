@@ -203,6 +203,18 @@ struct CanvasUiState {
 };
 
 struct AnimationUiState {
+    struct ClipboardEntry {
+        fabric::project::PropertyBinding binding;
+        fabric::project::AnimationKey key;
+        fabric::project::AnimationInterpolation interpolation{
+            fabric::project::AnimationInterpolation::linear};
+        fabric::project::AnimationComposition composition{
+            fabric::project::AnimationComposition::replace};
+    };
+    struct KeySelection {
+        fabric::project::PropertyBinding binding;
+        std::size_t index{};
+    };
     std::string node_id{"root"};
     std::string component_id{"transform"};
     std::string property_id{"position"};
@@ -235,6 +247,10 @@ struct AnimationUiState {
         fabric::project::AnimationInterpolation::linear};
     fabric::project::AnimationComposition composition{
         fabric::project::AnimationComposition::replace};
+    bool snap_keys{true};
+    float key_snap_interval{0.1F};
+    std::vector<KeySelection> selected_keys;
+    std::vector<ClipboardEntry> key_clipboard;
 };
 
 struct TexturedPathUiState {
@@ -4830,6 +4846,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SliderFloat("Scrub", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::Checkbox("Auto-key at scrub time", &animation_ui.auto_key);
+            ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(110.0F);
+            ImGui::InputFloat("Snap interval", &animation_ui.key_snap_interval,
+                              0.05F, 0.5F, "%.2f s");
+            animation_ui.key_snap_interval = std::max(0.01F,
+                                                      animation_ui.key_snap_interval);
+            const auto snap_key_time = [&](const float time) {
+                if (!animation_ui.snap_keys) return time;
+                return std::round(time / animation_ui.key_snap_interval) *
+                    animation_ui.key_snap_interval;
+            };
             const auto evaluated = fabric::project::evaluate_animation(
                 clip, animation_ui.scrub_time);
             ImGui::TextDisabled("Evaluated properties: %zu",
@@ -5278,6 +5306,60 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                       animation_ui.key_resource_id.empty()),
                                  "Choose a target node, component, property and resource value when required.");
             ImGui::SeparatorText("Tracks");
+            if (ImGui::Button("Select all keys")) {
+                animation_ui.selected_keys.clear();
+                for (const auto& track : clip.tracks)
+                    for (std::size_t key_index = 0;
+                         key_index < track.keys.size(); ++key_index)
+                        animation_ui.selected_keys.push_back(
+                            {track.binding, key_index});
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Clear key selection"))
+                animation_ui.selected_keys.clear();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(animation_ui.selected_keys.empty());
+            if (ImGui::Button("Copy selected keys")) {
+                animation_ui.key_clipboard.clear();
+                for (const auto& selected : animation_ui.selected_keys) {
+                    const auto track = std::ranges::find(
+                        clip.tracks, selected.binding,
+                        &fabric::project::AnimationTrack::binding);
+                    if (track == clip.tracks.end() ||
+                        selected.index >= track->keys.size()) continue;
+                    animation_ui.key_clipboard.push_back({
+                        selected.binding, track->keys[selected.index],
+                        track->interpolation, track->composition});
+                }
+                status = animation_ui.key_clipboard.empty()
+                    ? "No valid animation keys selected."
+                    : "Animation keys copied.";
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(animation_ui.key_clipboard.empty());
+            if (ImGui::Button("Paste at key time")) {
+                const auto first = std::ranges::min_element(
+                    animation_ui.key_clipboard, {},
+                    [](const auto& entry) { return entry.key.time; });
+                const auto first_time = first->key.time;
+                bool pasted = false;
+                for (const auto& entry : animation_ui.key_clipboard) {
+                    const auto time = snap_key_time(
+                        animation_ui.key_time + entry.key.time - first_time);
+                    pasted = session.set_selected_animation_key(
+                                 entry.binding, time, entry.key.value,
+                                 entry.interpolation,
+                                 fabric::editor::AutosaveScheduler::Clock::now(),
+                                 entry.composition) || pasted;
+                }
+                status = pasted ? "Animation keys pasted."
+                                : "Animation keys could not be pasted; inspect diagnostics.";
+            }
+            ImGui::EndDisabled();
+            if (!animation_ui.key_clipboard.empty())
+                ImGui::SameLine(), ImGui::TextDisabled(
+                    "%zu copied", animation_ui.key_clipboard.size());
             if (clip.tracks.empty()) {
                 ImGui::TextDisabled("No tracks yet.");
             }
@@ -5298,6 +5380,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         std::to_string(track_index) + "-" +
                         std::to_string(key_index);
                     ImGui::PushID(key_scope.c_str());
+                    bool selected = std::ranges::any_of(
+                        animation_ui.selected_keys, [&](const auto& candidate) {
+                            return candidate.binding == track.binding &&
+                                   candidate.index == key_index;
+                        });
+                    if (ImGui::Checkbox("##selected", &selected)) {
+                        const auto found = std::ranges::find_if(
+                            animation_ui.selected_keys,
+                            [&](const auto& candidate) {
+                                return candidate.binding == track.binding &&
+                                       candidate.index == key_index;
+                            });
+                        if (selected && found == animation_ui.selected_keys.end())
+                            animation_ui.selected_keys.push_back(
+                                {track.binding, key_index});
+                        else if (!selected &&
+                                 found != animation_ui.selected_keys.end())
+                            animation_ui.selected_keys.erase(found);
+                    }
+                    ImGui::SameLine();
                     ImGui::BulletText("key %zu", key_index);
                     ImGui::SameLine();
                     float key_time = key.time;
@@ -5305,9 +5407,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ImGui::SliderFloat("##key-time", &key_time, 0.0F,
                                            std::max(0.01F, clip.duration),
                                            "%.2f s")) {
+                        key_time = snap_key_time(key_time);
                         if (!session.move_selected_animation_key(
                                 track.binding, key_index, key_time)) {
                             status = "Key move rejected; inspect diagnostics.";
+                        } else {
+                            animation_ui.selected_keys.clear();
                         }
                     }
                     ImGui::SameLine();
