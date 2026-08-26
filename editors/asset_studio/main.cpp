@@ -1337,6 +1337,10 @@ bool draw_project_resource_picker(
     if (selected != resources.end()) {
         ImGui::TextDisabled("%s",
                             selected->document_path.generic_string().c_str());
+        if (selected->kind == fabric::editor::StudioResourceKind::texture &&
+            selected->width != 0U && selected->height != 0U)
+            ImGui::TextDisabled("%ux%u %s", selected->width, selected->height,
+                                selected->format.empty() ? "texture" : selected->format.c_str());
     }
     return changed;
 }

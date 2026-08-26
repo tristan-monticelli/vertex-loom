@@ -154,7 +154,9 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                     return false;
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
-                                   loaded.asset->document.name, relative, false});
+                                   loaded.asset->document.name, relative, false,
+                                   loaded.asset->width, loaded.asset->height,
+                                   loaded.asset->pixel_format});
             } else if (kind == StudioResourceKind::vector) {
                 auto loaded = project::load_vector_asset(
                     project_root, manifest, relative);

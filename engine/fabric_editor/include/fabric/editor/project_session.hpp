@@ -17,6 +17,7 @@
 #include "fabric/render/raster_image.hpp"
 
 #include <filesystem>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -56,6 +57,9 @@ struct StudioResource {
     std::string name;
     std::filesystem::path document_path;
     bool native{};
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::string format;
 
     friend bool operator==(const StudioResource&, const StudioResource&) = default;
 };
