@@ -45,6 +45,7 @@ std::string_view expected_type(const StudioResourceKind kind) noexcept {
     case StudioResourceKind::scene: return "scene";
     case StudioResourceKind::mechanic: return "mechanic";
     case StudioResourceKind::replay: return "replay";
+    case StudioResourceKind::audio: return "audio";
     }
     return {};
 }
@@ -102,6 +103,9 @@ std::function<project::ValidationReport(std::string_view)> resource_validator(
             break;
         case StudioResourceKind::replay:
             report.errors = project::parse_replay(manifest, contents).errors;
+            break;
+        case StudioResourceKind::audio:
+            report.errors = project::parse_audio(contents).errors;
             break;
         }
         return report;
@@ -320,7 +324,9 @@ std::optional<std::vector<StudioResource>> index_project_resources(
         !inspect(StudioResourceKind::mechanic,
                  assets / "mechanics", ".mechanic.json") ||
         !inspect(StudioResourceKind::replay,
-                 assets / "replays", ".replay.json")) {
+                 assets / "replays", ".replay.json") ||
+        !inspect(StudioResourceKind::audio,
+                 assets / "audio", ".audio.json")) {
         return std::nullopt;
     }
     std::ranges::sort(indexed, [](const StudioResource& left,

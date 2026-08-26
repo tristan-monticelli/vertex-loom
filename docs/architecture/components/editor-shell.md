@@ -123,7 +123,8 @@ C4Component
 - Le hub propose `New input bindings...`. Le prompt édite le nom, les actions
   et les couples périphérique/code, refuse les identifiants et bindings
   dupliqués, capture une touche ou un bouton SDL et publie atomiquement `InputDocument v2` sous
-  `assets/input/<id>.input.json`, puis le réindexe et le sélectionne.
+  `assets/input/<id>.input.json`, puis le réindexe et le sélectionne. Les
+  `AudioDocument` sont également indexés sous `assets/audio` dans le rail.
 - L’inspecteur d’un input existant permet de modifier les identifiants d’action,
   les périphériques et les codes, d’ajouter ou supprimer des actions et des
   bindings, puis de sauvegarder avec `CommandStack`, undo/redo et autosave

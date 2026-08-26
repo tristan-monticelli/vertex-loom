@@ -3,6 +3,7 @@
 #include "fabric/editor/autosave_scheduler.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/animation.hpp"
+#include "fabric/project/audio.hpp"
 #include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/entity.hpp"
 #include "fabric/project/input.hpp"
@@ -46,6 +47,7 @@ enum class StudioResourceKind {
     scene,
     mechanic,
     replay,
+    audio,
 };
 
 struct StudioResource {

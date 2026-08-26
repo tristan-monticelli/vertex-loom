@@ -913,6 +913,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity, 4);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation, 5);
     draw_kind("Input bindings", fabric::editor::StudioResourceKind::input, 6);
+    draw_kind("Audio", fabric::editor::StudioResourceKind::audio, 17);
     draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior, 7);
     draw_kind("Transformations",
               fabric::editor::StudioResourceKind::transformation, 8);
