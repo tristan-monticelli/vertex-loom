@@ -156,7 +156,13 @@ int main(const int argc, char** argv) {
     const bool external_scene = !options.project.empty() || !options.package.empty();
     if (!options.project.empty() && !options.package.empty()) return 2;
     if (!options.project.empty() && options.map_id.empty()) return 2;
-    const auto root = options.project.empty() ? generated_root : options.project;
+    const auto root = options.project.empty()
+        ? generated_root
+        : std::filesystem::absolute(options.project);
+    const auto package_root = options.package.empty()
+        ? std::optional<std::filesystem::path>{}
+        : std::optional<std::filesystem::path>{
+              std::filesystem::absolute(options.package)};
     const auto project_manifest = manifest();
     const auto fail = [&](const std::string_view message) {
         std::cerr << "error=" << message << '\n';
@@ -178,9 +184,7 @@ int main(const int argc, char** argv) {
 
     fabric::runtime::PreviewRuntime runtime;
     if (!runtime.load({.project_root = root,
-                       .package_root = options.package.empty()
-                           ? std::nullopt
-                           : std::optional<std::filesystem::path>{options.package},
+                       .package_root = package_root,
                        .map_id = {.value = external_scene
                            ? (options.map_id.empty() ? "" : options.map_id)
                            : "benchmark-map"},
