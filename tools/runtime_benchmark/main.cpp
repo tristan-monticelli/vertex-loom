@@ -185,8 +185,11 @@ int main(const int argc, char** argv) {
                            ? (options.map_id.empty() ? "" : options.map_id)
                            : "benchmark-map"},
                        .mode = fabric::runtime::RuntimeMode::benchmark,
-                       .frame_limit = options.frames}))
+                       .frame_limit = options.frames})) {
+        for (const auto& error : runtime.errors())
+            std::cerr << "detail=" << error << '\n';
         return fail("runtime_load");
+    }
     if (!runtime.run()) {
         for (const auto& error : runtime.errors()) std::cerr << "detail=" << error << '\n';
         return fail("runtime_run");
