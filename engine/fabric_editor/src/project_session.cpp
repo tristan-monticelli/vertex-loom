@@ -274,6 +274,14 @@ std::optional<std::vector<StudioResource>> index_project_resources(
                 }
                 indexed.push_back({kind, loaded.asset->document.id,
                                    loaded.asset->document.name, relative, false});
+            } else if (kind == StudioResourceKind::audio) {
+                auto loaded = project::load_audio(project_root, manifest, relative);
+                if (!loaded.ok()) {
+                    errors = std::move(loaded.errors);
+                    return false;
+                }
+                indexed.push_back({kind, loaded.audio->document.id,
+                                   loaded.audio->document.name, relative, false});
             } else {
                 auto loaded = project::load_replay(
                     project_root, manifest, relative);

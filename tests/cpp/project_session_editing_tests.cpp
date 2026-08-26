@@ -2,6 +2,7 @@
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/project/document_storage.hpp"
+#include "fabric/project/audio.hpp"
 #include "fabric/project/map.hpp"
 #include "fabric/project/mechanic_graph.hpp"
 #include "fabric/project/replay.hpp"
@@ -96,7 +97,7 @@ TEST_CASE("project manifest edits use command history and explicit save") {
     CHECK(load_manifest_or_fail(project.path()).pixels_per_unit == 64.0);
 }
 
-TEST_CASE("resource index includes maps scenes mechanics and replays") {
+TEST_CASE("resource index includes maps scenes mechanics replays and audio") {
     const TemporaryDirectory project;
     write_project(project.path());
     const auto manifest = load_manifest_or_fail(project.path());
@@ -121,6 +122,11 @@ TEST_CASE("resource index includes maps scenes mechanics and replays") {
                      .type = "replay", .id = {.value = "indexed-replay"},
                      .name = "Indexed Replay"},
         .build = "test-build"}).ok());
+    REQUIRE(fabric::project::publish_audio(project.path(), manifest, {
+        .document = {.schema_version = fabric::project::current_audio_schema_version,
+                     .type = "audio", .id = {.value = "indexed-audio"},
+                     .name = "Indexed Audio"},
+        .events = {{"theme", "theme.wav", 0.8F, true}}}).ok());
 
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
@@ -128,7 +134,8 @@ TEST_CASE("resource index includes maps scenes mechanics and replays") {
              fabric::editor::StudioResourceKind::map,
              fabric::editor::StudioResourceKind::scene,
              fabric::editor::StudioResourceKind::mechanic,
-             fabric::editor::StudioResourceKind::replay}) {
+             fabric::editor::StudioResourceKind::replay,
+             fabric::editor::StudioResourceKind::audio}) {
         const auto found = std::ranges::find(session.resources(), kind,
                                              &fabric::editor::StudioResource::kind);
         REQUIRE(found != session.resources().end());
