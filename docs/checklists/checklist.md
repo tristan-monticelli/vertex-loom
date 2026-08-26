@@ -407,7 +407,7 @@ reload et dans Preview Runtime.
 - [x] Ne jamais publier partiellement la nouvelle ressource avant la résolution
   de la transition.
 - [x] Afficher la ressource et le chemin concernés dans la confirmation.
-- [ ] Tester chaque action avec document clean, dirty valide et dirty invalide.
+- [x] Tester chaque action avec document clean, dirty valide et dirty invalide.
 - [x] Tester l'échec d'écriture et la conservation du document principal.
 - [x] Tester la création immédiatement après une édition non sauvegardée.
 

@@ -195,6 +195,11 @@ qu'un document invalide conserve le projet actif et empêche la nouvelle cible.
 Les transitions d'import et de duplication disposent du même contrôle valide /
 invalide, avec vérification qu'aucune nouvelle ressource n'est publiée après
 un échec de sauvegarde.
+La sélection d'une autre ressource vérifie également la conservation du
+document courant lorsqu'une sauvegarde devient impossible ; avec le parcours
+de fermeture Map Studio (`clean`, `save`, `cancel`, `discard`, échec), les
+actions de transition listées disposent désormais de scénarios propres,
+valides et invalides.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La

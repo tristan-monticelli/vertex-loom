@@ -292,6 +292,39 @@ TEST_CASE("import and duplicate honor the transition guard") {
     }
 }
 
+TEST_CASE("selection preserves an invalid dirty document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt source_prompt;
+    source_prompt.name = "Invalid Selection Source";
+    REQUIRE(session.create_vector_artwork(source_prompt));
+    fabric::editor::CreateVectorArtworkPrompt target_prompt;
+    target_prompt.name = "Selection Target";
+    REQUIRE(session.create_vector_artwork(target_prompt));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::vector,
+        {.value = "invalid-selection-source"}));
+    auto node = session.created_vector()->native->nodes.front();
+    node.name = "Unsaved selection edit";
+    REQUIRE(session.set_selected_vector_node(0U, std::move(node)));
+    const auto document = project.path() /
+        "assets/vectors/invalid-selection-source.vector.json";
+    REQUIRE(std::filesystem::remove(document));
+    REQUIRE(std::filesystem::create_directory(document));
+
+    CHECK_FALSE(session.select_resource(
+        fabric::editor::StudioResourceKind::vector,
+        {.value = "selection-target"}));
+    REQUIRE(session.selected_resource());
+    CHECK(session.selected_resource()->id.value == "invalid-selection-source");
+    CHECK(session.created_vector()->document.name ==
+          "Invalid Selection Source");
+    CHECK(session.dirty());
+}
+
 TEST_CASE("session save failure preserves the selected document") {
     const TemporaryDirectory project;
     write_project(project.path());
