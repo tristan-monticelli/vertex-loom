@@ -23,6 +23,7 @@
 
 #include <filesystem>
 #include <array>
+#include <cctype>
 #include <algorithm>
 #include <cstdint>
 #include <cmath>
@@ -250,12 +251,25 @@ void draw_resource_picker(const char* label,
     ImGui::SameLine();
     if (ImGui::SmallButton("Clear")) selected_id.clear();
     ImGui::PushID(label);
+    static std::unordered_map<std::string, std::string> filters;
+    auto& filter = filters[label];
+    ImGui::SetNextItemWidth(180.0F);
+    ImGui::InputText("Search", &filter);
     for (std::filesystem::directory_iterator iterator{directory, error}, end;
          !error && iterator != end; iterator.increment(error)) {
         if (!iterator->is_regular_file(error)) continue;
         auto filename = iterator->path().filename().string();
         if (!filename.ends_with(suffix)) continue;
         filename.resize(filename.size() - suffix.size());
+        if (!filter.empty()) {
+            auto haystack = filename;
+            auto needle = filter;
+            std::ranges::transform(haystack, haystack.begin(),
+                                   [](const unsigned char value) { return static_cast<char>(std::tolower(value)); });
+            std::ranges::transform(needle, needle.begin(),
+                                   [](const unsigned char value) { return static_cast<char>(std::tolower(value)); });
+            if (haystack.find(needle) == std::string::npos) continue;
+        }
         ImGui::SameLine();
         if (ImGui::SmallButton(filename.c_str())) selected_id = filename;
     }
