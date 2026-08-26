@@ -101,8 +101,11 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
   Il expose désormais l’arbre unifié, Duplicate, Rename, Reveal, Copy ID,
   analyse des références et Delete sécurisé dans le rail droit.
 - [x] Inclure maps, scènes, mécaniques et replays dans cet explorateur unifié.
-- [ ] Remplacer les identifiants texte libres de Map Studio par des pickers
+- [x] Remplacer les identifiants texte libres de Map Studio par des pickers
   typés et recherchables pour entités, prefabs, mécaniques et événements.
+  Les références d’entités/prefabs/mécaniques utilisent le picker commun et les
+  événements de triggers et de transitions sont sélectionnés dans les événements
+  déclarés des maps montées.
 - [x] Permettre d'ouvrir et de créer une map depuis Map Studio sans relancer
   l'outil avec des arguments CLI.
 - [ ] Ajouter confirmations et analyse d'impact avant les suppressions de
