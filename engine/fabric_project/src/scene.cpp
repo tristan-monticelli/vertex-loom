@@ -5,6 +5,7 @@
 #include <nlohmann/json.hpp>
 
 #include <set>
+#include <ranges>
 #include <utility>
 
 namespace fabric::project {
@@ -65,10 +66,15 @@ ValidationReport validate_scene(const ProjectManifest&, const SceneDocument& sce
         error(report.errors, ErrorCode::invalid_asset, "name", "must not be empty");
 
     std::set<std::string> map_ids;
+    std::set<std::string> mount_ids;
     for (const auto& map : scene.maps) {
         if (!core::ResourceId::is_valid(map.map.id.value) ||
             map.map.expected_type != "map" || !map_ids.insert(map.map.id.value).second)
             error(report.errors, ErrorCode::duplicate_resource, "maps", "map references must be valid and unique");
+        if (!core::ResourceId::is_valid(map.layer_id) ||
+            !mount_ids.insert(map.layer_id).second)
+            error(report.errors, ErrorCode::duplicate_resource, "maps.layer",
+                  "mount ids must be valid and unique");
     }
     if (scene.entry_map) {
         if (scene.entry_map->expected_type != "map" ||
@@ -207,6 +213,96 @@ SceneResult publish_scene(const std::filesystem::path& root, const ProjectManife
         [&](std::string_view text_value) { return parse_validation(manifest, text_value); });
     if (!saved.ok()) { result.errors = saved.errors; return result; }
     return load_scene(root, manifest, path);
+}
+
+SceneCompositionResult compose_scene_maps(
+    const std::filesystem::path& root, const ProjectManifest& manifest,
+    const SceneDocument& scene) {
+    SceneCompositionResult result;
+    const auto scene_validation = validate_scene(manifest, scene);
+    if (!scene_validation.ok()) {
+        result.errors = scene_validation.errors;
+        return result;
+    }
+    MapDocument composed{
+        .document = {.schema_version = current_map_schema_version,
+                     .type = "map",
+                     .id = scene.document.id,
+                     .name = scene.document.name}};
+    std::set<std::string> entry_point_ids;
+    for (const auto& reference : scene.maps) {
+        const auto loaded = load_map(
+            root, manifest, map_document_path(manifest, reference.map.id));
+        if (!loaded.ok()) {
+            result.errors.insert(result.errors.end(), loaded.errors.begin(),
+                                 loaded.errors.end());
+            continue;
+        }
+        const auto& source = *loaded.asset;
+        const auto prefixed = [&](const std::string& id) {
+            return reference.layer_id + "-" + id;
+        };
+        const auto collision_offset = composed.collisions.size();
+        for (auto layer : source.layers) {
+            layer.id = prefixed(layer.id);
+            composed.layers.push_back(std::move(layer));
+        }
+        for (auto prefab : source.prefabs) {
+            prefab.id = prefixed(prefab.id);
+            composed.prefabs.push_back(std::move(prefab));
+        }
+        for (auto instance : source.instances) {
+            instance.id = prefixed(instance.id);
+            instance.layer_id = prefixed(instance.layer_id);
+            if (instance.prefab)
+                instance.prefab->id.value = prefixed(instance.prefab->id.value);
+            for (const auto& property : instance.properties) {
+                if (property.id != "sceneEntryPoint") continue;
+                const auto* entry_id = std::get_if<std::string>(&property.value);
+                if (entry_id == nullptr ||
+                    !core::ResourceId::is_valid(*entry_id) ||
+                    !entry_point_ids.insert(*entry_id).second) {
+                    error(result.errors, ErrorCode::duplicate_resource,
+                          "instances.sceneEntryPoint",
+                          "scene entry points must be unique valid text ids");
+                    continue;
+                }
+                result.entry_points.push_back({
+                    .id = *entry_id,
+                    .instance_id = instance.id,
+                    .position = instance.transform.position});
+            }
+            composed.instances.push_back(std::move(instance));
+        }
+        for (auto collision : source.collisions) {
+            collision.layer_id = prefixed(collision.layer_id);
+            composed.collisions.push_back(std::move(collision));
+        }
+        for (auto trigger : source.triggers) {
+            trigger.id = prefixed(trigger.id);
+            trigger.layer_id = prefixed(trigger.layer_id);
+            trigger.collision_index += collision_offset;
+            composed.triggers.push_back(std::move(trigger));
+        }
+        for (const auto& event : source.events) {
+            const auto existing = std::ranges::find(
+                composed.events, event.id, &MapEventDefinition::id);
+            if (existing == composed.events.end()) {
+                composed.events.push_back(event);
+            } else if (existing->payload != event.payload) {
+                error(result.errors, ErrorCode::duplicate_resource,
+                      "events", "scene maps declare incompatible event payloads");
+            }
+        }
+    }
+    if (!result.errors.empty()) return result;
+    const auto validation = validate_map(manifest, composed);
+    if (!validation.ok()) {
+        result.errors = validation.errors;
+        return result;
+    }
+    result.map = std::move(composed);
+    return result;
 }
 
 } // namespace fabric::project

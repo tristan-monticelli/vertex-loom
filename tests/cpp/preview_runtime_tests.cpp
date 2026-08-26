@@ -611,7 +611,16 @@ TEST_CASE("preview runtime resolves a scene entry map before graphics") {
     const auto project_manifest = manifest();
     REQUIRE(fabric::project::create_project(root, project_manifest).ok());
     REQUIRE(fabric::project::publish_map(root, project_manifest, map()).ok());
-    REQUIRE(fabric::project::publish_scene(root, project_manifest, scene()).ok());
+    auto overlay = map();
+    overlay.document.id = {.value = "overlay"};
+    overlay.document.name = "Overlay";
+    REQUIRE(fabric::project::publish_map(
+        root, project_manifest, overlay).ok());
+    auto multi_map_scene = scene();
+    multi_map_scene.maps.push_back(
+        {{{.value = "overlay"}, "map"}, "overlay"});
+    REQUIRE(fabric::project::publish_scene(
+        root, project_manifest, multi_map_scene).ok());
 
     fabric::runtime::PreviewRuntime runtime;
     const std::map<std::string, fabric::project::ProgressValue> progress{
@@ -623,7 +632,10 @@ TEST_CASE("preview runtime resolves a scene entry map before graphics") {
     REQUIRE(runtime.scene().has_value());
     REQUIRE(runtime.map().has_value());
     CHECK(runtime.scene()->document.id.value == "preview-scene");
-    CHECK(runtime.map()->document.id.value == "preview");
+    CHECK(runtime.map()->document.id.value == "preview-scene");
+    REQUIRE(runtime.map()->layers.size() == 2U);
+    CHECK(runtime.map()->layers[0].id == "instances-instances");
+    CHECK(runtime.map()->layers[1].id == "overlay-instances");
     CHECK(runtime.progress_properties() == progress);
     CHECK(runtime.errors().empty());
     REQUIRE(runtime.run());
@@ -744,6 +756,17 @@ TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
     auto target_map = map();
     target_map.document.id = {.value = "target-map"};
     target_map.document.name = "Target Map";
+    target_map.instances.push_back({
+        .id = "start-marker",
+        .entity = fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"},
+        .layer_id = "instances",
+        .transform = {.position = {9.0F, 4.0F}},
+        .properties = {{"sceneEntryPoint", std::string{"start"}}}});
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, project_manifest, vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, project_manifest, entity()).ok());
     REQUIRE(fabric::project::publish_map(root, project_manifest, source_map).ok());
     REQUIRE(fabric::project::publish_map(root, project_manifest, target_map).ok());
 
@@ -765,6 +788,7 @@ TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
     fabric::runtime::SceneRuntimeSession session;
     REQUIRE(session.load(root, {.value = "source-scene"}));
     bool transitioned = false;
+    fabric::core::Vec2 final_character_position;
     for (int pass = 0; pass < 2; ++pass) {
         fabric::runtime::PreviewRuntime runtime;
         REQUIRE(runtime.load({.project_root = root,
@@ -775,14 +799,24 @@ TEST_CASE("runtime handoff transitions from a triggered scene to its target") {
                                   return false;
                               },
                               .enable_character = true,
+                              .character_spawn = session.entry_point()
+                                  ? std::optional<fabric::core::Vec2>{
+                                        session.entry_point()->position}
+                                  : std::nullopt,
                               .mode = fabric::runtime::RuntimeMode::smoke_test}));
         REQUIRE(runtime.run());
+        final_character_position = {runtime.stats().character_x,
+                                    runtime.stats().character_y};
     }
     REQUIRE(transitioned);
     REQUIRE(session.scene().has_value());
     REQUIRE(session.map().has_value());
     CHECK(session.scene()->document.id.value == "target-scene");
-    CHECK(session.map()->document.id.value == "target-map");
+    CHECK(session.map()->document.id.value == "target-scene");
+    REQUIRE(session.entry_point().has_value());
+    CHECK(session.entry_point()->position == fabric::core::Vec2{9.0F, 4.0F});
+    CHECK(final_character_position.x == Catch::Approx(9.0F));
+    CHECK(final_character_position.y > 3.9F);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

@@ -1,4 +1,5 @@
 #include "fabric/runtime/scene_session.hpp"
+#include "fabric/project/entity.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -32,28 +33,54 @@ TEST_CASE("scene runtime session transitions atomically between scenes") {
             std::chrono::steady_clock::now().time_since_epoch().count()));
     const auto project_manifest = manifest();
     REQUIRE(fabric::project::create_project(root, project_manifest).ok());
+    REQUIRE(fabric::project::publish_entity(
+        root, project_manifest,
+        {.document = {.schema_version = 1, .type = "entity",
+                      .id = {.value = "marker-entity"},
+                      .name = "Marker Entity"}}).ok());
     REQUIRE(fabric::project::publish_map(root, project_manifest, map("map-a")).ok());
-    REQUIRE(fabric::project::publish_map(root, project_manifest, map("map-b")).ok());
+    auto target_map = map("map-b");
+    target_map.instances.push_back({
+        .id = "start-marker",
+        .entity = fabric::project::ResourceReference{
+            {.value = "marker-entity"}, "entity"},
+        .layer_id = "world",
+        .transform = {.position = {8.0F, 3.0F}},
+        .properties = {{"sceneEntryPoint", std::string{"start"}}}});
+    REQUIRE(fabric::project::publish_map(
+        root, project_manifest, target_map).ok());
     auto first = scene("scene-a", "map-a");
     first.transitions.push_back({"to-b", {{.value = "scene-b"}, "scene"}, "start",
                                  fabric::core::ResourceId{.value = "open-door"}});
+    first.transitions.push_back({"to-missing-point",
+                                 {{.value = "scene-b"}, "scene"}, "missing",
+                                 std::nullopt});
     REQUIRE(fabric::project::publish_scene(root, project_manifest, first).ok());
     REQUIRE(fabric::project::publish_scene(root, project_manifest,
         scene("scene-b", "map-b")).ok());
 
     fabric::runtime::SceneRuntimeSession session;
-    REQUIRE(session.load(root, {.value = "scene-a"}));
+    const auto loaded = session.load(root, {.value = "scene-a"});
+    const auto diagnostic = session.errors().empty()
+        ? std::string{"no error"} : session.errors().front();
+    INFO(diagnostic);
+    REQUIRE(loaded);
     REQUIRE(session.scene().has_value());
     REQUIRE(session.map().has_value());
-    CHECK(session.map()->document.id.value == "map-a");
+    CHECK(session.map()->document.id.value == "scene-a");
     CHECK(session.scene()->transitions.front().event_id->value == "open-door");
+    CHECK_FALSE(session.transition("to-missing-point"));
+    CHECK(session.scene()->document.id.value == "scene-a");
     REQUIRE(session.transition_for_event({.value = "open-door"}));
     CHECK(session.scene()->document.id.value == "scene-b");
-    CHECK(session.map()->document.id.value == "map-b");
+    CHECK(session.map()->document.id.value == "scene-b");
+    REQUIRE(session.entry_point().has_value());
+    CHECK(session.entry_point()->id == "start");
+    CHECK(session.entry_point()->position == fabric::core::Vec2{8.0F, 3.0F});
     REQUIRE(session.load(root, {.value = "scene-a"}));
     REQUIRE(session.transition("to-b"));
     CHECK(session.scene()->document.id.value == "scene-b");
-    CHECK(session.map()->document.id.value == "map-b");
+    CHECK(session.map()->document.id.value == "scene-b");
     CHECK_FALSE(session.transition("missing"));
     CHECK(session.scene()->document.id.value == "scene-b");
     CHECK_FALSE(session.transition_for_event({.value = "missing-event"}));

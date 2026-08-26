@@ -9,7 +9,7 @@ sequenceDiagram
 
     Game->>Session: load(sceneId)
     Session->>Project: charger SceneDocument et toutes ses maps
-    Project-->>Session: map composée avec namespaces de montage
+    Project-->>Session: compose_scene_maps + points d'entrée
     Session-->>Game: scène + map composée
     Game->>Preview: scène + spawn optionnel
     Preview-->>Game: événement gameplay
@@ -23,3 +23,7 @@ sequenceDiagram
         Session-->>Game: scène courante conservée
     end
 ```
+
+La map composée prend l'identifiant de la scène et reste éphémère. La session
+expose le `SceneEntryPoint` résolu ; `game_runtime` transmet sa position dans
+`PreviewRuntimeOptions.character_spawn` au chargement suivant.

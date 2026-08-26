@@ -196,6 +196,10 @@ int main(int argc, char** argv) {
         options.scene_id = scene_id
             ? std::optional<fabric::core::ResourceId>{scene_session.scene()->document.id}
             : std::nullopt;
+        options.character_spawn = scene_id && scene_session.entry_point()
+            ? std::optional<fabric::core::Vec2>{
+                  scene_session.entry_point()->position}
+            : std::nullopt;
         options.gameplay_event_handler = scene_id
             ? fabric::runtime::GameplayEventHandler([&](const auto& event) {
                 if (event.kind != fabric::runtime::GameplayEventKind::entered) return true;

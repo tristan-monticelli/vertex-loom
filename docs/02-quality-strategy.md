@@ -193,6 +193,11 @@ sur trois copies temporaires de la fixture textile. Il couvre fermeture de
 fenêtre, `SDL_QUIT` produit par le raccourci système et échec de remplacement
 atomique ; chaque cas compare les octets du principal et de l'autosave et
 confirme que la session dirty reste ouverte après Cancel ou Save échoué.
+Les tests de scène publient deux maps montées sous des namespaces distincts,
+comparent leurs couches et instances composées, fusionnent un événement
+compatible et refusent les mounts dupliqués. `SceneRuntimeSession` résout un
+point `sceneEntryPoint` dans la cible, conserve la scène source si le point est
+absent et `PreviewRuntime` charge les deux maps puis reçoit le spawn résolu.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

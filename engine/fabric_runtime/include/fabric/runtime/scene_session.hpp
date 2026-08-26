@@ -24,19 +24,26 @@ public:
     [[nodiscard]] const std::optional<project::MapDocument>& map() const noexcept {
         return map_;
     }
+    [[nodiscard]] const std::optional<project::SceneEntryPoint>&
+    entry_point() const noexcept { return entry_point_; }
     [[nodiscard]] const std::vector<std::string>& errors() const noexcept { return errors_; }
 
 private:
-    [[nodiscard]] bool load_scene(const core::ResourceId& scene_id);
+    [[nodiscard]] bool load_scene(
+        const core::ResourceId& scene_id,
+        std::optional<std::string> entry_point_id = std::nullopt);
     [[nodiscard]] bool stage_scene(const core::ResourceId& scene_id,
+                                   const std::optional<std::string>& entry_point_id,
                                    std::optional<project::SceneDocument>& scene,
                                    std::optional<project::MapDocument>& map,
+                                   std::optional<project::SceneEntryPoint>& entry_point,
                                    std::vector<std::string>& errors) const;
 
     std::filesystem::path project_root_;
     std::optional<project::ProjectManifest> manifest_;
     std::optional<project::SceneDocument> scene_;
     std::optional<project::MapDocument> map_;
+    std::optional<project::SceneEntryPoint> entry_point_;
     std::vector<std::string> errors_;
 };
 

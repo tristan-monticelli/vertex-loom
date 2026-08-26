@@ -608,7 +608,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         }
     }
     std::optional<project::SceneDocument> loaded_scene;
-    auto map_id = options_.map_id;
+    std::optional<project::MapDocument> selected_map;
     if (options_.scene_id) {
         auto scene = project::load_scene(
             options_.project_root, *loaded_project.manifest,
@@ -617,19 +617,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             append_errors(errors_, scene.errors);
             return false;
         }
-        if (!scene.asset->entry_map) {
-            errors_.push_back("scene has no entry map");
+        const auto composition = project::compose_scene_maps(
+            options_.project_root, *loaded_project.manifest, *scene.asset);
+        if (!composition.ok()) {
+            append_errors(errors_, composition.errors);
             return false;
         }
-        map_id = scene.asset->entry_map->id;
+        selected_map = *composition.map;
         loaded_scene = std::move(scene.asset);
-    }
-    auto loaded_map = project::load_map(
-        options_.project_root, *loaded_project.manifest,
-        project::map_document_path(*loaded_project.manifest, map_id));
-    if (!loaded_map.ok()) {
-        append_errors(errors_, loaded_map.errors);
-        return false;
+    } else {
+        auto loaded_map = project::load_map(
+            options_.project_root, *loaded_project.manifest,
+            project::map_document_path(
+                *loaded_project.manifest, options_.map_id));
+        if (!loaded_map.ok()) {
+            append_errors(errors_, loaded_map.errors);
+            return false;
+        }
+        selected_map = std::move(loaded_map.asset);
     }
 
     std::optional<project::InputDocument> loaded_input;
@@ -679,7 +684,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
 
     manifest_ = std::move(loaded_project.manifest);
     scene_ = std::move(loaded_scene);
-    map_ = std::move(loaded_map.asset);
+    map_ = std::move(selected_map);
     const auto animation_directory = options_.project_root /
         manifest_->directories.assets / "animations";
     std::error_code directory_error;
@@ -870,7 +875,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             }
         }
         character_ = std::make_unique<CharacterController>();
-        if (!character_->create(physics_, {0.0F, 0.0F})) {
+        if (!character_->create(
+                physics_, options_.character_spawn.value_or(core::Vec2{}))) {
             errors_.push_back("could not create the runtime character");
             return false;
         }

@@ -2,6 +2,7 @@
 
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/map.hpp"
 
 #include <filesystem>
 #include <optional>
@@ -43,6 +44,23 @@ struct SceneResult {
     [[nodiscard]] bool ok() const noexcept { return asset.has_value() && errors.empty(); }
 };
 
+struct SceneEntryPoint {
+    std::string id;
+    std::string instance_id;
+    core::Vec2 position;
+    friend bool operator==(const SceneEntryPoint&,
+                           const SceneEntryPoint&) = default;
+};
+
+struct SceneCompositionResult {
+    std::optional<MapDocument> map;
+    std::vector<SceneEntryPoint> entry_points;
+    std::vector<Error> errors;
+    [[nodiscard]] bool ok() const noexcept {
+        return map.has_value() && errors.empty();
+    }
+};
+
 [[nodiscard]] std::filesystem::path scene_document_path(
     const ProjectManifest&, const core::ResourceId&);
 [[nodiscard]] ValidationReport validate_scene(const ProjectManifest&, const SceneDocument&);
@@ -53,5 +71,8 @@ struct SceneResult {
                                      const std::filesystem::path&);
 [[nodiscard]] SceneResult publish_scene(const std::filesystem::path&, const ProjectManifest&,
                                         const SceneDocument&);
+[[nodiscard]] SceneCompositionResult compose_scene_maps(
+    const std::filesystem::path&, const ProjectManifest&,
+    const SceneDocument&);
 
 } // namespace fabric::project

@@ -44,11 +44,11 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 ### Défauts P1 — logique du moteur incomplète ou contradictoire
 
-- [ ] Charger toutes les `SceneMapReference` d'une scène au lieu de charger
+- [x] Charger toutes les `SceneMapReference` d'une scène au lieu de charger
   uniquement `entry_map`.
-- [ ] Définir et appliquer la sémantique de `SceneMapReference.layer_id`,
+- [x] Définir et appliquer la sémantique de `SceneMapReference.layer_id`,
   actuellement sérialisé mais ignoré.
-- [ ] Appliquer `SceneTransition.entry_point` lors d'une transition ; ce champ
+- [x] Appliquer `SceneTransition.entry_point` lors d'une transition ; ce champ
   est actuellement persisté puis ignoré par `SceneRuntimeSession`.
 - [ ] Ajouter un Scene Studio ou un éditeur de scènes intégré. Les scènes et
   transitions n'ont aujourd'hui aucun parcours d'authoring graphique.
@@ -144,7 +144,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 | PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la modale de fermeture réelle ; les autres parcours restent à automatiser |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
-| MANQUE | Fidélité du modèle Scene au runtime | `maps`, `layer_id` et `entry_point` ne sont pas appliqués |
+| PARTIEL | Fidélité du modèle Scene au runtime | composition multi-map, mounts et entry points sont appliqués ; paquet et Studio restent à livrer |
 | CONFORME | Architecture fidèle au code mécanique | ADR-0106, C4 et flux d'instance correspondent au runtime testé |
 | MANQUE | Modularité des interfaces | `asset_studio/main.cpp` dépasse 4 000 lignes et `map_studio/main.cpp` 2 000 lignes |
 | N/A | Backend, compte et réseau | produit local sans backend dans le périmètre actuel |
