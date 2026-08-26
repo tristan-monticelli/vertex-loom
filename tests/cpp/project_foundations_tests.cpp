@@ -433,4 +433,22 @@ TEST_CASE("vector primitives convert to editable path commands") {
         .kind = fabric::project::VectorShapeKind::line,
         .points = {{0.0F, 0.0F}}};
     CHECK_FALSE(fabric::project::path_commands_from_shape(degenerate_line));
+
+    fabric::project::VectorShape editable_path{
+        .kind = fabric::project::VectorShapeKind::path,
+        .path = {{.kind = Kind::move, .point = {0.0F, 0.0F}},
+                 {.kind = Kind::line, .point = {1.0F, 0.0F}}}};
+    REQUIRE(fabric::project::insert_path_command(
+        editable_path, 1U,
+        {.kind = Kind::cubic,
+         .point = {2.0F, 1.0F},
+         .control1 = {1.0F, 0.5F},
+         .control2 = {1.5F, 1.0F}}));
+    REQUIRE(editable_path.path.size() == 3U);
+    CHECK(editable_path.path[1].kind == Kind::cubic);
+    REQUIRE(fabric::project::remove_path_command(editable_path, 1U));
+    CHECK(editable_path.path.size() == 2U);
+    CHECK_FALSE(fabric::project::remove_path_command(editable_path, 0U));
+    CHECK_FALSE(fabric::project::insert_path_command(
+        editable_path, 2U, {.kind = Kind::move, .point = {2.0F, 0.0F}}));
 }

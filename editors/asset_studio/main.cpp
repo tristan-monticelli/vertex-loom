@@ -3556,7 +3556,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
                 ImGui::TextDisabled("Path commands: %zu", node.shape.path.size());
-                if (ImGui::Button("Add move command")) {
+                if (ImGui::Button("Add line command")) {
+                    const auto point = node.shape.path.empty()
+                        ? node.shape.bounds.origin
+                        : fabric::core::Vec2{node.shape.path.back().point.x + 1.0F,
+                                              node.shape.path.back().point.y};
+                    if (fabric::project::insert_path_command(
+                            node.shape, node.shape.path.size(),
+                            {.kind = fabric::project::VectorPathCommandKind::line,
+                             .point = point}))
+                        commit_node(node);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Add move command") && node.shape.path.empty()) {
                     node.shape.path.push_back({
                         .kind = fabric::project::VectorPathCommandKind::move,
                         .point = node.shape.bounds.origin});
@@ -3602,9 +3614,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         }
                     }
                     if (ImGui::SmallButton("Remove command")) {
-                        node.shape.path.erase(node.shape.path.begin() +
-                                              static_cast<std::ptrdiff_t>(command_index));
-                        commit_node(node);
+                        if (fabric::project::remove_path_command(
+                                node.shape, command_index))
+                            commit_node(node);
                         ImGui::PopID();
                         break;
                     }

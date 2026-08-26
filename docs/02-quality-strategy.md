@@ -158,7 +158,9 @@ la publication atomique, les types incompatibles, les cibles absentes et les
 cycles composant/composition dans le validateur headless.
 La conversion primitive → path est testée pour rectangle, ellipse et ligne,
 avec refus des lignes dégénérées ; la géométrie convertie reste éditable dans
-le personnalisateur Asset Studio.
+le personnalisateur Asset Studio. Les insertions et suppressions de commandes
+respectent aussi la tête `move` et le minimum de deux commandes ; la plume et
+la manipulation directe des points sur canvas restent hors de cette preuve.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La

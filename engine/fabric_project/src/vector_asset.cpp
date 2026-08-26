@@ -796,6 +796,27 @@ path_commands_from_shape(const VectorShape& shape) {
         {.kind = Kind::close, .point = {center_x + radius_x, center_y}}};
 }
 
+bool insert_path_command(VectorShape& shape, const std::size_t index,
+                         VectorShape::PathCommand command) {
+    if (shape.kind != VectorShapeKind::path || index > shape.path.size())
+        return false;
+    if (command.kind == VectorPathCommandKind::move && index != 0U)
+        return false;
+    if (index == 0U && !shape.path.empty()) return false;
+    shape.path.insert(shape.path.begin() + static_cast<std::ptrdiff_t>(index),
+                      std::move(command));
+    return true;
+}
+
+bool remove_path_command(VectorShape& shape, const std::size_t index) {
+    if (shape.kind != VectorShapeKind::path || index >= shape.path.size() ||
+        shape.path.size() <= 2U || index == 0U ||
+        shape.path.front().kind != VectorPathCommandKind::move)
+        return false;
+    shape.path.erase(shape.path.begin() + static_cast<std::ptrdiff_t>(index));
+    return true;
+}
+
 std::filesystem::path vector_source_path(const ProjectManifest& manifest,
                                          const core::ResourceId& id) {
     return manifest.directories.assets / "vectors" / (id.value + ".svg");

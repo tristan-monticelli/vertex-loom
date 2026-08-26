@@ -152,6 +152,10 @@ struct NativeVectorDefinition {
 [[nodiscard]] std::optional<std::vector<VectorShape::PathCommand>>
 path_commands_from_shape(const VectorShape& shape);
 
+[[nodiscard]] bool insert_path_command(
+    VectorShape& shape, std::size_t index, VectorShape::PathCommand command);
+[[nodiscard]] bool remove_path_command(VectorShape& shape, std::size_t index);
+
 struct VectorAsset {
     AssetDocument document{
         .schema_version = current_vector_schema_version,

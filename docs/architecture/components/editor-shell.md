@@ -248,6 +248,10 @@ C4Component
 - Le passage d’une primitive `rectangle`, `ellipse` ou `line` vers `path`
   conserve sa géométrie via `path_commands_from_shape`; les formes dégénérées
   restent refusées et aucune conversion destructive n’est effectuée.
+- Les commandes de path sont insérées ou retirées par des opérations validées :
+  la commande `move` reste en tête et un path conserve au moins un segment.
+  L’inspecteur propose l’ajout de segments sans exposer une mutation JSON
+  directe.
 - Le personnalisateur expose ces points, commandes et deux poignées Bézier dans
   l'inspecteur de nœud, avec validation et CommandStack ; la manipulation
   directe sur le canvas reste une étape UX distincte.
