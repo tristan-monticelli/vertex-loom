@@ -180,6 +180,9 @@ résiduel.
 La session mécanique vérifie le même invariant pour création et ouverture : le
 graphe dirty précédent est rechargé depuis son fichier avec ses nœuds attendus
 avant et après la transition.
+La session map couvre création et ouverture selon le même scénario et recharge
+chaque map précédente depuis son fichier pour prouver la persistance de ses
+instances.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

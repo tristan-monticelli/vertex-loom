@@ -117,6 +117,42 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map creation and selection save the previous dirty map") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-map-transition-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    fabric::editor::MapSession session;
+    REQUIRE(session.create(root, map()));
+    REQUIRE(session.place_instance(instance("first-instance", 2.0F)));
+
+    auto second = map();
+    second.document.id = {.value = "second"};
+    second.document.name = "Second";
+    REQUIRE(session.create(root, second));
+    CHECK_FALSE(session.dirty());
+
+    auto persisted_first = fabric::project::load_map(
+        root, manifest(), "maps/session.map.json");
+    REQUIRE(persisted_first.ok());
+    REQUIRE(persisted_first.asset->instances.size() == 1U);
+    CHECK(persisted_first.asset->instances.front().id == "first-instance");
+
+    REQUIRE(session.place_instance(instance("second-instance", 3.0F)));
+    REQUIRE(session.open(root, {.value = "session"}));
+    CHECK_FALSE(session.dirty());
+    CHECK(session.map()->document.id.value == "session");
+
+    auto persisted_second = fabric::project::load_map(
+        root, manifest(), "maps/second.map.json");
+    REQUIRE(persisted_second.ok());
+    REQUIRE(persisted_second.asset->instances.size() == 1U);
+    CHECK(persisted_second.asset->instances.front().id == "second-instance");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("map session snaps placement on a configurable grid") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-map-snap-" + std::to_string(

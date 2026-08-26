@@ -102,10 +102,11 @@ core::Vec2 MapSession::snap_position(const core::Vec2 position,
 
 bool MapSession::create(const std::filesystem::path& project_root,
                         const project::MapDocument& map) {
-    project_root_ = project_root;
     auto loaded = project::load_manifest(project_root);
     if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
     if (!project::validate_map(*loaded.manifest, map).ok()) return false;
+    if (dirty() && !save()) return false;
+    project_root_ = project_root;
     manifest_ = std::move(*loaded.manifest);
     map_ = map;
     map_document_path_ = project::map_document_path(
@@ -119,13 +120,14 @@ bool MapSession::create(const std::filesystem::path& project_root,
 
 bool MapSession::open(const std::filesystem::path& project_root,
                       const core::ResourceId& map_id) {
-    project_root_ = project_root;
     auto loaded = project::load_manifest(project_root);
     if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
     auto loaded_map = project::load_map(
         project_root, *loaded.manifest,
         project::map_document_path(*loaded.manifest, map_id));
     if (!loaded_map.ok()) { errors_ = std::move(loaded_map.errors); return false; }
+    if (dirty() && !save()) return false;
+    project_root_ = project_root;
     manifest_ = std::move(*loaded.manifest);
     map_ = std::move(*loaded_map.asset);
     map_document_path_ = project::map_document_path(

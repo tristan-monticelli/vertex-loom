@@ -62,6 +62,9 @@ C4Component
 - `MechanicSession` applique la même sauvegarde automatique avant de créer ou
   d'ouvrir un autre graphe, y compris lors de l'ouverture d'une configuration
   de prefab ou d'instance.
+- `MapSession` sauvegarde également la map dirty avant de créer ou d'ouvrir une
+  autre map ; une cible invalide est chargée et validée avant de toucher à la
+  session courante.
 - La création demande un nom et un dossier parent existant. Le dossier projet
   final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
   vide ; le dossier parent peut contenir d'autres fichiers.
