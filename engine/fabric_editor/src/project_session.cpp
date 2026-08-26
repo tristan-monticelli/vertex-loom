@@ -2606,6 +2606,27 @@ bool ProjectSession::set_selected_entity_behavior(
     return true;
 }
 
+bool ProjectSession::set_selected_entity_definition(
+    project::EntityDefinition entity,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || !manifest_) return false;
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset, "editor",
+            "save the active document before editing the entity", now)) return false;
+    const auto validation = project::validate_entity(*manifest_, entity);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!commands_.execute(
+            std::make_unique<ReplaceValueCommand<project::EntityDefinition>>(
+                *selected_entity_, std::move(entity)))) return false;
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_visual_composition(
     project::VisualComposition composition,
     const AutosaveScheduler::Clock::time_point now) {

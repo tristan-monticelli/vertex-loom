@@ -531,8 +531,11 @@ publication.
   - [ ] un nœud existant ;
   - [ ] un nouveau nœud racine ;
   - [ ] un nouveau nœud enfant.
-- [ ] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
-  sections avancées éditables plutôt que seulement dans le contrat JSON.
+- [x] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
+  sections avancées éditables plutôt que seulement dans le contrat JSON. Les
+  sections passent par `set_selected_entity_definition`, et
+  `entity advanced definition edits validate and undo` couvre la mutation,
+  validation et annulation des données avancées.
 - [x] Attacher explicitement un BehaviorGraph à l'entité.
 - [x] Tester une entité multi-nœuds combinant texture, vectoriel et composant.
 - [x] Tester duplication, reparentage, changement d'artwork et reload.

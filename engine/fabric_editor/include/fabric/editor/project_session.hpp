@@ -160,6 +160,10 @@ public:
         std::optional<project::ResourceReference> behavior,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_entity_definition(
+        project::EntityDefinition entity,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_visual_composition(
         project::VisualComposition composition,
         AutosaveScheduler::Clock::time_point now =

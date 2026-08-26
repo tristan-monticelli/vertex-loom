@@ -4288,6 +4288,171 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
             const auto entity = *session.selected_entity();
+            const auto commit_advanced_entity =
+                [&](fabric::project::EntityDefinition next) {
+                    if (!session.set_selected_entity_definition(std::move(next)))
+                        status = "Advanced entity edit rejected; inspect diagnostics.";
+                    else
+                        status = "Advanced entity section saved.";
+                };
+            if (ImGui::CollapsingHeader("Constraints", ImGuiTreeNodeFlags_DefaultOpen)) {
+                for (std::size_t index = 0; index < entity.constraints.size(); ++index) {
+                    auto constraint = entity.constraints[index];
+                    ImGui::PushID(static_cast<int>(index));
+                    ImGui::InputText("Id", &constraint.id);
+                    ImGui::InputText("Target node", &constraint.target_node);
+                    ImGui::InputText("Source node", &constraint.source_node);
+                    ImGui::InputInt("Order", &constraint.order);
+                    ImGui::Checkbox("Position", &constraint.constrain_position);
+                    ImGui::Checkbox("Rotation", &constraint.constrain_rotation);
+                    ImGui::Checkbox("Scale", &constraint.constrain_scale);
+                    if (ImGui::Button("Save constraint")) {
+                        auto next = entity;
+                        next.constraints[index] = std::move(constraint);
+                        commit_advanced_entity(std::move(next));
+                    }
+                    ImGui::PopID();
+                }
+                if (ImGui::Button("Add copy-transform constraint")) {
+                    auto next = entity;
+                    next.constraints.push_back({
+                        .id = "constraint-" +
+                             std::to_string(next.constraints.size() + 1U),
+                        .kind = fabric::project::AnimationConstraintKind::copy_transform,
+                        .target_node = next.nodes.empty() ? "" : next.nodes.front().id,
+                        .source_node = next.nodes.empty() ? "" : next.nodes.front().id});
+                    commit_advanced_entity(std::move(next));
+                }
+                if (entity.constraints.empty())
+                    ImGui::TextDisabled("No constraints configured.");
+            }
+            if (ImGui::CollapsingHeader("IK chains")) {
+                for (std::size_t index = 0; index < entity.ik_chains.size(); ++index) {
+                    auto chain = entity.ik_chains[index];
+                    ImGui::PushID(static_cast<int>(index));
+                    ImGui::InputText("Id", &chain.id);
+                    ImGui::InputText("Target node", &chain.target_node);
+                    auto iterations = static_cast<int>(chain.max_iterations);
+                    if (ImGui::InputInt("Max iterations", &iterations))
+                        chain.max_iterations = static_cast<std::size_t>(
+                            std::max(1, iterations));
+                    ImGui::InputFloat("Tolerance", &chain.tolerance);
+                    if (ImGui::Button("Save IK chain")) {
+                        auto next = entity;
+                        next.ik_chains[index] = std::move(chain);
+                        commit_advanced_entity(std::move(next));
+                    }
+                    ImGui::PopID();
+                }
+                if (ImGui::Button("Add IK chain")) {
+                    auto next = entity;
+                    next.ik_chains.push_back({
+                        .id = "ik-" + std::to_string(next.ik_chains.size() + 1U),
+                        .target_node = next.nodes.empty() ? "" : next.nodes.back().id});
+                    commit_advanced_entity(std::move(next));
+                }
+                if (entity.ik_chains.empty())
+                    ImGui::TextDisabled("No IK chains configured.");
+            }
+            if (ImGui::CollapsingHeader("Deformation")) {
+                if (entity.deformation_mesh) {
+                    auto mesh = *entity.deformation_mesh;
+                    ImGui::Text("%zu vertices, %zu triangles", mesh.vertices.size(),
+                                mesh.triangles.size());
+                    for (std::size_t index = 0; index < mesh.vertices.size(); ++index) {
+                        ImGui::PushID(static_cast<int>(index));
+                        ImGui::Text("Vertex %zu", index);
+                        ImGui::InputFloat2("Rest position", &mesh.vertices[index]
+                                                                  .rest_position.x);
+                        if (ImGui::Button("Save vertex")) {
+                            auto next = entity;
+                            *next.deformation_mesh = std::move(mesh);
+                            commit_advanced_entity(std::move(next));
+                        }
+                        ImGui::PopID();
+                    }
+                    if (ImGui::Button("Remove deformation mesh")) {
+                        auto next = entity;
+                        next.deformation_mesh.reset();
+                        commit_advanced_entity(std::move(next));
+                    }
+                } else if (ImGui::Button("Create deformation mesh")) {
+                    auto next = entity;
+                    next.deformation_mesh = fabric::project::DeformationMesh{};
+                    commit_advanced_entity(std::move(next));
+                }
+            }
+            if (ImGui::CollapsingHeader("XPBD")) {
+                if (entity.xpbd) {
+                    auto xpbd = *entity.xpbd;
+                    ImGui::Text("%zu particles", xpbd.particles.size());
+                    for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
+                        ImGui::PushID(static_cast<int>(index));
+                        ImGui::InputFloat2("Position", &xpbd.particles[index].position.x);
+                        ImGui::InputFloat("Inverse mass", &xpbd.particles[index].inverse_mass);
+                        if (ImGui::Button("Save particle")) {
+                            auto next = entity;
+                            *next.xpbd = std::move(xpbd);
+                            commit_advanced_entity(std::move(next));
+                        }
+                        ImGui::PopID();
+                    }
+                    if (ImGui::Button("Add particle")) {
+                        xpbd.particles.push_back({});
+                        auto next = entity;
+                        next.xpbd = std::move(xpbd);
+                        commit_advanced_entity(std::move(next));
+                    }
+                    if (ImGui::Button("Remove XPBD system")) {
+                        auto next = entity;
+                        next.xpbd.reset();
+                        commit_advanced_entity(std::move(next));
+                    }
+                } else if (ImGui::Button("Create XPBD system")) {
+                    auto next = entity;
+                    next.xpbd = fabric::project::XpbdSystem{};
+                    commit_advanced_entity(std::move(next));
+                }
+            }
+            if (ImGui::CollapsingHeader("Animation state machine")) {
+                if (entity.animation_state_machine) {
+                    auto machine = *entity.animation_state_machine;
+                    ImGui::InputText("Initial state", &machine.initial_state);
+                    for (std::size_t index = 0; index < machine.states.size(); ++index) {
+                        ImGui::PushID(static_cast<int>(index));
+                        ImGui::InputText("State id", &machine.states[index].id);
+                        if (ImGui::Button("Save state")) {
+                            auto next = entity;
+                            *next.animation_state_machine = std::move(machine);
+                            commit_advanced_entity(std::move(next));
+                        }
+                        ImGui::PopID();
+                    }
+                    if (ImGui::Button("Add state")) {
+                        machine.states.push_back({
+                            .id = "state-" + std::to_string(machine.states.size() + 1U),
+                            .clip = {{.value = ""}, "animation"}});
+                        auto next = entity;
+                        *next.animation_state_machine = std::move(machine);
+                        commit_advanced_entity(std::move(next));
+                    }
+                    if (ImGui::Button("Remove state machine")) {
+                        auto next = entity;
+                        next.animation_state_machine.reset();
+                        commit_advanced_entity(std::move(next));
+                    }
+                } else if (ImGui::Button("Create state machine")) {
+                    auto next = entity;
+                    next.animation_state_machine =
+                        fabric::project::AnimationStateMachine{};
+                    commit_advanced_entity(std::move(next));
+                }
+            }
+        }
+        if (selected != nullptr &&
+            selected->kind == fabric::editor::StudioResourceKind::entity &&
+            session.selected_entity()) {
+            const auto entity = *session.selected_entity();
             const auto drawable_from_payload =
                 [&](const ResourceDragPayload& payload)
                     -> std::optional<std::pair<fabric::project::EntityDrawableKind,

@@ -1263,6 +1263,42 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     CHECK(*loaded.entity == *session.selected_entity());
 }
 
+TEST_CASE("entity advanced definition edits validate and undo") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Advanced entity";
+    prompt.node_name = "Root";
+    REQUIRE(session.create_entity(prompt));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.add_selected_entity_node(
+        {.id = "joint", .name = "Joint", .parent = "root"}, start));
+    REQUIRE(session.add_selected_entity_node(
+        {.id = "target", .name = "Target", .parent = "root"}, start));
+
+    auto next = *session.selected_entity();
+    next.constraints.push_back({
+        .id = "copy-root", .kind = fabric::project::AnimationConstraintKind::copy_transform,
+        .target_node = "target", .source_node = "root"});
+    next.ik_chains.push_back({
+        .id = "arm", .joints = {"root", "joint"}, .target_node = "target"});
+    next.deformation_mesh = fabric::project::DeformationMesh{
+        .vertices = {{{.rest_position = {0.0F, 0.0F},
+                      .influences = {{"root", 1.0F}}}}}};
+    next.xpbd = fabric::project::XpbdSystem{
+        .particles = {{{.position = {0.0F, 0.0F}, .inverse_mass = 1.0F}}}};
+    REQUIRE(session.set_selected_entity_definition(next, start));
+    REQUIRE(session.selected_entity()->constraints.size() == 1U);
+    REQUIRE(session.selected_entity()->ik_chains.size() == 1U);
+    REQUIRE(session.selected_entity()->deformation_mesh.has_value());
+    REQUIRE(session.selected_entity()->xpbd.has_value());
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_entity()->constraints.empty());
+    CHECK_FALSE(session.selected_entity()->deformation_mesh.has_value());
+}
+
 TEST_CASE("animation prompt publishes and indexes a clip") {
     const TemporaryDirectory project;
     write_project(project.path());

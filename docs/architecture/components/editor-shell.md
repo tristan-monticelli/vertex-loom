@@ -168,6 +168,10 @@ C4Component
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.
+- Les sections avancées de l’inspecteur éditent désormais les contraintes de
+  transformation, chaînes IK, maillage de déformation, système XPBD et machine
+  d’états de l’entité. Chaque sauvegarde remplace l’`EntityDefinition` dans
+  `ProjectSession`, passe la validation du contrat et reste undoable.
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.
