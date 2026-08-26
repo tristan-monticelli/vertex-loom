@@ -177,6 +177,9 @@ La session projet vérifie aussi qu'une création ou une nouvelle sélection
 sauvegarde automatiquement le document vectoriel dirty précédent, recharge le
 contenu persisté attendu et termine sur la nouvelle ressource sans dirty
 résiduel.
+La session mécanique vérifie le même invariant pour création et ouverture : le
+graphe dirty précédent est rechargé depuis son fichier avec ses nœuds attendus
+avant et après la transition.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

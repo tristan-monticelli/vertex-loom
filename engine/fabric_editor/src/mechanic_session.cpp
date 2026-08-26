@@ -83,8 +83,6 @@ project::ValidationReport validate_serialized(
 bool MechanicSession::create(const std::filesystem::path& project_root,
                              const project::MapDocument& map,
                              const project::MechanicGraph& graph) {
-    if (dirty()) return false;
-    project_root_ = project_root;
     auto manifest = project::load_manifest(project_root);
     if (!manifest.ok()) { errors_ = std::move(manifest.errors); return false; }
     const auto validation = project::validate_mechanic_graph(*manifest.manifest, graph);
@@ -98,6 +96,8 @@ bool MechanicSession::create(const std::filesystem::path& project_root,
                            "mechanic document already exists or cannot be inspected"});
         return false;
     }
+    if (dirty() && !save()) return false;
+    project_root_ = project_root;
     manifest_ = std::move(*manifest.manifest);
     map_ = map;
     graph_ = graph;
@@ -116,14 +116,14 @@ bool MechanicSession::create(const std::filesystem::path& project_root,
 bool MechanicSession::open(const std::filesystem::path& project_root,
                            const project::MapDocument& map,
                            const core::ResourceId& graph_id) {
-    if (dirty()) return false;
-    project_root_ = project_root;
     auto manifest = project::load_manifest(project_root);
     if (!manifest.ok()) { errors_ = std::move(manifest.errors); return false; }
     auto loaded = project::load_mechanic_graph(
         project_root, *manifest.manifest,
         project::mechanic_graph_document_path(*manifest.manifest, graph_id));
     if (!loaded.ok()) { errors_ = std::move(loaded.errors); return false; }
+    if (dirty() && !save()) return false;
+    project_root_ = project_root;
     manifest_ = std::move(*manifest.manifest);
     map_ = map;
     graph_ = std::move(*loaded.asset);

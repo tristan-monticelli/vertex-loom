@@ -59,6 +59,9 @@ C4Component
   appelle une transition de document unique dans `ProjectSession`. Le document
   dirty valide est sauvegardé, puis l'intention continue sans demander une
   action Save séparée ; un échec conserve la sélection et l'historique actifs.
+- `MechanicSession` applique la même sauvegarde automatique avant de créer ou
+  d'ouvrir un autre graphe, y compris lors de l'ouverture d'une configuration
+  de prefab ou d'instance.
 - La création demande un nom et un dossier parent existant. Le dossier projet
   final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
   vide ; le dossier parent peut contenir d'autres fichiers.

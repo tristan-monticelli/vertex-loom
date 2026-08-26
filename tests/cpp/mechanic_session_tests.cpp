@@ -109,3 +109,40 @@ TEST_CASE("mechanic session autosave recovery never replaces the main graph") {
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
 }
+
+TEST_CASE("mechanic creation and selection save the previous dirty graph") {
+    const auto root = temporary_root();
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    fabric::editor::MechanicSession session;
+    REQUIRE(session.create(root, map(), empty_graph()));
+    REQUIRE(session.add_node(fabric::project::MechanicNodeKind::body,
+                             "first-body"));
+    REQUIRE(session.dirty());
+
+    auto second = empty_graph();
+    second.document.id = {.value = "second-mechanic"};
+    second.document.name = "Second Mechanic";
+    REQUIRE(session.create(root, map(), second));
+    CHECK_FALSE(session.dirty());
+
+    auto persisted_first = fabric::project::load_mechanic_graph(
+        root, manifest(), "assets/mechanics/studio-mechanic.mechanic.json");
+    REQUIRE(persisted_first.ok());
+    REQUIRE(persisted_first.asset->nodes.size() == 1U);
+    CHECK(persisted_first.asset->nodes.front().id == "first-body");
+
+    REQUIRE(session.add_node(fabric::project::MechanicNodeKind::body,
+                             "second-body"));
+    REQUIRE(session.open(root, map(), {.value = "studio-mechanic"}));
+    CHECK_FALSE(session.dirty());
+    CHECK(session.graph()->document.id.value == "studio-mechanic");
+
+    auto persisted_second = fabric::project::load_mechanic_graph(
+        root, manifest(), "assets/mechanics/second-mechanic.mechanic.json");
+    REQUIRE(persisted_second.ok());
+    REQUIRE(persisted_second.asset->nodes.size() == 1U);
+    CHECK(persisted_second.asset->nodes.front().id == "second-body");
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
