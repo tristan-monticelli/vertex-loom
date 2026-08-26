@@ -738,6 +738,64 @@ std::string_view to_string(const VectorImageFit fit) noexcept {
     return "cover";
 }
 
+std::optional<std::vector<VectorShape::PathCommand>>
+path_commands_from_shape(const VectorShape& shape) {
+    using Command = VectorShape::PathCommand;
+    using Kind = VectorPathCommandKind;
+    if (shape.kind == VectorShapeKind::path) return shape.path;
+
+    if (shape.kind == VectorShapeKind::line) {
+        if (shape.points.size() < 2U) return std::nullopt;
+        std::vector<Command> result;
+        result.reserve(shape.points.size());
+        result.push_back({.kind = Kind::move, .point = shape.points.front()});
+        for (std::size_t index = 1U; index < shape.points.size(); ++index)
+            result.push_back({.kind = Kind::line, .point = shape.points[index]});
+        return result;
+    }
+
+    const float left = shape.bounds.origin.x;
+    const float top = shape.bounds.origin.y;
+    const float right = left + shape.bounds.size.x;
+    const float bottom = top + shape.bounds.size.y;
+    if (shape.bounds.size.x <= 0.0F || shape.bounds.size.y <= 0.0F)
+        return std::nullopt;
+    if (shape.kind == VectorShapeKind::rectangle) {
+        return std::vector<Command>{
+            {.kind = Kind::move, .point = {left, top}},
+            {.kind = Kind::line, .point = {right, top}},
+            {.kind = Kind::line, .point = {right, bottom}},
+            {.kind = Kind::line, .point = {left, bottom}},
+            {.kind = Kind::close, .point = {left, top}}};
+    }
+    if (shape.kind != VectorShapeKind::ellipse) return std::nullopt;
+
+    constexpr float kappa = 0.5522847498F;
+    const float center_x = (left + right) * 0.5F;
+    const float center_y = (top + bottom) * 0.5F;
+    const float radius_x = (right - left) * 0.5F;
+    const float radius_y = (bottom - top) * 0.5F;
+    return std::vector<Command>{
+        {.kind = Kind::move, .point = {center_x + radius_x, center_y}},
+        {.kind = Kind::cubic,
+         .point = {center_x, center_y + radius_y},
+         .control1 = {center_x + radius_x, center_y + kappa * radius_y},
+         .control2 = {center_x + kappa * radius_x, center_y + radius_y}},
+        {.kind = Kind::cubic,
+         .point = {center_x - radius_x, center_y},
+         .control1 = {center_x - kappa * radius_x, center_y + radius_y},
+         .control2 = {center_x - radius_x, center_y + kappa * radius_y}},
+        {.kind = Kind::cubic,
+         .point = {center_x, center_y - radius_y},
+         .control1 = {center_x - radius_x, center_y - kappa * radius_y},
+         .control2 = {center_x - kappa * radius_x, center_y - radius_y}},
+        {.kind = Kind::cubic,
+         .point = {center_x + radius_x, center_y},
+         .control1 = {center_x + kappa * radius_x, center_y - radius_y},
+         .control2 = {center_x + radius_x, center_y - kappa * radius_y}},
+        {.kind = Kind::close, .point = {center_x + radius_x, center_y}}};
+}
+
 std::filesystem::path vector_source_path(const ProjectManifest& manifest,
                                          const core::ResourceId& id) {
     return manifest.directories.assets / "vectors" / (id.value + ".svg");

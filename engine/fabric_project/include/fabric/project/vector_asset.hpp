@@ -147,6 +147,11 @@ struct NativeVectorDefinition {
                            const NativeVectorDefinition&) = default;
 };
 
+// Returns an editable path equivalent for primitive shapes. Existing paths
+// are copied; unsupported or degenerate primitives return no value.
+[[nodiscard]] std::optional<std::vector<VectorShape::PathCommand>>
+path_commands_from_shape(const VectorShape& shape);
+
 struct VectorAsset {
     AssetDocument document{
         .schema_version = current_vector_schema_version,

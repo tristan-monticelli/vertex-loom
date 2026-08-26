@@ -395,3 +395,42 @@ TEST_CASE("headless project validation rejects a missing image fill texture") {
     CHECK(contains_error(report,
                          fabric::project::ErrorCode::missing_resource));
 }
+
+TEST_CASE("vector primitives convert to editable path commands") {
+    using Kind = fabric::project::VectorPathCommandKind;
+    const fabric::project::VectorShape rectangle{
+        .kind = fabric::project::VectorShapeKind::rectangle,
+        .bounds = {{-2.0F, -1.0F}, {4.0F, 2.0F}}};
+    const auto rectangle_path =
+        fabric::project::path_commands_from_shape(rectangle);
+    REQUIRE(rectangle_path.has_value());
+    REQUIRE(rectangle_path->size() == 5U);
+    CHECK(rectangle_path->front().kind == Kind::move);
+    CHECK(rectangle_path->back().kind == Kind::close);
+    CHECK(rectangle_path->at(1).point == fabric::core::Vec2{2.0F, -1.0F});
+
+    const fabric::project::VectorShape line{
+        .kind = fabric::project::VectorShapeKind::line,
+        .points = {{0.0F, 0.0F}, {1.0F, 2.0F}, {3.0F, 1.0F}}};
+    const auto line_path = fabric::project::path_commands_from_shape(line);
+    REQUIRE(line_path.has_value());
+    REQUIRE(line_path->size() == 3U);
+    CHECK(line_path->at(0).kind == Kind::move);
+    CHECK(line_path->at(2).point == fabric::core::Vec2{3.0F, 1.0F});
+
+    const fabric::project::VectorShape ellipse{
+        .kind = fabric::project::VectorShapeKind::ellipse,
+        .bounds = {{-2.0F, -1.0F}, {4.0F, 2.0F}}};
+    const auto ellipse_path =
+        fabric::project::path_commands_from_shape(ellipse);
+    REQUIRE(ellipse_path.has_value());
+    REQUIRE(ellipse_path->size() == 6U);
+    CHECK(std::ranges::count_if(*ellipse_path, [](const auto& command) {
+              return command.kind == Kind::cubic;
+          }) == 4U);
+
+    const fabric::project::VectorShape degenerate_line{
+        .kind = fabric::project::VectorShapeKind::line,
+        .points = {{0.0F, 0.0F}}};
+    CHECK_FALSE(fabric::project::path_commands_from_shape(degenerate_line));
+}

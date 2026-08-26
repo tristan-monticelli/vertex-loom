@@ -580,7 +580,9 @@ sur un comportement sans modifier le runtime.
 - [x] Ajouter un arbre ordonné de nœuds vectoriels.
 - [x] Ajouter les actions Add, Duplicate, Reparent, Reorder et Delete.
 - [x] Ajouter les primitives rectangle, ellipse, ligne et path.
-- [ ] Permettre de changer une primitive en path éditable lorsque possible.
+- [x] Permettre de changer une primitive en path éditable lorsque possible ;
+  les rectangles, ellipses et lignes sont convertis en commandes de path, et
+  les formes dégénérées sont refusées.
 - [ ] Ajouter un outil plume pour :
   - [ ] ajouter un point ;
   - [ ] insérer un point sur un segment ;

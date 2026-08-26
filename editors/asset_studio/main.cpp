@@ -3512,10 +3512,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         fabric::project::to_string(shape_kind));
                     if (ImGui::Selectable(option.c_str(),
                                           node.shape.kind == shape_kind)) {
-                        node.shape.kind = shape_kind;
-                        if (shape_kind != fabric::project::VectorShapeKind::path)
+                        bool can_change = true;
+                        if (shape_kind == fabric::project::VectorShapeKind::path &&
+                            node.shape.kind != fabric::project::VectorShapeKind::path) {
+                            const auto converted =
+                                fabric::project::path_commands_from_shape(node.shape);
+                            if (!converted) {
+                                status = "This primitive cannot be converted to a path.";
+                                can_change = false;
+                            } else {
+                                node.shape.path = *converted;
+                            }
+                        } else if (shape_kind != fabric::project::VectorShapeKind::path) {
                             node.shape.path.clear();
-                        commit_node(node);
+                        }
+                        if (can_change) {
+                            node.shape.kind = shape_kind;
+                            commit_node(node);
+                        }
                     }
                 }
                 ImGui::EndCombo();

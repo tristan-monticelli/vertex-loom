@@ -245,6 +245,9 @@ C4Component
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.
+- Le passage d’une primitive `rectangle`, `ellipse` ou `line` vers `path`
+  conserve sa géométrie via `path_commands_from_shape`; les formes dégénérées
+  restent refusées et aucune conversion destructive n’est effectuée.
 - Le personnalisateur expose ces points, commandes et deux poignées Bézier dans
   l'inspecteur de nœud, avec validation et CommandStack ; la manipulation
   directe sur le canvas reste une étape UX distincte.
