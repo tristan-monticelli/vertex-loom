@@ -159,6 +159,12 @@ C4Component
   `set_selected_entity_node`. Les nœuds verrouillés restent non éditables ;
   le parcours `asset_studio_entity_e2e` injecte désormais ce drag SDL puis
   vérifie la position après sauvegarde et reload.
+- Le Resource Explorer expose un payload ImGui typé `VERTEX_LOOM_RESOURCE` pour
+  les textures, vecteurs et composants visuels. L’inspecteur accepte ce payload
+  sur un nœud existant ou sur les zones de création d’un nœud racine ou enfant,
+  puis applique la mutation via `ProjectSession`. Un composant visuel portant
+  des overrides est refusé par ce chemin tant que la confirmation de perte n’est
+  pas explicitement réutilisée.
 - Il permet aussi d’ajouter un nœud racine ou enfant, de dupliquer un nœud et
   de supprimer un nœud feuille. Les identifiants générés sont uniques ; une
   suppression d’un parent ayant encore des enfants est refusée.

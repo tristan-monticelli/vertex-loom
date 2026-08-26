@@ -54,6 +54,11 @@ using fabric::asset_studio::upload_preview;
 fabric::editor::ProjectSession* active_picker_session = nullptr;
 std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
 
+struct ResourceDragPayload {
+    int kind{};
+    char id[256]{};
+};
+
 constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
@@ -932,6 +937,16 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 resource.id.value;
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
+            }
+            if (ImGui::BeginDragDropSource()) {
+                ResourceDragPayload payload;
+                payload.kind = static_cast<int>(resource.kind);
+                std::snprintf(payload.id, sizeof(payload.id), "%s",
+                              resource.id.value.c_str());
+                ImGui::SetDragDropPayload("VERTEX_LOOM_RESOURCE", &payload,
+                                          sizeof(payload));
+                ImGui::Text("Drag %s", resource.name.c_str());
+                ImGui::EndDragDropSource();
             }
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("Duplicate")) {
@@ -4273,6 +4288,75 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
             const auto entity = *session.selected_entity();
+            const auto drawable_from_payload =
+                [&](const ResourceDragPayload& payload)
+                    -> std::optional<std::pair<fabric::project::EntityDrawableKind,
+                                                const char*>> {
+                    switch (static_cast<fabric::editor::StudioResourceKind>(payload.kind)) {
+                    case fabric::editor::StudioResourceKind::texture:
+                        return std::pair{fabric::project::EntityDrawableKind::texture,
+                                          "texture"};
+                    case fabric::editor::StudioResourceKind::vector:
+                        return std::pair{fabric::project::EntityDrawableKind::vector,
+                                          "vector"};
+                    case fabric::editor::StudioResourceKind::visual_component:
+                        return std::pair{fabric::project::EntityDrawableKind::visual_component,
+                                          "visualComponent"};
+                    default:
+                        return std::nullopt;
+                    }
+                };
+            const auto apply_resource_to_node =
+                [&](const std::size_t node_index,
+                    const ResourceDragPayload& payload) {
+                    if (node_index >= session.selected_entity()->nodes.size())
+                        return false;
+                    const auto drawable = drawable_from_payload(payload);
+                    if (!drawable) return false;
+                    auto changed = session.selected_entity()->nodes[node_index];
+                    if (changed.drawable.component_instance &&
+                        !changed.drawable.component_instance->overrides.empty())
+                        return false;
+                    changed.drawable.kind = drawable->first;
+                    changed.drawable.resource =
+                        fabric::project::ResourceReference{
+                            {.value = payload.id}, drawable->second};
+                    changed.drawable.material.reset();
+                    changed.drawable.component_instance.reset();
+                    if (drawable->first ==
+                        fabric::project::EntityDrawableKind::visual_component)
+                        changed.drawable.component_instance =
+                            fabric::project::VisualComponentInstance{};
+                    return session.set_selected_entity_node(
+                        node_index, std::move(changed));
+                };
+            const auto add_dropped_node =
+                [&](const std::optional<std::string>& parent,
+                    const ResourceDragPayload& payload) {
+                    const auto drawable = drawable_from_payload(payload);
+                    if (!drawable) return false;
+                    fabric::project::EntityNode added{
+                        .id = "node-" + std::to_string(entity.nodes.size() + 1U),
+                        .name = "Node " + std::to_string(entity.nodes.size() + 1U),
+                        .parent = parent};
+                    while (std::ranges::any_of(
+                        entity.nodes, [&](const auto& candidate) {
+                            return candidate.id == added.id;
+                        }))
+                        added.id += "-copy";
+                    added.drawable.kind = drawable->first;
+                    added.drawable.resource =
+                        fabric::project::ResourceReference{
+                            {.value = payload.id}, drawable->second};
+                    if (drawable->first ==
+                        fabric::project::EntityDrawableKind::visual_component)
+                        added.drawable.component_instance =
+                            fabric::project::VisualComponentInstance{};
+                    const auto added_ok = session.add_selected_entity_node(
+                        std::move(added));
+                    if (added_ok) canvas.selected_node = entity.nodes.size();
+                    return added_ok;
+                };
             ImGui::SeparatorText("Entity behavior");
             if (ImGui::Button("Add animation clip...")) {
                 creation.request_animation = true;
@@ -4309,6 +4393,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         status = "Entity node rejected; inspect diagnostics.";
                     }
                 }
+                ImGui::SameLine();
+                ImGui::Button("Drop artwork as root");
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const auto* payload = ImGui::AcceptDragDropPayload(
+                            "VERTEX_LOOM_RESOURCE");
+                        payload && payload->DataSize == sizeof(ResourceDragPayload)) {
+                        if (add_dropped_node(std::nullopt,
+                                             *static_cast<const ResourceDragPayload*>(
+                                                 payload->Data)))
+                            status = "Artwork dropped on new root node.";
+                        else
+                            status = "Artwork kind cannot be used on an entity node.";
+                    }
+                    ImGui::EndDragDropTarget();
+                }
                 ImGui::TextDisabled("This entity has no nodes.");
             } else {
             if (ImGui::Button("Add child")) {
@@ -4329,6 +4428,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 } else {
                     status = "Entity node rejected; inspect diagnostics.";
                 }
+            }
+            ImGui::SameLine();
+            ImGui::Button("Drop artwork as child");
+            if (ImGui::BeginDragDropTarget()) {
+                if (const auto* payload = ImGui::AcceptDragDropPayload(
+                        "VERTEX_LOOM_RESOURCE");
+                    payload && payload->DataSize == sizeof(ResourceDragPayload)) {
+                    if (add_dropped_node(entity.nodes[canvas.selected_node].id,
+                                         *static_cast<const ResourceDragPayload*>(
+                                             payload->Data)))
+                        status = "Artwork dropped on new child node.";
+                    else
+                        status = "Artwork kind cannot be used on an entity node.";
+                }
+                ImGui::EndDragDropTarget();
             }
             ImGui::SameLine();
             if (ImGui::Button("Duplicate")) {
@@ -4388,6 +4502,27 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (ImGui::Selectable(label.c_str(),
                                       canvas.selected_node == node_index)) {
                     canvas.selected_node = node_index;
+                }
+                if (ImGui::BeginDragDropTarget()) {
+                    if (const auto* payload = ImGui::AcceptDragDropPayload(
+                            "VERTEX_LOOM_RESOURCE");
+                        payload && payload->DataSize == sizeof(ResourceDragPayload)) {
+                        if (apply_resource_to_node(
+                                node_index,
+                                *static_cast<const ResourceDragPayload*>(payload->Data))) {
+                            canvas.selected_node = node_index;
+                            status = "Artwork dropped on existing node.";
+                        } else if (session.selected_entity()->nodes[node_index]
+                                       .drawable.component_instance &&
+                                   !session.selected_entity()
+                                        ->nodes[node_index]
+                                        .drawable.component_instance->overrides.empty()) {
+                            status = "Drop rejected: confirm incompatible overrides first.";
+                        } else {
+                            status = "Artwork kind cannot be used on an entity node.";
+                        }
+                    }
+                    ImGui::EndDragDropTarget();
                 }
             }
             auto node = entity.nodes[canvas.selected_node];
