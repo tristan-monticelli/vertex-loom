@@ -84,10 +84,10 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 ### Défauts P1 — parcours Studio
 
-- [ ] Remplacer le blocage de `ProjectSession::select_resource` lorsque le
-  document est dirty par la transition commune Save/Discard/Cancel.
-- [ ] Appliquer la même transition aux créations et imports ; les méthodes de
-  création refusent actuellement l'action avec « save current changes ».
+- [x] Remplacer le blocage de `ProjectSession::select_resource` lorsque le
+  document est dirty par la transition commune avec sauvegarde automatique.
+- [x] Appliquer la même transition aux créations et imports ; la session
+  sauvegarde désormais automatiquement le document valide avant de continuer.
 - [ ] Rendre le matériau sélectionné modifiable. Il est chargeable et
   créable, mais absent de `DirtyDocument`, de `save`, de l'autosave et de
   l'inspecteur d'édition.
@@ -298,15 +298,15 @@ reload et dans Preview Runtime.
 - [ ] Remplacer les contrôles dispersés de `commands_.dirty()` par un service
   commun de transition.
 - [ ] Couvrir les actions suivantes :
-  - [ ] sélectionner une autre ressource ;
-  - [ ] créer une ressource ;
-  - [ ] importer une ressource ;
+  - [x] sélectionner une autre ressource ;
+  - [x] créer une ressource ;
+  - [x] importer une ressource ;
   - [ ] dupliquer une ressource ;
   - [ ] ouvrir un projet ;
   - [ ] créer un projet ;
   - [ ] fermer le Studio.
-- [ ] Sauvegarder automatiquement le document courant lorsqu'il est valide.
-- [ ] Continuer automatiquement lorsque la sauvegarde réussit.
+- [x] Sauvegarder automatiquement le document courant lorsqu'il est valide.
+- [x] Continuer automatiquement lorsque la sauvegarde réussit.
 - [ ] Ne jamais bloquer silencieusement après remplissage d'une modale.
 - [ ] En cas d'échec, proposer `Retry`, `Discard` et `Cancel`.
 - [ ] Garder le document courant et son historique lorsque l'utilisateur annule.
@@ -315,7 +315,7 @@ reload et dans Preview Runtime.
 - [ ] Afficher la ressource et le chemin concernés dans la confirmation.
 - [ ] Tester chaque action avec document clean, dirty valide et dirty invalide.
 - [ ] Tester l'échec d'écriture et la conservation du document principal.
-- [ ] Tester la création immédiatement après une édition non sauvegardée.
+- [x] Tester la création immédiatement après une édition non sauvegardée.
 
 Gate : créer ou sélectionner une ressource sauvegarde l'ancienne sans blocage
 si elle est valide et ne perd jamais les changements en cas d'échec.

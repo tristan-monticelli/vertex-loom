@@ -55,6 +55,10 @@ C4Component
   `SessionTransitionGuard`. Map Studio agrège le dirty de sa map et de sa
   mécanique ouverte, nomme les documents concernés dans la modale et ne quitte
   après `Save and continue` que si chaque sauvegarde demandée réussit.
+- Dans un projet Asset Studio déjà ouvert, sélectionner, créer ou importer
+  appelle une transition de document unique dans `ProjectSession`. Le document
+  dirty valide est sauvegardé, puis l'intention continue sans demander une
+  action Save séparée ; un échec conserve la sélection et l'historique actifs.
 - La création demande un nom et un dossier parent existant. Le dossier projet
   final est calculé comme `<parent>/<identifiant-généré>` et doit être absent ou
   vide ; le dossier parent peut contenir d'autres fichiers.

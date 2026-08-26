@@ -381,6 +381,10 @@ bool ProjectSession::open(const std::filesystem::path& project_root) {
     return true;
 }
 
+bool ProjectSession::save_before_document_transition() {
+    return !commands_.dirty() || save();
+}
+
 bool ProjectSession::import_png(const std::filesystem::path& source,
                                 const core::ResourceId& id,
                                 const std::string& name) {
@@ -389,12 +393,6 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
                     "a project must be open before importing a texture"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before importing another resource"}};
-        return false;
-    }
-
     auto decoded = render::load_png(source);
     if (!decoded.ok()) {
         errors_ = {{project::ErrorCode::invalid_asset, "source",
@@ -402,6 +400,7 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
                         ": " + decoded.error->message}};
         return false;
     }
+    if (!save_before_document_transition()) return false;
 
     project::TextureAsset asset{
         .document = {
@@ -440,12 +439,6 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
                     "a project must be open before importing a vector"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before importing another resource"}};
-        return false;
-    }
-
     auto decoded = render::load_svg_preview(source);
     if (!decoded.ok()) {
         errors_ = {{project::ErrorCode::invalid_asset, "source",
@@ -453,6 +446,7 @@ bool ProjectSession::import_svg(const std::filesystem::path& source,
                         ": " + decoded.error->message}};
         return false;
     }
+    if (!save_before_document_transition()) return false;
 
     project::VectorAsset asset{
         .document = {
@@ -489,11 +483,6 @@ bool ProjectSession::create_vector_artwork(
                     "a project must be open before creating an artwork"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before creating another resource"}};
-        return false;
-    }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
     if (!prompt_validation.ok()) {
         errors_.clear();
@@ -503,6 +492,7 @@ bool ProjectSession::create_vector_artwork(
         }
         return false;
     }
+    if (!save_before_document_transition()) return false;
 
     project::NativeVectorDefinition native{
         .size = {static_cast<float>(prompt.width),
@@ -577,11 +567,6 @@ bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
                     "a project must be open before creating a material"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before creating another resource"}};
-        return false;
-    }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
     if (!prompt_validation.ok()) {
         errors_.clear();
@@ -591,6 +576,7 @@ bool ProjectSession::create_material(const CreateMaterialPrompt& prompt) {
         }
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::MaterialDefinition material{
         .document = {
             .schema_version = project::current_material_schema_version,
@@ -635,11 +621,6 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
                     "a project must be open before creating an entity"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before creating another resource"}};
-        return false;
-    }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
     if (!prompt_validation.ok()) {
         errors_.clear();
@@ -649,6 +630,7 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
         }
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::EntityDefinition entity{
         .document = {
             .schema_version = project::current_entity_schema_version,
@@ -705,11 +687,6 @@ bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
                     "a project must be open before creating an animation"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save vector changes before creating another resource"}};
-        return false;
-    }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
     if (!prompt_validation.ok()) {
         errors_.clear();
@@ -719,6 +696,7 @@ bool ProjectSession::create_animation(const CreateAnimationPrompt& prompt) {
         }
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::AnimationClip animation{
         .document = {
             .schema_version = project::current_animation_schema_version,
@@ -757,11 +735,6 @@ bool ProjectSession::create_input(const CreateInputPrompt& prompt) {
                     "a project must be open before creating input bindings"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save current changes before creating another resource"}};
-        return false;
-    }
     const auto prompt_validation = prompt.validate(project_root_, *manifest_);
     if (!prompt_validation.ok()) {
         errors_.clear();
@@ -770,6 +743,7 @@ bool ProjectSession::create_input(const CreateInputPrompt& prompt) {
                                error.field, error.message});
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::InputDocument input{
         .document = {.schema_version = project::current_input_schema_version,
                      .type = "input",
@@ -801,11 +775,7 @@ bool ProjectSession::create_visual_preset(
                     "a project must be open before creating a visual preset"}};
         return false;
     }
-    if (commands_.dirty()) {
-        errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "save current changes before creating another resource"}};
-        return false;
-    }
+    if (!save_before_document_transition()) return false;
     auto published = publish_visual_preset(
         project_root_, *manifest_, request);
     if (!published.ok()) {
@@ -818,9 +788,9 @@ bool ProjectSession::create_visual_preset(
 
 bool ProjectSession::create_visual_composition(
     const core::ResourceId& id, std::string name, const core::Vec2 size) {
-    if (!has_project() || commands_.dirty()) {
+    if (!has_project()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "open a project and save current changes before creating a composition"}};
+                    "open a project before creating a composition"}};
         return false;
     }
     const auto path = project::visual_composition_document_path(*manifest_, id);
@@ -831,6 +801,7 @@ bool ProjectSession::create_visual_composition(
                     "the visual composition destination already exists"}};
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::VisualComposition composition{
         .document = {.schema_version =
                          project::current_visual_composition_schema_version,
@@ -851,9 +822,9 @@ bool ProjectSession::create_visual_composition(
 bool ProjectSession::create_visual_component(
     const core::ResourceId& id, std::string name,
     const core::ResourceId& composition_id, const core::Rect bounds) {
-    if (!has_project() || commands_.dirty()) {
+    if (!has_project()) {
         errors_ = {{project::ErrorCode::invalid_asset, "project",
-                    "open a project and save current changes before creating a component"}};
+                    "open a project before creating a component"}};
         return false;
     }
     if (std::ranges::none_of(resources_, [&](const auto& resource) {
@@ -872,6 +843,7 @@ bool ProjectSession::create_visual_component(
                     "the visual component destination already exists"}};
         return false;
     }
+    if (!save_before_document_transition()) return false;
     project::VisualComponent component{
         .document = {.schema_version =
                          project::current_visual_component_schema_version,
@@ -978,14 +950,11 @@ bool ProjectSession::select_resource(const StudioResourceKind kind,
                     "the selected resource is not indexed"}};
         return false;
     }
-    if (commands_.dirty() && dirty_document_ != DirtyDocument::none) {
+    if (commands_.dirty()) {
         const auto* selected = selected_resource();
-        if (selected == nullptr || selected->kind != kind || selected->id != id) {
-            errors_ = {{project::ErrorCode::invalid_asset, "selection",
-                        "save or undo vector changes before changing selection"}};
-            return false;
-        }
-        return true;
+        if (selected != nullptr && selected->kind == kind && selected->id == id)
+            return true;
+        if (!save_before_document_transition()) return false;
     }
     if (!commands_.dirty()) {
         if (dirty_document_ != DirtyDocument::none && autosave_.pending() &&

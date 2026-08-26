@@ -15,9 +15,9 @@ explicite du créateur.
 ## Décision
 
 Toutes les coquilles utilisent `SessionTransitionGuard` pour les actions qui
-remplacent ou ferment un document actif. La garde reçoit l'intention, agrège
-l'état dirty de tous les documents concernés et produit exactement une des
-décisions suivantes :
+remplacent un projet ou ferment un document actif. La garde reçoit l'intention,
+agrège l'état dirty de tous les documents concernés et produit exactement une
+des décisions suivantes :
 
 - `Save and continue` sauvegarde chaque document dirty et continue uniquement
   si toutes les sauvegardes réussissent ;
@@ -29,6 +29,14 @@ la modale ouverte, conserve les états en mémoire et expose les diagnostics de 
 session en erreur. Fermer la fenêtre, utiliser le raccourci système, changer de
 ressource, créer, importer, ouvrir un projet ou créer un projet empruntent la
 même politique.
+
+À l'intérieur d'un même projet, sélectionner, créer ou importer une ressource
+utilise `ProjectSession::save_before_document_transition`. La session tente la
+sauvegarde du document courant uniquement lorsque la nouvelle intention est
+déjà localement valide, continue automatiquement après succès et conserve le
+document actif ainsi que ses diagnostics après échec. Cette voie évite une
+modale sur chaque navigation normale ; l'interface peut proposer Retry,
+Discard ou Cancel si l'échec nécessite une décision humaine.
 
 Map Studio sauvegarde d'abord la mécanique ouverte, puis la map qui peut la
 référencer. La fermeture n'est autorisée qu'après les deux succès. Cette

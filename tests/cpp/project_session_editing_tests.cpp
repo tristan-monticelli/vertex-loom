@@ -165,6 +165,52 @@ TEST_CASE("vector artwork prompt publishes a reloadable native document") {
     CHECK(image.deform_with_shape);
 }
 
+TEST_CASE("resource creation and selection save the previous dirty document") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Transition artwork";
+    REQUIRE(session.create_vector_artwork(artwork));
+    auto node = session.created_vector()->native->nodes.front();
+    node.name = "Saved before creation";
+    REQUIRE(session.set_selected_vector_node(0U, node));
+    REQUIRE(session.dirty());
+
+    fabric::editor::CreateMaterialPrompt material;
+    material.name = "Transition material";
+    REQUIRE(session.create_material(material));
+    CHECK_FALSE(session.dirty());
+    REQUIRE(session.selected_material().has_value());
+
+    auto persisted = fabric::project::load_vector_asset(
+        project.path(), *session.manifest(),
+        "assets/vectors/transition-artwork.vector.json");
+    REQUIRE(persisted.ok());
+    CHECK(persisted.asset->native->nodes.front().name ==
+          "Saved before creation");
+
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::vector,
+        {.value = "transition-artwork"}));
+    node = session.created_vector()->native->nodes.front();
+    node.name = "Saved before selection";
+    REQUIRE(session.set_selected_vector_node(0U, node));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::material,
+        {.value = "transition-material"}));
+    CHECK_FALSE(session.dirty());
+
+    persisted = fabric::project::load_vector_asset(
+        project.path(), *session.manifest(),
+        "assets/vectors/transition-artwork.vector.json");
+    REQUIRE(persisted.ok());
+    CHECK(persisted.asset->native->nodes.front().name ==
+          "Saved before selection");
+}
+
 TEST_CASE("project session creates indexes and reloads a visual preset") {
     const TemporaryDirectory project;
     write_project(project.path());

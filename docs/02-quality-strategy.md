@@ -173,6 +173,10 @@ Les commandes d'édition de composition et composant couvrent modification et
 duplication de calque, transform, Z, visibilité, ancrages et paramètres. Le
 test session vérifie undo/redo, autosave, récupération, sauvegarde et reload
 avant que ces commandes soient exposées par l'inspecteur Asset Studio.
+La session projet vérifie aussi qu'une création ou une nouvelle sélection
+sauvegarde automatiquement le document vectoriel dirty précédent, recharge le
+contenu persisté attendu et termine sur la nouvelle ressource sans dirty
+résiduel.
 `TexturedPath v1` couvre le round-trip strict des commandes ligne/cubique, les
 chemins ouverts/fermés, profils de largeur, modes UV, couleur, opacité,
 raccords et terminaisons. Les tests vérifient sa publication atomique, sa seule

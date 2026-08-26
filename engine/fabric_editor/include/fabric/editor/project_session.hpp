@@ -253,6 +253,8 @@ public:
     [[nodiscard]] const StudioResource* selected_resource() const noexcept;
 
 private:
+    [[nodiscard]] bool save_before_document_transition();
+
     enum class DirtyDocument {
         none,
         manifest,
