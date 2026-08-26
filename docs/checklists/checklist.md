@@ -583,7 +583,7 @@ automatiquement sur les trois plateformes.
 - [x] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
 - [x] Exécuter `npm run validate` après chaque étape fonctionnelle.
 - [x] Exécuter le smoke OpenGL après toute modification du renderer.
-- [ ] Exécuter les benchmarks après toute modification significative du rendu
+- [x] Exécuter les benchmarks après toute modification significative du rendu
   ou du runtime.
 - [x] Auditer le diff, les voisins, les régressions et les effets de bord.
 - [x] Vérifier `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json` et les hooks modifiés.
