@@ -542,8 +542,9 @@ utilisées pour tous les types de ressources.
 
 ## 12 — Tests UX et end-to-end
 
-- [ ] Choisir et documenter un outil d'automatisation pour SDL2/Dear ImGui.
-- [ ] Mettre à jour `docs/02-quality-strategy.md` avec la commande réelle.
+- [x] Choisir et documenter un outil d'automatisation pour SDL2/Dear ImGui
+  (CTest avec fenêtres SDL cachées).
+- [x] Mettre à jour `docs/02-quality-strategy.md` avec la commande réelle.
 - [ ] Ajouter un mode de test avec IDs de widgets stables.
 - [ ] Ajouter une fixture de projet contenant plusieurs ressources de chaque
   type.
@@ -563,7 +564,7 @@ utilisées pour tous les types de ressources.
   - [ ] changer fill, texture et stroke après création.
 - [ ] Capturer diagnostics et screenshots lors d'un échec.
 - [ ] Exécuter les parcours sur macOS, Windows et Linux.
-- [ ] Garder les tests headless de contrats en complément, pas en remplacement.
+- [x] Garder les tests headless de contrats en complément, pas en remplacement.
 
 Gate : les parcours qui ont échoué lors de l'audit sont exécutés
 automatiquement sur les trois plateformes.
