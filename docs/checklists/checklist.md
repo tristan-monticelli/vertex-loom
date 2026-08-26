@@ -575,7 +575,7 @@ automatiquement sur les trois plateformes.
 - [x] Mettre à jour `docs/00-project-brief.md` si le périmètre BehaviorGraph et
   transformations change les critères de succès.
 - [x] Mettre à jour C4 Context et Container avant chaque changement structurel.
-- [ ] Ajouter ou mettre à jour les diagrammes de composants concernés.
+- [x] Ajouter ou mettre à jour les diagrammes de composants concernés.
 - [x] Ajouter un ADR par nouveau contrat ou politique persistante.
 - [ ] Supprimer les affirmations de gate validé qui ne disposent pas d'une
   preuve UX reproductible.
