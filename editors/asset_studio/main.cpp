@@ -5389,9 +5389,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SetNextItemWidth(130.0F);
                 if (ImGui::Combo("Device", &device, devices, 2))
                     binding.device = static_cast<fabric::project::InputDevice>(device);
+                int binding_kind = static_cast<int>(binding.kind);
+                const char* binding_kinds[] = {"button", "axis"};
+                ImGui::SameLine();
+                if (ImGui::Combo("Kind", &binding_kind, binding_kinds, 2))
+                    binding.kind = static_cast<fabric::project::InputBindingKind>(binding_kind);
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(130.0F);
                 ImGui::InputInt("Code", &binding.code);
+                if (binding.kind == fabric::project::InputBindingKind::axis) {
+                    ImGui::InputFloat("Threshold", &binding.threshold, 0.05F, 0.1F, "%.2f");
+                    ImGui::InputFloat("Dead zone", &binding.dead_zone, 0.05F, 0.1F, "%.2f");
+                }
                 ImGui::SameLine();
                 ImGui::TextDisabled("%s", input_binding_label(binding).c_str());
                 ImGui::SameLine();

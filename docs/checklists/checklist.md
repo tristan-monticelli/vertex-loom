@@ -460,14 +460,14 @@ et ne dépend jamais de l'ordre antérieur des clics.
 
 ## 9 — Inputs physiques réellement personnalisables
 
-- [ ] Conserver `InputDocument` séparé du BehaviorGraph.
+- [x] Conserver `InputDocument` séparé du BehaviorGraph.
 - [x] Ajouter des noms lisibles de touches et boutons à côté des codes persistés.
 - [x] Permettre un nombre quelconque d'actions et de bindings.
 - [x] Ajouter Add, Duplicate, Reorder et Remove dans la modale de création.
 - [x] Générer des identifiants uniques au lieu de répéter `action`.
 - [x] Empêcher qu'un nouvel item invalide rende toute la modale incompréhensible.
 - [x] Ajouter capture interactive de la prochaine touche ou du prochain bouton.
-- [ ] Ajouter axes, seuils et dead zones.
+- [x] Ajouter axes, seuils et dead zones.
 - [ ] Ajouter combinaisons et modificateurs.
 - [ ] Ajouter contextes ou profils si leur besoin est confirmé par ADR.
 - [ ] Afficher les BehaviorGraph qui consomment chaque action sémantique.

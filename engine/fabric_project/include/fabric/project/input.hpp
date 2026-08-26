@@ -11,13 +11,17 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_input_schema_version = 1;
+inline constexpr std::uint32_t current_input_schema_version = 2;
 
 enum class InputDevice { keyboard, gamepad };
+enum class InputBindingKind { button, axis };
 
 struct InputBinding {
     InputDevice device{InputDevice::keyboard};
     int code{};
+    InputBindingKind kind{InputBindingKind::button};
+    float threshold{0.5F};
+    float dead_zone{0.1F};
 
     friend bool operator==(const InputBinding&, const InputBinding&) = default;
 };

@@ -12,7 +12,7 @@ C4Component
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
-        Component(session, "ProjectSession", "C++20", "Conserve les documents validés, l'index unifié et orchestre création, import, commandes et diagnostics, y compris InputDocument v1")
+        Component(session, "ProjectSession", "C++20", "Conserve les documents validés, l’index unifié et orchestre création, import, commandes et diagnostics, y compris InputDocument v2")
         Component(mechanic_session, "MechanicSession", "C++20", "Édite un MechanicGraph ou prévisualise sa configuration de prefab, puis pilote Box2D, le personnage de test et les overlays de cycle de vie")
         Component(scene_session, "SceneSession", "C++20", "Édite maps montées, map d'entrée et transitions d'un SceneDocument avec historique et récupération")
         Component(prompts, "Typed prompt models", "C++20", "Valide champs, valeurs par défaut et résumé sans dépendre de Dear ImGui, dont les actions et bindings d’InputDocument")
@@ -122,7 +122,7 @@ C4Component
   `assets/animations`, puis le réindexe sans imposer de piste métier.
 - Le hub propose `New input bindings...`. Le prompt édite le nom, les actions
   et les couples périphérique/code, refuse les identifiants et bindings
-  dupliqués, publie atomiquement `InputDocument v1` sous
+  dupliqués, capture une touche ou un bouton SDL et publie atomiquement `InputDocument v2` sous
   `assets/input/<id>.input.json`, puis le réindexe et le sélectionne.
 - L’inspecteur d’un input existant permet de modifier les identifiants d’action,
   les périphériques et les codes, d’ajouter ou supprimer des actions et des

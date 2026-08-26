@@ -57,6 +57,16 @@ std::optional<InputDevice> parse_device(const std::string_view value) {
     return std::nullopt;
 }
 
+std::string_view kind_name(const InputBindingKind kind) noexcept {
+    return kind == InputBindingKind::axis ? "axis" : "button";
+}
+
+std::optional<InputBindingKind> parse_kind(const std::string_view value) {
+    if (value == "button") return InputBindingKind::button;
+    if (value == "axis") return InputBindingKind::axis;
+    return std::nullopt;
+}
+
 ValidationReport parse_validation(const ProjectManifest&, const std::string_view text) {
     const auto parsed = parse_input(text);
     return {.errors = parsed.errors};
@@ -73,7 +83,7 @@ ValidationReport validate_input(const ProjectManifest&, const InputDocument& inp
     ValidationReport report;
     if (input.document.schema_version != current_input_schema_version)
         error(report.errors, ErrorCode::unsupported_schema_version, "schemaVersion",
-              "only input schema version 1 is supported");
+              "only input schema version 2 is supported");
     if (input.document.type != "input")
         error(report.errors, ErrorCode::invalid_asset, "type", "must be input");
     if (!core::ResourceId::is_valid(input.document.id.value))
@@ -97,6 +107,10 @@ ValidationReport validate_input(const ProjectManifest&, const InputDocument& inp
                 error(report.errors, ErrorCode::invalid_asset,
                       field + ".bindings[" + std::to_string(binding_index) + "].code",
                       "must be non-negative");
+            if (binding.threshold < 0.0F || binding.threshold > 1.0F)
+                error(report.errors, ErrorCode::invalid_asset, field + ".bindings[" + std::to_string(binding_index) + "].threshold", "must be in [0,1]");
+            if (binding.dead_zone < 0.0F || binding.dead_zone >= 1.0F)
+                error(report.errors, ErrorCode::invalid_asset, field + ".bindings[" + std::to_string(binding_index) + "].deadZone", "must be in [0,1)");
             if (std::find(bindings.begin(), bindings.end(), binding) != bindings.end())
                 error(report.errors, ErrorCode::invalid_asset,
                       field + ".bindings[" + std::to_string(binding_index) + "]",
@@ -128,6 +142,8 @@ InputResult parse_input(const std::string_view serialized) {
     if (!read_text(json, "type", input.document.type, result.errors)) return result;
     if (!read_text(json, "id", input.document.id.value, result.errors)) return result;
     if (!read_text(json, "name", input.document.name, result.errors)) return result;
+    if (input.document.schema_version == 1)
+        input.document.schema_version = current_input_schema_version;
 
     const auto actions = json.find("actions");
     if (actions == json.end() || !actions->is_array()) {
@@ -160,7 +176,16 @@ InputResult parse_input(const std::string_view serialized) {
                     if (valid_device && valid_code) {
                         const auto parsed_device = parse_device(device);
                         if (!parsed_device) error(result.errors, ErrorCode::invalid_asset, binding_field + ".device", "unsupported input device");
-                        else action.bindings.push_back({*parsed_device, code});
+                        else {
+                            InputBinding binding{*parsed_device, code};
+                            if (const auto found_kind = binding_json.find("kind"); found_kind != binding_json.end() && found_kind->is_string()) {
+                                if (const auto parsed_kind = parse_kind(found_kind->get<std::string>()); parsed_kind)
+                                    binding.kind = *parsed_kind;
+                            }
+                            if (const auto found = binding_json.find("threshold"); found != binding_json.end() && found->is_number()) binding.threshold = found->get<float>();
+                            if (const auto found = binding_json.find("deadZone"); found != binding_json.end() && found->is_number()) binding.dead_zone = found->get<float>();
+                            action.bindings.push_back(binding);
+                        }
                     }
                 }
             }
@@ -182,7 +207,7 @@ std::string serialize_input(const InputDocument& input) {
     for (const auto& action : input.actions) {
         Json item = {{"id", action.id}, {"bindings", Json::array()}};
         for (const auto& binding : action.bindings)
-            item["bindings"].push_back({{"device", device_name(binding.device)}, {"code", binding.code}});
+            item["bindings"].push_back({{"device", device_name(binding.device)}, {"code", binding.code}, {"kind", kind_name(binding.kind)}, {"threshold", binding.threshold}, {"deadZone", binding.dead_zone}});
         json["actions"].push_back(std::move(item));
     }
     return json.dump(2) + "\n";
