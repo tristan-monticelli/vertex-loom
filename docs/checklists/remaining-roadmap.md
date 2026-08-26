@@ -442,7 +442,7 @@ déclencher une transition de scène via un hand-off propre ; les autres
 options CLI validées.
 Les bindings d’actions peuvent être fournis par `--bind` sans modifier le
 programme.
-Asset Studio peut créer et modifier ces bindings dans des `InputDocument v1`
+Asset Studio peut créer et modifier ces bindings dans des `InputDocument v2`
 persistants, avec undo/redo et autosave atomique.
 Les bindings peuvent maintenant être publiés dans `assets/input/<id>.input.json`
 et chargés automatiquement par `PreviewRuntime` via `default` ou `--input <id>`.

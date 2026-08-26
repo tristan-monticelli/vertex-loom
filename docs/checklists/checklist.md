@@ -578,8 +578,8 @@ automatiquement sur les trois plateformes.
 - [x] Ajouter un ADR par nouveau contrat ou politique persistante.
 - [ ] Supprimer les affirmations de gate validé qui ne disposent pas d'une
   preuve UX reproductible.
-- [ ] Réconcilier cette checklist avec `remaining-roadmap.md`.
-- [ ] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
+- [x] Réconcilier cette checklist avec `remaining-roadmap.md`.
+- [x] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
 - [x] Exécuter `npm run validate` après chaque étape fonctionnelle.
 - [ ] Exécuter le smoke OpenGL après toute modification du renderer.
 - [ ] Exécuter les benchmarks après toute modification significative du rendu
