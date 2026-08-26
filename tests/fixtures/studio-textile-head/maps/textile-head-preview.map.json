@@ -13,7 +13,18 @@
       },
       "id": "textile-head",
       "layer": "instances",
-      "properties": [],
+      "properties": [
+        {
+          "id": "animation",
+          "value": {
+            "kind": "resource",
+            "value": {
+              "expectedType": "animation",
+              "id": "beam-scroll"
+            }
+          }
+        }
+      ],
       "transform": {
         "pivot": {
           "x": 0.0,

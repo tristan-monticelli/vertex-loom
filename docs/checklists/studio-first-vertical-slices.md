@@ -54,17 +54,19 @@ PNG après sauvegarde, autosave et récupération.
   validées ; le test session couvre undo/redo, autosave, récupération,
   sauvegarde atomique et reload des calques, ancrages et paramètres.
 - [x] Construire une tête textile avec crop raster, deux yeux paramétriques,
-  boutons et couture uniquement depuis l'outil.
+  boutons, couture et Beam animé uniquement depuis l'outil.
 
   Preuve : `tests/fixtures/studio-textile-head` est régénérée par
   `ProjectSession` avec composition générique, crop 1 × 2 sur source 2 × 2,
-  deux instances d'œil, deux boutons et une couture ; le resolver vérifie ses
-  20 draw packets et les UV recadrés.
+  deux instances d'œil, deux boutons, une couture et un Beam à bordure
+  texturée ; le resolver vérifie ses 21 draw packets et les UV recadrés. La
+  map assigne `beam-scroll` à l'instance et Preview Runtime vérifie le binding
+  `root/beam/offset` à mi-lecture.
 - [x] Prévisualiser et charger la composition dans une entité et une map.
 
   Preuve : la fixture crée aussi l'entité `textile-head-entity` et la map
   `textile-head-preview` avec les sessions Studio. Preview Runtime charge la
-  map et ses 20 draw packets sont appariés par identifiant stable puis comparés
+  map et ses 21 draw packets sont appariés par identifiant stable puis comparés
   aux packets résolus directement : géométrie, UV, indices, couleurs et
   textures sont identiques.
 
@@ -249,8 +251,13 @@ le runtime avec le même résultat visible et physique.
 
 ## Tranche 5 — Scène textile de référence
 
-- [ ] Produire avec les studios une scène originale contenant personnage
+- [x] Produire avec les studios une scène originale contenant personnage
   raster recadré, yeux, boutons, couture, bordure texturée et Beam animé.
+
+  Preuve : la fixture `studio-textile-head` est régénérée octet par octet par
+  Asset Studio, conserve la source raster intacte et combine crop, yeux,
+  boutons, couture et Beam texturé ; la map et l'animation sont créées par les
+  sessions Studio et chargées par Preview Runtime.
 - [ ] Ajouter la plateforme tournante, son capteur, ses événements et la
   réaction animée du personnage.
 - [ ] Tester création, sauvegarde, reload, simulation, replay et publication.

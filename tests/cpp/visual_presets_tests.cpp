@@ -211,6 +211,20 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
     entity.resource_id = "textile-head";
     REQUIRE(studio.create_entity(entity));
 
+    fabric::editor::CreateAnimationPrompt animation;
+    animation.name = "Beam Scroll";
+    animation.duration = 1.0;
+    animation.loop = true;
+    REQUIRE(studio.create_animation(animation));
+    const fabric::project::PropertyBinding offset{"root", "beam", "offset"};
+    REQUIRE(studio.insert_selected_animation_key(
+        offset, 0.0F, 0.0F,
+        fabric::project::AnimationInterpolation::linear));
+    REQUIRE(studio.insert_selected_animation_key(
+        offset, 1.0F, 4.0F,
+        fabric::project::AnimationInterpolation::linear));
+    REQUIRE(studio.save());
+
     fabric::editor::MapSession map;
     REQUIRE(map.create(root, {
         .document = {.schema_version =
@@ -226,6 +240,10 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
         .entity = fabric::project::ResourceReference{
             {.value = "textile-head-entity"}, "entity"},
         .layer_id = "instances"}, {.enabled = false}));
+    REQUIRE(map.set_instance_property(
+        {.value = "textile-head"},
+        {"animation", fabric::project::ResourceReference{
+            {.value = "beam-scroll"}, "animation"}}));
     REQUIRE(map.save());
 }
 
@@ -259,6 +277,8 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
                   "head-button", "Head Button");
     create_preset(fabric::editor::VisualPresetKind::seam,
                   "head-seam", "Head Seam");
+    create_preset(fabric::editor::VisualPresetKind::seam,
+                  "beam", "Beam");
 
     REQUIRE(studio.create_visual_composition(
         {.value = "textile-head-composition"}, "Textile Head Composition",
@@ -305,6 +325,12 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
          .resource = {{.value = "head-seam"}, "visualComponent"},
          .transform = {.position = {0.0F, -2.0F}},
          .z_order = 5.0F,
+         .component_instance = fabric::project::VisualComponentInstance{}},
+        {.id = "beam", .name = "Animated Beam",
+         .kind = fabric::project::VisualLayerKind::component,
+         .resource = {{.value = "beam"}, "visualComponent"},
+         .transform = {.position = {0.0F, -3.0F}, .scale = {1.25F, 1.25F}},
+         .z_order = 6.0F,
          .component_instance = fabric::project::VisualComponentInstance{}}};
     REQUIRE(studio.set_selected_visual_composition(std::move(composition)));
     REQUIRE(studio.save());
@@ -629,7 +655,7 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     const auto resolved = fabric::render::resolve_visual_component(
         fixture, *fixture_manifest.manifest, *loaded.asset);
     REQUIRE(resolved.ok());
-    REQUIRE(resolved.packets.size() == 20U);
+    REQUIRE(resolved.packets.size() == 21U);
     const auto& face = resolved.packets.front();
     REQUIRE(face.image_fill.has_value());
     REQUIRE_FALSE(face.fill_uv.empty());
@@ -643,6 +669,14 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
         .map_id = {.value = "textile-head-preview"},
         .mode = fabric::runtime::RuntimeMode::smoke_test}));
     REQUIRE(runtime.map()->instances.size() == 1U);
+    REQUIRE(runtime.animation_count() == 1U);
+    const auto beam_evaluation =
+        runtime.evaluate_instance_animation("textile-head", 0.5F);
+    REQUIRE(beam_evaluation.has_value());
+    REQUIRE(beam_evaluation->ok());
+    REQUIRE(beam_evaluation->properties.size() == 1U);
+    CHECK(std::get<float>(beam_evaluation->properties.front().value) ==
+          Catch::Approx(2.0F));
     REQUIRE(runtime.run());
     REQUIRE(runtime.last_frame_packets().size() == resolved.packets.size());
     for (const auto& studio_packet : resolved.packets) {

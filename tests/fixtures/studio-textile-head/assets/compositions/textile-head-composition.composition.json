@@ -234,6 +234,40 @@
       },
       "visible": true,
       "zOrder": 5.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "componentInstance": {
+        "overrides": []
+      },
+      "id": "beam",
+      "kind": "component",
+      "name": "Animated Beam",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "visualComponent",
+        "id": "beam"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -3.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.25,
+          "y": 1.25
+        }
+      },
+      "visible": true,
+      "zOrder": 6.0
     }
   ],
   "name": "Textile Head Composition",
