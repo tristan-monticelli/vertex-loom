@@ -3017,9 +3017,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         fabric::editor::StudioResourceKind::texture,
                         session.imported_texture()->asset.document.id)) {
                     ImGui::Text("Used by: %zu resource(s)", references->size());
-                    for (const auto& reference : *references)
+                    for (const auto& reference : *references) {
                         ImGui::BulletText("%s (%s)", reference.name.c_str(),
                                          reference.id.value.c_str());
+                        ImGui::SameLine();
+                        ImGui::PushID(reference.id.value.c_str());
+                        if (ImGui::SmallButton("Open in Resource Explorer"))
+                            static_cast<void>(session.select_resource(
+                                reference.kind, reference.id));
+                        ImGui::PopID();
+                    }
                 }
                 ImGui::SeparatorText("Raster view (non-destructive)");
                 static std::string raster_view_edit_id;
