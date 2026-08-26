@@ -313,6 +313,19 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         loaded_manifest.manifest->directories.maps;
     const auto scenes_directory = project_root /
         loaded_manifest.manifest->directories.scenes;
+    std::vector<std::string> map_event_ids;
+    if (session.scene()) {
+        for (const auto& mounted : session.scene()->maps) {
+            const auto map = fabric::project::load_map(
+                project_root, *loaded_manifest.manifest,
+                fabric::project::map_document_path(*loaded_manifest.manifest,
+                                                   mounted.map.id));
+            if (!map.ok()) continue;
+            for (const auto& event : map.asset->events)
+                if (std::ranges::find(map_event_ids, event.id.value) == map_event_ids.end())
+                    map_event_ids.push_back(event.id.value);
+        }
+    }
 
     ImGui::SeparatorText("Create or open");
     ImGui::SetNextItemWidth(150.0F);
@@ -484,8 +497,21 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
                          state.target_scene_id);
     ImGui::SetNextItemWidth(160.0F);
     ImGui::InputText("Entry point", &state.entry_point);
-    ImGui::SetNextItemWidth(160.0F);
-    ImGui::InputText("Event (optional)", &state.event_id);
+    ImGui::SetNextItemWidth(220.0F);
+    if (map_event_ids.empty()) {
+        ImGui::TextDisabled("Event: no mounted map events");
+        state.event_id.clear();
+    } else {
+        std::vector<const char*> labels;
+        labels.reserve(map_event_ids.size() + 1U);
+        labels.push_back("(none)");
+        for (const auto& id : map_event_ids) labels.push_back(id.c_str());
+        int selected_event = 0;
+        for (std::size_t index = 0; index < map_event_ids.size(); ++index)
+            if (map_event_ids[index] == state.event_id) selected_event = static_cast<int>(index + 1U);
+        if (ImGui::Combo("Event", &selected_event, labels.data(), static_cast<int>(labels.size())))
+            state.event_id = selected_event == 0 ? std::string{} : map_event_ids[static_cast<std::size_t>(selected_event - 1)];
+    }
     if (session.scene()) {
         ImGui::SameLine();
         if (ImGui::SmallButton("Clear event")) state.event_id.clear();
