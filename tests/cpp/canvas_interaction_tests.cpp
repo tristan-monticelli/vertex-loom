@@ -1,5 +1,6 @@
 #include "fabric/editor/canvas_interaction.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
@@ -49,6 +50,45 @@ TEST_CASE("rotation handle extends along the transformed edge") {
         {10.0F, 10.0F}, {10.0F, 15.0F}, 3.0F);
     CHECK(rotated.x == 10.0F);
     CHECK(rotated.y == 18.0F);
+}
+
+TEST_CASE("Bezier handle modes preserve their editing contract") {
+    using Mode = fabric::editor::BezierHandleMode;
+    using Kind = fabric::project::VectorPathCommandKind;
+    const auto make_shape = [] {
+        return fabric::project::VectorShape{
+            .kind = fabric::project::VectorShapeKind::path,
+            .path = {
+                {.kind = Kind::move, .point = {0.0F, 0.0F}},
+                {.kind = Kind::cubic,
+                 .point = {4.0F, 0.0F},
+                 .control1 = {1.0F, 1.0F},
+                 .control2 = {3.0F, 0.0F}},
+            },
+        };
+    };
+
+    auto free_shape = make_shape();
+    REQUIRE(fabric::editor::update_bezier_handle(
+        free_shape, 1, true, {8.0F, 2.0F}, Mode::free));
+    CHECK(free_shape.path[1].control1 == fabric::core::Vec2{8.0F, 2.0F});
+    CHECK(free_shape.path[1].control2 == fabric::core::Vec2{3.0F, 0.0F});
+
+    auto symmetric_shape = make_shape();
+    REQUIRE(fabric::editor::update_bezier_handle(
+        symmetric_shape, 1, true, {8.0F, 2.0F}, Mode::symmetric));
+    CHECK(symmetric_shape.path[1].control2 == fabric::core::Vec2{0.0F, -2.0F});
+
+    auto linked_shape = make_shape();
+    REQUIRE(fabric::editor::update_bezier_handle(
+        linked_shape, 1, true, {8.0F, 2.0F}, Mode::linked));
+    CHECK(linked_shape.path[1].control2.x ==
+          Catch::Approx(4.0F - 4.0F / std::sqrt(20.0F)));
+    CHECK(linked_shape.path[1].control2.y ==
+          Catch::Approx(-2.0F / std::sqrt(20.0F)));
+
+    CHECK_FALSE(fabric::editor::update_bezier_handle(
+        linked_shape, 0, true, {1.0F, 1.0F}, Mode::linked));
 }
 
 TEST_CASE("raster crop drag stays inside the immutable source") {

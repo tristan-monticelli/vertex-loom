@@ -182,6 +182,8 @@ struct CanvasUiState {
     std::size_t selected_node{};
     bool native_canvas{};
     Tool tool{Tool::move};
+    fabric::editor::BezierHandleMode bezier_handle_mode{
+        fabric::editor::BezierHandleMode::linked};
     bool dragging{};
     DragOperation drag_operation{DragOperation::none};
     ImVec2 drag_start_mouse{};
@@ -1971,12 +1973,14 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 world_to_local(current_mouse);
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle1 &&
                    canvas.path_command_index < changed.shape.path.size()) {
-            changed.shape.path[canvas.path_command_index].control1 =
-                world_to_local(current_mouse);
+            static_cast<void>(fabric::editor::update_bezier_handle(
+                changed.shape, canvas.path_command_index, true,
+                world_to_local(current_mouse), canvas.bezier_handle_mode));
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle2 &&
                    canvas.path_command_index < changed.shape.path.size()) {
-            changed.shape.path[canvas.path_command_index].control2 =
-                world_to_local(current_mouse);
+            static_cast<void>(fabric::editor::update_bezier_handle(
+                changed.shape, canvas.path_command_index, false,
+                world_to_local(current_mouse), canvas.bezier_handle_mode));
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::move) {
             changed.transform.position = {
                 start.position.x + current_mouse.x - start_mouse.x,
@@ -3760,6 +3764,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (fabric::project::open_path(node.shape)) commit_node(node);
                     else status = "This path is already open.";
                 }
+                const std::array<std::pair<fabric::editor::BezierHandleMode,
+                                           const char*>, 3> handle_modes{{
+                    {fabric::editor::BezierHandleMode::linked, "Linked"},
+                    {fabric::editor::BezierHandleMode::symmetric, "Symmetric"},
+                    {fabric::editor::BezierHandleMode::free, "Free"}}};
+                const auto handle_mode_label = std::ranges::find_if(
+                    handle_modes, [&](const auto& mode) {
+                        return mode.first == canvas.bezier_handle_mode;
+                    });
+                if (ImGui::BeginCombo(
+                        "Bezier handle mode",
+                        handle_mode_label == handle_modes.end()
+                            ? "Linked" : handle_mode_label->second)) {
+                    for (const auto [mode, label] : handle_modes) {
+                        if (ImGui::Selectable(label,
+                                              canvas.bezier_handle_mode == mode))
+                            canvas.bezier_handle_mode = mode;
+                    }
+                    ImGui::EndCombo();
+                }
                 for (std::size_t command_index = 0;
                      command_index < node.shape.path.size(); ++command_index) {
                     auto& command = node.shape.path[command_index];
@@ -3802,12 +3826,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         float control1[]{command.control1.x, command.control1.y};
                         float control2[]{command.control2.x, command.control2.y};
                         if (ImGui::InputFloat2("Bezier handle 1", control1)) {
-                            command.control1 = {control1[0], control1[1]};
-                            commit_node(node);
+                            if (fabric::editor::update_bezier_handle(
+                                    node.shape, command_index, true,
+                                    {control1[0], control1[1]},
+                                    canvas.bezier_handle_mode))
+                                commit_node(node);
                         }
                         if (ImGui::InputFloat2("Bezier handle 2", control2)) {
-                            command.control2 = {control2[0], control2[1]};
-                            commit_node(node);
+                            if (fabric::editor::update_bezier_handle(
+                                    node.shape, command_index, false,
+                                    {control2[0], control2[1]},
+                                    canvas.bezier_handle_mode))
+                                commit_node(node);
                         }
                     }
                     if (ImGui::SmallButton("Remove command")) {

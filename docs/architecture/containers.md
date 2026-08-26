@@ -11,7 +11,7 @@ C4Container
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
-        Container(editorlib, "fabric_editor", "C++20 static library", "Sessions, index unifié de ressources et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération et journal de preview borné")
+        Container(editorlib, "fabric_editor", "C++20 static library", "Sessions, index unifié de ressources et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération, journal de preview borné et contraintes de poignées Bézier")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
         Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
         Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")

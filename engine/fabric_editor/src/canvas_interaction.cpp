@@ -53,6 +53,40 @@ std::optional<std::size_t> topmost_vector_node_at(
     return std::nullopt;
 }
 
+bool update_bezier_handle(project::VectorShape& shape, const std::size_t index,
+                          const bool first, const core::Vec2 next,
+                          const BezierHandleMode mode) noexcept {
+    using Kind = project::VectorPathCommandKind;
+    if (shape.kind != project::VectorShapeKind::path ||
+        index >= shape.path.size() || shape.path[index].kind != Kind::cubic)
+        return false;
+    auto& command = shape.path[index];
+    const auto anchor = command.point;
+    const auto opposite = first ? command.control2 : command.control1;
+    const float dx = next.x - anchor.x;
+    const float dy = next.y - anchor.y;
+    if (first) command.control1 = next;
+    else command.control2 = next;
+    if (mode == BezierHandleMode::free) return true;
+    if (mode == BezierHandleMode::symmetric) {
+        const auto mirrored = core::Vec2{anchor.x - dx, anchor.y - dy};
+        if (first) command.control2 = mirrored;
+        else command.control1 = mirrored;
+        return true;
+    }
+    const float length = std::hypot(dx, dy);
+    const float opposite_length = std::hypot(
+        opposite.x - anchor.x, opposite.y - anchor.y);
+    if (length > 0.0001F) {
+        const float factor = opposite_length / length;
+        const auto aligned = core::Vec2{
+            anchor.x - dx * factor, anchor.y - dy * factor};
+        if (first) command.control2 = aligned;
+        else command.control1 = aligned;
+    }
+    return true;
+}
+
 project::RasterView drag_raster_crop(
     const project::RasterView& start, const RasterCropDrag operation,
     const core::Vec2 delta_pixels, const std::uint32_t source_width,

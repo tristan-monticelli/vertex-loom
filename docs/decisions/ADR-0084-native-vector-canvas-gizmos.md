@@ -35,6 +35,12 @@ Une sélection multiple d’ancres applique translation, rotation et échelle
 autour de son centroïde. Les poignées des segments cubic sélectionnés suivent
 la même transformation afin de conserver la forme locale du segment.
 
+Les poignées Bézier proposent trois modes d’édition : `linked` conserve la
+longueur de la poignée opposée tout en alignant sa direction, `symmetric`
+miroite sa position autour de l’ancre et `free` ne modifie que la poignée
+éditée. Cette règle est centralisée dans `fabric_editor` et partagée par le
+canvas et l’inspecteur.
+
 ## Conséquences
 
 - Le canvas et l’inspecteur partagent le même contrat `Transform`.
@@ -43,5 +49,4 @@ la même transformation afin de conserver la forme locale du segment.
 - Le renderer et les draw packets reçoivent exactement le même transform que
   celui affiché pendant l’édition.
 - Les poignées de sommets Bézier sont éditables par leurs coordonnées de
-  commande et par le canvas ; les modes de poignées liées, symétriques et
-  libres restent des incréments ultérieurs.
+  commande et par le canvas, avec les modes liés, symétriques et libres.

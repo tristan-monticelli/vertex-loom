@@ -95,6 +95,8 @@ round-trip des compositions et la migration d'une référence texture directe
 vers une composition implicite sans changement visible. Les overlays,
 composants paramétriques et chemins texturés seront évalués par les mêmes draw
 packets en test headless, Asset Studio, Map Studio et Preview Runtime.
+Les contrats unitaires de manipulation des poignées Bézier couvrent les modes
+liés, symétriques et libres, ainsi que le refus des commandes non cubiques.
 Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
 étirement, largeur variable, UV continus, raccords, texture manquante et
 séparation stricte entre ruban de rendu et collision.

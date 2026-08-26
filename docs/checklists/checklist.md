@@ -593,7 +593,7 @@ sur un comportement sans modifier le runtime.
   - [x] ouvrir un contour ;
   - [x] fermer un contour.
 - [ ] Afficher et modifier les poignées Bézier directement sur le canvas.
-- [ ] Supporter poignées liées, symétriques et libres.
+- [x] Supporter poignées liées, symétriques et libres.
 - [x] Ajouter sélection simple et multiple de points.
 - [x] Ajouter déplacement, rotation et échelle d'une sélection de points.
 - [x] Exposer les bounds des primitives.

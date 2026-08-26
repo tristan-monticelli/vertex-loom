@@ -21,6 +21,12 @@ namespace fabric::editor {
     std::span<const project::VectorNode> nodes, core::Vec2 world,
     float tolerance = 0.0F) noexcept;
 
+enum class BezierHandleMode { linked, symmetric, free };
+
+[[nodiscard]] bool update_bezier_handle(
+    project::VectorShape& shape, std::size_t index, bool first,
+    core::Vec2 next, BezierHandleMode mode) noexcept;
+
 enum class RasterCropDrag {
     move,
     top_left,
