@@ -469,6 +469,7 @@ private:
 
 bool ProjectSession::create(const std::filesystem::path& project_root,
                             const project::ProjectManifest& manifest) {
+    if (!save_before_document_transition()) return false;
     auto created = project::create_project(project_root, manifest);
     if (!created.ok()) {
         errors_ = std::move(created.errors);
@@ -516,6 +517,7 @@ bool ProjectSession::create(const std::filesystem::path& project_root,
 }
 
 bool ProjectSession::open(const std::filesystem::path& project_root) {
+    if (!save_before_document_transition()) return false;
     auto loaded = project::load_project(project_root);
     if (!loaded.ok()) {
         errors_ = std::move(loaded.errors);

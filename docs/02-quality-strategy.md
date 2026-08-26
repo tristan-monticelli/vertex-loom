@@ -186,6 +186,9 @@ Le même ensemble de tests couvre les collisions d'identifiant et les
 documents absents ; les tests de fondations couvrent les cycles de dépendances
 et le test de sauvegarde de session couvre un échec disque sans perdre la
 sélection ni le document sale.
+La transition de projet applique maintenant le garde commun à `open` et
+`create` ; quatre scénarios vérifient qu'un document valide est sauvegardé et
+qu'un document invalide conserve le projet actif et empêche la nouvelle cible.
 La fixture `tests/fixtures/studio-preset-gallery` est régénérée exclusivement
 avec `ProjectSession` et `MapSession`. Son test compare tous les fichiers
 octet par octet, valide le graphe puis charge sa map dans Preview Runtime. La

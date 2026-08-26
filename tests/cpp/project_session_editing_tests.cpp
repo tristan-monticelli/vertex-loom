@@ -112,7 +112,95 @@ TEST_CASE("opening an invalid project preserves the active document") {
     REQUIRE(session.manifest());
     CHECK(session.manifest()->id.value == "editing-project");
     CHECK(session.manifest()->pixels_per_unit == 64.0);
-    CHECK(session.dirty());
+    CHECK_FALSE(session.dirty());
+    CHECK(load_manifest_or_fail(project.path()).pixels_per_unit == 64.0);
+}
+
+TEST_CASE("project transitions save valid edits and preserve invalid ones") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const TemporaryDirectory target;
+    write_project(target.path());
+
+    const auto make_dirty = [](fabric::editor::ProjectSession& session,
+                               const std::string& name) {
+        fabric::editor::CreateVectorArtworkPrompt prompt;
+        prompt.name = name;
+        REQUIRE(session.create_vector_artwork(prompt));
+        auto node = session.created_vector()->native->nodes.front();
+        node.name = "Unsaved edit";
+        REQUIRE(session.set_selected_vector_node(0U, std::move(node)));
+        REQUIRE(session.dirty());
+    };
+
+    SECTION("open saves a valid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Open Source");
+        REQUIRE(session.open(target.path()));
+        CHECK(session.project_root() == target.path());
+        auto saved = fabric::project::load_vector_asset(
+            project.path(), load_manifest_or_fail(project.path()),
+            "assets/vectors/open-source.vector.json");
+        REQUIRE(saved.ok());
+        CHECK(saved.asset->native->nodes.front().name == "Unsaved edit");
+    }
+
+    SECTION("open preserves an invalid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Open Invalid");
+        const auto document = project.path() /
+            "assets/vectors/open-invalid.vector.json";
+        REQUIRE(std::filesystem::remove(document));
+        REQUIRE(std::filesystem::create_directory(document));
+        CHECK_FALSE(session.open(target.path()));
+        CHECK(session.project_root() == project.path());
+        CHECK(session.created_vector()->document.name == "Open Invalid");
+        CHECK(session.dirty());
+    }
+
+    SECTION("create saves a valid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Create Source");
+        const auto created_root = target.path() / "created-project";
+        const fabric::project::ProjectManifest manifest{
+            .schema_version = fabric::project::current_schema_version,
+            .id = {.value = "created-project"},
+            .name = "Created Project",
+            .directories = {},
+        };
+        REQUIRE(session.create(created_root, manifest));
+        CHECK(session.project_root() == created_root);
+        auto saved = fabric::project::load_vector_asset(
+            project.path(), load_manifest_or_fail(project.path()),
+            "assets/vectors/create-source.vector.json");
+        REQUIRE(saved.ok());
+        CHECK(saved.asset->native->nodes.front().name == "Unsaved edit");
+    }
+
+    SECTION("create preserves an invalid dirty document") {
+        fabric::editor::ProjectSession session;
+        REQUIRE(session.open(project.path()));
+        make_dirty(session, "Create Invalid");
+        const auto document = project.path() /
+            "assets/vectors/create-invalid.vector.json";
+        REQUIRE(std::filesystem::remove(document));
+        REQUIRE(std::filesystem::create_directory(document));
+        const auto created_root = target.path() / "rejected-project";
+        const fabric::project::ProjectManifest manifest{
+            .schema_version = fabric::project::current_schema_version,
+            .id = {.value = "rejected-project"},
+            .name = "Rejected Project",
+            .directories = {},
+        };
+        CHECK_FALSE(session.create(created_root, manifest));
+        CHECK(session.project_root() == project.path());
+        CHECK(session.created_vector()->document.name == "Create Invalid");
+        CHECK(session.dirty());
+        CHECK_FALSE(std::filesystem::exists(created_root));
+    }
 }
 
 TEST_CASE("session save failure preserves the selected document") {
