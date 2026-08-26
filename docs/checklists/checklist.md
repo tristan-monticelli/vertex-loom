@@ -222,8 +222,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Permettre de changer le type du fill après création et de choisir ou
   remplacer sa texture avec le picker commun.
 - [x] Exposer ajout, retrait, couleur, largeur, join et cap du stroke.
-- [ ] Afficher les erreurs au niveau du champ dans Map Studio ; plusieurs
-  formulaires utilisent encore un statut global et des valeurs texte parsées.
+- [x] Afficher les erreurs au niveau du champ dans Map Studio ; les valeurs
+  texte parsées des payloads, triggers, instances, overrides et paramètres
+  mécaniques affichent maintenant la cause, le format attendu et une correction,
+  avec diagnostics d'id/nom sur les créations carte et scène. Vérifié par le
+  build `map_studio` et les E2E `map_studio_close_e2e`, `map_studio_scene_e2e`,
+  `map_studio_transformation_e2e`, ainsi que `fabric_map_session_tests`.
 - [ ] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
   hiérarchisés, redimensionnables et focalisés sur la sélection courante.
 
