@@ -76,6 +76,7 @@ public:
     [[nodiscard]] bool set_collision_shape(std::size_t collision_index,
                                            project::CollisionShape shape);
     [[nodiscard]] bool add_collision_shape(project::CollisionShape shape);
+    [[nodiscard]] bool remove_collision_shape(std::size_t collision_index);
     [[nodiscard]] bool undo();
     [[nodiscard]] bool redo();
 

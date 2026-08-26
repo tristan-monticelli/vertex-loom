@@ -108,6 +108,11 @@ TEST_CASE("map session places, moves, saves and undoes instances") {
     REQUIRE(session.undo());
     REQUIRE(session.set_layer_locked({.value = "collision"}, true));
     REQUIRE_FALSE(session.set_collision_shape(0, collision));
+    REQUIRE(session.set_layer_locked({.value = "collision"}, false));
+    REQUIRE(session.remove_collision_shape(0));
+    CHECK(session.map()->collisions.empty());
+    REQUIRE(session.undo());
+    CHECK(session.map()->collisions.size() == 1);
     REQUIRE(session.save());
 
     fabric::editor::MapSession reopened;

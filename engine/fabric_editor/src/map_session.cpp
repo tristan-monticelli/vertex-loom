@@ -601,6 +601,20 @@ bool MapSession::add_collision_shape(project::CollisionShape shape) {
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::remove_collision_shape(const std::size_t collision_index) {
+    if (!map_ || collision_index >= map_->collisions.size()) return false;
+    if (std::ranges::any_of(map_->triggers, [&](const auto& trigger) {
+            return trigger.collision_index == collision_index;
+        })) return false;
+    auto next = *map_;
+    next.collisions.erase(next.collisions.begin() +
+                          static_cast<std::ptrdiff_t>(collision_index));
+    for (auto& trigger : next.triggers)
+        if (trigger.collision_index > collision_index) --trigger.collision_index;
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::undo() { return commands_.undo(); }
 bool MapSession::redo() { return commands_.redo(); }
 

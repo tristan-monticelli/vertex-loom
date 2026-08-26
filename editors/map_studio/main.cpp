@@ -2153,6 +2153,7 @@ int run(const std::filesystem::path& project_root,
     std::string trigger_event_id;
     int trigger_collision_index = 0;
     int selected_collision_index = -1;
+    int remove_collision_request = -1;
     int collision_editor_index = -1;
     fabric::project::CollisionShape collision_editor;
     std::string new_collision_layer;
@@ -2648,6 +2649,51 @@ int run(const std::filesystem::path& project_root,
                     status = applied ? "Collision updated" :
                                        "Collision update rejected (layer locked or invalid)";
                 }
+                ImGui::SameLine();
+                if (ImGui::Button("Delete collision...")) {
+                    remove_collision_request = selected_collision_index;
+                    ImGui::OpenPopup("Delete collision?");
+                }
+            }
+            if (ImGui::BeginPopupModal("Delete collision?", nullptr,
+                                       ImGuiWindowFlags_AlwaysAutoResize)) {
+                const auto valid = remove_collision_request >= 0 &&
+                    static_cast<std::size_t>(remove_collision_request) <
+                        map.collisions.size();
+                std::size_t trigger_references = 0;
+                if (valid) {
+                    trigger_references = static_cast<std::size_t>(std::ranges::count_if(
+                        map.triggers, [&](const auto& trigger) {
+                            return trigger.collision_index ==
+                                static_cast<std::size_t>(remove_collision_request);
+                        }));
+                    ImGui::Text("Delete collision %d?", remove_collision_request);
+                    ImGui::TextWrapped(
+                        "The collision is removed from the map. Triggers referencing it are protected and must be removed first.");
+                }
+                ImGui::BeginDisabled(!valid || trigger_references != 0U);
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImVec4{0.62F, 0.16F, 0.14F, 1.0F});
+                if (ImGui::Button("Delete collision") &&
+                    session.remove_collision_shape(
+                        static_cast<std::size_t>(remove_collision_request))) {
+                    selected_collision_index = -1;
+                    collision_editor_index = -1;
+                    remove_collision_request = -1;
+                    status = "Collision deleted";
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::PopStyleColor();
+                ImGui::EndDisabled();
+                if (trigger_references != 0U)
+                    ImGui::TextDisabled("Blocked: %zu trigger reference(s) remain.",
+                                        trigger_references);
+                ImGui::SameLine();
+                if (ImGui::Button("Cancel")) {
+                    remove_collision_request = -1;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndPopup();
             }
             ImGui::Text("Triggers: %zu", map.triggers.size());
             ImGui::Text("Events: %zu", map.events.size());
