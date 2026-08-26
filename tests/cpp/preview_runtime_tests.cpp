@@ -3,6 +3,7 @@
 
 #include "fabric/project/entity.hpp"
 #include "fabric/project/behavior_graph.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/material.hpp"
 #include "fabric/project/map_package.hpp"
 #include "fabric/project/mechanic_graph.hpp"
@@ -203,6 +204,40 @@ fabric::project::BehaviorGraph shared_behavior() {
         .ports = {{"in", Direction::input, Type::signal},
                   {"out", Direction::output, Type::signal}},
         .properties = {{"vector", fabric::core::Vec2{6.0F, 0.0F}}}});
+    return result;
+}
+
+fabric::project::BehaviorGraph transformation_behavior() {
+    using Direction = fabric::project::BehaviorPortDirection;
+    using Type = fabric::project::BehaviorValueType;
+    fabric::project::BehaviorGraph result;
+    result.document.id = {.value = "transformation-behavior"};
+    result.document.name = "Transformation Behavior";
+    result.nodes = {
+        {.id = "seed", .type = "event_source",
+         .ports = {{"out", Direction::output, Type::signal}},
+         .properties = {{"semantic_id", std::string{"seed"}}}},
+        {.id = "seed-health", .type = "set_property",
+         .ports = {{"in", Direction::input, Type::signal},
+                   {"out", Direction::output, Type::signal}},
+         .properties = {{"target", std::string{"health"}},
+                        {"value", std::int64_t{42}}}},
+        {.id = "transform", .type = "event_source",
+         .ports = {{"out", Direction::output, Type::signal}},
+         .properties = {{"semantic_id", std::string{"transform"}}}},
+        {.id = "become-beast", .type = "transform_entity",
+         .ports = {{"in", Direction::input, Type::signal},
+                   {"out", Direction::output, Type::signal}},
+         .properties = {{"transformation",
+             fabric::project::ResourceReference{
+                 {.value = "hero-to-beast"}, "transformation"}}}},
+    };
+    result.connections = {
+        {.id = "seed-flow", .from_node = "seed", .from_port = "out",
+         .to_node = "seed-health", .to_port = "in"},
+        {.id = "transform-flow", .from_node = "transform", .from_port = "out",
+         .to_node = "become-beast", .to_port = "in"},
+    };
     return result;
 }
 
@@ -1420,6 +1455,132 @@ TEST_CASE("published Preview Runtime evaluates one attached behavior for player 
     std::filesystem::remove_all(package, ignored);
 }
 
+TEST_CASE("published behavior transforms an entity atomically with mapped state") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-transformation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto package = root.string() + "-package";
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), transformation_behavior()).ok());
+    auto hero = entity();
+    hero.behavior = fabric::project::ResourceReference{
+        {.value = "transformation-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), hero).ok());
+    auto beast = entity();
+    beast.document.id = {.value = "beast-entity"};
+    beast.document.name = "Beast Entity";
+    beast.behavior.reset();
+    beast.nodes.front().transform.position = {20.0F, 0.0F};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), beast).ok());
+    fabric::project::EntityTransformation transformation;
+    transformation.document.id = {.value = "hero-to-beast"};
+    transformation.document.name = "Hero to Beast";
+    transformation.source_entity = {{.value = "runtime-entity"}, "entity"};
+    transformation.destination_entity = {{.value = "beast-entity"}, "entity"};
+    transformation.policy.properties = fabric::project::TransferMode::mapping;
+    transformation.policy.mappings.push_back({
+        fabric::project::TransferDomain::property, "health", "hit-points"});
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), transformation).ok());
+    auto source_map = map();
+    source_map.instances.push_back({
+        "hero", fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"},
+        std::nullopt, "instances", {.position = {7.0F, 9.0F}}, 0, 0, {}});
+    REQUIRE(fabric::project::publish_map(root, manifest(), source_map).ok());
+    REQUIRE(fabric::project::publish_map_package(
+        root, {.value = "preview"}, package).ok());
+    REQUIRE(std::filesystem::is_regular_file(
+        std::filesystem::path{package} /
+        "assets/transformations/hero-to-beast.transformation.json"));
+    REQUIRE(std::filesystem::is_regular_file(
+        std::filesystem::path{package} /
+        "entities/beast-entity.entity.json"));
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.package_root = package,
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.instance_entity_id("hero") ==
+            fabric::core::ResourceId{.value = "runtime-entity"});
+    REQUIRE(runtime.evaluate_instance_behavior(
+        "hero", {fabric::runtime::BehaviorSignalSource::map_event, "seed", {}},
+        1.0F / 60.0F));
+    REQUIRE(runtime.instance_property("hero", "health") ==
+            fabric::project::BehaviorValue{std::int64_t{42}});
+    const auto actions = runtime.evaluate_instance_behavior(
+        "hero", {fabric::runtime::BehaviorSignalSource::map_event,
+                   "transform", {}}, 1.0F / 60.0F);
+    REQUIRE(actions);
+    REQUIRE(actions->size() == 1U);
+    CHECK(actions->front().kind ==
+          fabric::runtime::BehaviorActionKind::transform_entity);
+    REQUIRE(runtime.instance_entity_id("hero") ==
+            fabric::core::ResourceId{.value = "beast-entity"});
+    REQUIRE(runtime.instance_property("hero", "hit-points") ==
+            fabric::project::BehaviorValue{std::int64_t{42}});
+    CHECK_FALSE(runtime.instance_property("hero", "health"));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    CHECK(runtime.last_frame_packets().front().fill_vertices.front().x ==
+          Catch::Approx(26.0F));
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
+}
+
+TEST_CASE("failed transformation leaves the complete source instance intact") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-transformation-failure-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(
+        root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), transformation_behavior()).ok());
+    auto hero = entity();
+    hero.behavior = fabric::project::ResourceReference{
+        {.value = "transformation-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), hero).ok());
+    auto beast = entity();
+    beast.document.id = {.value = "beast-entity"};
+    beast.document.name = "Beast Entity";
+    beast.behavior.reset();
+    REQUIRE(fabric::project::publish_entity(root, manifest(), beast).ok());
+    auto transformation = fabric::project::EntityTransformation{};
+    transformation.document.id = {.value = "hero-to-beast"};
+    transformation.document.name = "Invalid Hero to Beast";
+    transformation.source_entity = {{.value = "runtime-entity"}, "entity"};
+    transformation.destination_entity = {{.value = "beast-entity"}, "entity"};
+    transformation.policy.properties = fabric::project::TransferMode::mapping;
+    transformation.policy.incompatible_values = fabric::project::TransferMode::error;
+    transformation.policy.mappings.push_back({
+        fabric::project::TransferDomain::property, "missing", "hit-points"});
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), transformation).ok());
+    auto source_map = map();
+    source_map.instances.push_back({
+        "hero", fabric::project::ResourceReference{
+            {.value = "runtime-entity"}, "entity"},
+        std::nullopt, "instances", {}, 0, 0, {}});
+    REQUIRE(fabric::project::publish_map(root, manifest(), source_map).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE_FALSE(runtime.transform_instance(
+        "hero", {.value = "hero-to-beast"}));
+    CHECK(runtime.instance_entity_id("hero") ==
+          fabric::core::ResourceId{.value = "runtime-entity"});
+    CHECK(runtime.packet_order().size() == 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("preview runtime resolves visual component entity drawables") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-preview-components-" + std::to_string(
@@ -1578,7 +1739,23 @@ TEST_CASE("published mechanic instances execute and move their visual in runtime
     REQUIRE(fabric::project::create_project(root, manifest()).ok());
     REQUIRE(fabric::project::publish_native_vector_asset(
         root, manifest(), vector_asset()).ok());
-    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+    REQUIRE(fabric::project::publish_behavior_graph(
+        root, manifest(), transformation_behavior()).ok());
+    auto platform = entity();
+    platform.behavior = fabric::project::ResourceReference{
+        {.value = "transformation-behavior"}, "behavior"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), platform).ok());
+    auto beast = entity();
+    beast.document.id = {.value = "beast-entity"};
+    beast.document.name = "Beast Entity";
+    REQUIRE(fabric::project::publish_entity(root, manifest(), beast).ok());
+    fabric::project::EntityTransformation transformation;
+    transformation.document.id = {.value = "hero-to-beast"};
+    transformation.document.name = "Platform to Beast";
+    transformation.source_entity = {{.value = "runtime-entity"}, "entity"};
+    transformation.destination_entity = {{.value = "beast-entity"}, "entity"};
+    REQUIRE(fabric::project::publish_entity_transformation(
+        root, manifest(), transformation).ok());
     REQUIRE(fabric::project::publish_mechanic_graph(
         root, manifest(), always_running_mechanic()).ok());
     REQUIRE(fabric::project::publish_map(
@@ -1610,6 +1787,12 @@ TEST_CASE("published mechanic instances execute and move their visual in runtime
         runtime.last_frame_packets().front().fill_vertices.front();
     CHECK(moved_point.x != Catch::Approx(2.0F));
     CHECK(moved_point.y != Catch::Approx(1.0F));
+    REQUIRE(runtime.transform_instance(
+        "runtime-instance", {.value = "hero-to-beast"}));
+    CHECK(runtime.mechanic_instance_count() == 0U);
+    CHECK(runtime.instance_entity_id("runtime-instance") ==
+          fabric::core::ResourceId{.value = "beast-entity"});
+    CHECK(runtime.packet_order().size() == 1U);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

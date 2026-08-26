@@ -7,6 +7,7 @@
 #include "fabric/project/map_package.hpp"
 #include "fabric/project/progress_save.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/mesh_deformation.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/replay.hpp"
@@ -27,6 +28,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace fabric::runtime {
@@ -158,6 +160,13 @@ public:
     evaluate_instance_behavior(const std::string& instance_id,
                                const BehaviorSignal& signal,
                                float fixed_step_seconds);
+    [[nodiscard]] std::optional<core::ResourceId> instance_entity_id(
+        const std::string& instance_id) const;
+    [[nodiscard]] std::optional<project::BehaviorValue> instance_property(
+        const std::string& instance_id, std::string_view property_id) const;
+    [[nodiscard]] bool transform_instance(
+        const std::string& instance_id,
+        const core::ResourceId& transformation_id);
     [[nodiscard]] const std::vector<BehaviorAction>&
     behavior_actions() const noexcept;
 

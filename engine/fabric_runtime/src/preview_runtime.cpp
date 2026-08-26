@@ -6,6 +6,7 @@
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "fabric/project/entity.hpp"
+#include "fabric/project/entity_transformation.hpp"
 #include "fabric/project/animation_ik.hpp"
 #include "fabric/project/behavior_graph.hpp"
 #include "fabric/project/manifest.hpp"
@@ -58,6 +59,7 @@ struct PreviewRuntime::Impl {
     };
 
     struct EntitySimulation {
+        core::ResourceId entity_id;
         std::optional<project::DeformationMesh> mesh;
         std::optional<project::XpbdSystem> xpbd;
         std::vector<core::Vec2> previous_xpbd_positions;
@@ -67,6 +69,7 @@ struct PreviewRuntime::Impl {
         std::vector<project::FabrikChainDefinition> ik_chains;
         std::vector<project::DeformationPose> poses;
         core::Transform instance_transform;
+        float layer_depth{};
         std::optional<BehaviorEvaluator> behavior;
         std::map<std::string, project::BehaviorValue> behavior_properties;
     };
@@ -129,10 +132,26 @@ struct PreviewRuntime::Impl {
     std::vector<GameplayEvent> gameplay_events;
     std::vector<AnimationMarkerEvent> animation_marker_events;
     std::vector<BehaviorAction> behavior_actions;
+    std::vector<std::pair<std::string, core::ResourceId>>
+        pending_transformations;
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
     bool sdl_initialized{};
+    std::filesystem::path project_root;
+    const project::ProjectManifest* manifest{};
+    std::vector<std::string>* errors{};
+
+    [[nodiscard]] bool transform_entity_instance(
+        const std::string& instance_id,
+        const core::ResourceId& transformation_id);
+    void flush_transformations() {
+        auto pending = std::move(pending_transformations);
+        pending_transformations.clear();
+        for (const auto& [instance_id, transformation_id] : pending)
+            static_cast<void>(transform_entity_instance(
+                instance_id, transformation_id));
+    }
 
     render::VectorDrawPacket apply_mechanic_pose(
         render::VectorDrawPacket packet, const std::string& instance_id) const {
@@ -175,6 +194,7 @@ struct PreviewRuntime::Impl {
                                 const float fixed_step_seconds) {
         const auto simulation = entity_simulations.find(instance_id);
         if (simulation == entity_simulations.end()) return;
+        std::vector<core::ResourceId> transformations;
         for (const auto& action : actions) {
             if (action.kind == BehaviorActionKind::move) {
                 const auto vector = std::ranges::find(
@@ -195,9 +215,21 @@ struct PreviewRuntime::Impl {
                 if (target != action.properties.end() && value != action.properties.end())
                     if (const auto* id = std::get_if<std::string>(&target->value))
                         simulation->second.behavior_properties[*id] = value->value;
+            } else if (action.kind == BehaviorActionKind::transform_entity) {
+                const auto property = std::ranges::find(
+                    action.properties, "transformation",
+                    &project::BehaviorNodeProperty::id);
+                if (property != action.properties.end())
+                    if (const auto* reference =
+                            std::get_if<project::ResourceReference>(
+                                &property->value))
+                        transformations.push_back(reference->id);
             }
             behavior_actions.push_back(action);
         }
+        for (auto& transformation : transformations)
+            pending_transformations.emplace_back(
+                instance_id, std::move(transformation));
     }
 };
 
@@ -303,6 +335,409 @@ bool resolve_ik_chains(std::vector<project::EntityNode>& nodes,
     }
     return true;
 }
+
+core::Vec2 apply_node_transform(core::Vec2, const project::EntityDefinition&,
+                                std::size_t, const core::Transform&);
+void transform_packet(render::VectorDrawPacket&,
+                      const project::EntityDefinition&, std::size_t,
+                      const core::Transform&);
+void apply_material(render::VectorDrawPacket&,
+                    const project::MaterialDefinition&);
+void generate_planar_uvs(render::VectorDrawPacket&);
+RuntimePacketBounds packet_bounds_for(const render::VectorDrawPacket&);
+
+} // namespace
+
+bool PreviewRuntime::Impl::transform_entity_instance(
+    const std::string& instance_id,
+    const core::ResourceId& transformation_id) {
+    const auto source = entity_simulations.find(instance_id);
+    if (source == entity_simulations.end() || !manifest || !errors) return false;
+    const auto loaded_transformation = project::load_entity_transformation(
+        project_root, *manifest,
+        project::entity_transformation_document_path(
+            *manifest, transformation_id));
+    if (!loaded_transformation.ok()) {
+        append_errors(*errors, loaded_transformation.errors);
+        return false;
+    }
+    const auto& transformation = *loaded_transformation.asset;
+    if (source->second.entity_id != transformation.source_entity.id) {
+        errors->push_back("transformation source does not match instance entity: " +
+                          instance_id);
+        return false;
+    }
+    auto loaded_entity = project::load_entity(
+        project_root, *manifest,
+        project::entity_document_path(
+            *manifest, transformation.destination_entity.id));
+    if (!loaded_entity.ok()) {
+        append_errors(*errors, loaded_entity.errors);
+        return false;
+    }
+    auto destination = std::move(*loaded_entity.entity);
+    if (!resolve_constraints(destination.nodes, destination.constraints) ||
+        !resolve_ik_chains(destination.nodes, destination.ik_chains)) {
+        errors->push_back("transformation destination constraints are invalid");
+        return false;
+    }
+
+    EntitySimulation candidate{
+        .entity_id = destination.document.id,
+        .mesh = destination.deformation_mesh,
+        .xpbd = destination.xpbd,
+        .nodes = destination.nodes,
+        .constraints = destination.constraints,
+        .ik_chains = destination.ik_chains,
+        .instance_transform = transformation.policy.world_transform ==
+                project::TransferMode::preserve
+            ? source->second.instance_transform : core::Transform{},
+        .layer_depth = source->second.layer_depth};
+    if (destination.behavior) {
+        auto behavior = project::load_behavior_graph(
+            project_root, *manifest,
+            project::behavior_graph_document_path(
+                *manifest, destination.behavior->id));
+        if (!behavior.ok()) {
+            append_errors(*errors, behavior.errors);
+            return false;
+        }
+        candidate.behavior.emplace(std::move(*behavior.asset));
+    }
+    if (candidate.xpbd) {
+        if (transformation.policy.physics == project::TransferMode::preserve &&
+            source->second.xpbd &&
+            source->second.xpbd->particles.size() ==
+                candidate.xpbd->particles.size()) {
+            *candidate.xpbd = *source->second.xpbd;
+        } else if (transformation.policy.physics ==
+                       project::TransferMode::preserve &&
+                   transformation.policy.incompatible_values ==
+                       project::TransferMode::error) {
+            errors->push_back(
+                "transformation cannot preserve incompatible physics state");
+            return false;
+        }
+        for (const auto& particle : candidate.xpbd->particles) {
+            candidate.previous_xpbd_positions.push_back(particle.position);
+            candidate.interpolated_xpbd_positions.push_back(particle.position);
+        }
+    }
+    for (const auto& node : candidate.nodes)
+        candidate.poses.push_back({.node_id = node.id,
+                                   .transform = node.transform});
+
+    if (transformation.policy.properties == project::TransferMode::preserve) {
+        candidate.behavior_properties = source->second.behavior_properties;
+    } else if (transformation.policy.properties ==
+               project::TransferMode::mapping) {
+        for (const auto& mapping : transformation.policy.mappings) {
+            if (mapping.domain != project::TransferDomain::property) continue;
+            const auto value = source->second.behavior_properties.find(mapping.source);
+            if (value == source->second.behavior_properties.end()) {
+                if (transformation.policy.incompatible_values ==
+                    project::TransferMode::error) {
+                    errors->push_back("transformation property mapping is missing: " +
+                                      mapping.source);
+                    return false;
+                }
+                continue;
+            }
+            candidate.behavior_properties[mapping.target] = value->second;
+        }
+    }
+
+    std::optional<std::string> next_animation;
+    if (const auto current = animation_instances.find(instance_id);
+        current != animation_instances.end()) next_animation = current->second;
+    if (transformation.policy.animation == project::TransferMode::reset) {
+        next_animation.reset();
+    } else if (transformation.policy.animation == project::TransferMode::mapping &&
+               next_animation) {
+        const auto mapping = std::ranges::find_if(
+            transformation.policy.mappings, [&](const auto& item) {
+                return item.domain == project::TransferDomain::animation &&
+                    item.source == *next_animation;
+            });
+        if (mapping == transformation.policy.mappings.end() ||
+            !animation_clips.contains(mapping->target)) {
+            if (transformation.policy.incompatible_values ==
+                project::TransferMode::error) {
+                errors->push_back("transformation animation mapping is invalid");
+                return false;
+            }
+            next_animation.reset();
+        } else next_animation = mapping->target;
+    }
+
+    std::string destination_instance_id = instance_id;
+    if (transformation.policy.instance_id == project::TransferMode::reset) {
+        destination_instance_id = instance_id + "-transformed";
+        for (std::size_t suffix = 2U;
+             entity_simulations.contains(destination_instance_id); ++suffix)
+            destination_instance_id = instance_id + "-transformed-" +
+                std::to_string(suffix);
+    }
+
+    std::vector<render::VectorDrawPacket> candidate_packets;
+    std::unordered_map<std::string, PacketBaseTransform> candidate_bases;
+    std::unordered_map<std::string, PacketSortKey> candidate_sorts;
+    std::unordered_map<std::string, AnimatedVisualComponent>
+        candidate_components;
+    const auto ensure_texture = [&](const project::ResourceReference& reference) {
+        if (texture_sources.contains(reference.id.value)) return true;
+        auto texture = project::load_texture_asset(
+            project_root, *manifest,
+            project::texture_document_path(*manifest, reference.id));
+        if (!texture.ok()) {
+            append_errors(*errors, texture.errors);
+            return false;
+        }
+        texture_sources.emplace(reference.id.value, TextureSource{
+            .path = project_root / texture.asset->source,
+            .width = texture.asset->width,
+            .height = texture.asset->height,
+            .view = texture.asset->view});
+        return true;
+    };
+    const auto append_packet = [&](render::VectorDrawPacket packet,
+                                   const project::EntityNode& node,
+                                   const std::size_t node_index,
+                                   const std::string& packet_id) {
+        transform_packet(packet, destination, node_index,
+                         candidate.instance_transform);
+        packet.node_id = packet_id;
+        candidate_bases.emplace(packet.node_id, PacketBaseTransform{
+            .local_position = node.transform.position,
+            .rotation_degrees = node.transform.rotation_degrees,
+            .scale = node.transform.scale,
+            .world_origin = apply_node_transform(
+                {0.0F, 0.0F}, destination, node_index,
+                candidate.instance_transform)});
+        candidate_sorts.emplace(packet.node_id, PacketSortKey{
+            candidate.layer_depth, node.z_order});
+        candidate_packets.push_back(std::move(packet));
+    };
+    for (std::size_t node_index = 0; node_index < destination.nodes.size();
+         ++node_index) {
+        const auto& node = destination.nodes[node_index];
+        if (node.drawable.kind == project::EntityDrawableKind::vector &&
+            node.drawable.resource) {
+            const auto vector_id = node.drawable.resource->id.value;
+            project::VectorAsset drawable;
+            if (const auto cached = vector_assets.find(vector_id);
+                cached != vector_assets.end()) drawable = cached->second;
+            else {
+                auto loaded = project::load_vector_asset(
+                    project_root, *manifest,
+                    project::vector_document_path(
+                        *manifest, node.drawable.resource->id));
+                if (!loaded.ok()) { append_errors(*errors, loaded.errors); return false; }
+                drawable = std::move(*loaded.asset);
+                if (drawable.source_kind == project::VectorSourceKind::linked_svg) {
+                    auto converted = render::convert_svg_to_native(
+                        project_root / drawable.source, drawable.document.id,
+                        drawable.document.name);
+                    if (!converted.ok()) {
+                        append_errors(*errors, converted.errors);
+                        return false;
+                    }
+                    drawable = std::move(*converted.asset);
+                }
+                vector_assets.emplace(vector_id, drawable);
+            }
+            auto geometry = vector_geometry_cache.get_or_build(drawable);
+            if (!geometry.ok()) {
+                errors->insert(errors->end(), geometry.errors.begin(),
+                               geometry.errors.end());
+                return false;
+            }
+            std::optional<project::MaterialDefinition> material;
+            if (node.drawable.material) {
+                auto loaded = project::load_material(
+                    project_root, *manifest,
+                    project::material_document_path(
+                        *manifest, node.drawable.material->id));
+                if (!loaded.ok()) { append_errors(*errors, loaded.errors); return false; }
+                material = std::move(*loaded.asset);
+            }
+            for (auto& packet : geometry.packets) {
+                if (packet.image_fill && !ensure_texture(packet.image_fill->texture))
+                    return false;
+                if (material && material->texture &&
+                    !ensure_texture(*material->texture)) return false;
+                if (material) apply_material(packet, *material);
+                if (material && material->texture) {
+                    packet.image_fill = project::VectorImageFill{
+                        .texture = *material->texture,
+                        .transform = material->uv_transform,
+                        .opacity = material->opacity};
+                    packet.fill_color.reset();
+                    generate_planar_uvs(packet);
+                }
+                const auto packet_id = destination_instance_id + ":" + node.id +
+                    ":" + packet.node_id;
+                append_packet(std::move(packet), node, node_index, packet_id);
+            }
+        } else if (node.drawable.kind ==
+                       project::EntityDrawableKind::visual_component &&
+                   node.drawable.resource) {
+            auto component = project::load_visual_component(
+                project_root, *manifest,
+                project::visual_component_document_path(
+                    *manifest, node.drawable.resource->id));
+            if (!component.ok()) { append_errors(*errors, component.errors); return false; }
+            const auto component_instance = node.drawable.component_instance.value_or(
+                project::VisualComponentInstance{});
+            candidate_components.emplace(destination_instance_id + ":" + node.id,
+                AnimatedVisualComponent{
+                    .component = *component.asset,
+                    .instance = component_instance,
+                    .entity = destination,
+                    .node_index = node_index,
+                    .instance_transform = candidate.instance_transform,
+                    .instance_id = destination_instance_id,
+                    .node_id = node.id});
+            auto visual = render::resolve_visual_component(
+                project_root, *manifest, *component.asset, component_instance);
+            if (!visual.ok()) {
+                errors->insert(errors->end(), visual.errors.begin(),
+                               visual.errors.end());
+                return false;
+            }
+            for (auto& packet : visual.packets) {
+                if (packet.image_fill && !ensure_texture(packet.image_fill->texture))
+                    return false;
+                const auto packet_id = destination_instance_id + ":" + node.id +
+                    ":" + packet.node_id;
+                append_packet(std::move(packet), node, node_index, packet_id);
+            }
+        } else if (node.drawable.kind == project::EntityDrawableKind::texture &&
+                   node.drawable.resource) {
+            if (!ensure_texture(*node.drawable.resource)) return false;
+            const auto& texture = texture_sources.at(
+                node.drawable.resource->id.value);
+            auto geometry = render::build_raster_view_draw_packets({
+                .node_id = node.id,
+                .texture = *node.drawable.resource,
+                .source_width = texture.width,
+                .source_height = texture.height,
+                .pixels_per_unit = static_cast<float>(manifest->pixels_per_unit),
+                .view = texture.view});
+            if (!geometry.ok()) {
+                errors->insert(errors->end(), geometry.errors.begin(),
+                               geometry.errors.end());
+                return false;
+            }
+            append_packet(std::move(geometry.packets.front()), node, node_index,
+                          destination_instance_id + ":" + node.id);
+        }
+    }
+
+    entity_simulations.erase(source);
+    entity_simulations.emplace(destination_instance_id, std::move(candidate));
+    animation_instances.erase(instance_id);
+    if (next_animation)
+        animation_instances[destination_instance_id] = *next_animation;
+    animation_state_machines.erase(instance_id);
+    if (destination.animation_state_machine)
+        animation_state_machines[destination_instance_id] =
+            *destination.animation_state_machine;
+    animation_parameters.erase(instance_id);
+    animation_parameters.emplace(destination_instance_id,
+                                 std::vector<project::AnimationParameter>{});
+    if (transformation.policy.physics == project::TransferMode::reset)
+        mechanic_instances.erase(instance_id);
+    else if (destination_instance_id != instance_id) {
+        auto mechanic = mechanic_instances.extract(instance_id);
+        if (!mechanic.empty()) {
+            mechanic.key() = destination_instance_id;
+            mechanic_instances.insert(std::move(mechanic));
+        }
+    }
+
+    const auto prefix = instance_id + ":";
+    std::vector<render::VectorDrawPacket> retained_packets;
+    std::vector<RuntimePacketBounds> retained_bounds;
+    std::vector<bool> retained_dynamic;
+    retained_packets.reserve(packets.size());
+    retained_bounds.reserve(packet_bounds.size());
+    retained_dynamic.reserve(packet_bounds_dynamic.size());
+    for (std::size_t index = 0; index < packets.size(); ++index) {
+        if (packets[index].node_id.starts_with(prefix)) continue;
+        retained_packets.push_back(std::move(packets[index]));
+        if (index < packet_bounds.size())
+            retained_bounds.push_back(packet_bounds[index]);
+        if (index < packet_bounds_dynamic.size())
+            retained_dynamic.push_back(packet_bounds_dynamic[index]);
+    }
+    packets = std::move(retained_packets);
+    packet_bounds = std::move(retained_bounds);
+    packet_bounds_dynamic = std::move(retained_dynamic);
+    packet_indices_by_instance.clear();
+    for (std::size_t index = 0; index < packets.size(); ++index) {
+        const auto separator = packets[index].node_id.find(':');
+        if (separator != std::string::npos)
+            packet_indices_by_instance[
+                packets[index].node_id.substr(0, separator)].push_back(index);
+    }
+    std::erase_if(animated_visual_components, [&](const auto& item) {
+        return item.first.starts_with(prefix);
+    });
+    std::erase_if(packet_base_transforms, [&](const auto& item) {
+        return item.first.starts_with(prefix);
+    });
+    std::erase_if(packet_sort_keys, [&](const auto& item) {
+        return item.first.starts_with(prefix);
+    });
+    animated_visual_components.insert(
+        std::make_move_iterator(candidate_components.begin()),
+        std::make_move_iterator(candidate_components.end()));
+    packet_base_transforms.insert(
+        std::make_move_iterator(candidate_bases.begin()),
+        std::make_move_iterator(candidate_bases.end()));
+    packet_sort_keys.insert(
+        std::make_move_iterator(candidate_sorts.begin()),
+        std::make_move_iterator(candidate_sorts.end()));
+    packets.insert(packets.end(),
+                   std::make_move_iterator(candidate_packets.begin()),
+                   std::make_move_iterator(candidate_packets.end()));
+    std::stable_sort(packets.begin(), packets.end(), [&](const auto& left,
+                                                         const auto& right) {
+        const auto& left_key = packet_sort_keys.at(left.node_id);
+        const auto& right_key = packet_sort_keys.at(right.node_id);
+        if (left_key.layer_depth != right_key.layer_depth)
+            return left_key.layer_depth < right_key.layer_depth;
+        if (left_key.z_order != right_key.z_order)
+            return left_key.z_order < right_key.z_order;
+        return left.node_id < right.node_id;
+    });
+    packet_indices_by_instance.clear();
+    packet_bounds.clear();
+    packet_bounds_dynamic.clear();
+    for (std::size_t index = 0; index < packets.size(); ++index) {
+        const auto separator = packets[index].node_id.find(':');
+        const auto packet_instance = separator == std::string::npos
+            ? std::string{} : packets[index].node_id.substr(0, separator);
+        if (!packet_instance.empty())
+            packet_indices_by_instance[packet_instance].push_back(index);
+        packet_bounds.push_back(packet_bounds_for(packets[index]));
+        const auto simulation = entity_simulations.find(packet_instance);
+        packet_bounds_dynamic.push_back(
+            simulation != entity_simulations.end() &&
+            (simulation->second.mesh.has_value() ||
+             !simulation->second.constraints.empty() ||
+             !simulation->second.ik_chains.empty() ||
+             animation_instances.contains(packet_instance) ||
+             animation_state_machines.contains(packet_instance) ||
+             mechanic_instances.contains(packet_instance)));
+    }
+    evaluation_cache_valid = false;
+    chunk_index_ready = false;
+    return true;
+}
+
+namespace {
 
 void apply_animation_to_nodes(std::vector<project::EntityNode>& nodes,
                               const project::EvaluationResult& animation) {
@@ -581,6 +1016,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->gameplay_events.clear();
     impl_->animation_marker_events.clear();
     impl_->behavior_actions.clear();
+    impl_->pending_transformations.clear();
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
@@ -777,6 +1213,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     manifest_ = std::move(loaded_project.manifest);
     scene_ = std::move(loaded_scene);
     map_ = std::move(selected_map);
+    impl_->project_root = options_.project_root;
+    impl_->manifest = &*manifest_;
+    impl_->errors = &errors_;
     const auto animation_directory = options_.project_root /
         manifest_->directories.assets / "animations";
     std::error_code directory_error;
@@ -1002,12 +1441,14 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 instance.id, *resolved_entity.animation_state_machine);
         }
         Impl::EntitySimulation simulation{
+            .entity_id = *entity_id,
             .mesh = resolved_entity.deformation_mesh,
             .xpbd = resolved_entity.xpbd,
             .nodes = resolved_entity.nodes,
             .constraints = resolved_entity.constraints,
             .ik_chains = resolved_entity.ik_chains,
-            .instance_transform = instance.transform};
+            .instance_transform = instance.transform,
+            .layer_depth = layer_depth};
         if (resolved_entity.behavior) {
             auto behavior = project::load_behavior_graph(
                 options_.project_root, *manifest_,
@@ -1456,6 +1897,7 @@ bool PreviewRuntime::run() {
                     stats_.behavior_actions += actions.size();
                 }
             }
+            impl_->flush_transformations();
             if (character_)
                 character_->update(input_, static_cast<float>(fixed_time_step));
             for (auto& [instance_id, mechanic] : impl_->mechanic_instances) {
@@ -2084,8 +2526,35 @@ PreviewRuntime::evaluate_instance_behavior(const std::string& instance_id,
         return std::nullopt;
     auto actions = found->second.behavior->evaluate(signal, fixed_step_seconds);
     impl_->apply_behavior_actions(instance_id, actions, fixed_step_seconds);
+    impl_->flush_transformations();
     stats_.behavior_actions += actions.size();
     return actions;
+}
+
+std::optional<core::ResourceId> PreviewRuntime::instance_entity_id(
+    const std::string& instance_id) const {
+    if (!impl_) return std::nullopt;
+    const auto found = impl_->entity_simulations.find(instance_id);
+    if (found == impl_->entity_simulations.end()) return std::nullopt;
+    return found->second.entity_id;
+}
+
+std::optional<project::BehaviorValue> PreviewRuntime::instance_property(
+    const std::string& instance_id, const std::string_view property_id) const {
+    if (!impl_) return std::nullopt;
+    const auto simulation = impl_->entity_simulations.find(instance_id);
+    if (simulation == impl_->entity_simulations.end()) return std::nullopt;
+    const auto property = simulation->second.behavior_properties.find(
+        std::string{property_id});
+    return property == simulation->second.behavior_properties.end()
+        ? std::nullopt : std::optional<project::BehaviorValue>{property->second};
+}
+
+bool PreviewRuntime::transform_instance(
+    const std::string& instance_id,
+    const core::ResourceId& transformation_id) {
+    return impl_ && impl_->transform_entity_instance(
+        instance_id, transformation_id);
 }
 
 const std::vector<BehaviorAction>& PreviewRuntime::behavior_actions() const noexcept {

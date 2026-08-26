@@ -277,9 +277,9 @@ Gate : le Studio programme un joueur et un monstre sans ajouter de code propre
   - [x] caméra et suivi éventuel.
 - [x] Définir les propriétés incompatibles comme reset, mapping explicite ou
   erreur de validation.
-- [ ] Rendre l'opération atomique dans le runtime.
-- [ ] Empêcher une frame intermédiaire sans entité valide.
-- [ ] Préserver ou reconstruire proprement collision et mécanique.
+- [x] Rendre l'opération atomique dans le runtime.
+- [x] Empêcher une frame intermédiaire sans entité valide.
+- [x] Préserver ou reconstruire proprement collision et mécanique.
 - [x] Exposer un formulaire typé dans Asset Studio.
 - [x] Permettre la sélection des entités source et destination depuis le
   Resource Explorer.

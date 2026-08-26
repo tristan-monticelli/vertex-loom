@@ -144,6 +144,6 @@ cooldowns et états appartient à un évaluateur par instance dans
 
 `EntityTransformation v1` est une ressource de politique atteinte depuis une
 action Behavior. `fabric_project` valide source, destination et mappings puis
-ferme la destination dans les paquets. La tranche runtime retenue devra préparer
-un candidat complet hors monde et ne remplacer l'état d'instance qu'après
-validation ; un échec devra conserver intégralement la source.
+ferme la destination dans les paquets. Preview Runtime prépare un candidat hors
+monde, applique les mappings et ne remplace l'état d'instance qu'après
+validation ; un échec conserve intégralement la source.
