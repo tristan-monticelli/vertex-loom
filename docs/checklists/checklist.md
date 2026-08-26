@@ -43,13 +43,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tests fill/image-fill, sauvegarde/reload/state-machine/runtime.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
-- [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
+- [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
   poignées liées/symétriques/libres, sélection et transform multi-points,
   transform fill indépendante, clips imbriqués, registre animable, CommandStack,
   géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
   cap), stroke image avec répétition/UV et preset pédagogique `beam` livré par
-  défaut,
-  géométrie, E2E canvas et comparaison des draw packets.
+  défaut, géométrie, E2E canvas et comparaison des draw packets. Vérifié par
+  les tests géométriques, `asset_studio_vector_canvas_e2e`,
+  `fabric_render_gl_smoke`, les tests de presets et les draw packets comparés.
 - [ ] Inspecteur : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
