@@ -162,7 +162,7 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 - [x] Lot D : scènes multi-maps, entry points et paquet de scènes.
 - [x] Lot E : triggers cohérents avec les formes et toutes les entités.
 - [x] Lot F : BehaviorGraph, monstres et transformations d'entités.
-- [ ] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
+- [x] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
 - [ ] Lot H : vectoriel complet, input avancé et tests UX end-to-end.
 
 Gate : aucun lot suivant ne commence tant que les tests du lot courant ne
