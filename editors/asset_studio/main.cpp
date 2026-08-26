@@ -165,6 +165,9 @@ struct CanvasUiState {
         rotate,
         scale,
         pivot,
+        path_point,
+        bezier_handle1,
+        bezier_handle2,
     };
 
     float zoom{1.0F};
@@ -176,6 +179,8 @@ struct CanvasUiState {
     DragOperation drag_operation{DragOperation::none};
     ImVec2 drag_start_mouse{};
     fabric::core::Transform drag_start_transform;
+    fabric::project::VectorNode drag_start_node;
+    std::size_t path_command_index{};
     ImVec2 native_origin{};
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
@@ -1813,13 +1818,54 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         CanvasUiState::DragOperation operation =
             CanvasUiState::DragOperation::none;
         if (selected_node != nullptr && !selected_node->locked) {
-            if (canvas.tool == CanvasUiState::Tool::rotate &&
+            if (canvas.tool == CanvasUiState::Tool::move &&
+                selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+                const auto distance = [](const ImVec2 left, const ImVec2 right) {
+                    return std::hypot(left.x - right.x, left.y - right.y);
+                };
+                float closest = 10.0F;
+                for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
+                    const auto& command = selected_node->shape.path[index];
+                    if (command.kind == fabric::project::VectorPathCommandKind::move ||
+                        command.kind == fabric::project::VectorPathCommandKind::line ||
+                        command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                        const auto candidate = to_screen(
+                            transform_point(*selected_node, command.point));
+                        const float hit = distance(mouse, candidate);
+                        if (hit <= closest) {
+                            closest = hit;
+                            operation = CanvasUiState::DragOperation::path_point;
+                            canvas.path_command_index = index;
+                        }
+                    }
+                    if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                        for (const auto [handle, candidate_operation] : {
+                                 std::pair{command.control1,
+                                           CanvasUiState::DragOperation::bezier_handle1},
+                                 std::pair{command.control2,
+                                           CanvasUiState::DragOperation::bezier_handle2}}) {
+                            const auto candidate = to_screen(
+                                transform_point(*selected_node, handle));
+                            const float hit = distance(mouse, candidate);
+                            if (hit <= closest) {
+                                closest = hit;
+                                operation = candidate_operation;
+                                canvas.path_command_index = index;
+                            }
+                        }
+                    }
+                }
+            }
+            if (operation == CanvasUiState::DragOperation::none &&
+                canvas.tool == CanvasUiState::Tool::rotate &&
                 distance(mouse, rotate_handle) <= 12.0F) {
                 operation = CanvasUiState::DragOperation::rotate;
-            } else if (canvas.tool == CanvasUiState::Tool::scale &&
+            } else if (operation == CanvasUiState::DragOperation::none &&
+                       canvas.tool == CanvasUiState::Tool::scale &&
                        distance(mouse, scale_handle) <= 12.0F) {
                 operation = CanvasUiState::DragOperation::scale;
-            } else if (canvas.tool == CanvasUiState::Tool::pivot &&
+            } else if (operation == CanvasUiState::DragOperation::none &&
+                       canvas.tool == CanvasUiState::Tool::pivot &&
                        distance(mouse, pivot_handle) <= 12.0F) {
                 operation = CanvasUiState::DragOperation::pivot;
             }
@@ -1844,6 +1890,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             canvas.drag_operation = operation;
             canvas.drag_start_mouse = mouse;
             canvas.drag_start_transform = selected_node->transform;
+            canvas.drag_start_node = *selected_node;
         }
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
@@ -1858,7 +1905,35 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         const auto& start = canvas.drag_start_transform;
         const auto start_mouse = to_world(canvas.drag_start_mouse);
         const auto current_mouse = to_world(io.MousePos);
-        if (canvas.drag_operation == CanvasUiState::DragOperation::move) {
+        const auto world_to_local = [&](const fabric::core::Vec2 world) {
+            const auto& transform = canvas.drag_start_node.transform;
+            const float angle = -transform.rotation_degrees *
+                std::numbers::pi_v<float> / 180.0F;
+            const float cosine = std::cos(angle);
+            const float sine = std::sin(angle);
+            const float x = world.x - transform.position.x - transform.pivot.x;
+            const float y = world.y - transform.position.y - transform.pivot.y;
+            return fabric::core::Vec2{
+                (x * cosine + y * sine) /
+                    std::max(std::abs(transform.scale.x), 0.0001F) +
+                    transform.pivot.x,
+                (-x * sine + y * cosine) /
+                    std::max(std::abs(transform.scale.y), 0.0001F) +
+                    transform.pivot.y};
+        };
+        if (canvas.drag_operation == CanvasUiState::DragOperation::path_point &&
+            canvas.path_command_index < changed.shape.path.size()) {
+            changed.shape.path[canvas.path_command_index].point =
+                world_to_local(current_mouse);
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle1 &&
+                   canvas.path_command_index < changed.shape.path.size()) {
+            changed.shape.path[canvas.path_command_index].control1 =
+                world_to_local(current_mouse);
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle2 &&
+                   canvas.path_command_index < changed.shape.path.size()) {
+            changed.shape.path[canvas.path_command_index].control2 =
+                world_to_local(current_mouse);
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::move) {
             changed.transform.position = {
                 start.position.x + current_mouse.x - start_mouse.x,
                 start.position.y + current_mouse.y - start_mouse.y};
@@ -2086,11 +2161,39 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
                                {pivot_handle.x, pivot_handle.y + 7.0F},
                                IM_COL32(180, 110, 235, 255), 2.0F);
+        } else if (canvas.tool == CanvasUiState::Tool::move &&
+                   selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+            for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
+                const auto& command = selected_node->shape.path[index];
+                if (command.kind == fabric::project::VectorPathCommandKind::move ||
+                    command.kind == fabric::project::VectorPathCommandKind::line ||
+                    command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                    draw_list->AddCircleFilled(
+                        to_screen(transform_point(*selected_node, command.point)),
+                        4.0F, IM_COL32(236, 180, 75, 255));
+                }
+                if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
+                    const auto anchor = to_screen(
+                        transform_point(*selected_node, command.point));
+                    const auto handle1 = to_screen(
+                        transform_point(*selected_node, command.control1));
+                    const auto handle2 = to_screen(
+                        transform_point(*selected_node, command.control2));
+                    draw_list->AddLine(anchor, handle1,
+                                       IM_COL32(180, 110, 235, 210), 1.0F);
+                    draw_list->AddLine(anchor, handle2,
+                                       IM_COL32(180, 110, 235, 210), 1.0F);
+                    draw_list->AddCircleFilled(handle1, 4.0F,
+                                               IM_COL32(180, 110, 235, 255));
+                    draw_list->AddCircleFilled(handle2, 4.0F,
+                                               IM_COL32(180, 110, 235, 255));
+                }
+            }
         }
     }
     draw_list->PopClipRect();
     if (hovered) {
-        ImGui::SetTooltip("Click a shape to select it. Move drags the selected shape; Rotate, Scale and Pivot drag only their active handle. Middle drag: pan | Wheel: zoom %.0f%%",
+        ImGui::SetTooltip("Click a shape to select it. Move drags the selected shape; on a path, drag anchors or Bézier handles. Rotate, Scale and Pivot drag only their active handle. Middle drag: pan | Wheel: zoom %.0f%%",
                           canvas.zoom * 100.0F);
     }
 }

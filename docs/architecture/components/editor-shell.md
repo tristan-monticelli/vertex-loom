@@ -253,8 +253,10 @@ C4Component
   L’inspecteur propose l’ajout de segments sans exposer une mutation JSON
   directe.
 - Le personnalisateur expose ces points, commandes et deux poignées Bézier dans
-  l'inspecteur de nœud, avec validation et CommandStack ; la manipulation
-  directe sur le canvas reste une étape UX distincte.
+  l'inspecteur de nœud, avec validation et CommandStack. Sur un path
+  sélectionné, le canvas rend les ancres et poignées, convertit leurs
+  déplacements écran en coordonnées locales et les persiste par la session ;
+  la sélection multiple et les modes de poignées restent à compléter.
 - Un nœud peut conserver un contour avec couleur, largeur, jointure et
   extrémité ; les nœuds sont composés dans l’ordre stable de `native.nodes`.
 - Les nœuds natifs peuvent référencer un parent et un clip par identifiants
