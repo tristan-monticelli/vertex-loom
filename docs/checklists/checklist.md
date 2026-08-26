@@ -582,7 +582,7 @@ automatiquement sur les trois plateformes.
 - [x] Réconcilier cette checklist avec `remaining-roadmap.md`.
 - [x] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
 - [x] Exécuter `npm run validate` après chaque étape fonctionnelle.
-- [ ] Exécuter le smoke OpenGL après toute modification du renderer.
+- [x] Exécuter le smoke OpenGL après toute modification du renderer.
 - [ ] Exécuter les benchmarks après toute modification significative du rendu
   ou du runtime.
 - [x] Auditer le diff, les voisins, les régressions et les effets de bord.
