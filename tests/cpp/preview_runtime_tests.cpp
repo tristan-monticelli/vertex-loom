@@ -146,6 +146,12 @@ fabric::project::AnimationClip material_animation() {
         fabric::project::AnimationInterpolation::linear,
         {{0.0F, 0.1F}, {1.0F, 0.1F}},
         fabric::project::AnimationComposition::additive});
+    result.tracks.push_back({
+        {.node_id = "root", .component_id = "fill", .property_id = "color"},
+        fabric::project::AnimationInterpolation::linear,
+        {{0.0F, fabric::core::Color{0.6F, 0.2F, 0.15F, 0.35F}},
+         {1.0F, fabric::core::Color{0.6F, 0.2F, 0.15F, 0.35F}}},
+        fabric::project::AnimationComposition::replace});
     return result;
 }
 

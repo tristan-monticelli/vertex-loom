@@ -5491,7 +5491,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             const char* binding_presets[] = {
                 "Custom", "Transform / Position", "Transform / Rotation",
-                "Transform / Scale", "Material / Opacity", "Material / Color"};
+                "Transform / Scale", "Material / Opacity", "Material / Color",
+                "Fill / Color", "Image fill / Opacity"};
             if (ImGui::Combo("Binding preset", &animation_ui.binding_preset,
                              binding_presets,
                              static_cast<int>(std::size(binding_presets)))) {
@@ -5520,6 +5521,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     animation_ui.component_id = "material";
                     animation_ui.property_id = "color";
                     animation_ui.key_kind = 2;
+                    break;
+                case 6:
+                    animation_ui.component_id = "fill";
+                    animation_ui.property_id = "color";
+                    animation_ui.key_kind = 2;
+                    break;
+                case 7:
+                    animation_ui.component_id = "imageFill";
+                    animation_ui.property_id = "opacity";
+                    animation_ui.key_kind = 1;
                     break;
                 default:
                     break;

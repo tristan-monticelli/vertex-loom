@@ -2261,12 +2261,14 @@ bool PreviewRuntime::run() {
                            property.binding.property_id == "scale") {
                     if (const auto* value = std::get_if<core::Vec2>(&property.value))
                         scale = *value;
-                } else if (property.binding.component_id == "material" &&
+                } else if ((property.binding.component_id == "material" ||
+                            property.binding.component_id == "fill") &&
                            property.binding.property_id == "color") {
                     if (const auto* value = std::get_if<core::Color>(&property.value))
                         color = *value,
                         color_composition = property.composition;
-                } else if (property.binding.component_id == "material" &&
+                } else if ((property.binding.component_id == "material" ||
+                            property.binding.component_id == "imageFill") &&
                            property.binding.property_id == "opacity") {
                     if (const auto* value = std::get_if<float>(&property.value))
                         opacity = *value,

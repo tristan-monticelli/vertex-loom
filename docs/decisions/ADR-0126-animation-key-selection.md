@@ -17,6 +17,11 @@ Le collage aligne la clé la plus ancienne sur le temps demandé, conserve les
 `CommandStack`, dirty state et autosave. Les temps peuvent être arrondis à un
 intervalle positif configurable avant l’écriture.
 
+Les bindings visuels de base restent explicites dans le clip : `material/color`
+et `material/opacity` sont conservés, tandis que l’éditeur expose aussi
+`fill/color` et `imageFill/opacity` pour cibler directement les paquets de
+rendu correspondants.
+
 ## Conséquences
 
 - Les sélections invalidées par une réorganisation de piste sont ignorées au
