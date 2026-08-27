@@ -35,8 +35,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   nœuds/map/ressources, remplacement de références, cascade explicitée,
   duplication superficielle/profonde, réécriture sélective et tests collisions,
   cycles, fichiers absents et erreurs disque.
-- [ ] Textures : tests de navigation à grande échelle et vérification complète
-  des performances de recherche et des noms similaires.
+- [x] Textures : navigation à grande échelle et noms similaires vérifiés par
+  `resource index remains unambiguous with many similar textures` avec 1024
+  ressources indexées et sélectionnées par identifiant.
 - [ ] Entités : confirmation des overrides incompatibles, gizmos de nœuds,
   glisser-déposer artwork vers nœud existant/racine/enfant, sections éditables
   contraintes/IK/déformation/XPBD/state machine.

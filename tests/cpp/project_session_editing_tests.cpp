@@ -635,7 +635,7 @@ TEST_CASE("resource index remains unambiguous with many similar textures") {
     }
     REQUIRE(std::filesystem::is_regular_file(source));
 
-    constexpr std::size_t texture_count = 128U;
+    constexpr std::size_t texture_count = 1024U;
     for (std::size_t index = 0; index < texture_count; ++index) {
         const auto suffix = std::to_string(index);
         const fabric::project::TextureAsset texture{
@@ -659,7 +659,7 @@ TEST_CASE("resource index remains unambiguous with many similar textures") {
             return resource.kind == fabric::editor::StudioResourceKind::texture;
         });
     CHECK(textures == texture_count);
-    for (const auto index : {0U, 1U, 10U, 99U, 127U}) {
+    for (const auto index : {0U, 1U, 10U, 99U, 511U, 1023U}) {
         const auto id = fabric::core::ResourceId{
             .value = "fabric-panel-" + std::to_string(index)};
         CHECK(std::ranges::any_of(session.resources(), [&](const auto& resource) {
