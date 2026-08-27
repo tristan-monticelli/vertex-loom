@@ -31,10 +31,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   dirty valide/invalide, erreur disque et conservation du document. La suite
   `project transitions save valid edits and preserve invalid ones`, les tests
   de sélection/import/duplication et les E2E de fermeture couvrent ces chemins.
-- [ ] Suppressions et dépendances : confirmations avec analyse d'impact pour
+- [x] Suppressions et dépendances : confirmations avec analyse d'impact pour
   nœuds/map/ressources, remplacement de références, cascade explicitée,
   duplication superficielle/profonde, réécriture sélective et tests collisions,
-  cycles, fichiers absents et erreurs disque.
+  cycles, fichiers absents et erreurs disque. Vérifié dans la section 4 et les
+  suites de fondations, session et map package.
 - [x] Textures : navigation à grande échelle et noms similaires vérifiés par
   `resource index remains unambiguous with many similar textures` avec 1024
   ressources indexées et sélectionnées par identifiant.
@@ -69,7 +70,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 
 - [x] Afficher dès l'accueil un état vide guidé : projet courant, ressource
   active, prochaine action et raccourcis disponibles.
-- [ ] Garantir qu'ouvrir, créer, importer, dupliquer et fermer utilisent une
+- [x] Garantir qu'ouvrir, créer, importer, dupliquer et fermer utilisent une
   transition unique `Save/Discard/Cancel/Retry`, sans perte de contexte.
 - [ ] Montrer dans chaque picker le type, le chemin, la miniature, les
   dimensions, le format, les dépendances et une action d'ouverture.
@@ -81,13 +82,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   conserver toute propriété créée dans l'inspecteur après publication.
 - [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
   clavier et cohérent entre Asset Studio, Map Studio et scènes.
-- [ ] Ajouter une analyse d'impact avant chaque suppression et proposer
+- [x] Ajouter une analyse d'impact avant chaque suppression et proposer
   remplacement, cascade explicitée ou annulation.
-- [ ] Permettre duplication superficielle/profonde et réécriture sélective des
-  références internes.
+- [x] Permettre duplication superficielle/profonde et réécriture sélective des
+  références internes. Les options et les tests de réécriture sélective sont
+  documentés dans la section 4.
 - [ ] Ajouter gizmos de nœuds et drag-and-drop des artworks vers un nœud
   existant, un nœud racine ou un enfant.
-- [ ] Exposer les contraintes, IK, déformation, XPBD et state machines dans
+- [x] Exposer les contraintes, IK, déformation, XPBD et state machines dans
   des sections réellement éditables.
 - [ ] Faire correspondre chaque paramètre de timeline au descripteur runtime,
   y compris transform, matériau, fill, image fill et composants.
@@ -740,12 +742,12 @@ automatiquement sur les trois plateformes.
 
 ## Ordre d'exécution recommandé
 
-- [ ] Lot 1 : transition uniforme entre documents.
-- [ ] Lot 2 : Resource Explorer et duplication générique.
+- [x] Lot 1 : transition uniforme entre documents.
+- [x] Lot 2 : Resource Explorer et duplication générique.
 - [ ] Lot 3 : textures, matériaux et édition complète des drawables d'entité.
 - [x] Lot 4 : cible explicite des animations.
-- [ ] Lot 5 : BehaviorGraph et inputs physiques séparés.
-- [ ] Lot 6 : transformation d'entité.
+- [x] Lot 5 : BehaviorGraph et inputs physiques séparés.
+- [x] Lot 6 : transformation d'entité.
 - [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
   transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
   comparaison des draw packets sont validés.
