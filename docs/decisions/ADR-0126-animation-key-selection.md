@@ -28,5 +28,7 @@ rendu correspondants.
   collage plutôt que d’écrire dans une autre piste.
 - Le clipboard reste local à la session Asset Studio et n’ajoute aucun champ
   au format `AnimationClip`.
-- Les tangentes et l’easing restent un contrat distinct à décider avant leur
-  persistance.
+- Le schéma d’animation v3 persiste un easing par piste et des tangentes
+  entrante et sortante optionnelles par clé. Les tangentes sont des valeurs du
+  même type que la clé et ne sont évaluées que pour une interpolation cubique ;
+  sans tangentes, le comportement cubique historique est conservé.

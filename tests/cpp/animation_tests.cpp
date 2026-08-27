@@ -1,5 +1,6 @@
 #include "fabric/project/animation.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <string>
@@ -113,6 +114,39 @@ TEST_CASE("animation composition round-trips and is exposed during evaluation") 
     REQUIRE(evaluated.properties.front().composition ==
             fabric::project::AnimationComposition::additive);
     CHECK(std::get<float>(evaluated.properties.front().value) == 0.5F);
+}
+
+TEST_CASE("animation easing and tangents round-trip and affect cubic evaluation") {
+    auto source = clip();
+    source.tracks[0].easing = fabric::project::AnimationEasing::ease_in;
+    auto& track = source.tracks[1];
+    track.easing = fabric::project::AnimationEasing::linear;
+    track.keys[0].out_tangent = fabric::core::Vec2{10.0F, 0.0F};
+    track.keys[1].in_tangent = fabric::core::Vec2{0.0F, 20.0F};
+
+    const auto serialized = fabric::project::serialize_animation(source);
+    REQUIRE(serialized.find("inTangent") != std::string::npos);
+    REQUIRE(serialized.find("outTangent") != std::string::npos);
+    const auto parsed = fabric::project::parse_animation(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    REQUIRE(parsed.asset->tracks[1] == track);
+
+    const auto evaluated = fabric::project::evaluate_animation(*parsed.asset, 0.5F);
+    REQUIRE(evaluated.ok());
+    const auto position = std::get<fabric::core::Vec2>(evaluated.properties[1].value);
+    CHECK(std::get<float>(evaluated.properties[0].value) == 0.25F);
+    CHECK(position.x == 6.25F);
+    CHECK(position.y == 7.5F);
+}
+
+TEST_CASE("animation validation rejects tangent type mismatches") {
+    auto invalid = clip();
+    invalid.tracks[1].keys.front().out_tangent = 1.0F;
+    const auto report = fabric::project::validate_animation(manifest(), invalid);
+    REQUIRE_FALSE(report.ok());
+    CHECK(std::ranges::any_of(report.errors, [](const auto& error) {
+        return error.field == "tracks.keys.outTangent";
+    }));
 }
 
 TEST_CASE("rotation interpolation follows the shortest angular path") {

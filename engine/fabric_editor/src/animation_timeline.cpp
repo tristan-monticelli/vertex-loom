@@ -83,19 +83,25 @@ std::vector<project::PropertyBinding> AnimationTimeline::animatable_bindings(
 bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
                                    float time, project::AnimationValue value,
                                    project::AnimationInterpolation interpolation,
-                                   project::AnimationComposition composition) {
+                                   project::AnimationComposition composition,
+                                   project::AnimationEasing easing,
+                                   std::optional<project::AnimationValue> in_tangent,
+                                   std::optional<project::AnimationValue> out_tangent) {
     auto next = clip_;
     auto* track = find_track(next, binding);
     if (!track) {
-        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}},
-                               composition});
+        next.tracks.push_back({binding, interpolation, {{time, std::move(value),
+                                                         std::move(in_tangent),
+                                                         std::move(out_tangent)}},
+                               composition, easing});
     } else {
         if (track->interpolation != interpolation ||
-            track->composition != composition)
+            track->composition != composition || track->easing != easing)
             return false;
         if (!track->keys.empty() && !same_value_type(track->keys.front().value, value))
             return false;
-        track->keys.push_back({time, std::move(value)});
+        track->keys.push_back({time, std::move(value), std::move(in_tangent),
+                               std::move(out_tangent)});
         std::stable_sort(track->keys.begin(), track->keys.end(),
                          [](const auto& left, const auto& right) {
                              return left.time < right.time;
@@ -108,15 +114,20 @@ bool AnimationTimeline::insert_key(const project::PropertyBinding& binding,
 bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
                                 const float time, project::AnimationValue value,
                                 const project::AnimationInterpolation interpolation,
-                                const project::AnimationComposition composition) {
+                                const project::AnimationComposition composition,
+                                const project::AnimationEasing easing,
+                                std::optional<project::AnimationValue> in_tangent,
+                                std::optional<project::AnimationValue> out_tangent) {
     auto next = clip_;
     auto* track = find_track(next, binding);
     if (!track) {
-        next.tracks.push_back({binding, interpolation, {{time, std::move(value)}},
-                               composition});
+        next.tracks.push_back({binding, interpolation, {{time, std::move(value),
+                                                         std::move(in_tangent),
+                                                         std::move(out_tangent)}},
+                               composition, easing});
     } else {
         if (track->interpolation != interpolation ||
-            track->composition != composition ||
+            track->composition != composition || track->easing != easing ||
             (!track->keys.empty() &&
              !same_value_type(track->keys.front().value, value))) {
             return false;
@@ -125,8 +136,11 @@ bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
             track->keys, [&](const auto& key) { return key.time == time; });
         if (existing != track->keys.end()) {
             existing->value = std::move(value);
+            existing->in_tangent = std::move(in_tangent);
+            existing->out_tangent = std::move(out_tangent);
         } else {
-            track->keys.push_back({time, std::move(value)});
+            track->keys.push_back({time, std::move(value), std::move(in_tangent),
+                                   std::move(out_tangent)});
         }
         std::stable_sort(track->keys.begin(), track->keys.end(),
                          [](const auto& left, const auto& right) {
@@ -142,7 +156,8 @@ bool AnimationTimeline::set_segment(
     project::AnimationValue start_value, const float end_time,
     project::AnimationValue end_value,
     const project::AnimationInterpolation interpolation,
-    const project::AnimationComposition composition) {
+    const project::AnimationComposition composition,
+    const project::AnimationEasing easing) {
     if (!(start_time < end_time) || !same_value_type(start_value, end_value))
         return false;
     auto next = clip_;
@@ -151,10 +166,10 @@ bool AnimationTimeline::set_segment(
         next.tracks.push_back({binding, interpolation,
                                {{start_time, std::move(start_value)},
                                 {end_time, std::move(end_value)}},
-                               composition});
+                               composition, easing});
     } else {
         if (track->interpolation != interpolation ||
-            track->composition != composition ||
+            track->composition != composition || track->easing != easing ||
             (!track->keys.empty() &&
              (!same_value_type(track->keys.front().value, start_value) ||
               !same_value_type(track->keys.front().value, end_value))))

@@ -130,17 +130,20 @@ C4Component
   en mémoire avec un nœud visible et déverrouillé. Les
   contraintes référencent uniquement des nœuds de la même entité et sont
   validées contre les cycles, doublons d’ordre et nœuds manquants.
-- `AnimationClip v2` est stocké sous
+- `AnimationClip v3` est stocké sous
   `assets/animations/<id>.animation.json`. Il porte une durée, une boucle,
   une cible d'entité de prévisualisation optionnelle, des markers et des pistes
   liées par `nodeId + componentId + propertyId`. La v1 devient explicitement
   générique à la lecture.
   Les valeurs v1 sont scalaire, `Vec2`, couleur, booléen ou référence de
   ressource ; les interpolations disponibles sont step, linear et cubic.
-  Chaque piste porte aussi une composition `replace` ou `additive` ; le champ
+  Chaque piste porte aussi une composition `replace` ou `additive` et un easing
+  `linear`, `easeIn`, `easeOut` ou `easeInOut` ; le champ
   est facultatif à la lecture pour conserver la compatibilité des clips v1
   existants et vaut `replace` par défaut. L’évaluation headless expose cette
-  composition avec la valeur interpolée. Le helper `animation_markers_between`
+  composition avec la valeur interpolée. Une clé peut porter des tangentes
+  entrante et sortante du même type que sa valeur ; elles pilotent l’évaluation
+  cubique et restent optionnelles. Le helper `animation_markers_between`
   et l’API runtime correspondante renvoient les markers franchis dans
   l’intervalle semi-ouvert `(from, to]` (`from < marker <= to`), avec
   instant absolu, instant local et index de boucle.

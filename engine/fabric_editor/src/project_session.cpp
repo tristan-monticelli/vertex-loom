@@ -3237,11 +3237,15 @@ bool ProjectSession::insert_selected_animation_key(
     project::AnimationValue value,
     const project::AnimationInterpolation interpolation,
     const AutosaveScheduler::Clock::time_point now,
-    const project::AnimationComposition composition) {
+    const project::AnimationComposition composition,
+    const project::AnimationEasing easing,
+    std::optional<project::AnimationValue> in_tangent,
+    std::optional<project::AnimationValue> out_tangent) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.insert_key(std::move(binding), time, std::move(value),
-                             interpolation, composition)) {
+                             interpolation, composition, easing,
+                             std::move(in_tangent), std::move(out_tangent))) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;
@@ -3257,11 +3261,15 @@ bool ProjectSession::set_selected_animation_key(
     project::AnimationValue value,
     const project::AnimationInterpolation interpolation,
     const AutosaveScheduler::Clock::time_point now,
-    const project::AnimationComposition composition) {
+    const project::AnimationComposition composition,
+    const project::AnimationEasing easing,
+    std::optional<project::AnimationValue> in_tangent,
+    std::optional<project::AnimationValue> out_tangent) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.set_key(std::move(binding), time, std::move(value),
-                          interpolation, composition)) {
+                          interpolation, composition, easing,
+                          std::move(in_tangent), std::move(out_tangent))) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;
@@ -3278,12 +3286,14 @@ bool ProjectSession::set_selected_animation_segment(
     project::AnimationValue end_value,
     const project::AnimationInterpolation interpolation,
     const AutosaveScheduler::Clock::time_point now,
-    const project::AnimationComposition composition) {
+    const project::AnimationComposition composition,
+    const project::AnimationEasing easing) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.set_segment(std::move(binding), start_time,
                               std::move(start_value), end_time,
-                              std::move(end_value), interpolation, composition)) {
+                              std::move(end_value), interpolation, composition,
+                              easing)) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys",
                     "animation segment requires ordered times and matching value types"}};
         return false;

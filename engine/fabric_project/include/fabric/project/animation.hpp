@@ -12,13 +12,16 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_animation_schema_version = 2;
+inline constexpr std::uint32_t current_animation_schema_version = 3;
 
 using AnimationValue = std::variant<float, core::Vec2, core::Color, bool,
                                      ResourceReference>;
 
 enum class AnimationInterpolation { step, linear, cubic };
 [[nodiscard]] std::string_view to_string(AnimationInterpolation) noexcept;
+
+enum class AnimationEasing { linear, ease_in, ease_out, ease_in_out };
+[[nodiscard]] std::string_view to_string(AnimationEasing) noexcept;
 
 enum class AnimationComposition { replace, additive };
 [[nodiscard]] std::string_view to_string(AnimationComposition) noexcept;
@@ -33,6 +36,8 @@ struct PropertyBinding {
 struct AnimationKey {
     float time{};
     AnimationValue value{0.0F};
+    std::optional<AnimationValue> in_tangent;
+    std::optional<AnimationValue> out_tangent;
     friend bool operator==(const AnimationKey&, const AnimationKey&) = default;
 };
 
@@ -41,6 +46,7 @@ struct AnimationTrack {
     AnimationInterpolation interpolation{AnimationInterpolation::linear};
     std::vector<AnimationKey> keys;
     AnimationComposition composition{AnimationComposition::replace};
+    AnimationEasing easing{AnimationEasing::linear};
     friend bool operator==(const AnimationTrack&, const AnimationTrack&) = default;
 };
 

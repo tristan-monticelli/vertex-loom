@@ -221,6 +221,8 @@ struct AnimationUiState {
             fabric::project::AnimationInterpolation::linear};
         fabric::project::AnimationComposition composition{
             fabric::project::AnimationComposition::replace};
+        fabric::project::AnimationEasing easing{
+            fabric::project::AnimationEasing::linear};
     };
     struct KeySelection {
         fabric::project::PropertyBinding binding;
@@ -239,6 +241,13 @@ struct AnimationUiState {
     int key_kind{};
     float key_scalar{};
     float key_color[4]{1.0F, 1.0F, 1.0F, 1.0F};
+    bool tangents_enabled{};
+    float key_in_tangent[2]{};
+    float key_out_tangent[2]{};
+    float key_in_tangent_scalar{};
+    float key_out_tangent_scalar{};
+    float key_in_tangent_color[4]{};
+    float key_out_tangent_color[4]{};
     bool key_boolean{};
     bool auto_key{};
     std::string key_resource_id;
@@ -256,6 +265,8 @@ struct AnimationUiState {
     std::string segment_end_resource_id;
     fabric::project::AnimationInterpolation interpolation{
         fabric::project::AnimationInterpolation::linear};
+    fabric::project::AnimationEasing easing{
+        fabric::project::AnimationEasing::linear};
     fabric::project::AnimationComposition composition{
         fabric::project::AnimationComposition::replace};
     bool snap_keys{true};
@@ -5664,6 +5675,23 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::EndCombo();
                 }
             }
+            if (animation_ui.interpolation ==
+                    fabric::project::AnimationInterpolation::cubic &&
+                animation_ui.key_kind != 3 && animation_ui.key_kind != 4) {
+                ImGui::Checkbox("Custom tangents", &animation_ui.tangents_enabled);
+                if (animation_ui.tangents_enabled) {
+                    if (animation_ui.key_kind == 0) {
+                        ImGui::InputFloat2("In tangent", animation_ui.key_in_tangent);
+                        ImGui::InputFloat2("Out tangent", animation_ui.key_out_tangent);
+                    } else if (animation_ui.key_kind == 1) {
+                        ImGui::InputFloat("In tangent", &animation_ui.key_in_tangent_scalar);
+                        ImGui::InputFloat("Out tangent", &animation_ui.key_out_tangent_scalar);
+                    } else {
+                        ImGui::InputFloat4("In tangent", animation_ui.key_in_tangent_color);
+                        ImGui::InputFloat4("Out tangent", animation_ui.key_out_tangent_color);
+                    }
+                }
+            }
             ImGui::SeparatorText("A → B segment");
             animation_ui.segment_start_time = std::clamp(
                 animation_ui.segment_start_time, 0.0F,
@@ -5762,7 +5790,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     segment_value(true), animation_ui.segment_end_time,
                     segment_value(false), animation_ui.interpolation,
                     fabric::editor::AutosaveScheduler::Clock::now(),
-                    animation_ui.composition);
+                    animation_ui.composition, animation_ui.easing);
                 status = created ? "Animation A → B segment created."
                                  : "Animation segment rejected; inspect diagnostics.";
             }
@@ -5779,6 +5807,22 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ImGui::Selectable(label.c_str(), selected_option)) {
                         animation_ui.interpolation = option;
                     }
+                }
+                ImGui::EndCombo();
+            }
+            const auto easing_label = std::string(
+                fabric::project::to_string(animation_ui.easing));
+            if (ImGui::BeginCombo("Easing", easing_label.c_str())) {
+                for (const auto option : {
+                         fabric::project::AnimationEasing::linear,
+                         fabric::project::AnimationEasing::ease_in,
+                         fabric::project::AnimationEasing::ease_out,
+                         fabric::project::AnimationEasing::ease_in_out}) {
+                    const bool selected_option = option == animation_ui.easing;
+                    const auto label = std::string(
+                        fabric::project::to_string(option));
+                    if (ImGui::Selectable(label.c_str(), selected_option))
+                        animation_ui.easing = option;
                 }
                 ImGui::EndCombo();
             }
@@ -5819,6 +5863,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     value = fabric::project::ResourceReference{
                         {.value = animation_ui.key_resource_id}, "resource"};
                 }
+                std::optional<fabric::project::AnimationValue> in_tangent;
+                std::optional<fabric::project::AnimationValue> out_tangent;
+                if (animation_ui.tangents_enabled && animation_ui.key_kind == 0) {
+                    in_tangent = fabric::core::Vec2{animation_ui.key_in_tangent[0],
+                                                   animation_ui.key_in_tangent[1]};
+                    out_tangent = fabric::core::Vec2{animation_ui.key_out_tangent[0],
+                                                    animation_ui.key_out_tangent[1]};
+                } else if (animation_ui.tangents_enabled && animation_ui.key_kind == 1) {
+                    in_tangent = animation_ui.key_in_tangent_scalar;
+                    out_tangent = animation_ui.key_out_tangent_scalar;
+                } else if (animation_ui.tangents_enabled && animation_ui.key_kind == 2) {
+                    in_tangent = fabric::core::Color{animation_ui.key_in_tangent_color[0],
+                                                     animation_ui.key_in_tangent_color[1],
+                                                     animation_ui.key_in_tangent_color[2],
+                                                     animation_ui.key_in_tangent_color[3]};
+                    out_tangent = fabric::core::Color{animation_ui.key_out_tangent_color[0],
+                                                      animation_ui.key_out_tangent_color[1],
+                                                      animation_ui.key_out_tangent_color[2],
+                                                      animation_ui.key_out_tangent_color[3]};
+                }
                 if (session.set_selected_animation_key(
                         {.node_id = animation_ui.node_id,
                          .component_id = animation_ui.component_id,
@@ -5829,7 +5893,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         std::move(value),
                         animation_ui.interpolation,
                         fabric::editor::AutosaveScheduler::Clock::now(),
-                        animation_ui.composition)) {
+                        animation_ui.composition, animation_ui.easing,
+                        std::move(in_tangent), std::move(out_tangent))) {
                     status = "Animation key set.";
                 } else {
                     status = "Animation key rejected; inspect diagnostics.";
@@ -5870,7 +5935,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         selected.index >= track->keys.size()) continue;
                     animation_ui.key_clipboard.push_back({
                         selected.binding, track->keys[selected.index],
-                        track->interpolation, track->composition});
+                        track->interpolation, track->composition, track->easing});
                 }
                 status = animation_ui.key_clipboard.empty()
                     ? "No valid animation keys selected."
@@ -5892,7 +5957,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                  entry.binding, time, entry.key.value,
                                  entry.interpolation,
                                  fabric::editor::AutosaveScheduler::Clock::now(),
-                                 entry.composition) || pasted;
+                                 entry.composition, entry.easing,
+                                 entry.key.in_tangent,
+                                 entry.key.out_tangent) || pasted;
                 }
                 status = pasted ? "Animation keys pasted."
                                 : "Animation keys could not be pasted; inspect diagnostics.";

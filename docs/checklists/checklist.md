@@ -578,7 +578,10 @@ rail droit sans recréation ni édition JSON.
   Studio gère la sélection par binding/index, le clipboard conserve les
   offsets relatifs et le snapping utilise un intervalle configurable ; le
   contrat est documenté dans `ADR-0126-animation-key-selection.md`.
-- [ ] Ajouter tangentes et easing après décision de contrat.
+- [x] Ajouter tangentes et easing après décision de contrat. Le schéma v3,
+  la migration, la validation, l’évaluation cubique, l’éditeur et les tests de
+  round-trip sont couverts par `ADR-0126-animation-key-selection.md` et
+  `fabric_animation_tests`.
 - [x] Prévisualiser le clip sur l'entité dès sa création.
 - [x] Tester création ciblée, changement de cible et cible absente.
 - [ ] Tester changements de fill et transform d'image dans la timeline.
