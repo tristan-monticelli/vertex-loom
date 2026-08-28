@@ -155,6 +155,27 @@ fabric::project::AnimationClip material_animation() {
     return result;
 }
 
+fabric::project::AnimationClip image_fill_animation() {
+    auto result = animation();
+    result.tracks = {
+        {{.node_id = "root", .component_id = "imageFill", .property_id = "position"},
+         fabric::project::AnimationInterpolation::linear,
+         {{0.0F, fabric::core::Vec2{2.0F, 3.0F}},
+          {1.0F, fabric::core::Vec2{2.0F, 3.0F}}}},
+        {{.node_id = "root", .component_id = "imageFill", .property_id = "scale"},
+         fabric::project::AnimationInterpolation::linear,
+         {{0.0F, fabric::core::Vec2{1.5F, 0.75F}},
+          {1.0F, fabric::core::Vec2{1.5F, 0.75F}}}},
+        {{.node_id = "root", .component_id = "imageFill", .property_id = "rotationDegrees"},
+         fabric::project::AnimationInterpolation::linear,
+         {{0.0F, 25.0F}, {1.0F, 25.0F}}},
+        {{.node_id = "root", .component_id = "imageFill", .property_id = "pivot"},
+         fabric::project::AnimationInterpolation::linear,
+         {{0.0F, fabric::core::Vec2{0.25F, 0.75F}},
+          {1.0F, fabric::core::Vec2{0.25F, 0.75F}}}}};
+    return result;
+}
+
 fabric::project::AnimationClip component_animation() {
     return {.document = {.schema_version = 1,
                          .type = "animation",
@@ -671,6 +692,14 @@ fabric::project::MapDocument map_with_texture_entity() {
                                 fabric::project::ResourceReference{
                                     {.value = "runtime-texture-entity"}, "entity"},
                                 std::nullopt, "instances", {}, 0, 0, {}});
+    return result;
+}
+
+fabric::project::MapDocument map_with_animated_texture_entity() {
+    auto result = map_with_texture_entity();
+    result.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-image-animation"}, "animation"}});
     return result;
 }
 
@@ -1978,6 +2007,58 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
     REQUIRE(studio_packet.ok());
     REQUIRE(studio_packet.packets.size() == 1U);
     CHECK(packets.front() == studio_packet.packets.front());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime applies animated image fill transforms") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-image-fill-animation-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    const auto input = root / "input.png";
+    constexpr std::array<unsigned char, 70> png{
+        0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+        0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+        0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4,
+        0x89, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x44, 0x41,
+        0x54, 0x78, 0x9c, 0x63, 0x60, 0xf8, 0xcf, 0xc0,
+        0x00, 0x00, 0x03, 0x01, 0x01, 0x00, 0x18, 0xdd,
+        0x8d, 0xb8, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45,
+        0x4e, 0x44, 0xae, 0x42, 0x60, 0x82};
+    std::ofstream output(input, std::ios::binary);
+    output.write(reinterpret_cast<const char*>(png.data()),
+                 static_cast<std::streamsize>(png.size()));
+    output.close();
+    REQUIRE(fabric::project::publish_texture_asset(
+        root, manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "runtime-texture"},
+                      .name = "Runtime Texture"},
+         .source = "assets/textures/runtime-texture.png",
+         .width = 1,
+         .height = 1}, input).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), texture_entity()).ok());
+    auto clip = image_fill_animation();
+    clip.document.id = {.value = "runtime-image-animation"};
+    REQUIRE(fabric::project::publish_animation(root, manifest(), clip).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_animated_texture_entity()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    REQUIRE(runtime.last_frame_packets().front().image_fill.has_value());
+    const auto& transform = runtime.last_frame_packets().front().image_fill->transform;
+    CHECK(transform.position == fabric::core::Vec2{2.0F, 3.0F});
+    CHECK(transform.scale == fabric::core::Vec2{1.5F, 0.75F});
+    CHECK(transform.rotation_degrees == 25.0F);
+    CHECK(transform.pivot == fabric::core::Vec2{0.25F, 0.75F});
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

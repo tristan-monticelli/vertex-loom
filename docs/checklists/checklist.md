@@ -585,7 +585,11 @@ rail droit sans recréation ni édition JSON.
   `fabric_animation_tests`.
 - [x] Prévisualiser le clip sur l'entité dès sa création.
 - [x] Tester création ciblée, changement de cible et cible absente.
-- [ ] Tester changements de fill et transform d'image dans la timeline.
+- [x] Tester changements de fill et transform d'image dans la timeline. Les
+  tests `preview runtime applies animated material tracks to submitted packets`
+  et `preview runtime applies animated image fill transforms` couvrent fill,
+  opacité et les quatre composantes du transform d’image après publication et
+  reload runtime.
 - [x] Tester sauvegarde, reload, state machine et runtime. `fabric_project_
   session_editing_tests` couvre publication, autosave, récupération et reload
   d’un clip ; `fabric_animation_state_machine_tests`,
