@@ -2241,6 +2241,10 @@ bool PreviewRuntime::run() {
             std::optional<core::Vec2> position;
             std::optional<float> rotation_degrees;
             std::optional<core::Vec2> scale;
+            std::optional<core::Vec2> image_position;
+            std::optional<core::Vec2> image_scale;
+            std::optional<core::Vec2> image_pivot;
+            std::optional<float> image_rotation_degrees;
             std::optional<core::Color> color;
             std::optional<float> opacity;
             project::AnimationComposition color_composition =
@@ -2273,6 +2277,22 @@ bool PreviewRuntime::run() {
                     if (const auto* value = std::get_if<float>(&property.value))
                         opacity = *value,
                         opacity_composition = property.composition;
+                } else if (property.binding.component_id == "imageFill" &&
+                           property.binding.property_id == "position") {
+                    if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                        image_position = *value;
+                } else if (property.binding.component_id == "imageFill" &&
+                           property.binding.property_id == "scale") {
+                    if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                        image_scale = *value;
+                } else if (property.binding.component_id == "imageFill" &&
+                           property.binding.property_id == "rotationDegrees") {
+                    if (const auto* value = std::get_if<float>(&property.value))
+                        image_rotation_degrees = *value;
+                } else if (property.binding.component_id == "imageFill" &&
+                           property.binding.property_id == "pivot") {
+                    if (const auto* value = std::get_if<core::Vec2>(&property.value))
+                        image_pivot = *value;
                 }
             }
             if (resolved_node) {
@@ -2280,7 +2300,9 @@ bool PreviewRuntime::run() {
                 rotation_degrees = resolved_node->transform.rotation_degrees;
                 scale = resolved_node->transform.scale;
             }
-            if (!position && !rotation_degrees && !scale && !color && !opacity)
+            if (!position && !rotation_degrees && !scale && !color && !opacity &&
+                !image_position && !image_scale && !image_rotation_degrees &&
+                !image_pivot)
                 return packet;
             if (color && packet.fill_color) {
                 if (color_composition == project::AnimationComposition::additive) {
@@ -2303,6 +2325,13 @@ bool PreviewRuntime::run() {
                         project::AnimationComposition::additive
                         ? packet.image_fill->opacity + *opacity : *opacity;
                 }
+            }
+            if (packet.image_fill) {
+                if (image_position) packet.image_fill->transform.position = *image_position;
+                if (image_scale) packet.image_fill->transform.scale = *image_scale;
+                if (image_rotation_degrees)
+                    packet.image_fill->transform.rotation_degrees = *image_rotation_degrees;
+                if (image_pivot) packet.image_fill->transform.pivot = *image_pivot;
             }
             if (!position && !rotation_degrees && !scale) return packet;
             const auto& base = base_transform->second;

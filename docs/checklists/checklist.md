@@ -567,8 +567,9 @@ rail droit sans recréation ni édition JSON.
 - [x] Construire les propriétés depuis le registre de descripteurs de la cible.
 - [ ] Exposer transform, matériau, fill, image fill et paramètres de composant.
   Les presets Asset Studio couvrent désormais `fill/color` et
-  `imageFill/opacity`; les paramètres complets et le transform d’image restent
-  à brancher.
+  `imageFill/opacity`, ainsi que les quatre propriétés du transform d’image ;
+  les paramètres de composants visuels et leur registre runtime restent à
+  brancher.
 - [x] Signaler immédiatement les bindings devenus invalides.
 - [x] Ajouter une action pour réparer ou remplacer un binding invalide.
 - [x] Permettre de créer le clip depuis l'entité sélectionnée.
