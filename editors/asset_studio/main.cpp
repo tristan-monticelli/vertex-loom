@@ -6569,11 +6569,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &creation.artwork.name);
         ImGui::SetNextItemWidth(180.0F);
-        ImGui::InputDouble("Width", &creation.artwork.width, 1.0, 10.0,
+        ImGui::InputDouble("Width (world units)", &creation.artwork.width, 1.0, 10.0,
                            "%.2f");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(180.0F);
-        ImGui::InputDouble("Height", &creation.artwork.height, 1.0, 10.0,
+        ImGui::InputDouble("Height (world units)", &creation.artwork.height, 1.0, 10.0,
                            "%.2f");
         ImGui::TextUnformatted("Units: project world units");
         const auto origin_label =
@@ -7043,18 +7043,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         float position[] = {creation.entity.transform.position.x,
                             creation.entity.transform.position.y};
-        if (ImGui::InputFloat2("Position", position)) {
+        if (ImGui::InputFloat2("Position (world units)", position)) {
             creation.entity.transform.position = {position[0], position[1]};
         }
         float scale[] = {creation.entity.transform.scale.x,
                          creation.entity.transform.scale.y};
-        if (ImGui::InputFloat2("Scale", scale)) {
+        if (ImGui::InputFloat2("Scale (factor)", scale)) {
             creation.entity.transform.scale = {scale[0], scale[1]};
         }
-        ImGui::InputFloat("Rotation",
+        ImGui::InputFloat("Rotation (degrees)",
                           &creation.entity.transform.rotation_degrees,
                           1.0F, 10.0F, "%.2f deg");
-        ImGui::InputFloat("Z order", &creation.entity.z_order, 0.1F, 1.0F,
+        ImGui::InputFloat("Z order (world units)", &creation.entity.z_order, 0.1F, 1.0F,
                           "%.2f");
         const auto validation = creation.entity.validate(
             session.project_root(), *session.manifest());

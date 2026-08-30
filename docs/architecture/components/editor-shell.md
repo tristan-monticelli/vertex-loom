@@ -126,6 +126,9 @@ C4Component
 - Les prompts Behavior, Transformation, preset visuel, composition et
   composant réutilisent le même composant de formulaire pour leur nom et leur
   identifiant, avec des clés ImGui stables.
+- Les prompts artwork et entité affichent explicitement les unités de leurs
+  dimensions, positions, échelles, rotations et ordre Z ; les valeurs stockées
+  restent inchangées.
 - L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
   opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
   validée passe par le `CommandStack`; sauvegarde, autosave et récupération
