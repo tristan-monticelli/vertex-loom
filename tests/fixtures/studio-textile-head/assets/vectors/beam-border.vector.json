@@ -1,0 +1,65 @@
+{
+  "id": "beam-border",
+  "name": "Beam Border",
+  "native": {
+    "nodes": [
+      {
+        "fill": {
+          "kind": "none"
+        },
+        "id": "border-shape",
+        "locked": false,
+        "name": "Beam border",
+        "shape": {
+          "bounds": {
+            "origin": {
+              "x": -2.0,
+              "y": -0.4000000059604645
+            },
+            "size": {
+              "x": 4.0,
+              "y": 0.800000011920929
+            }
+          },
+          "id": "border-shape-shape",
+          "kind": "rectangle"
+        },
+        "stroke": {
+          "cap": "round",
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.019999999552965164,
+            "green": 0.03999999910593033,
+            "red": 0.07999999821186066
+          },
+          "join": "round",
+          "width": 0.05999999865889549
+        },
+        "transform": {
+          "pivot": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "position": {
+            "x": 0.0,
+            "y": 0.0
+          },
+          "rotationDegrees": 0.0,
+          "scale": {
+            "x": 1.0,
+            "y": 1.0
+          }
+        },
+        "visible": true
+      }
+    ],
+    "origin": "center",
+    "size": {
+      "x": 4.0,
+      "y": 0.800000011920929
+    }
+  },
+  "schemaVersion": 2,
+  "sourceKind": "native",
+  "type": "vector"
+}
