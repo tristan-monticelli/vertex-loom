@@ -35,7 +35,7 @@ jobs:
             throw 'Mesa3D archive checksum mismatch'
           }
           $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d-$mesaVersion"
-          7z x $mesaArchive x64 -o$mesaRoot -y
+          7z e $mesaArchive 'x64\*' -o$mesaRoot -y
           "MESA_ROOT=$mesaRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Linux graphics dependencies
