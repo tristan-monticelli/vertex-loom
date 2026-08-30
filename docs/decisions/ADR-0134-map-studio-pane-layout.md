@@ -20,3 +20,5 @@ Un séparateur horizontal interactif conserve une largeur bornée du panneau des
 calques et expose le curseur de redimensionnement. Les sous-zones `Layers` et
 `Events` sont des sections repliables avec des IDs stables, afin de garder la
 navigation clavier exploitable quand la carte contient beaucoup de contenu.
+Les pickers de ressources de Map Studio trient leurs entrées et utilisent des
+lignes sélectionnables à ID stable, avec focus clavier sur la ressource active.

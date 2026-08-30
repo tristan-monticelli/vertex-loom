@@ -99,6 +99,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   widget de nom est partagé et le round-trip entité/animation est testé.
 - [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
   clavier et cohérent entre Asset Studio, Map Studio et scènes.
+  Map Studio dispose maintenant de sections et pickers hiérarchiques à IDs
+  stables ; la cohérence complète avec Asset Studio et scènes reste à fermer.
 - [x] Ajouter une analyse d'impact avant chaque suppression et proposer
   remplacement, cascade explicitée ou annulation.
 - [x] Permettre duplication superficielle/profonde et réécriture sélective des

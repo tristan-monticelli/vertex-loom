@@ -120,7 +120,9 @@ C4Component
 - Map Studio conserve ses deux panneaux `map-layers-pane` et
   `map-selection-pane`, avec splitter borné ; les sous-zones `Layers` et
   `Events` sont repliables et portent des IDs stables pour la navigation clavier
-  dans les cartes volumineuses.
+  dans les cartes volumineuses. Ses pickers de dossiers trient les ressources,
+  affichent une hiérarchie logique repliable et restaurent le focus sur la
+  sélection active.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés

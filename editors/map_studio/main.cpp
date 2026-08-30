@@ -408,7 +408,8 @@ void draw_resource_picker(const char* label,
     static std::unordered_map<std::string, std::string> filters;
     auto& filter = filters[label];
     ImGui::SetNextItemWidth(180.0F);
-    ImGui::InputText("Search", &filter);
+    ImGui::InputText("Search##resource-picker-search", &filter);
+    std::vector<std::string> resource_ids;
     for (std::filesystem::directory_iterator iterator{directory, error}, end;
          !error && iterator != end; iterator.increment(error)) {
         if (!iterator->is_regular_file(error)) continue;
@@ -424,8 +425,23 @@ void draw_resource_picker(const char* label,
                                    [](const unsigned char value) { return static_cast<char>(std::tolower(value)); });
             if (haystack.find(needle) == std::string::npos) continue;
         }
-        ImGui::SameLine();
-        if (ImGui::SmallButton(filename.c_str())) selected_id = filename;
+        resource_ids.push_back(std::move(filename));
+    }
+    std::ranges::sort(resource_ids);
+    if (ImGui::TreeNodeEx("Resources##resource-picker-tree",
+                          ImGuiTreeNodeFlags_DefaultOpen |
+                              ImGuiTreeNodeFlags_SpanAvailWidth)) {
+        for (const auto& resource_id : resource_ids) {
+            const auto item_label = resource_id + "##resource-picker-item-" +
+                resource_id;
+            if (ImGui::Selectable(item_label.c_str(), selected_id == resource_id))
+                selected_id = resource_id;
+            if (selected_id == resource_id)
+                ImGui::SetItemDefaultFocus();
+        }
+        if (resource_ids.empty())
+            ImGui::TextDisabled("No matching resource.");
+        ImGui::TreePop();
     }
     if (!selected_id.empty()) {
         const auto selected_path = directory /
