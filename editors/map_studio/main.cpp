@@ -669,6 +669,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Select a mounted map before removing its mount.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             state.remove_map_request = -1;
@@ -791,6 +793,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Select a transition before removing it.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             state.remove_transition_request = -1;
@@ -1189,6 +1193,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         status = session.reset_preview() ? "Simulation reset"
                                          : "Simulation reset failed";
     ImGui::EndDisabled();
+    draw_disabled_reason(!simulation.valid(),
+                         "Load a valid mechanic graph before starting the simulation.");
     ImGui::Text("Fixed steps: %zu", simulation.step_count());
     ImGui::SeparatorText("Preview character");
     ImGui::DragFloat2("Character position", &state.preview_character.position.x,
@@ -1448,6 +1454,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     if (ImGui::Button("Frame selection"))
         status = frame_instances(true) ? "Selection framed" : "No visible selected instance";
     ImGui::EndDisabled();
+    draw_disabled_reason(selected_instances.empty(),
+                         "Select at least one instance before framing the selection.");
     ImGui::SameLine();
     if (ImGui::Button("Frame all"))
         status = frame_instances(false) ? "Map framed" : "No visible instance to frame";
@@ -2812,6 +2820,8 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::PopStyleColor();
                 ImGui::EndDisabled();
+                draw_disabled_reason(!valid || trigger_references != 0U,
+                                     "Select a collision without remaining trigger references before deleting it.");
                 if (trigger_references != 0U)
                     ImGui::TextDisabled("Blocked: %zu trigger reference(s) remain.",
                                         trigger_references);
@@ -2953,6 +2963,8 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::PopStyleColor();
                 ImGui::EndDisabled();
+                draw_disabled_reason(!valid || referenced,
+                                     "Select an event with no remaining trigger references before deleting it.");
                 if (referenced)
                     ImGui::TextDisabled("Blocked: one or more triggers still reference this event.");
                 ImGui::SameLine();
@@ -3000,6 +3012,8 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::PopStyleColor();
                 ImGui::EndDisabled();
+                draw_disabled_reason(!valid,
+                                     "Select a trigger before deleting it.");
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel")) {
                     remove_trigger_request.clear();
@@ -3055,6 +3069,9 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(trigger_id.empty() || trigger_event_id.empty() ||
+                                     !valid_trigger_collision(trigger_collision_index),
+                                 "Enter a trigger id, choose an event and choose a closed sensor collision.");
             if (selected_trigger_index >= 0 &&
                 static_cast<std::size_t>(selected_trigger_index) < map.triggers.size()) {
                 if (trigger_editor_index != selected_trigger_index) {
@@ -3231,6 +3248,8 @@ int run(const std::filesystem::path& project_root,
                         : "Transformation preview failed; the source instance was kept.";
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(!can_preview,
+                                     "Save the map, select an entity instance and choose its matching transformation.");
                 if (session.dirty())
                     ImGui::TextDisabled(
                         "Save the map before running the isolated runtime preview.");
@@ -3274,6 +3293,8 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(instance_property_id.empty() || instance_property_value.empty(),
+                                     "Enter an instance property id and value before applying it.");
             }
             ImGui::SeparatorText("Prefabs");
             ImGui::SetNextItemWidth(160.0F);
@@ -3311,6 +3332,8 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(new_prefab_id.empty() || new_prefab_entity.empty(),
+                                 "Enter a prefab id and choose an entity resource before creating it.");
             for (const auto& prefab : map.prefabs) {
                 const auto selected = selected_prefab == prefab.id;
                 if (ImGui::Selectable(prefab.id.c_str(), selected)) selected_prefab = prefab.id;
@@ -3453,6 +3476,8 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(override_id.empty() || override_value.empty(),
+                                     "Enter an override property id and value before applying it.");
             }
             ImGui::EndChild();
             if (!status.empty()) ImGui::TextDisabled("%s", status.c_str());
