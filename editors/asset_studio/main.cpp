@@ -6971,14 +6971,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a native, editable vector artwork");
         ImGui::TextDisabled("The validated document is published atomically in the open project.");
+        const auto validation = creation.artwork.validate(
+            session.project_root(), *session.manifest());
         draw_resource_name_field("Name##artwork-name", creation.artwork.name);
+        focus_prompt_field(validation, "name");
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Width (world units)", &creation.artwork.width, 1.0, 10.0,
                            "%.2f");
+        focus_prompt_field(validation, "width");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Height (world units)", &creation.artwork.height, 1.0, 10.0,
                            "%.2f");
+        focus_prompt_field(validation, "height");
         ImGui::TextUnformatted("Units: project world units");
         const auto origin_label =
             std::string(fabric::editor::label(creation.artwork.origin));
@@ -7061,6 +7066,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.artwork.image_transform.position = {
                     offset[0], offset[1]};
             }
+            focus_prompt_field(validation, "imageTransform");
             float scale[] = {creation.artwork.image_transform.scale.x,
                              creation.artwork.image_transform.scale.y};
             if (ImGui::InputFloat2("Image scale (factor)", scale)) {
@@ -7082,13 +7088,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    "%.2f")) {
                 creation.artwork.image_opacity = opacity;
             }
+            focus_prompt_field(validation, "imageOpacity");
             ImGui::Checkbox("Warp pixels with vector shape (advanced)",
                             &creation.artwork.deform_image_with_shape);
             ImGui::TextDisabled(
                 "Off keeps image placement independent; crop the raster source in its own viewport.");
         }
-        const auto validation = creation.artwork.validate(
-            session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
         draw_prompt_error(validation, "width");
