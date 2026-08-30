@@ -3206,20 +3206,20 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
         ui_texture_crop_target = {crop_max.x - 24.0F, crop_max.y - 24.0F};
     }
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    const auto near = [&](const ImVec2 point) {
+    const auto is_near = [&](const ImVec2 point) {
         return std::hypot(mouse.x - point.x, mouse.y - point.y) <= 11.0F;
     };
     if (ImGui::IsItemHovered() &&
         ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 top_right{crop_max.x, crop_min.y};
         const ImVec2 bottom_left{crop_min.x, crop_max.y};
-        if (near(crop_min)) {
+        if (is_near(crop_min)) {
             canvas.crop_drag = fabric::editor::RasterCropDrag::top_left;
-        } else if (near(top_right)) {
+        } else if (is_near(top_right)) {
             canvas.crop_drag = fabric::editor::RasterCropDrag::top_right;
-        } else if (near(bottom_left)) {
+        } else if (is_near(bottom_left)) {
             canvas.crop_drag = fabric::editor::RasterCropDrag::bottom_left;
-        } else if (near(crop_max)) {
+        } else if (is_near(crop_max)) {
             canvas.crop_drag = fabric::editor::RasterCropDrag::bottom_right;
         } else if (mouse.x >= crop_min.x && mouse.x <= crop_max.x &&
                    mouse.y >= crop_min.y && mouse.y <= crop_max.y) {
