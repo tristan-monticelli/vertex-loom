@@ -84,6 +84,24 @@ void draw_prompt_error(const editor::PromptValidation& validation,
     }
 }
 
+void focus_prompt_field(const editor::PromptValidation& validation,
+                        const std::string_view field) {
+    static std::string focused_error;
+    if (validation.errors.empty()) {
+        focused_error.clear();
+        return;
+    }
+    if (validation.errors.front().field != field)
+        return;
+    const std::string key = std::to_string(ImGui::GetID(std::string(field).c_str())) +
+        ":" + std::string(field) + ":" + validation.errors.front().message;
+    if (focused_error == key)
+        return;
+    ImGui::SetKeyboardFocusHere(-1);
+    ImGui::SetScrollHereY(0.0F);
+    focused_error = key;
+}
+
 void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         return;
@@ -197,15 +215,16 @@ void draw_import_workflow(editor::ProjectSession& session, SDL_Window* window,
 
     if (ImGui::BeginPopupModal("Import PNG", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto validation = imports.png.prompt.validate(
+            editor::ImportSourceKind::png_image, session.project_root(),
+            *session.manifest());
         ImGui::TextUnformatted("PNG source file");
         ImGui::TextWrapped("%s", imports.png.prompt.source.string().c_str());
         draw_bounded_preview(pending_preview, 560.0F, 220.0F);
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &imports.png.prompt.name);
+        focus_prompt_field(validation, "name");
         ImGui::TextDisabled("The PNG and its versioned document are copied into assets/textures.");
-        const auto validation = imports.png.prompt.validate(
-            editor::ImportSourceKind::png_image, session.project_root(),
-            *session.manifest());
         draw_prompt_error(validation, "source");
         draw_prompt_error(validation, "name");
         draw_prompt_summary(validation);
@@ -240,15 +259,16 @@ void draw_import_workflow(editor::ProjectSession& session, SDL_Window* window,
 
     if (ImGui::BeginPopupModal("Import SVG", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        const auto validation = imports.svg.prompt.validate(
+            editor::ImportSourceKind::linked_svg, session.project_root(),
+            *session.manifest());
         ImGui::TextUnformatted("SVG source file");
         ImGui::TextWrapped("%s", imports.svg.prompt.source.string().c_str());
         draw_bounded_preview(pending_preview, 560.0F, 220.0F);
         ImGui::SetNextItemWidth(560.0F);
         ImGui::InputText("Name", &imports.svg.prompt.name);
+        focus_prompt_field(validation, "name");
         ImGui::TextDisabled("The SVG and its versioned document are copied into assets/vectors.");
-        const auto validation = imports.svg.prompt.validate(
-            editor::ImportSourceKind::linked_svg, session.project_root(),
-            *session.manifest());
         draw_prompt_error(validation, "source");
         draw_prompt_error(validation, "name");
         draw_prompt_summary(validation);
