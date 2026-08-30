@@ -1210,6 +1210,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         status = session.step_once() ? "Simulation advanced one fixed step"
                                      : "Simulation step rejected";
     ImGui::EndDisabled();
+    draw_disabled_reason(simulation.playing(),
+                         "Pause the simulation before advancing a single step.");
     ImGui::SameLine();
     if (ImGui::Button("Reset"))
         status = session.reset_preview() ? "Simulation reset"
@@ -2960,6 +2962,8 @@ int run(const std::filesystem::path& project_root,
                         } else status = "Event payload value rejected";
                     }
                     ImGui::EndDisabled();
+                    draw_disabled_reason(event_property_id.empty() || event_property_value.empty(),
+                                         "Enter a payload property id and value before applying it.");
                 }
             }
             if (ImGui::BeginPopupModal("Delete event?", nullptr,
@@ -3189,6 +3193,8 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(trigger_property_id.empty() || trigger_property_value.empty(),
+                                     "Enter a trigger property id and value before setting the override.");
                 if (!valid_trigger_collision(trigger_editor_collision_index))
                     ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                                        "Trigger collision must be a closed sensor");
@@ -3205,6 +3211,9 @@ int run(const std::filesystem::path& project_root,
                                        "Trigger update rejected (event, collision or layer)";
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(!valid_trigger_collision(trigger_editor_collision_index) ||
+                                         trigger_editor.event_id.value.empty(),
+                                     "Choose a valid sensor collision and event before applying the trigger.");
             }
             if (selected_instances.size() == 1U) {
                 const fabric::core::ResourceId selected_id{selected_instances.front()};

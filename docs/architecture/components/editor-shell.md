@@ -77,8 +77,8 @@ C4Component
   session courante.
 - Les principales actions désactivées de Map Studio exposent désormais leur
   précondition au survol (sélection, identifiant manquant, couche active,
-  historique ou minimum géométrique) ; les contrôles secondaires d’Asset
-  Studio restent à harmoniser.
+  historique, référence d’événement ou minimum géométrique) ; les contrôles
+  secondaires d’Asset Studio restent à harmoniser.
 - `SceneSession` applique le même shell de document aux scènes. Map Studio
   expose création et ouverture, références de maps avec mount stable, map
   d'entrée, transitions événementielles, undo/redo, autosave, récupération,
