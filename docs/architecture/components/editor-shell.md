@@ -152,6 +152,9 @@ C4Component
 - Les champs numériques de plateforme et de preview de personnage indiquent
   désormais aussi leur unité ou leur nature (`world units`, `degrees`,
   `world units/s`, `force` ou `coefficient`).
+- Les contrôles techniques d’IK et d’animation indiquent également leur
+  domaine (`iterations`, `world units`, `seconds`, unités de propriété ou
+  canaux couleur) et exposent une explication au survol.
 - Les connexions du graphe mécanique sélectionnent leurs nœuds puis leurs ports
   typés dans les listes du nœud choisi, avec recherche et état explicite des
   références absentes ; les ports de sortie et d'entrée sont filtrés selon le

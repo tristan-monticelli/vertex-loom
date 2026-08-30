@@ -4879,10 +4879,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     static_cast<void>(draw_entity_node_picker(
                         "Target node", entity.nodes, chain.target_node));
                     auto iterations = static_cast<int>(chain.max_iterations);
-                    if (ImGui::InputInt("Max iterations", &iterations))
+                    if (ImGui::InputInt("Max iterations (iterations)", &iterations))
                         chain.max_iterations = static_cast<std::size_t>(
                             std::max(1, iterations));
-                    ImGui::InputFloat("Tolerance", &chain.tolerance);
+                    draw_technical_tooltip(
+                        "Maximum number of solver iterations for this IK chain.");
+                    ImGui::InputFloat("Tolerance (world units)", &chain.tolerance);
+                    draw_technical_tooltip(
+                        "Maximum IK solver error, measured in project world units.");
                     if (ImGui::Button("Save IK chain")) {
                         auto next = entity;
                         next.ik_chains[index] = std::move(chain);
@@ -5823,8 +5827,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(110.0F);
-            ImGui::InputFloat("Snap interval", &animation_ui.key_snap_interval,
+            ImGui::InputFloat("Snap interval (seconds)", &animation_ui.key_snap_interval,
                               0.05F, 0.5F, "%.2f s");
+            draw_technical_tooltip(
+                "Key times are rounded to this interval when snapping is enabled.");
             animation_ui.key_snap_interval = std::max(0.01F,
                                                       animation_ui.key_snap_interval);
             const auto snap_key_time = [&](const float time) {
@@ -6170,11 +6176,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                          "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
             bool auto_key_changed = false;
             if (animation_ui.key_kind == 0) {
-                auto_key_changed = ImGui::InputFloat2("Vec2 value",
+                auto_key_changed = ImGui::InputFloat2("Vec2 value (property units)",
                                                       animation_ui.key_value);
+                draw_technical_tooltip(
+                    "Vector value written to the selected animatable property.");
             } else if (animation_ui.key_kind == 1) {
-                auto_key_changed = ImGui::InputFloat("Scalar value",
+                auto_key_changed = ImGui::InputFloat("Scalar value (property units)",
                                                      &animation_ui.key_scalar);
+                draw_technical_tooltip(
+                    "Scalar value written to the selected animatable property.");
             } else if (animation_ui.key_kind == 2) {
                 auto_key_changed = ImGui::ColorEdit4("Color value",
                                                      animation_ui.key_color);
@@ -6215,14 +6225,32 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::Checkbox("Custom tangents", &animation_ui.tangents_enabled);
                 if (animation_ui.tangents_enabled) {
                     if (animation_ui.key_kind == 0) {
-                        ImGui::InputFloat2("In tangent", animation_ui.key_in_tangent);
-                        ImGui::InputFloat2("Out tangent", animation_ui.key_out_tangent);
+                        ImGui::InputFloat2("In tangent (property units)",
+                                           animation_ui.key_in_tangent);
+                        draw_technical_tooltip(
+                            "Incoming cubic tangent in the selected property units.");
+                        ImGui::InputFloat2("Out tangent (property units)",
+                                           animation_ui.key_out_tangent);
+                        draw_technical_tooltip(
+                            "Outgoing cubic tangent in the selected property units.");
                     } else if (animation_ui.key_kind == 1) {
-                        ImGui::InputFloat("In tangent", &animation_ui.key_in_tangent_scalar);
-                        ImGui::InputFloat("Out tangent", &animation_ui.key_out_tangent_scalar);
+                        ImGui::InputFloat("In tangent (property units)",
+                                          &animation_ui.key_in_tangent_scalar);
+                        draw_technical_tooltip(
+                            "Incoming cubic tangent in the selected property units.");
+                        ImGui::InputFloat("Out tangent (property units)",
+                                          &animation_ui.key_out_tangent_scalar);
+                        draw_technical_tooltip(
+                            "Outgoing cubic tangent in the selected property units.");
                     } else {
-                        ImGui::InputFloat4("In tangent", animation_ui.key_in_tangent_color);
-                        ImGui::InputFloat4("Out tangent", animation_ui.key_out_tangent_color);
+                        ImGui::InputFloat4("In tangent (color channels)",
+                                           animation_ui.key_in_tangent_color);
+                        draw_technical_tooltip(
+                            "Incoming cubic tangent for the color channels.");
+                        ImGui::InputFloat4("Out tangent (color channels)",
+                                           animation_ui.key_out_tangent_color);
+                        draw_technical_tooltip(
+                            "Outgoing cubic tangent for the color channels.");
                     }
                 }
             }
