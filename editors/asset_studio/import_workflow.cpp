@@ -84,6 +84,12 @@ void draw_prompt_error(const editor::PromptValidation& validation,
     }
 }
 
+void draw_disabled_reason(const bool disabled, const std::string_view reason) {
+    if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        return;
+    ImGui::SetTooltip("%s", std::string(reason).c_str());
+}
+
 void draw_prompt_summary(const editor::PromptValidation& validation) {
     ImGui::SeparatorText("Review");
     for (const auto& line : validation.summary) {
@@ -216,6 +222,8 @@ void draw_import_workflow(editor::ProjectSession& session, SDL_Window* window,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Choose a readable PNG source and enter a valid resource name.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             imports.png = {};
@@ -257,6 +265,8 @@ void draw_import_workflow(editor::ProjectSession& session, SDL_Window* window,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Choose a readable SVG source and enter a valid resource name.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             imports.svg = {};

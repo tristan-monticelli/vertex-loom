@@ -123,6 +123,8 @@ C4Component
   exposent aussi leur raison ; les contrôles d’édition plus fins restent à
   harmoniser. Les actions `Undo`, `Redo`, suppression de point et ajout de
   ressource indiquent également leur précondition.
+- Les actions `Import` des prompts PNG et SVG indiquent aussi leur précondition
+  lorsqu’une source lisible ou un nom de ressource valide manque.
 - Le panneau de diagnostics associe chaque erreur à son champ, sa cause, la
   contrainte attendue et une action corrective dérivée de `ErrorCode`.
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et
