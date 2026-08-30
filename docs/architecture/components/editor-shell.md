@@ -128,6 +128,9 @@ C4Component
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et
   le format (ou `n/a` lorsqu’ils ne s’appliquent pas), les références entrantes
   et l’action d’ouverture dans le Resource Explorer.
+- Les pickers de documents de Map Studio affichent également le type, le chemin,
+  la taille en octets et indiquent explicitement lorsqu’une miniature ne
+  s’applique pas ; leur action `Open` ouvre le document sélectionné sur disque.
 - Le hub de création sépare maintenant `New material / fill` des imports et
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource

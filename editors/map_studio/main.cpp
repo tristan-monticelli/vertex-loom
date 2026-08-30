@@ -311,8 +311,15 @@ void draw_resource_picker(const char* label,
             (selected_id + std::string{suffix});
         if (std::filesystem::is_regular_file(selected_path, error)) {
             ImGui::TextDisabled("Type: %s", std::string{suffix}.c_str());
-            ImGui::TextDisabled("%s", selected_path.generic_string().c_str());
-            ImGui::SameLine();
+            ImGui::TextDisabled("Path: %s", selected_path.generic_string().c_str());
+            const auto size = std::filesystem::file_size(selected_path, error);
+            if (!error) {
+                ImGui::TextDisabled("Size: %llu bytes",
+                                   static_cast<unsigned long long>(size));
+            } else {
+                ImGui::TextDisabled("Size: n/a");
+            }
+            ImGui::TextDisabled("Preview: n/a (document resource)");
             if (ImGui::SmallButton("Open##resource-picker-open")) {
                 const auto absolute = std::filesystem::absolute(selected_path, error);
                 if (!error) {
