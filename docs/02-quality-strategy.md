@@ -48,6 +48,11 @@ attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
+Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
+SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
+explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
+échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
+graphique et ne ferme aucune case de couverture visuelle.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame et écrit le
 registre JSON des IDs stables des widgets dans le projet fourni ; il est destiné
 aux contrôleurs UX et ne modifie pas le document projet.

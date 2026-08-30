@@ -12,7 +12,10 @@ execute_process(
     RESULT_VARIABLE STUDIO_RESULT
     OUTPUT_VARIABLE STUDIO_OUTPUT
     ERROR_VARIABLE STUDIO_ERROR)
-if(NOT STUDIO_RESULT EQUAL 0)
+if(STUDIO_RESULT EQUAL 77)
+    message("SKIP: Asset Studio Texture E2E requires a display")
+    return()
+elseif(NOT STUDIO_RESULT EQUAL 0)
     message(FATAL_ERROR
         "Asset Studio Texture E2E failed (${STUDIO_RESULT})\n${STUDIO_OUTPUT}\n${STUDIO_ERROR}")
 endif()

@@ -16,7 +16,10 @@ foreach(MODE IN ITEMS clean window shortcut save save-failure)
         OUTPUT_VARIABLE STUDIO_OUTPUT
         ERROR_VARIABLE STUDIO_ERROR
     )
-    if(NOT STUDIO_RESULT EQUAL 0)
+    if(STUDIO_RESULT EQUAL 77)
+        message("SKIP: Map Studio close E2E requires a display")
+        return()
+    elseif(NOT STUDIO_RESULT EQUAL 0)
         message(FATAL_ERROR
             "Map Studio ${MODE} close failed (${STUDIO_RESULT})\n"
             "${STUDIO_OUTPUT}\n${STUDIO_ERROR}")

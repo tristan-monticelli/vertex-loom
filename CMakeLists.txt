@@ -600,6 +600,19 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-transformation-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_transformation_e2e.cmake
         )
+        set_tests_properties(
+            asset_studio_behavior_e2e
+            asset_studio_transformation_e2e
+            asset_studio_entity_e2e
+            asset_studio_animation_e2e
+            asset_studio_texture_e2e
+            asset_studio_vector_e2e
+            asset_studio_vector_canvas_e2e
+            map_studio_close_e2e
+            map_studio_scene_e2e
+            map_studio_transformation_e2e
+            PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP:"
+        )
     endif()
 
     add_executable(fabric_audio_mixer_tests tests/cpp/audio_mixer_tests.cpp)
@@ -761,6 +774,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         SDL2::SDL2-static
     )
     add_test(NAME fabric_render_gl_smoke COMMAND fabric_render_gl_smoke)
+    set_tests_properties(fabric_render_gl_smoke PROPERTIES SKIP_RETURN_CODE 77)
 
     add_test(
         NAME project_validator_accepts_valid_project

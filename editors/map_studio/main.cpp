@@ -2317,10 +2317,12 @@ int run(const std::filesystem::path& project_root,
         const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
         const bool scene_e2e = false,
         const bool transformation_e2e = false) {
+    const int graphical_failure =
+        (e2e_mode || scene_e2e || transformation_e2e) ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
-        return 1;
+        return graphical_failure;
     }
     if (NFD_Init() != NFD_OKAY) {
         std::cerr << "native file dialog initialization failed: "
@@ -2349,7 +2351,7 @@ int run(const std::filesystem::path& project_root,
         std::cerr << SDL_GetError() << '\n';
         NFD_Quit();
         SDL_Quit();
-        return 1;
+        return graphical_failure;
     }
     SDL_SetWindowMinimumSize(window, 960, 640);
     auto context = SDL_GL_CreateContext(window);
@@ -2358,7 +2360,7 @@ int run(const std::filesystem::path& project_root,
         SDL_DestroyWindow(window);
         NFD_Quit();
         SDL_Quit();
-        return 1;
+        return graphical_failure;
     }
     SDL_GL_MakeCurrent(window, context);
 

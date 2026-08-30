@@ -7840,10 +7840,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool vector_e2e = false,
                      const bool vector_canvas_e2e = false,
                      const bool ui_test_mode = false) {
+    const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
+        animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
+        ui_test_mode;
+    const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
-        return 1;
+        return graphical_failure;
     }
 
 #if defined(__APPLE__)
@@ -7872,7 +7876,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
         SDL_Quit();
-        return 1;
+        return graphical_failure;
     }
     SDL_SetWindowMinimumSize(window, 900, 600);
 
@@ -7892,7 +7896,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         NFD_Quit();
         SDL_DestroyWindow(window);
         SDL_Quit();
-        return 1;
+        return graphical_failure;
     }
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(

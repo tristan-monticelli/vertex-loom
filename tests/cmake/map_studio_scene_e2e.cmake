@@ -15,7 +15,10 @@ execute_process(
     OUTPUT_VARIABLE STUDIO_OUTPUT
     ERROR_VARIABLE STUDIO_ERROR
 )
-if(NOT STUDIO_RESULT EQUAL 0)
+if(STUDIO_RESULT EQUAL 77)
+    message("SKIP: Map Studio scene E2E requires a display")
+    return()
+elseif(NOT STUDIO_RESULT EQUAL 0)
     message(FATAL_ERROR
         "Map Studio scene authoring failed (${STUDIO_RESULT})\n"
         "${STUDIO_OUTPUT}\n${STUDIO_ERROR}")
