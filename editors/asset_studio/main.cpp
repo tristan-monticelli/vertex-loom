@@ -4542,6 +4542,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(node.locked,
+                                 "Unlock the node to edit its properties.");
             }
         }
         if (selected != nullptr &&
@@ -5186,6 +5188,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     select_and_preview_resource(
                         session, *artwork, preview, status, "Opened artwork: ");
                 ImGui::EndDisabled();
+                draw_disabled_reason(artwork == session.resources().end(),
+                                     "Choose an existing artwork resource first.");
                 ImGui::SameLine();
                 if (ImGui::Button("Clear drawable")) {
                     node.drawable = {};
@@ -5351,6 +5355,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(node.locked,
+                                 "Unlock the node to edit its properties.");
             }
         }
         if (selected != nullptr &&
