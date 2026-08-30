@@ -148,6 +148,13 @@ bool draw_behavior_node_picker(
     const std::span<const fabric::project::BehaviorNodeDefinition> nodes,
     std::string& selected_id);
 
+bool draw_behavior_port_picker(
+    const char* label,
+    const std::span<const fabric::project::BehaviorNodeDefinition> nodes,
+    std::string_view node_id,
+    std::string& selected_id,
+    fabric::project::BehaviorPortDirection direction);
+
 #if defined(__APPLE__)
 constexpr const char* new_shortcut = "Cmd+N";
 constexpr const char* open_shortcut = "Cmd+O";
@@ -1613,10 +1620,14 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     ImGui::InputText("Connection id", &connection_id);
     static_cast<void>(draw_behavior_node_picker(
         "From node", behavior_session.graph()->nodes, from_node)); ImGui::SameLine();
-    ImGui::InputText("From port", &from_port);
+    static_cast<void>(draw_behavior_port_picker(
+        "From port", behavior_session.graph()->nodes, from_node, from_port,
+        fabric::project::BehaviorPortDirection::output));
     static_cast<void>(draw_behavior_node_picker(
         "To node", behavior_session.graph()->nodes, to_node)); ImGui::SameLine();
-    ImGui::InputText("To port", &to_port);
+    static_cast<void>(draw_behavior_port_picker(
+        "To port", behavior_session.graph()->nodes, to_node, to_port,
+        fabric::project::BehaviorPortDirection::input));
     if (ImGui::Button("Connect"))
         static_cast<void>(behavior_session.connect({connection_id, from_node, from_port, to_node, to_port}));
     std::optional<std::string> remove_connection;
@@ -1877,6 +1888,66 @@ bool draw_behavior_node_picker(
         if (!found) ImGui::TextDisabled("No matching graph node.");
         if (selected == nodes.end() && !selected_id.empty())
             ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
+bool draw_behavior_port_picker(
+    const char* label,
+    const std::span<const fabric::project::BehaviorNodeDefinition> nodes,
+    const std::string_view node_id,
+    std::string& selected_id,
+    const fabric::project::BehaviorPortDirection direction) {
+    const auto node = std::ranges::find_if(
+        nodes, [&](const auto& candidate) { return candidate.id == node_id; });
+    const fabric::project::BehaviorPortDefinition* selected = nullptr;
+    if (node != nodes.end()) {
+        const auto selected_it = std::ranges::find_if(node->ports, [&](const auto& port) {
+            return port.id == selected_id && port.direction == direction;
+        });
+        if (selected_it != node->ports.end()) selected = &*selected_it;
+    }
+    const std::string preview = selected != nullptr
+        ? selected->id + " (" + std::string{fabric::project::to_string(selected->type)} + ")"
+        : selected_id.empty() ? std::string{"Choose a graph port..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##behavior-port-search", "Search port ID or type...",
+                                 &filter);
+        bool found = false;
+        if (node != nodes.end()) {
+            for (const auto& port : node->ports) {
+                if (port.direction != direction) continue;
+                const auto type = std::string{fabric::project::to_string(port.type)};
+                auto haystack = port.id + " " + type;
+                auto needle = filter;
+                std::ranges::transform(haystack, haystack.begin(), [](const unsigned char character) {
+                    return static_cast<char>(std::tolower(character));
+                });
+                std::ranges::transform(needle, needle.begin(), [](const unsigned char character) {
+                    return static_cast<char>(std::tolower(character));
+                });
+                if (!needle.empty() && haystack.find(needle) == std::string::npos) continue;
+                found = true;
+                const bool is_selected = port.id == selected_id;
+                const auto item_label = port.id + " (" + type + ")##behavior-port-option-" + port.id;
+                if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                    selected_id = port.id;
+                    changed = true;
+                }
+                if (is_selected) ImGui::SetItemDefaultFocus();
+            }
+        }
+        if (!found) ImGui::TextDisabled("No matching graph port for this node.");
+        if (node == nodes.end()) ImGui::TextDisabled("Choose a graph node first.");
+        else if (selected == nullptr && !selected_id.empty())
+            ImGui::TextDisabled("Missing port reference: %s", selected_id.c_str());
         ImGui::EndCombo();
     }
     return changed;
