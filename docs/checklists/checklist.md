@@ -39,9 +39,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Textures : navigation à grande échelle et noms similaires vérifiés par
   `resource index remains unambiguous with many similar textures` avec 1024
   ressources indexées et sélectionnées par identifiant.
-- [ ] Entités : confirmation des overrides incompatibles, gizmos de nœuds,
-  glisser-déposer artwork vers nœud existant/racine/enfant, sections éditables
-  contraintes/IK/déformation/XPBD/state machine.
+- [ ] Entités : les overrides incompatibles, gizmos, drop vers nœud
+  existant/racine/enfant et sections avancées sont implémentés et testés ; il
+  reste la preuve UX reproductible du glisser-déposer.
 - [x] Animations : descripteurs transform/matériau/fill/image-fill/composants,
   geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
   tests fill/image-fill, sauvegarde/reload/state-machine/runtime. Les
@@ -89,8 +89,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Permettre duplication superficielle/profonde et réécriture sélective des
   références internes. Les options et les tests de réécriture sélective sont
   documentés dans la section 4.
-- [ ] Ajouter gizmos de nœuds et drag-and-drop des artworks vers un nœud
-  existant, un nœud racine ou un enfant.
+- [ ] Fermer la preuve UX du drag-and-drop des artworks vers un nœud existant,
+  un nœud racine ou un enfant ; les gizmos et les mutations sont déjà vérifiés.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machines dans
   des sections réellement éditables.
 - [x] Faire correspondre chaque paramètre de timeline au descripteur runtime,
