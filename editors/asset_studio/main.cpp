@@ -77,6 +77,10 @@ bool ui_texture_canvas_seen = false;
 bool ui_texture_crop_applied = false;
 ImVec2 ui_texture_crop_source{};
 ImVec2 ui_texture_crop_target{};
+bool ui_input_probe_enabled = false;
+bool ui_input_modal_seen = false;
+bool ui_input_created = false;
+bool ui_input_reloaded = false;
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -1599,6 +1603,17 @@ void write_ui_texture_probe(const std::filesystem::path& project_path) {
         {"crop_canvas_seen", ui_texture_canvas_seen},
         {"crop_applied", ui_texture_crop_applied}};
     std::ofstream output(project_path / "asset-studio-ui-texture.json");
+    if (output) output << probe.dump(2) << '\n';
+}
+
+void write_ui_input_probe(const std::filesystem::path& project_path) {
+    if (project_path.empty()) return;
+    nlohmann::json probe = {
+        {"schema", "asset-studio-ui-input-test-v1"},
+        {"modal_seen", ui_input_modal_seen},
+        {"created", ui_input_created},
+        {"reloaded", ui_input_reloaded}};
+    std::ofstream output(project_path / "asset-studio-ui-input.json");
     if (output) output << probe.dump(2) << '\n';
 }
 
@@ -7105,6 +7120,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (creation.request_input && session.has_project()) {
         creation.input.reset();
+        if (ui_input_probe_enabled) {
+            creation.input.name = "Player and Monster Controls";
+            creation.input.actions = {
+                {"move", {{fabric::project::InputDevice::keyboard, 65}}},
+                {"attack", {{fabric::project::InputDevice::gamepad, 0}}}};
+        }
         ImGui::OpenPopup("Create input bindings");
         creation.request_input = false;
     }
@@ -7836,6 +7857,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create input bindings", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
+        if (ui_input_probe_enabled) ui_input_modal_seen = true;
         ImGui::TextUnformatted("Create an InputDocument v1");
         ImGui::TextDisabled(
             "Bindings are saved atomically and can be selected by Preview Runtime.");
@@ -8059,11 +8081,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_accessibility_test = false,
                      const bool ui_drag_test = false,
                      const bool ui_override_test = false,
-                     const bool ui_texture_test = false) {
+                     const bool ui_texture_test = false,
+                     const bool ui_input_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
-        ui_accessibility_test || ui_drag_test || ui_override_test || ui_texture_test;
+        ui_accessibility_test || ui_drag_test || ui_override_test ||
+        ui_texture_test || ui_input_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -8096,7 +8120,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
               ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-              ui_drag_test || ui_override_test || ui_texture_test)
+              ui_drag_test || ui_override_test || ui_texture_test || ui_input_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -8128,7 +8152,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
          ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-         ui_drag_test || ui_override_test || ui_texture_test) ? 0 : 1);
+         ui_drag_test || ui_override_test || ui_texture_test || ui_input_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -8185,7 +8209,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
     }
     if ((ui_test_mode || ui_min_window_test || ui_drag_test || ui_override_test ||
-         ui_texture_test) &&
+         ui_texture_test || ui_input_test) &&
         session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
@@ -8233,6 +8257,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             upload_preview(preview, session.imported_texture()->image);
             preview.kind = PreviewKind::texture;
         }
+    }
+    if (ui_input_test && session.has_project()) {
+        ui_input_probe_enabled = true;
+        ui_input_modal_seen = false;
+        ui_input_created = false;
+        ui_input_reloaded = false;
+        creation.request_input = true;
     }
     if (ui_focus_test && session.has_project()) {
         creation.material.name.clear();
@@ -8596,6 +8627,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_drag_frame = 0U;
     std::size_t ui_override_frame = 0U;
     std::size_t ui_texture_frame = 0U;
+    std::size_t ui_input_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -9190,7 +9222,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
-            ui_texture_test)
+            ui_texture_test || ui_input_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -9289,6 +9321,27 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                          view.crop.size.y < static_cast<float>(session.imported_texture()->asset.height));
                 }
                 write_ui_texture_probe(initial_project);
+                running = false;
+            }
+        }
+        if (ui_input_test) {
+            ++ui_input_frame;
+            if (ui_input_frame == 3U && ui_input_modal_seen && !ui_input_created) {
+                ui_input_created = session.create_input(creation.input);
+                if (ui_input_created) {
+                    fabric::editor::ProjectSession reloaded;
+                    ui_input_reloaded = reloaded.open(initial_project) &&
+                        reloaded.select_resource(
+                            fabric::editor::StudioResourceKind::input,
+                            {.value = "player-and-monster-controls"}) &&
+                        reloaded.selected_input() &&
+                        reloaded.selected_input()->actions.size() == 2U &&
+                        reloaded.selected_input()->actions[0].bindings.size() == 1U &&
+                        reloaded.selected_input()->actions[1].bindings.size() == 1U;
+                }
+            }
+            if (ui_input_frame >= 4U) {
+                write_ui_input_probe(initial_project);
                 running = false;
             }
         }
@@ -9429,11 +9482,13 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-overrides-test";
     const bool ui_texture_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-texture-test";
+    const bool ui_input_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-input-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
         !ui_focus_test && !ui_accessibility_test && !ui_drag_test &&
-        !ui_override_test && !ui_texture_test) {
+        !ui_override_test && !ui_texture_test && !ui_input_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -9450,14 +9505,15 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-drag-root-test project-directory\n"
                      "       asset_studio --ui-drag-child-test project-directory\n"
                      "       asset_studio --ui-overrides-test project-directory\n"
-                     "       asset_studio --ui-texture-test project-directory\n";
+                     "       asset_studio --ui-texture-test project-directory\n"
+                     "       asset_studio --ui-input-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-        ui_drag_test || ui_override_test || ui_texture_test)
+        ui_drag_test || ui_override_test || ui_texture_test || ui_input_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
@@ -9466,5 +9522,5 @@ int main(const int argument_count, char** arguments) {
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
                             ui_focus_test, ui_accessibility_test, ui_drag_test,
-                            ui_override_test, ui_texture_test);
+                            ui_override_test, ui_texture_test, ui_input_test);
 }

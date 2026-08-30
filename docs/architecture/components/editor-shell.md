@@ -280,6 +280,9 @@ C4Component
   destination.
   Le scénario texture rend le canvas de crop, conserve la source raster et
   vérifie la vue bornée dans `asset-studio-ui-texture.json`.
+  Le scénario input rend le prompt de bindings, publie les actions joueur et
+  attaque, puis vérifie leur rechargement et leurs périphériques dans
+  `asset-studio-ui-input.json`.
 - Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
   `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
   lignes de ressources et des nœuds d’entité, ainsi qu’une capture PPM du frame

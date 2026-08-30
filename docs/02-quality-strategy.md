@@ -76,6 +76,9 @@ déclarée dans l’artefact.
 Le test `asset_studio_ui_texture_e2e` importe une texture de fixture, rend le
 canvas de crop raster, injecte un geste SDL vers une poignée et vérifie un crop
 non destructif borné dans `asset-studio-ui-texture.json`.
+Le test `asset_studio_ui_input_e2e` rend le prompt de bindings, prépare les
+actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
+relecture avec un binding clavier et un binding gamepad.
 Le test `asset_studio_ui_overrides_e2e` prépare un override d’instance, rend la
 modale de perte avec ses deux actions, vérifie l’annulation sans perte puis la
 confirmation avec suppression de l’instance dans
