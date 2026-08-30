@@ -149,6 +149,9 @@ C4Component
   restent inchangées.
 - Map Studio applique la même convention aux transforms, à la grille et aux
   formes de collision ; les temps de preview sont affichés en secondes.
+- Les champs numériques de plateforme et de preview de personnage indiquent
+  désormais aussi leur unité ou leur nature (`world units`, `degrees`,
+  `world units/s`, `force` ou `coefficient`).
 - Les connexions du graphe mécanique sélectionnent leurs nœuds puis leurs ports
   typés dans les listes du nœud choisi, avec recherche et état explicite des
   références absentes ; les ports de sortie et d'entrée sont filtrés selon le

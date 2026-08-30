@@ -1043,8 +1043,10 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         draw_resource_picker("Visual entity (optional):", directory, ".entity.json",
                              state.platform_visual_entity);
     }
-    ImGui::DragFloat2("Platform position", &state.platform.position.x, 0.1F);
-    ImGui::DragFloat2("Platform size", &state.platform.size.x, 0.1F, 0.01F, 256.0F);
+    ImGui::DragFloat2("Platform position (world units)",
+                      &state.platform.position.x, 0.1F);
+    ImGui::DragFloat2("Platform size (world units)", &state.platform.size.x,
+                      0.1F, 0.01F, 256.0F);
     ImGui::DragFloat("Speed (deg/s)",
                      &state.platform.speed_degrees_per_second, 1.0F, 0.0F, 3600.0F);
     ImGui::Combo("Direction", &state.platform_direction,
@@ -1052,18 +1054,19 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::DragFloat("Acceleration (deg/s2)",
                      &state.platform.acceleration_degrees_per_second_squared,
                      1.0F, 0.0F, 7200.0F);
-    ImGui::DragFloat("Maximum torque", &state.platform.maximum_torque,
+    ImGui::DragFloat("Maximum torque (force)", &state.platform.maximum_torque,
                      1.0F, 0.0F, 100000.0F);
     ImGui::Checkbox("Angular limits", &state.platform.limit_enabled);
     if (state.platform.limit_enabled) {
-        ImGui::DragFloat("Minimum angle", &state.platform.minimum_angle_degrees,
+        ImGui::DragFloat("Minimum angle (degrees)", &state.platform.minimum_angle_degrees,
                          1.0F, -178.0F, 178.0F);
-        ImGui::DragFloat("Maximum angle", &state.platform.maximum_angle_degrees,
+        ImGui::DragFloat("Maximum angle (degrees)", &state.platform.maximum_angle_degrees,
                          1.0F, -178.0F, 178.0F);
     }
     if (state.platform_activation == 0) {
-        ImGui::DragFloat2("Sensor center", &state.platform.sensor_center.x, 0.1F);
-        ImGui::DragFloat2("Sensor size", &state.platform.sensor_size.x,
+        ImGui::DragFloat2("Sensor center (world units)",
+                          &state.platform.sensor_center.x, 0.1F);
+        ImGui::DragFloat2("Sensor size (world units)", &state.platform.sensor_size.x,
                           0.1F, 0.01F, 256.0F);
     }
     if (ImGui::Button("Create rotating platform")) {
@@ -1236,11 +1239,13 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                          "Load a valid mechanic graph before starting the simulation.");
     ImGui::Text("Fixed steps: %zu", simulation.step_count());
     ImGui::SeparatorText("Preview character");
-    ImGui::DragFloat2("Character position", &state.preview_character.position.x,
+    ImGui::DragFloat2("Character position (world units)",
+                      &state.preview_character.position.x,
                       0.1F);
-    ImGui::DragFloat2("Character size", &state.preview_character.size.x,
+    ImGui::DragFloat2("Character size (world units)", &state.preview_character.size.x,
                       0.05F, 0.05F, 16.0F);
-    ImGui::DragFloat("Character friction", &state.preview_character.friction,
+    ImGui::DragFloat("Character friction (coefficient)",
+                     &state.preview_character.friction,
                      0.05F, 0.0F, 4.0F);
     if (ImGui::Button("Place / reset character"))
         status = session.place_preview_character(state.preview_character)
@@ -1256,7 +1261,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     if (ImGui::Button("Move right"))
         static_cast<void>(session.set_preview_character_velocity(
             {state.preview_character_speed, 0.0F}));
-    ImGui::DragFloat("Character speed", &state.preview_character_speed,
+    ImGui::DragFloat("Character speed (world units/s)", &state.preview_character_speed,
                      0.1F, 0.0F, 20.0F);
     if (const auto character = simulation.preview_character_state())
         ImGui::BulletText("character  pos %.2f, %.2f  vel %.2f, %.2f",
