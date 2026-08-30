@@ -5766,7 +5766,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::InputText("Event id", &event.id);
                     ImGui::InputText("Source", &event.source);
                     ImGui::SliderFloat("Volume (0–1)", &event.volume, 0.0F, 1.0F);
+                    draw_technical_tooltip(
+                        "Playback gain for this audio event; 1.0 is the source level.");
                     ImGui::Checkbox("Loop", &event.loop);
+                    draw_technical_tooltip(
+                        "Restart this event automatically when playback reaches its end.");
                     if (ImGui::Button("Save event") &&
                         !session.set_selected_audio_event(event_index, std::move(event)))
                         status = "Audio event rejected; inspect diagnostics.";
