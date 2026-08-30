@@ -320,6 +320,44 @@ void draw_resource_picker(const char* label,
     ImGui::PopID();
 }
 
+bool draw_id_picker(const char* label,
+                    const std::span<const std::string> values,
+                    std::string& selected_id,
+                    const char* empty_label) {
+    const auto selected = std::ranges::find(values, selected_id);
+    const std::string preview = selected != values.end()
+        ? *selected
+        : selected_id.empty() ? std::string{empty_label}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(220.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##id-picker-search", "Search identifier...", &filter);
+        for (const auto& value : values) {
+            auto haystack = value;
+            auto needle = filter;
+            std::ranges::transform(haystack, haystack.begin(), [](const unsigned char character) {
+                return static_cast<char>(std::tolower(character));
+            });
+            std::ranges::transform(needle, needle.begin(), [](const unsigned char character) {
+                return static_cast<char>(std::tolower(character));
+            });
+            if (!needle.empty() && haystack.find(needle) == std::string::npos) continue;
+            if (ImGui::Selectable(value.c_str(), value == selected_id)) {
+                selected_id = value;
+                changed = true;
+            }
+        }
+        if (selected == values.end() && !selected_id.empty())
+            ImGui::TextDisabled("Missing identifier: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 bool draw_mechanic_node_picker(
     const char* label,
     const std::span<const fabric::project::MechanicNodeDefinition> nodes,
@@ -976,15 +1014,13 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::InputText("Platform name", &state.platform.name);
     ImGui::Combo("Activation", &state.platform_activation,
                  "Presence sensor\0Map event\0");
-    if (state.platform_activation == 1)
-        ImGui::InputText("Activation event", &state.platform.event_id.value);
-    if (state.platform_activation == 1 && !map_session.map()->events.empty()) {
-        ImGui::TextDisabled("Map events:");
-        for (const auto& event : map_session.map()->events) {
-            ImGui::SameLine();
-            if (ImGui::SmallButton(event.id.value.c_str()))
-                state.platform.event_id = event.id;
-        }
+    if (state.platform_activation == 1) {
+        std::vector<std::string> event_ids;
+        event_ids.reserve(map_session.map()->events.size());
+        for (const auto& event : map_session.map()->events)
+            event_ids.push_back(event.id.value);
+        draw_id_picker("Activation event", event_ids, state.platform.event_id.value,
+                       "Choose a map event...");
     }
     ImGui::InputText("Visual entity (optional)", &state.platform_visual_entity);
     if (map_session.manifest()) {
@@ -2617,7 +2653,11 @@ int run(const std::filesystem::path& project_root,
                 draw_resource_picker("Entity resources:", directory, ".entity.json",
                                      placement_resource_id);
             } else {
-                ImGui::InputText("Prefab resource id", &placement_resource_id);
+                std::vector<std::string> prefab_ids;
+                prefab_ids.reserve(map.prefabs.size());
+                for (const auto& prefab : map.prefabs) prefab_ids.push_back(prefab.id);
+                draw_id_picker("Prefab resources", prefab_ids, placement_resource_id,
+                               "Choose a prefab...");
             }
             ImGui::BeginDisabled(placement_id.empty() || placement_resource_id.empty() ||
                                  active_layer_id.empty());
