@@ -379,6 +379,8 @@ C4Component
 - Les fenêtres Asset Studio et Map Studio imposent respectivement une taille
   minimale de `900×600` et `960×640` afin de préserver leurs panneaux et leur
   navigation.
+- Les deux contextes Dear ImGui activent la navigation clavier et désactivent
+  le fichier d’état local pour conserver des IDs et un parcours reproductibles.
 - Le manifeste constitue le premier document éditable intégré : son nom et ses
   unités passent par commandes, Save remplace `project.json`, et son autosave
   sert de preuve headless du flux commun avant les futurs documents d’asset.

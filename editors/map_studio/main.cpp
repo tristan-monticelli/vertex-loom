@@ -2114,6 +2114,9 @@ int run(const std::filesystem::path& project_root,
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    auto& imgui_io = ImGui::GetIO();
+    imgui_io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    imgui_io.IniFilename = nullptr;
     ImGui::StyleColorsDark();
     ImGui_ImplSDL2_InitForOpenGL(window, context);
 #if defined(__APPLE__)
