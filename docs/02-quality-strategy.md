@@ -6,7 +6,7 @@
 | --- | --- | --- | --- | --- |
 | Unit | Oui | CTest + Catch2 3.15.3 | `ctest --test-dir build -C Debug` | Physique, contrats, graphe, maths et sérialisation. |
 | Integration | Oui | CTest | `ctest --test-dir build -C Debug` | Chargement de projet et contrats du cœur. |
-| End-to-end | Plus tard | À sélectionner | null | Parcours éditeur vers runtime. |
+| End-to-end | Oui | CTest + SDL2/OpenGL | `ctest --test-dir build -C Debug --output-on-failure` | Parcours éditeur vers runtime et interactions canvas ; une fenêtre ou un affichage virtuel est requis. |
 | Contract | Oui | validateurs C++ | `ctest --test-dir build -C Debug` | Schémas et versions de ressources. |
 | Property | Plus tard | À sélectionner | null | Invariants de physique après stabilisation. |
 | Snapshot | Non | — | null | Variations GPU ; scènes de référence manuelles. |
