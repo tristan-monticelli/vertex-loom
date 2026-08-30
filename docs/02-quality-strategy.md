@@ -228,7 +228,8 @@ gate global.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
 conservation byte-for-byte de la source PNG. Les fixtures JSON sont comparées
-après parsing et les PNG vérifient taille et en-tête, tandis qu'Asset Studio et
+après parsing avec tolérance numérique et les PNG vérifient taille et en-tête,
+tandis qu'Asset Studio et
 Preview Runtime
 utilisent le même constructeur de packet raster ; un test d'intégration compare
 le packet runtime au packet studio attendu et le smoke OpenGL vérifie le pixel
