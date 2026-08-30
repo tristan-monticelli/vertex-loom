@@ -4350,7 +4350,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::BeginDisabled(node.locked);
             std::string node_name = node.name;
-            if (ImGui::InputText("Name", &node_name)) {
+            if (draw_resource_name_field("Name", node_name, 360.0F)) {
                 node.name = std::move(node_name);
                 commit_node(node);
             }
@@ -5355,7 +5355,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 commit_entity_node(node);
             }
             std::string node_name = node.name;
-            if (ImGui::InputText("Node name", &node_name)) {
+            if (draw_resource_name_field("Node name", node_name, 360.0F)) {
                 node.name = std::move(node_name);
                 commit_entity_node(node);
             }
@@ -7453,8 +7453,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##entity-name", creation.entity.name);
         focus_prompt_field(validation, "name");
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Root node name", &creation.entity.node_name);
+        draw_resource_name_field("Root node name", creation.entity.node_name,
+                                 360.0F);
         focus_prompt_field(validation, "node_name");
         const auto drawable_label = std::string(
             fabric::project::to_string(creation.entity.drawable));
