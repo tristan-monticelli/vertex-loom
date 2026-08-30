@@ -163,6 +163,8 @@ C4Component
 - Les valeurs numériques dynamiques des propriétés de mécanique et de
   comportement indiquent qu’elles utilisent les unités déclarées par leur
   schéma et expliquent ce domaine au survol.
+- Les paramètres image et stroke des drawables, ainsi que les champs principaux
+  de timeline, expliquent leur effet technique au survol.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.

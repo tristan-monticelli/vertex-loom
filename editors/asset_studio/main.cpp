@@ -4693,6 +4693,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         image_offset[0], image_offset[1]};
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Translation of the image inside the vector fill.");
                 float image_scale[]{node.fill.image->transform.scale.x,
                                     node.fill.image->transform.scale.y};
                 if (ImGui::InputFloat2("Image scale (factor)", image_scale)) {
@@ -4700,6 +4701,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         image_scale[0], image_scale[1]};
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Scale multiplier applied to the image fill.");
                 float image_rotation =
                     node.fill.image->transform.rotation_degrees;
                 if (ImGui::InputFloat("Image rotation (degrees)", &image_rotation,
@@ -4707,6 +4709,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     node.fill.image->transform.rotation_degrees = image_rotation;
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Rotation of the image fill around its pivot.");
                 float image_pivot[]{node.fill.image->transform.pivot.x,
                                     node.fill.image->transform.pivot.y};
                 if (ImGui::InputFloat2("Image pivot (world units)", image_pivot)) {
@@ -4714,12 +4717,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         image_pivot[0], image_pivot[1]};
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Pivot used by the image fill transform.");
                 float opacity = node.fill.image->opacity;
                 if (ImGui::SliderFloat("Image opacity (0–1)", &opacity, 0.0F, 1.0F,
                                        "%.2f")) {
                     node.fill.image->opacity = opacity;
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Opacity multiplier applied after image sampling.");
                 bool deform = node.fill.image->deform_with_shape;
                 if (ImGui::Checkbox("Warp pixels with shape (advanced)",
                                     &deform)) {
@@ -4749,6 +4754,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     node.stroke->width = stroke_width;
                     commit_node(node);
                 }
+                ImGui::SetItemTooltip("Width of the rendered stroke around the path.");
                 const auto join_label = std::string(
                     fabric::project::to_string(node.stroke->join));
                 if (ImGui::BeginCombo("Stroke join", join_label.c_str())) {
@@ -4811,24 +4817,28 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         image.transform.position = {image_offset[0], image_offset[1]};
                         commit_node(node);
                     }
+                    ImGui::SetItemTooltip("Translation of the repeated stroke texture.");
                     float image_scale[]{image.transform.scale.x,
                                        image.transform.scale.y};
                     if (ImGui::InputFloat2("Stroke image scale (factor)", image_scale)) {
                         image.transform.scale = {image_scale[0], image_scale[1]};
                         commit_node(node);
                     }
+                    ImGui::SetItemTooltip("Scale multiplier for the stroke texture.");
                     float image_rotation = image.transform.rotation_degrees;
                     if (ImGui::InputFloat("Stroke image rotation (degrees)", &image_rotation,
                                           1.0F, 10.0F, "%.2f deg")) {
                         image.transform.rotation_degrees = image_rotation;
                         commit_node(node);
                     }
+                    ImGui::SetItemTooltip("Rotation of the stroke texture around its pivot.");
                     float image_opacity = image.opacity;
                     if (ImGui::SliderFloat("Stroke image opacity (0–1)", &image_opacity,
                                            0.0F, 1.0F, "%.2f")) {
                         image.opacity = image_opacity;
                         commit_node(node);
                     }
+                    ImGui::SetItemTooltip("Opacity multiplier applied to the stroke texture.");
                     bool deform = image.deform_with_shape;
                     if (ImGui::Checkbox("Deform stroke image with shape", &deform)) {
                         image.deform_with_shape = deform;
@@ -5831,6 +5841,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     status = "Animation duration rejected; inspect diagnostics.";
                 }
             }
+            ImGui::SetItemTooltip("Total clip duration; key times are constrained to this range.");
             bool loop = clip.loop;
             if (ImGui::Checkbox("Loop", &loop)) {
                 if (!session.set_selected_animation_loop(loop)) {
@@ -5841,6 +5852,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                   std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Scrub (seconds)", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
+            ImGui::SetItemTooltip("Preview time used to evaluate the animation clip.");
             ImGui::Checkbox("Auto-key at scrub time", &animation_ui.auto_key);
             ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
             ImGui::SameLine();
@@ -6190,6 +6202,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                 std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Key time (seconds)", &animation_ui.key_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
+            ImGui::SetItemTooltip("Time position at which the new key is inserted.");
             ImGui::Combo("Key type", &animation_ui.key_kind,
                          "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
             bool auto_key_changed = false;
