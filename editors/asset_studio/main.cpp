@@ -4833,8 +4833,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             for (std::size_t node_index = 0; node_index < entity.nodes.size();
                  ++node_index) {
+                ImGui::PushID(entity.nodes[node_index].id.c_str());
                 const auto label = entity.nodes[node_index].name + "##entity-node-" +
-                    std::to_string(node_index);
+                    entity.nodes[node_index].id;
                 if (ImGui::Selectable(label.c_str(),
                                       canvas.selected_node == node_index)) {
                     canvas.selected_node = node_index;
@@ -4860,6 +4861,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::EndDragDropTarget();
                 }
+                ImGui::PopID();
             }
             auto node = entity.nodes[canvas.selected_node];
             const auto commit_entity_node =

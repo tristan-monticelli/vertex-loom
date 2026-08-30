@@ -161,7 +161,9 @@ C4Component
   un drag convertit le delta écran en unités monde et passe par
   `set_selected_entity_node`. Les nœuds verrouillés restent non éditables ;
   le parcours `asset_studio_entity_e2e` injecte désormais ce drag SDL puis
-  vérifie la position après sauvegarde et reload.
+  vérifie la position après sauvegarde et reload. Les widgets de l’arbre et les
+  cibles de drop utilisent l’identifiant persistant du nœud, pas sa position
+  courante dans le tableau.
 - Le Resource Explorer expose un payload ImGui typé `VERTEX_LOOM_RESOURCE` pour
   les textures, vecteurs et composants visuels. L’inspecteur accepte ce payload
   sur un nœud existant ou sur les zones de création d’un nœud racine ou enfant,
