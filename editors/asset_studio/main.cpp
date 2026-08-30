@@ -1591,16 +1591,23 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                 ImGui::PushID(property.id.c_str());
                 auto value = property.value;
                 bool changed = false;
+                const std::string numeric_label = property.id +
+                    " (declared units)##behavior-numeric-" + property.id;
                 if (auto* typed = std::get_if<bool>(&value)) changed = ImGui::Checkbox(property.id.c_str(), typed);
                 else if (auto* typed = std::get_if<std::int64_t>(&value)) {
                     int visible = static_cast<int>(*typed);
-                    changed = ImGui::InputInt(property.id.c_str(), &visible);
+                    changed = ImGui::InputInt(numeric_label.c_str(), &visible);
                     *typed = visible;
-                } else if (auto* typed = std::get_if<float>(&value)) changed = ImGui::InputFloat(property.id.c_str(), typed);
+                    ImGui::SetItemTooltip("Integer value interpreted using the behavior property schema.");
+                } else if (auto* typed = std::get_if<float>(&value)) {
+                    changed = ImGui::InputFloat(numeric_label.c_str(), typed);
+                    ImGui::SetItemTooltip("Real value interpreted using the behavior property schema.");
+                }
                 else if (auto* typed = std::get_if<std::string>(&value)) changed = ImGui::InputText(property.id.c_str(), typed);
                 else if (auto* typed = std::get_if<fabric::core::Vec2>(&value)) {
-                    float values[2]{typed->x, typed->y}; changed = ImGui::InputFloat2(property.id.c_str(), values);
+                    float values[2]{typed->x, typed->y}; changed = ImGui::InputFloat2(numeric_label.c_str(), values);
                     *typed = {values[0], values[1]};
+                    ImGui::SetItemTooltip("Vector value interpreted using the behavior property schema.");
                 } else if (auto* typed = std::get_if<fabric::project::ResourceReference>(&value)) {
                     changed = draw_typed_resource_reference(
                         property.id.c_str(), project_session.resources(), *typed);

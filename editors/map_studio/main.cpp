@@ -919,26 +919,31 @@ void draw_mechanic_value_editor(
     ImGui::PushID(property.id.c_str());
     auto value = property.value;
     bool changed = false;
+    const std::string numeric_label = property.id +
+        " (declared units)##numeric-" + property.id;
     std::visit([&](auto& item) {
         using Value = std::decay_t<decltype(item)>;
         if constexpr (std::is_same_v<Value, bool>) {
             changed = ImGui::Checkbox(property.id.c_str(), &item);
         } else if constexpr (std::is_same_v<Value, std::int64_t>) {
             auto edited = static_cast<int>(item);
-            if (ImGui::InputInt(property.id.c_str(), &edited) &&
+            if (ImGui::InputInt(numeric_label.c_str(), &edited) &&
                 ImGui::IsItemDeactivatedAfterEdit()) {
                 item = edited;
                 changed = true;
             }
+            ImGui::SetItemTooltip("Integer value interpreted using the mechanic property schema.");
         } else if constexpr (std::is_same_v<Value, float>) {
-            changed = ImGui::DragFloat(property.id.c_str(), &item, 0.1F) &&
+            changed = ImGui::DragFloat(numeric_label.c_str(), &item, 0.1F) &&
                       ImGui::IsItemDeactivatedAfterEdit();
+            ImGui::SetItemTooltip("Real value interpreted using the mechanic property schema.");
         } else if constexpr (std::is_same_v<Value, std::string>) {
             changed = ImGui::InputText(property.id.c_str(), &item) &&
                       ImGui::IsItemDeactivatedAfterEdit();
         } else if constexpr (std::is_same_v<Value, fabric::core::Vec2>) {
-            changed = ImGui::DragFloat2(property.id.c_str(), &item.x, 0.1F) &&
+            changed = ImGui::DragFloat2(numeric_label.c_str(), &item.x, 0.1F) &&
                       ImGui::IsItemDeactivatedAfterEdit();
+            ImGui::SetItemTooltip("Vector value interpreted using the mechanic property schema.");
         } else {
             changed = ImGui::InputText(property.id.c_str(), &item.id.value) &&
                       ImGui::IsItemDeactivatedAfterEdit();

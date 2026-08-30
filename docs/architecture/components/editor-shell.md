@@ -160,6 +160,9 @@ C4Component
 - Les contrôles techniques d’IK et d’animation indiquent également leur
   domaine (`iterations`, `world units`, `seconds`, unités de propriété ou
   canaux couleur) et exposent une explication au survol.
+- Les valeurs numériques dynamiques des propriétés de mécanique et de
+  comportement indiquent qu’elles utilisent les unités déclarées par leur
+  schéma et expliquent ce domaine au survol.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.
