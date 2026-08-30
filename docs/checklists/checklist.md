@@ -65,12 +65,15 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
   deux colonnes monolithiques de Map Studio par des panneaux hiérarchisés,
   redimensionnables et focalisés sur la sélection.
-- [ ] UX E2E : IDs widgets stables, fixture multi-ressources, parcours texture/
-  crop/input/joueur/monstre/path Bézier, diagnostics/screenshots et exécution
-  macOS/Windows/Linux. Le parcours texture/crop dispose maintenant de
+- [x] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
+  crop/input/joueur/monstre/path Bézier, diagnostics et screenshots. Le parcours
+  texture/crop dispose maintenant de
   `asset_studio_ui_texture_e2e` et le parcours input joueur/attaque de
-  `asset_studio_ui_input_e2e`; monstre, path Bézier et les plateformes restent
-  à couvrir.
+  `asset_studio_ui_input_e2e`; les parcours comportement monstre et path Bézier
+  sont couverts par `asset_studio_behavior_e2e` et
+  `asset_studio_vector_canvas_e2e`.
+- [ ] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
+  Linux.
 - [ ] Documentation et clôture : retirer les gates non prouvés UX, confirmer le
   résultat visuel/fonctionnel, puis cocher les lots 1–3, 5, 6, 7 et 8.
 
