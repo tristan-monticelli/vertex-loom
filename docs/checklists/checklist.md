@@ -718,7 +718,8 @@ externe.
   Ctrl ou Cmd selon la plateforme.
 - [x] Rendre les actions destructives visuellement distinctes.
 - [x] Vérifier le comportement aux tailles minimales de fenêtre ; `asset_studio_ui_min_window_e2e` exécute le shell à 900×600 et exige une capture PPM.
-- [ ] Vérifier navigation clavier et contraste.
+- [x] Vérifier navigation clavier et contraste ; `asset_studio_ui_accessibility_e2e`
+  confirme la navigation ImGui activée et un contraste texte/fond de 19,03:1.
 
 Gate : les mêmes conventions de sélection, édition, validation et actions sont
 utilisées pour tous les types de ressources.

@@ -1502,6 +1502,33 @@ void write_ui_focus_probe(const std::filesystem::path& project_path,
     if (output) output << probe.dump(2) << '\n';
 }
 
+float relative_luminance(const ImVec4 color) {
+    const auto linear = [](const float channel) {
+        return channel <= 0.03928F
+            ? channel / 12.92F
+            : std::pow((channel + 0.055F) / 1.055F, 2.4F);
+    };
+    return 0.2126F * linear(color.x) + 0.7152F * linear(color.y) +
+        0.0722F * linear(color.z);
+}
+
+void write_ui_accessibility_probe(const std::filesystem::path& project_path,
+                                  const bool keyboard_navigation_enabled) {
+    if (project_path.empty()) return;
+    const auto& colors = ImGui::GetStyle().Colors;
+    const float background = relative_luminance(colors[ImGuiCol_WindowBg]);
+    const float text = relative_luminance(colors[ImGuiCol_Text]);
+    const float contrast = (std::max(background, text) + 0.05F) /
+        (std::min(background, text) + 0.05F);
+    nlohmann::json probe = {
+        {"schema", "asset-studio-ui-accessibility-test-v1"},
+        {"keyboard_navigation_enabled", keyboard_navigation_enabled},
+        {"text_window_contrast", contrast},
+        {"text_window_contrast_ok", contrast >= 4.5F}};
+    std::ofstream output(project_path / "asset-studio-ui-accessibility.json");
+    if (output) output << probe.dump(2) << '\n';
+}
+
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                           fabric::editor::BehaviorSession& behavior_session,
                           CreationUiState& creation, std::string& status) {
@@ -7878,10 +7905,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool vector_canvas_e2e = false,
                      const bool ui_test_mode = false,
                      const bool ui_min_window_test = false,
-                     const bool ui_focus_test = false) {
+                     const bool ui_focus_test = false,
+                     const bool ui_accessibility_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
-        ui_test_mode || ui_min_window_test || ui_focus_test;
+        ui_test_mode || ui_min_window_test || ui_focus_test ||
+        ui_accessibility_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -7913,7 +7942,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-              ui_min_window_test || ui_focus_test)
+              ui_min_window_test || ui_focus_test || ui_accessibility_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7944,7 +7973,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_GL_SetSwapInterval(
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-         ui_min_window_test || ui_focus_test) ? 0 : 1);
+         ui_min_window_test || ui_focus_test || ui_accessibility_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -8019,6 +8048,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_focus_probe_enabled = true;
         ui_focus_probe_succeeded = false;
     }
+    if (ui_accessibility_test)
+        ui_focus_probe_enabled = false;
     bool texture_e2e_complete = false;
     if (texture_e2e && session.has_project()) {
         const auto source = initial_project / "assets/textures/head-face.png";
@@ -8834,7 +8865,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        if (ui_test_mode || ui_min_window_test || ui_focus_test)
+        if (ui_test_mode || ui_min_window_test || ui_focus_test ||
+            ui_accessibility_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -8842,6 +8874,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             running = false;
         if (ui_focus_test && ++ui_test_frame >= 3U) {
             write_ui_focus_probe(initial_project, ui_focus_probe_succeeded);
+            running = false;
+        }
+        if (ui_accessibility_test && ++ui_test_frame >= 1U) {
+            write_ui_accessibility_probe(
+                initial_project,
+                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
             running = false;
         }
         if (vector_canvas_e2e) {
@@ -8967,10 +9005,12 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-test-min-window";
     const bool ui_focus_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-focus-test";
+    const bool ui_accessibility_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-accessibility-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
-        !ui_focus_test) {
+        !ui_focus_test && !ui_accessibility_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -8981,18 +9021,19 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --e2e-vector-canvas project-directory\n"
                      "       asset_studio --ui-test project-directory\n"
                      "       asset_studio --ui-test-min-window project-directory\n"
-                     "       asset_studio --ui-focus-test project-directory\n";
+                     "       asset_studio --ui-focus-test project-directory\n"
+                     "       asset_studio --ui-accessibility-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-        ui_min_window_test || ui_focus_test)
+        ui_min_window_test || ui_focus_test || ui_accessibility_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
-                            ui_focus_test);
+                            ui_focus_test, ui_accessibility_test);
 }

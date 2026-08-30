@@ -64,6 +64,8 @@ ou contexte SDL n’est disponible.
 Le test `asset_studio_ui_focus_e2e` ouvre un prompt matériau avec un nom invalide,
 attend l’application du focus ImGui sur le premier champ, puis vérifie l’artefact
 `asset-studio-ui-focus.json` et la demande de scroll associée.
+Le test `asset_studio_ui_accessibility_e2e` vérifie l’activation de la navigation
+clavier ImGui et un ratio de contraste texte/fond d’au moins 4,5:1.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
 sa primitive en path Bézier, insère et retire un point, convertit un segment,
 modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide

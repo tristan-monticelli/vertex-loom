@@ -41,6 +41,20 @@ if(DEFINED FOCUS_ARTIFACT)
         message(FATAL_ERROR "Asset Studio UI focus test did not focus the first invalid field")
     endif()
 endif()
+if(DEFINED ACCESSIBILITY_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${ACCESSIBILITY_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${ACCESSIBILITY_ARTIFACT}")
+    endif()
+    file(READ "${TEST_ROOT}/project/${ACCESSIBILITY_ARTIFACT}" ACCESSIBILITY_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"keyboard_navigation_enabled\": true"
+            "\"text_window_contrast_ok\": true")
+        string(FIND "${ACCESSIBILITY_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio accessibility probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"
