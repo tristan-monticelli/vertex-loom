@@ -1022,25 +1022,11 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         draw_id_picker("Activation event", event_ids, state.platform.event_id.value,
                        "Choose a map event...");
     }
-    ImGui::InputText("Visual entity (optional)", &state.platform_visual_entity);
     if (map_session.manifest()) {
         const auto directory = map_session.project_root() /
             map_session.manifest()->directories.entities;
-        std::error_code error;
-        if (std::filesystem::exists(directory, error)) {
-            ImGui::TextDisabled("Asset Studio entities:");
-            for (std::filesystem::directory_iterator iterator{directory, error}, end;
-                 !error && iterator != end; iterator.increment(error)) {
-                if (!iterator->is_regular_file(error)) continue;
-                auto filename = iterator->path().filename().string();
-                constexpr std::string_view suffix = ".entity.json";
-                if (!filename.ends_with(suffix)) continue;
-                filename.resize(filename.size() - suffix.size());
-                ImGui::SameLine();
-                if (ImGui::SmallButton(filename.c_str()))
-                    state.platform_visual_entity = filename;
-            }
-        }
+        draw_resource_picker("Visual entity (optional):", directory, ".entity.json",
+                             state.platform_visual_entity);
     }
     ImGui::DragFloat2("Platform position", &state.platform.position.x, 0.1F);
     ImGui::DragFloat2("Platform size", &state.platform.size.x, 0.1F, 0.01F, 256.0F);
