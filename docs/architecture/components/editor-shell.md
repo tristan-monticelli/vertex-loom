@@ -459,6 +459,9 @@ C4Component
 - Asset Studio expose un parcours SDL caché de texture qui importe une source,
   persiste son crop non destructif avant de créer une autre ressource, puis
   revalide le projet publié.
+- Les parcours E2E Asset Studio et Map Studio écrivent un rapport de diagnostic
+  dans le projet temporaire en cas d’échec et capturent le framebuffer courant
+  en PPM lorsqu’une fenêtre SDL a été créée.
 - L’inspecteur d’animation propose une commande A→B qui crée ou remplace deux
   clés de même type dans une seule opération de timeline undoable ; les temps
   doivent être strictement ordonnés et le clip est revalidé avant publication.

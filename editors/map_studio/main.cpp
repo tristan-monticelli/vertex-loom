@@ -117,6 +117,46 @@ void draw_technical_tooltip(const std::string_view text) {
     ImGui::SetItemTooltip("%s", std::string(text).c_str());
 }
 
+void write_e2e_failure_artifacts(
+    const std::filesystem::path& project_path, SDL_Window* window,
+    const std::string& status,
+    const fabric::editor::MapSession& session,
+    const std::vector<fabric::project::Error>& package_errors) {
+    if (project_path.empty()) return;
+
+    std::ofstream report(project_path / "map_studio-e2e-failure.txt");
+    if (report) {
+        report << "status: " << status << '\n';
+        for (const auto& error : session.errors()) {
+            report << error.field << " | " << error.message << '\n';
+        }
+        for (const auto& error : package_errors) {
+            report << "package:" << error.field << " | " << error.message << '\n';
+        }
+    }
+
+    if (window == nullptr) return;
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    std::ofstream image(project_path / "map_studio-e2e-failure.ppm",
+                        std::ios::binary);
+    if (!image) return;
+    image << "P6\n" << width << ' ' << height << "\n255\n";
+    const auto row_size = static_cast<std::size_t>(width) * 3U;
+    for (int row = height - 1; row >= 0; --row) {
+        image.write(reinterpret_cast<const char*>(pixels.data() +
+                                                   static_cast<std::size_t>(row) *
+                                                       row_size),
+                    static_cast<std::streamsize>(row_size));
+    }
+}
+
 void draw_scene_errors(const fabric::editor::SceneSession& session) {
     for (const auto& error : session.errors()) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
@@ -3776,6 +3816,12 @@ int run(const std::filesystem::path& project_root,
         if (scene_e2e || transformation_e2e) running = false;
     }
 
+    const bool e2e_incomplete = e2e_failed ||
+        (scene_e2e && !scene_e2e_complete) ||
+        (transformation_e2e && !transformation_e2e_complete);
+    if (e2e_incomplete)
+        write_e2e_failure_artifacts(project_root, window, status, session,
+                                    package_errors);
     for (const auto& [_, texture] : map_textures) {
         if (texture.handle != 0U) glDeleteTextures(1, &texture.handle);
     }
@@ -3787,9 +3833,7 @@ int run(const std::filesystem::path& project_root,
     SDL_DestroyWindow(window);
     NFD_Quit();
     SDL_Quit();
-    return e2e_failed || (scene_e2e && !scene_e2e_complete) ||
-            (transformation_e2e && !transformation_e2e_complete)
-        ? 1 : 0;
+    return e2e_incomplete ? 1 : 0;
 }
 
 } // namespace

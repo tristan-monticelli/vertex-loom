@@ -738,7 +738,10 @@ utilisées pour tous les types de ressources.
   - [x] transformer une entité A vers B ;
   - [x] créer et éditer un path Bézier ;
   - [x] changer fill, texture et stroke après création.
-- [ ] Capturer diagnostics et screenshots lors d'un échec.
+- [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map
+  Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
+  créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
+  qu'un diagnostic de processus.
 - [ ] Exécuter les parcours sur macOS, Windows et Linux.
 - [x] Garder les tests headless de contrats en complément, pas en remplacement.
 
