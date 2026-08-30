@@ -3907,7 +3907,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         if (!has_children) flags |= ImGuiTreeNodeFlags_Leaf;
                         if (canvas.selected_node == node_index)
                             flags |= ImGuiTreeNodeFlags_Selected;
-                        ImGui::PushID(static_cast<int>(node_index));
+                        ImGui::PushID(candidate.id.c_str());
                         const bool open = ImGui::TreeNodeEx(
                             candidate.name.c_str(), flags);
                         if (ImGui::IsItemClicked() &&

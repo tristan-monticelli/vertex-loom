@@ -163,7 +163,7 @@ C4Component
   le parcours `asset_studio_entity_e2e` injecte désormais ce drag SDL puis
   vérifie la position après sauvegarde et reload. Les widgets de l’arbre et les
   cibles de drop utilisent l’identifiant persistant du nœud, pas sa position
-  courante dans le tableau.
+  courante dans le tableau ; le même contrat s’applique à l’arbre vectoriel.
 - Le Resource Explorer expose un payload ImGui typé `VERTEX_LOOM_RESOURCE` pour
   les textures, vecteurs et composants visuels. L’inspecteur accepte ce payload
   sur un nœud existant ou sur les zones de création d’un nœud racine ou enfant,
