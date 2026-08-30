@@ -7406,9 +7406,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create a reusable EntityDefinition v4");
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
+        const auto validation = creation.entity.validate(
+            session.project_root(), *session.manifest());
         draw_resource_name_field("Name##entity-name", creation.entity.name);
+        focus_prompt_field(validation, "name");
         ImGui::SetNextItemWidth(360.0F);
         ImGui::InputText("Root node name", &creation.entity.node_name);
+        focus_prompt_field(validation, "node_name");
         const auto drawable_label = std::string(
             fabric::project::to_string(creation.entity.drawable));
         if (ImGui::BeginCombo("Drawable", drawable_label.c_str())) {
@@ -7465,6 +7469,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::InputFloat2("Position (world units)", position)) {
             creation.entity.transform.position = {position[0], position[1]};
         }
+        focus_prompt_field(validation, "transform");
         float scale[] = {creation.entity.transform.scale.x,
                          creation.entity.transform.scale.y};
         if (ImGui::InputFloat2("Scale (factor)", scale)) {
@@ -7475,8 +7480,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                           1.0F, 10.0F, "%.2f deg");
         ImGui::InputFloat("Z order (world units)", &creation.entity.z_order, 0.1F, 1.0F,
                           "%.2f");
-        const auto validation = creation.entity.validate(
-            session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "node_name");
         draw_prompt_error(validation, "id");
