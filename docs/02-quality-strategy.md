@@ -81,6 +81,8 @@ actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
 relecture avec un binding clavier et un binding gamepad.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
+son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires
+à SDL2 et au dialogue natif avant la configuration CMake.
 la gate multiplateforme n’est fermée qu’après un run vert de cette matrice.
 Le test `asset_studio_ui_overrides_e2e` prépare un override d’instance, rend la
 modale de perte avec ses deux actions, vérifie l’annulation sans perte puis la
