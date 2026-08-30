@@ -88,6 +88,20 @@ if(DEFINED OVERRIDE_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED TEXTURE_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${TEXTURE_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${TEXTURE_ARTIFACT}")
+    endif()
+    file(READ "${TEST_ROOT}/project/${TEXTURE_ARTIFACT}" TEXTURE_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"crop_canvas_seen\": true"
+            "\"crop_applied\": true")
+        string(FIND "${TEXTURE_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio texture probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"
@@ -100,7 +114,8 @@ foreach(REQUIRED_ID
     endif()
 endforeach()
 
-if(NOT DEFINED DRAG_ARTIFACT)
+if(NOT DEFINED DRAG_ARTIFACT AND NOT DEFINED OVERRIDE_ARTIFACT AND
+   NOT DEFINED TEXTURE_ARTIFACT)
 execute_process(
     COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT

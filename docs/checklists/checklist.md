@@ -67,7 +67,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   redimensionnables et focalisés sur la sélection.
 - [ ] UX E2E : IDs widgets stables, fixture multi-ressources, parcours texture/
   crop/input/joueur/monstre/path Bézier, diagnostics/screenshots et exécution
-  macOS/Windows/Linux.
+  macOS/Windows/Linux. Le parcours texture/crop dispose maintenant de
+  `asset_studio_ui_texture_e2e`; input, joueur/monstre, path Bézier et les
+  plateformes restent à couvrir.
 - [ ] Documentation et clôture : retirer les gates non prouvés UX, confirmer le
   résultat visuel/fonctionnel, puis cocher les lots 1–3, 5, 6, 7 et 8.
 
