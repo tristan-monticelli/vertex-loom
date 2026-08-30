@@ -3364,7 +3364,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             material = current;
             float opacity = material.opacity;
-            if (ImGui::SliderFloat("Opacity", &opacity, 0.0F, 1.0F, "%.2f")) {
+            if (ImGui::SliderFloat("Opacity (0–1)", &opacity, 0.0F, 1.0F, "%.2f")) {
                 material.opacity = opacity;
                 commit_material(std::move(material));
             }
@@ -3498,14 +3498,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     selected_path_command < path.commands.size()) {
                     auto command = path.commands[selected_path_command];
                     bool command_changed = ImGui::DragFloat2(
-                        selected_path_command == 0U ? "Start" : "Endpoint",
+                        selected_path_command == 0U ? "Start (world units)" : "Endpoint (world units)",
                         &command.point.x, 0.05F);
                     if (command.kind ==
                         fabric::project::TexturedPathCommandKind::cubic) {
                         command_changed |= ImGui::DragFloat2(
-                            "Handle in", &command.control1.x, 0.05F);
+                            "Handle in (world units)", &command.control1.x, 0.05F);
                         command_changed |= ImGui::DragFloat2(
-                            "Handle out", &command.control2.x, 0.05F);
+                            "Handle out (world units)", &command.control2.x, 0.05F);
                     }
                     if (command_changed) {
                         auto candidate = path;
@@ -3560,16 +3560,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SeparatorText("Ribbon and texture");
                 style_changed |= ImGui::Checkbox("Closed", &style.closed);
                 style_changed |= ImGui::DragFloat(
-                    "Width", &style.width, 0.01F, 0.001F, 1000.0F);
+                    "Width (world units)", &style.width, 0.01F, 0.001F, 1000.0F);
                 style_changed |= ImGui::DragFloat2(
-                    "Texture repeat", &style.uv_scale.x, 0.05F,
+                    "Texture repeat (factor)", &style.uv_scale.x, 0.05F,
                     0.001F, 1000.0F);
                 style_changed |= ImGui::DragFloat2(
-                    "Texture offset", &style.uv_offset.x, 0.01F);
+                    "Texture offset (normalized)", &style.uv_offset.x, 0.01F);
                 style_changed |= ImGui::ColorEdit4(
                     "Color", &style.color.red);
                 style_changed |= ImGui::SliderFloat(
-                    "Opacity", &style.opacity, 0.0F, 1.0F);
+                    "Opacity (0–1)", &style.opacity, 0.0F, 1.0F);
                 int uv_mode = style.uv_mode ==
                         fabric::project::TexturedPathUvMode::repeat ? 0 : 1;
                 if (ImGui::Combo("UV mode", &uv_mode,
@@ -3583,7 +3583,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     (void)session.set_selected_textured_path(std::move(style));
                 ImGui::SeparatorText("Texture animation preview");
                 ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
-                ImGui::DragFloat("Scroll speed", &path_ui.scroll_speed,
+                ImGui::DragFloat("Scroll speed (factor/s)", &path_ui.scroll_speed,
                                  0.05F, -100.0F, 100.0F);
                 if (ImGui::Button("Reset preview offset"))
                     path_ui.preview_offset = 0.0F;
@@ -3745,21 +3745,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     bool changed = false;
                     ImGui::SeparatorText("Selected layer");
                     changed |= ImGui::Checkbox("Visible", &layer.visible);
-                    changed |= ImGui::DragFloat("Z order", &layer.z_order,
+                    changed |= ImGui::DragFloat("Z order (world units)", &layer.z_order,
                                                 0.1F);
-                    changed |= ImGui::SliderFloat("Opacity", &layer.opacity,
+                    changed |= ImGui::SliderFloat("Opacity (0–1)", &layer.opacity,
                                                   0.0F, 1.0F);
-                    changed |= ImGui::SliderFloat2("Anchor", &layer.anchor.x,
+                    changed |= ImGui::SliderFloat2("Anchor (normalized)", &layer.anchor.x,
                                                    0.0F, 1.0F);
-                    changed |= ImGui::DragFloat2("Position",
+                    changed |= ImGui::DragFloat2("Position (world units)",
                                                  &layer.transform.position.x,
                                                  0.05F);
                     changed |= ImGui::DragFloat(
-                        "Rotation", &layer.transform.rotation_degrees, 0.5F);
-                    changed |= ImGui::DragFloat2("Scale",
+                        "Rotation (degrees)", &layer.transform.rotation_degrees, 0.5F);
+                    changed |= ImGui::DragFloat2("Scale (factor)",
                                                  &layer.transform.scale.x,
                                                  0.01F, 0.001F, 100.0F);
-                    changed |= ImGui::DragFloat2("Pivot",
+                    changed |= ImGui::DragFloat2("Pivot (world units)",
                                                  &layer.transform.pivot.x,
                                                  0.01F);
                     if (layer.kind ==
@@ -3784,7 +3784,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             } else {
                                 auto& view = *layer.raster_view;
                                 if (ImGui::DragFloat2(
-                                        "Crop origin", &view.crop.origin.x,
+                                        "Crop origin (pixels)", &view.crop.origin.x,
                                         1.0F, 0.0F,
                                         static_cast<float>(std::max(
                                             texture.asset->width,
@@ -3800,7 +3800,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     changed = true;
                                 }
                                 if (ImGui::DragFloat2(
-                                        "Crop size", &view.crop.size.x, 1.0F,
+                                        "Crop size (pixels)", &view.crop.size.x, 1.0F,
                                         1.0F,
                                         static_cast<float>(std::max(
                                             texture.asset->width,
@@ -3816,7 +3816,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     changed = true;
                                 }
                                 changed |= ImGui::SliderFloat2(
-                                    "Crop pivot", &view.pivot.x, 0.0F, 1.0F);
+                                    "Crop pivot (normalized)", &view.pivot.x, 0.0F, 1.0F);
                                 if (ImGui::Button("Reset full crop")) {
                                     view.crop = {{0.0F, 0.0F},
                                         {static_cast<float>(texture.asset->width),
@@ -4304,19 +4304,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             float position[]{node.transform.position.x,
                              node.transform.position.y};
-            if (ImGui::InputFloat2("Position", position)) {
+            if (ImGui::InputFloat2("Position (world units)", position)) {
                 node.transform.position = {position[0], position[1]};
                 commit_node(node);
             }
             draw_technical_tooltip("Node translation in world units.");
             float scale[]{node.transform.scale.x, node.transform.scale.y};
-            if (ImGui::InputFloat2("Scale", scale)) {
+            if (ImGui::InputFloat2("Scale (factor)", scale)) {
                 node.transform.scale = {scale[0], scale[1]};
                 commit_node(node);
             }
             draw_technical_tooltip("Node scale multiplier.");
             float rotation = node.transform.rotation_degrees;
-            if (ImGui::InputFloat("Rotation", &rotation, 1.0F, 10.0F,
+            if (ImGui::InputFloat("Rotation (degrees)", &rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
                 node.transform.rotation_degrees = rotation;
                 commit_node(node);
@@ -4324,14 +4324,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             draw_technical_tooltip("Node rotation in degrees.");
             float bounds_origin[]{node.shape.bounds.origin.x,
                                   node.shape.bounds.origin.y};
-            if (ImGui::InputFloat2("Bounds origin", bounds_origin)) {
+            if (ImGui::InputFloat2("Bounds origin (world units)", bounds_origin)) {
                 node.shape.bounds.origin = {bounds_origin[0], bounds_origin[1]};
                 commit_node(node);
             }
             draw_technical_tooltip("Shape bounds origin in world units.");
             float bounds_size[]{node.shape.bounds.size.x,
                                 node.shape.bounds.size.y};
-            if (ImGui::InputFloat2("Bounds size", bounds_size)) {
+            if (ImGui::InputFloat2("Bounds size (world units)", bounds_size)) {
                 node.shape.bounds.size = {bounds_size[0], bounds_size[1]};
                 commit_node(node);
             }
@@ -4616,14 +4616,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 float image_offset[]{
                     node.fill.image->transform.position.x,
                     node.fill.image->transform.position.y};
-                if (ImGui::InputFloat2("Image offset", image_offset)) {
+                if (ImGui::InputFloat2("Image offset (world units)", image_offset)) {
                     node.fill.image->transform.position = {
                         image_offset[0], image_offset[1]};
                     commit_node(node);
                 }
                 float image_scale[]{node.fill.image->transform.scale.x,
                                     node.fill.image->transform.scale.y};
-                if (ImGui::InputFloat2("Image scale", image_scale)) {
+                if (ImGui::InputFloat2("Image scale (factor)", image_scale)) {
                     node.fill.image->transform.scale = {
                         image_scale[0], image_scale[1]};
                     commit_node(node);
@@ -4637,13 +4637,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 float image_pivot[]{node.fill.image->transform.pivot.x,
                                     node.fill.image->transform.pivot.y};
-                if (ImGui::InputFloat2("Image pivot", image_pivot)) {
+                if (ImGui::InputFloat2("Image pivot (world units)", image_pivot)) {
                     node.fill.image->transform.pivot = {
                         image_pivot[0], image_pivot[1]};
                     commit_node(node);
                 }
                 float opacity = node.fill.image->opacity;
-                if (ImGui::SliderFloat("Image opacity", &opacity, 0.0F, 1.0F,
+                if (ImGui::SliderFloat("Image opacity (0–1)", &opacity, 0.0F, 1.0F,
                                        "%.2f")) {
                     node.fill.image->opacity = opacity;
                     commit_node(node);
@@ -4672,7 +4672,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_node(node);
                 }
                 float stroke_width = node.stroke->width;
-                if (ImGui::InputFloat("Stroke width", &stroke_width,
+                if (ImGui::InputFloat("Stroke width (world units)", &stroke_width,
                                       0.1F, 1.0F)) {
                     node.stroke->width = stroke_width;
                     commit_node(node);
@@ -5252,7 +5252,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 commit_entity_node(node);
             }
             float z_order = node.z_order;
-            if (ImGui::InputFloat("Z order", &z_order, 0.1F, 1.0F, "%.2f")) {
+            if (ImGui::InputFloat("Z order (world units)", &z_order, 0.1F, 1.0F, "%.2f")) {
                 node.z_order = z_order;
                 commit_entity_node(node);
             }
@@ -5654,7 +5654,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ImGui::Combo("Device", &device, devices, 2)) changed = true;
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(130.0F);
-                    if (ImGui::InputInt("Code", &code)) changed = true;
+                    if (ImGui::InputInt("Code (platform)", &code)) changed = true;
                     edited_binding.device = static_cast<fabric::project::InputDevice>(device);
                     edited_binding.code = code;
                     int binding_kind = static_cast<int>(binding.kind);
@@ -5662,8 +5662,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ImGui::Combo("Kind", &binding_kind, binding_kinds, 2)) changed = true;
                     edited_binding.kind = static_cast<fabric::project::InputBindingKind>(binding_kind);
                     if (edited_binding.kind == fabric::project::InputBindingKind::axis) {
-                        if (ImGui::InputFloat("Threshold", &edited_binding.threshold, 0.05F, 0.1F, "%.2f")) changed = true;
-                        if (ImGui::InputFloat("Dead zone", &edited_binding.dead_zone, 0.05F, 0.1F, "%.2f")) changed = true;
+                        if (ImGui::InputFloat("Threshold (normalized)", &edited_binding.threshold, 0.05F, 0.1F, "%.2f")) changed = true;
+                        if (ImGui::InputFloat("Dead zone (normalized)", &edited_binding.dead_zone, 0.05F, 0.1F, "%.2f")) changed = true;
                     }
                     if (ImGui::Checkbox("Ctrl", &edited_binding.ctrl)) changed = true;
                     ImGui::SameLine();
@@ -5755,7 +5755,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             animation_ui.scrub_time = std::clamp(animation_ui.scrub_time, 0.0F,
                                                   std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Scrub", &animation_ui.scrub_time, 0.0F,
+            ImGui::SliderFloat("Scrub (seconds)", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::Checkbox("Auto-key at scrub time", &animation_ui.auto_key);
             ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
@@ -5822,7 +5822,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::InputText("Marker id", &animation_ui.marker_id);
             animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
                                                    std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Marker time", &animation_ui.marker_time, 0.0F,
+            ImGui::SliderFloat("Marker time (seconds)", &animation_ui.marker_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::BeginDisabled(animation_ui.marker_id.empty());
             if (ImGui::Button("Add marker")) {
@@ -6102,7 +6102,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             animation_ui.key_time = std::clamp(animation_ui.key_time, 0.0F,
                                                 std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Key time", &animation_ui.key_time, 0.0F,
+            ImGui::SliderFloat("Key time (seconds)", &animation_ui.key_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::Combo("Key type", &animation_ui.key_kind,
                          "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
@@ -6171,9 +6171,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             animation_ui.segment_end_time = std::clamp(
                 animation_ui.segment_end_time, 0.0F,
                 std::max(0.0F, clip.duration));
-            ImGui::InputFloat("A time", &animation_ui.segment_start_time,
+            ImGui::InputFloat("A time (seconds)", &animation_ui.segment_start_time,
                               0.1F, 1.0F, "%.2f s");
-            ImGui::InputFloat("B time", &animation_ui.segment_end_time,
+            ImGui::InputFloat("B time (seconds)", &animation_ui.segment_end_time,
                               0.1F, 1.0F, "%.2f s");
             if (animation_ui.key_kind == 0) {
                 ImGui::InputFloat2("A value", animation_ui.segment_start_value);
@@ -6581,15 +6581,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                            "%.2f");
         ImGui::SeparatorText("Runtime preview");
         ImGui::Checkbox("Enable character", &project_settings.runtime_enabled);
-        ImGui::InputFloat2("Character spawn", &project_settings.spawn_x);
+        ImGui::InputFloat2("Character spawn (world units)", &project_settings.spawn_x);
         ImGui::InputText("Left action", &project_settings.runtime_actions[0]);
         ImGui::InputText("Right action", &project_settings.runtime_actions[1]);
         ImGui::InputText("Jump action", &project_settings.runtime_actions[2]);
         ImGui::Checkbox("Follow character", &project_settings.camera_follow_character);
         ImGui::Checkbox("Camera limits", &project_settings.camera_limits_enabled);
         if (project_settings.camera_limits_enabled) {
-            ImGui::InputFloat2("Camera origin", &project_settings.camera_x);
-            ImGui::InputFloat2("Camera size", &project_settings.camera_width);
+            ImGui::InputFloat2("Camera origin (world units)", &project_settings.camera_x);
+            ImGui::InputFloat2("Camera size (world units)", &project_settings.camera_width);
         }
         draw_project_resource_picker(
             "Audio document", session.resources(),
@@ -7067,7 +7067,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         auto& fields = creation.composition;
         ImGui::TextUnformatted("Create an empty layered visual composition");
         draw_resource_identity_fields(fields.name, fields.id);
-        ImGui::InputFloat2("Size", fields.size);
+        ImGui::InputFloat2("Size (world units)", fields.size);
         const bool valid = !fields.name.empty() &&
             fabric::core::ResourceId::is_valid(fields.id) &&
             std::isfinite(fields.size[0]) && std::isfinite(fields.size[1]) &&
@@ -7124,7 +7124,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::EndCombo();
         }
-        ImGui::InputFloat2("Bounds size", fields.size);
+        ImGui::InputFloat2("Bounds size (world units)", fields.size);
         const bool valid = !fields.name.empty() &&
             fabric::core::ResourceId::is_valid(fields.id) &&
             fabric::core::ResourceId::is_valid(fields.composition_id) &&
@@ -7167,7 +7167,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.material.color = {color[0], color[1], color[2], color[3]};
         }
         float opacity = static_cast<float>(creation.material.opacity);
-        if (ImGui::SliderFloat("Opacity", &opacity, 0.0F, 1.0F, "%.2f")) {
+        if (ImGui::SliderFloat("Opacity (0–1)", &opacity, 0.0F, 1.0F, "%.2f")) {
             creation.material.opacity = opacity;
         }
         const auto blend_label = std::string(
@@ -7197,16 +7197,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.material.vector_pattern_id, true));
         float uv_position[] = {creation.material.uv_transform.position.x,
                                creation.material.uv_transform.position.y};
-        if (ImGui::InputFloat2("UV offset", uv_position)) {
+        if (ImGui::InputFloat2("UV offset (normalized)", uv_position)) {
             creation.material.uv_transform.position =
                 {uv_position[0], uv_position[1]};
         }
         float uv_scale[] = {creation.material.uv_transform.scale.x,
                             creation.material.uv_transform.scale.y};
-        if (ImGui::InputFloat2("UV scale", uv_scale)) {
+        if (ImGui::InputFloat2("UV scale (factor)", uv_scale)) {
             creation.material.uv_transform.scale = {uv_scale[0], uv_scale[1]};
         }
-        ImGui::InputFloat("UV rotation",
+        ImGui::InputFloat("UV rotation (degrees)",
                           &creation.material.uv_transform.rotation_degrees,
                           1.0F, 10.0F, "%.2f deg");
         const auto validation = creation.material.validate(
