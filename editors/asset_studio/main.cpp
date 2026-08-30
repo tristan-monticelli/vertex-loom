@@ -85,6 +85,11 @@ void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     ImGui::SetTooltip("%s", std::string(reason).c_str());
 }
 
+void same_line_if_room(const float minimum_width = 96.0F) {
+    if (ImGui::GetContentRegionAvail().x >= minimum_width)
+        ImGui::SameLine();
+}
+
 bool draw_resource_name_field(const char* label, std::string& name,
                               const float width = 560.0F) {
     ImGui::SetNextItemWidth(width);
@@ -999,27 +1004,27 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             const auto resource = *selected;
             duplicate_project_resource(session, resource, preview, status);
         }
-        ImGui::SameLine();
+        same_line_if_room();
         if (ImGui::Button("Rename...")) request_rename(*selected);
-        ImGui::SameLine();
+        same_line_if_room();
         if (ImGui::Button("Copy ID")) {
             SDL_SetClipboardText(selected->id.value.c_str());
             status = "Resource ID copied.";
         }
-        ImGui::SameLine();
+        same_line_if_room();
         if (ImGui::Button("Copy path")) {
             const auto path = selected->document_path.generic_string();
             SDL_SetClipboardText(path.c_str());
             status = "Resource path copied.";
         }
-        ImGui::SameLine();
+        same_line_if_room();
         if (ImGui::Button("Reveal"))
             reveal_project_resource(session, *selected, status);
         ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.55F, 0.16F, 0.15F, 1.0F});
         if (ImGui::Button("Delete...")) request_delete(*selected);
         ImGui::PopStyleColor();
         if (session.can_restore_trashed_resource()) {
-            ImGui::SameLine();
+            same_line_if_room();
             if (ImGui::Button("Undo delete")) {
                 status = session.restore_trashed_resource()
                     ? "Deleted resource restored."

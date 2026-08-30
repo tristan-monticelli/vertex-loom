@@ -114,7 +114,9 @@ C4Component
   sources PNG ou SVG partagées.
 - Les rails Project et Inspector d’Asset Studio sont séparés du preview par
   deux splitters `left-panel-splitter` et `right-panel-splitter`, bornés pour
-  préserver une zone centrale minimale et redimensionnables au glisser.
+  préserver une zone centrale minimale et redimensionnables au glisser. Les
+  actions du Resource Explorer se réorganisent sur plusieurs lignes lorsque la
+  largeur du rail ne permet plus de les afficher côte à côte.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
