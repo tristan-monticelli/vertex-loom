@@ -754,6 +754,7 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
         const auto created = session.create(project_root, scene);
         status = created ? "Scene created" : "Scene creation rejected";
         if (created) {
+            static_cast<void>(resource_catalog.refresh_resources());
             state.open_id = state.new_id;
             state.edited_name = state.new_name;
             state.new_id.clear();
@@ -1215,9 +1216,11 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         fabric::project::MechanicGraph graph;
         graph.document.id = {.value = state.new_id};
         graph.document.name = state.new_name;
-        status = session.create(map_session.project_root(), *map_session.map(), graph)
-            ? "Mechanic created" : "Mechanic creation rejected";
-        if (session.has_graph()) {
+        const bool created = session.create(
+            map_session.project_root(), *map_session.map(), graph);
+        status = created ? "Mechanic created" : "Mechanic creation rejected";
+        if (created) {
+            static_cast<void>(resource_catalog.refresh_resources());
             state.open_id = state.new_id;
             state.new_id.clear();
             state.new_name.clear();
@@ -2753,8 +2756,10 @@ int run(const std::filesystem::path& project_root,
                     const fabric::project::MapDocument map{
                         .document = {.schema_version = 1, .type = "map",
                                      .id = {.value = new_map_id}, .name = new_map_name}};
-                    status = session.create(project_root, map)
-                        ? "Map created" : "Map creation failed";
+                    const bool created = session.create(project_root, map);
+                    status = created ? "Map created" : "Map creation failed";
+                    if (created)
+                        static_cast<void>(resource_catalog.refresh_resources());
                 }
                 ImGui::EndDisabled();
                 draw_disabled_reason(new_map_id.empty() || new_map_name.empty(),
