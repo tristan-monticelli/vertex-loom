@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 2,
+  "type": "vector",
+  "id": "triangle",
+  "name": "Triangle",
+  "sourceKind": "native",
+  "native": {
+    "size": {"x": 1.0, "y": 1.0},
+    "origin": "center",
+    "nodes": [
+      {
+        "id": "triangle-node",
+        "name": "Triangle",
+        "visible": true,
+        "locked": false,
+        "transform": {
+          "position": {"x": 0.0, "y": 0.0},
+          "rotationDegrees": 0.0,
+          "scale": {"x": 1.0, "y": 1.0},
+          "pivot": {"x": 0.0, "y": 0.0}
+        },
+        "shape": {
+          "id": "triangle-shape",
+          "kind": "path",
+          "bounds": {
+            "origin": {"x": 0.0, "y": 0.0},
+            "size": {"x": 1.0, "y": 1.0}
+          },
+          "path": [
+            {"kind": "move", "point": {"x": 0.0, "y": 0.0}},
+            {"kind": "line", "point": {"x": 1.0, "y": 0.0}},
+            {"kind": "line", "point": {"x": 0.5, "y": 1.0}},
+            {"kind": "close"}
+          ]
+        },
+        "fill": {
+          "kind": "solid",
+          "color": {"red": 1.0, "green": 0.0, "blue": 0.0, "alpha": 1.0}
+        }
+      }
+    ]
+  }
+}

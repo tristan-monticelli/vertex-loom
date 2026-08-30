@@ -1,0 +1,43 @@
+{
+  "id": "head-button-composition",
+  "layers": [
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "button",
+      "kind": "vector",
+      "name": "Button",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "head-button-artwork"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 0.0
+    }
+  ],
+  "name": "Head Button Composition",
+  "schemaVersion": 1,
+  "size": {
+    "x": 1.5,
+    "y": 1.5
+  },
+  "type": "visualComposition"
+}

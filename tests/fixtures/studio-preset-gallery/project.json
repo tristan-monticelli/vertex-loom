@@ -1,0 +1,13 @@
+{
+  "directories": {
+    "assets": "assets",
+    "entities": "entities",
+    "maps": "maps",
+    "scenes": "scenes",
+    "schemas": "schemas"
+  },
+  "id": "studio-preset-gallery",
+  "name": "Studio Preset Gallery",
+  "pixelsPerUnit": 100.0,
+  "schemaVersion": 2
+}

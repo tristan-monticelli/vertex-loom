@@ -20,6 +20,7 @@ choice, or required C4 diagram is missing.
 - `01-technology-decisions.md`: technical choices and criteria.
 - `02-quality-strategy.md`: test and quality strategy.
 - `architecture/`: versioned C4, component, and flow diagrams.
+- `checklists/`: audits produit et feuilles de route vérifiables.
 - `decisions/`: durable decisions as ADRs.
 - `systems/`: subsystem contracts and responsibilities.
 - `workflows/`: important procedures and interactions.

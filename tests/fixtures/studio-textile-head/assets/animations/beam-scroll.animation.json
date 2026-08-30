@@ -1,0 +1,41 @@
+{
+  "duration": 1.0,
+  "id": "beam-scroll",
+  "loop": true,
+  "markers": [],
+  "name": "Beam Scroll",
+  "previewEntity": {
+    "expectedType": "entity",
+    "id": "textile-head-entity"
+  },
+  "schemaVersion": 3,
+  "tracks": [
+    {
+      "binding": {
+        "component": "beam",
+        "node": "root",
+        "property": "offset"
+      },
+      "composition": "replace",
+      "easing": "linear",
+      "interpolation": "linear",
+      "keys": [
+        {
+          "time": 0.0,
+          "value": {
+            "kind": "scalar",
+            "value": 0.0
+          }
+        },
+        {
+          "time": 1.0,
+          "value": {
+            "kind": "scalar",
+            "value": 4.0
+          }
+        }
+      ]
+    }
+  ],
+  "type": "animation"
+}

@@ -1,0 +1,465 @@
+# Checklist restante après audit produit
+
+## Priorité produit studio-first
+
+La feuille [Tranches verticales studio-first](studio-first-vertical-slices.md)
+est désormais le gate prioritaire de cette roadmap. Chaque nouvelle capacité
+doit être créable, prévisualisable, sauvegardable et testable dans le studio
+qui la possède avant d'être considérée comme disponible dans le runtime.
+
+Le premier gate corrige les ajouts visuels existants sans les supprimer : les
+textures restent des sources immuables, le cadrage devient un crop réversible,
+les composants visuels restent des calques séparés et les chemins vectoriels
+peuvent recevoir une texture répétée. La première mécanique verticale associe
+ces capacités à une plateforme tournante éditable dans Map Studio.
+
+## Intention corrigée
+
+Vertex Loom est un atelier et un moteur 2D à rendu vectoriel. « Vectoriel » ne
+signifie pas que le format interne doit être du SVG : le SVG est un format
+d’échange possible, tandis que le projet conserve une géométrie native,
+éditable, stable et animable.
+
+La géométrie peut définir une silhouette, un masque ou un contour esthétique,
+mais une image n'est jamais forcée dans cette représentation. Une source
+raster peut rester rectangulaire et recevoir un crop non destructif, ou être
+placée explicitement dans une forme comme fill. Son cadrage, sa transformation
+et ses overlays restent éditables indépendamment de la source.
+
+Le produit n’utilise pas de spritesheets. Le lecteur Aseprite, le packer
+d’atlas et `SpriteSheetDefinition v1` ont été retirés après inventaire et
+confirmation explicite ; ADR-0025 enregistre cette décision.
+
+Chaque opération de création distincte possède son propre prompt ou assistant
+typé. Un import de source n’est pas présenté comme la création d’un document.
+
+## Audit de l’état actuel
+
+| État | Constat et preuve | Correction attendue |
+| --- | --- | --- |
+| CONFORME | La création de projet valide le nom, l’identifiant généré et une destination vide dans `project_creator.cpp`. | Conserver la sûreté du stockage. |
+| CONFORME | `CreateProjectPrompt` demande destination, nom, unités monde, preset et `pixelsPerUnit`, puis affiche l’identifiant calculé, les erreurs et le résumé avant création. | Conserver les tests headless du modèle. |
+| CONFORME | Les états PNG et SVG sont isolés, l’aperçu précède la publication et `Add existing` sélectionne désormais une ressource indexée sans créer de document. | Conserver la séparation sélection, validation/décodage, aperçu et publication. |
+| PARTIEL | `VectorAsset v2 native` persiste primitives, chemins, fills, contours et clips, produit des draw packets headless et dispose d'un cache de géométrie ; l'édition complète des sommets et clips imbriqués reste ouverte. | Terminer le personnalisateur et sa validation visuelle. |
+| CONFORME | Un SVG importé reste lié et opaque ; sa conversion explicite produit les chemins cubiques, fills couleur et contours pris en charge avec diagnostic des pertes. | Conserver l'absence de conversion automatique. |
+| PARTIEL | `AnimationClip v1`, bindings génériques, timeline, auto-key, composition additive, markers et preview runtime sont livrés ; la sélection multiple et les workflows avancés restent ouverts. | Fermer le gate UX et replay sans ajouter de piste métier. |
+| CONFORME | Le pipeline sprite a été retiré du build, des contrats, du validateur et de l’interface par ADR-0025. | Empêcher sa réintroduction dans les futurs contrats. |
+| CONFORME | `CommandStack`, sauvegarde atomique, autosave et récupération sont testés sans fenêtre. | Réutiliser ces services pour chaque futur document éditable. |
+| CONFORME | Le registre de ressources vérifie types, doublons, documents manquants et cycles. | Étendre ses types aux formes, fills, animations, entités et maps. |
+| PARTIEL | La branche passe `npm run validate` localement ; la matrice macOS/Windows/Linux doit être confirmée pour chaque nouveau HEAD avant de fermer un gate. | Garder ce gate après chaque incrément. |
+
+## Décisions architecturales acceptées
+
+Les cases de cette section prouvent une décision documentée, pas son
+implémentation. Les preuves fonctionnelles restent exclusivement dans les
+étapes et gates ci-dessous.
+
+- [x] Une action `Create…` ouvre un prompt propre au type créé : projet,
+  artwork vectoriel, matériau/fill, entité, animation, prefab, map ou scène.
+- [x] Chaque prompt explique le document produit, propose des valeurs par
+  défaut, valide en direct et affiche un résumé avant publication.
+- [x] `Import…` choisit et normalise une source ; `Create…` produit un document
+  éditable ; `Add existing…` référence une ressource déjà enregistrée.
+- [x] Le format vectoriel interne ne dépend ni du DOM SVG ni d’une
+  rasterisation persistante.
+- [x] Le SVG importé peut rester lié et opaque ou être converti explicitement
+  vers les primitives prises en charge ; le choix est visible et réversible
+  tant que le document n’est pas publié.
+- [x] Les images intégrées ou importées sont des ressources locales explicites.
+  Une forme peut les employer comme fill avec transform UV, mode de cadrage,
+  opacité et clipping par le contour.
+- [x] Les références externes d’un SVG ne sont jamais suivies silencieusement :
+  elles sont refusées ou copiées après choix explicite dans le prompt.
+- [x] La spritesheet n’est pas un contrat requis par le personnalisateur,
+  l’animation, Map Studio ou le runtime cible.
+- [x] Toute mutation éditable passe par `CommandStack`, autosave et sauvegarde
+  atomique ; les gestes continus fusionnent en une seule commande.
+- [x] La timeline découvre les propriétés via un registre typé ; elle ne
+  contient pas de `switch` métier par nom de propriété.
+
+## Étape A — Recaler les contrats et l’architecture
+
+- [x] Écrire un ADR qui remplace l’orientation sprite-first par l’authoring
+  vectoriel natif et documente le statut hérité d’ADR-0021.
+- [x] Écrire un ADR pour le modèle `shape + fill + stroke + clip` et les images
+  contenues dans les formes.
+- [x] Écrire un ADR pour les prompts de création typés et la séparation
+  `Create / Import / Add existing`.
+- [x] Mettre à jour le C4 Container et les composants Asset Studio, format
+  projet et rendu avant le prochain changement structurel.
+- [x] Définir la migration `VectorAsset v1 -> v2` sans perte : les SVG actuels
+  deviennent `sourceKind = linkedSvg`.
+- [x] Décider par inventaire que le pipeline devient entièrement obsolète et le
+  retirer après confirmation explicite.
+
+Gate : la documentation ne présente plus les sprites comme une fondation du
+runtime et chaque futur document possède un propriétaire clair.
+
+## Étape B — Hub de création et prompts dédiés
+
+- [x] Remplacer la colonne d’actions d’import par des sections distinctes
+  `Create`, `Import` et `Add existing`.
+- [x] Rendre `Add existing` fonctionnel avec un sélecteur de ressources
+  enregistrées ; la sélection recharge le document sans en créer un nouveau.
+- [x] Enrichir `Create project` : destination, nom, identifiant automatique, unités,
+  pixels par unité, preset de projet et résumé final.
+- [x] Ajouter le prompt `Create vector artwork` : nom, identifiant automatique, taille de
+  travail, origine, unités, première forme, fill initial et couleur.
+- [x] Publier réellement l’artwork créé comme `VectorAsset v2 native` par
+  sauvegarde atomique après validation complète du prompt et du document.
+- [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation ; les
+  trois créations publient désormais leurs documents atomiquement.
+
+Asset Studio publie désormais un `MaterialDefinition v1` depuis un prompt
+dédié : couleur, opacité, blend, références locales optionnelles et transform
+UV sont validés, écrits atomiquement et réindexés sans créer de bitmap.
+Il publie également un `EntityDefinition v1` mono-nœud avec drawable, matériau
+optionnel et transform, puis l’ajoute au registre des ressources.
+Enfin, il publie un `AnimationClip v1` avec durée, boucle et marker optionnel,
+prêt à recevoir des pistes génériques dans le timeline editor.
+- [x] Garder chaque état de prompt isolé ; fermer ou annuler un assistant ne
+  doit pas modifier le projet ni polluer le prompt suivant.
+- [x] Résoudre automatiquement les conflits d’identifiants par suffixe et
+  afficher l’identifiant calculé ainsi que la destination avant confirmation.
+- [x] Tester les modèles de prompt et leurs validations sans Dear ImGui.
+- [x] Sortir de `main.cpp` l’orchestration des imports, des previews OpenGL et
+  du legacy afin de n’y laisser que le routage et le rendu des widgets.
+
+Gate : deux opérations différentes ne partagent ni libellé ambigu, ni état
+caché, ni publication implicite.
+
+État : gate partiellement validé. La séparation des libellés, des modèles et
+des états, la publication d’artwork, `Add existing` et l’extraction du workflow
+d’import sont livrées.
+
+## Étape C — `VectorAsset v2` natif
+
+Tranche livrée : dimensions et origine du document, nœuds et formes à
+identifiants stables, visibilité, verrouillage, transform, rectangle, ellipse,
+fill couleur, transparent ou image locale, cadrage et transform du fill,
+opacité, liaison à la déformation, round-trip, publication atomique et
+validation du graphe headless. Les cases ci-dessous restent ouvertes
+lorsqu’elles contiennent encore des variantes non livrées.
+
+- [x] Définir des identifiants stables pour document, nœuds, formes et
+  ressources de fill.
+- [x] Stocker rectangle, ellipse, ligne et chemin `move/line/cubic/close`.
+- [x] Stocker fill couleur, fill image, transform du fill, opacité, contour,
+  largeur, jointure, extrémité et ordre de dessin.
+- [x] Autoriser une image locale comme contenu d’une forme sans transformer la
+  forme en sprite ou en bitmap autonome.
+- [x] Conserver hiérarchie, groupes, visibilité, verrouillage, transform, pivot
+  et clipping.
+- [x] Limiter la première version aux contours simples ; détecter les
+  auto-intersections au lieu de produire une géométrie ambiguë.
+- [x] Aplatir les Bézier selon une tolérance fournie par la vue, trianguler de
+  façon déterministe et mettre en cache la géométrie par version de document.
+- [x] Charger les SVG liés avec NanoSVG ; convertir explicitement les chemins
+  cubiques, fills couleur et contours simples, et signaler gradients ou paints
+  non pris en charge avant validation.
+- [ ] Ajouter round-trip, migration v1, validation stricte, chemins sûrs,
+  tessellation et rendu headless.
+
+Gate : un artwork combinant contour vectoriel et image remplissante est créé,
+sauvegardé, rechargé et rendu sans atlas ni rasterisation persistante.
+
+Le convertisseur NanoSVG produit désormais un `VectorAsset v2 native` pour les
+chemins cubiques, fills couleur et contours simples ; les pertes sont
+diagnostiquées avant publication. Asset Studio expose cette conversion comme
+commande undoable, avec retour au SVG lié et publication native atomique. Le
+payload headless de fill image et la triangulation de sa silhouette sont
+désormais disponibles. Les draw packets appliquent les transforms locales et
+parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
+initialise et dessine les triangles de fills couleur dans le canvas Asset
+Studio ainsi que les contours ouverts/fermés. Asset Studio résout maintenant
+les `TextureAsset` locaux à la demande et met leurs handles GPU en cache ; la
+validation visuelle complète du gate reste ouverte. Les `clipNodeId` simples
+sont maintenant appliqués par stencil dans le backend ; clips imbriqués,
+gizmos de clip et validation visuelle complète restent ouverts.
+
+## Étape D — Personnalisateur intégré
+
+Tranche livrée : navigateur persistant, sélection d'un artwork natif,
+prévisualisation rectangles/ellipses, pan, zoom sous le curseur et édition des
+nœuds avec historique, sauvegarde, autosave et récupération. Les cases
+ci-dessous restent ouvertes jusqu'au support complet de tous les nœuds et des
+draw packets du renderer.
+
+- [ ] Ajouter canvas avec pan, zoom sous le curseur, cadrage, grille et unités.
+
+Le canvas natif affiche désormais une grille adaptative et son pas en unités
+monde ; le cadrage explicite et les interactions de gizmo restent ouverts.
+- [ ] Ajouter arbre de calques/nœuds, sélection multiple, verrouillage,
+  visibilité, groupes et ordre Z.
+
+L’inspecteur permet désormais de choisir le parent et le clip d’un nœud natif
+avec historique et validation ; l’arbre de calques, la sélection multiple et
+les groupes restent ouverts.
+- [ ] Ajouter plume Bézier, primitives, édition des nœuds et poignées
+  liées/libres, ouverture et fermeture de contour.
+- [x] Ajouter gizmos rotation, échelle et pivot ; la transform du fill reste
+  indépendante du transform de la forme et ouverte.
+- [ ] Ajouter sélecteur de fill : couleur, image, motif et matériau référencé.
+- [ ] Ajouter modes de cadrage image (`contain`, `cover`, `stretch`, libre),
+  offset, rotation et échelle dans le masque.
+- [ ] Ajouter presets réutilisables sans figer les propriétés dans le code.
+- [ ] Brancher toutes les mutations à undo/redo, fusion continue, dirty,
+  autosave et récupération.
+- [ ] Ajouter une prévisualisation fidèle utilisant les mêmes draw packets que
+  le futur runtime.
+
+Gate : l’utilisateur fabrique et personnalise entièrement un asset esthétique
+dans Asset Studio sans préparer une spritesheet externe.
+
+Le canvas permet désormais de déplacer, faire pivoter et mettre à l’échelle le
+nœud sélectionné par poignées, ainsi que de déplacer son pivot sans changer la
+géométrie visuelle ; chaque geste utilise la même commande réversible que
+l’inspecteur. La transformation indépendante du fill reste ouverte.
+
+## Étape E — Keyframes génériques et intelligentes
+
+- [x] Définir `PropertyDescriptor` : identifiant stable, chemin affiché, type,
+  lecture, écriture, bornes, unité, animabilité et mode de composition.
+- [x] Définir `PropertyBinding` par `nodeId + componentId + propertyId`, jamais
+  par pointeur, index temporaire ou chaîne interprétée au runtime.
+- [x] Supporter scalaire, `Vec2`, couleur, booléen et référence de ressource.
+  Angle, transform et paramètres de fill restent à relier aux descripteurs.
+- [x] Définir `AnimationClip v1` : durée, boucle, markers, pistes typées et clés.
+- [x] Supporter step, linear et cubic ; tangentes, easing et rotation par
+  chemin angulaire court restent à définir.
+- [x] Lister automatiquement dans la timeline toutes les propriétés déclarées
+  animables par le registre.
+- [x] Définir des états et transitions déterministes avec conditions
+  booléennes/numériques, priorités et exit time normalisé.
+- [x] Persister les state machines d’entité et les évaluer dans Preview Runtime
+  avec paramètres d’instance booléens/numériques.
+- [x] Définir l’ordre des contraintes copy-transform, limites et look-at et
+  refuser les cycles avant résolution.
+- [x] Ajouter IK 2D par FABRIK avec racine fixe, tolérance et nombre maximal
+  d’itérations déterministe.
+- [x] Persister les chaînes FABRIK dans EntityDefinition et les résoudre dans Preview Runtime.
+- [x] Ajouter XPBD distance, flexion, aire, pin et collision avec compliance,
+  lambdas et quantification après sous-pas.
+- [x] Ajouter déformation par maillage triangulé et poids par nœud.
+- [ ] Un geste « déplacer de A à B » capture la valeur de départ au temps A et
+  la valeur d’arrivée au temps B, puis crée ou met à jour la piste générique.
+- [x] Supporter création explicite de clé, déplacement et suppression de clés
+  par commandes undo/redo. Auto-key, multi-sélection, copier/coller, snapping
+  et scrubbing restent à ajouter.
+- [x] Exposer dans Asset Studio l’insertion de toutes les valeurs
+  `AnimationValue` (`Vec2`, scalaire, couleur, booléen et ressource).
+- [ ] Permettre valeurs absolues, offsets relatifs et composition additive sans
+  coder une animation particulière dans le moteur.
+- [ ] Prévisualiser une animation sur n’importe quelle propriété compatible et
+  expliquer les liaisons devenues invalides après modification du document.
+- [ ] Évaluer dans un ordre déterministe : valeurs de base, pistes, contraintes,
+  déformations, puis simulation.
+- [ ] Tester interpolation, tangentes, bindings, renommage, suppression de
+  cible, reload et replay déterministe.
+
+Gate : le même éditeur crée translation, rotation, changement de fill et
+transformation d’image de A vers B sans ajouter de code spécifique à ces cas.
+
+## Étape F — Entités, matériaux et déformations
+
+- [x] Définir `MaterialDefinition v1` autour des fills et contours, sans
+  dépendance sprite.
+- [x] Définir `EntityDefinition v1` avec nœuds stables, parentage, transforms,
+  drawables vectoriels et références d’artworks.
+- [x] Persister les contraintes `copy-transform`, `limits` et `look-at` dans
+  l’entité, avec ordre déterministe, cycles et nœuds absents refusés.
+- [x] Persister un maillage de déformation optionnel avec positions de repos,
+  influences de nœuds et triangles validés headless.
+- [x] Persister un état XPBD optionnel avec particules, lambdas et les cinq
+  familles de contraintes validées headless.
+- [x] Charger les maillages et états XPBD par instance dans Preview Runtime,
+  exposer leur évaluation headless et exécuter XPBD à pas fixe.
+- [x] Injecter les positions déformées dans les draw packets lorsque les
+  sommets et la topologie correspondent exactement.
+- [x] Ajouter l’inspecteur hiérarchique : nom, parent et transform passent par
+  `CommandStack`, avec sauvegarde atomique, autosave et récupération d’entité.
+- [x] Ajouter, dupliquer et supprimer les nœuds de l’arbre avec refus des
+  suppressions qui laisseraient des enfants orphelins.
+- [x] Rendre les clips éditables : durée, boucle, première piste générique,
+  clés `Vec2` et interpolation dans Asset Studio.
+- [x] Lister les clés d’une track et supprimer une clé de façon undoable, en
+  conservant au moins une clé par track.
+- [x] Déplacer les clés avec fusion des gestes continus et évaluer le clip via
+  un scrubber temporel.
+- [x] Ajouter et supprimer les markers d’un clip avec validation de l’id et du
+  temps dans la durée.
+- [x] Prévisualiser les drawables vectoriels et texturés d’une entité dans le
+  viewport OpenGL, avec composition des transforms et matériaux.
+- [x] Refuser cycles, références invalides et valeurs non finies.
+- [x] Ajouter contraintes copy-transform, limites, look-at et ordre explicite
+  dans Preview Runtime.
+- [ ] Ajouter maillage triangulé, poids, FABRIK 2D et solveur XPBD unifié.
+- [ ] Quantifier l’état simulé après chaque sous-pas pour le replay portable.
+- [x] Ajouter `fabric_asset_preview` headless basé sur les draw packets réels.
+
+Gate : une entité vectorielle personnalisée, animée et déformée conserve le
+même résultat visible après sauvegarde, rechargement et replay.
+
+## Étape G — Map Studio
+
+- [ ] Réutiliser la session, les prompts typés, le personnalisateur de
+  propriétés et le renderer vectoriel d’Asset Studio.
+- [x] Définir `MapDocument v1`, calques, prefabs, instances, collisions et
+  triggers et événements nommés sans référence obligatoire à une frame de sprite.
+- [x] Indexer les instances par chunks de 64 × 64 unités ; le benchmark
+  100 000 éléments et la cible 10 000 visibles restent à mesurer.
+- [x] Ajouter placement, snapping configurable et overrides typés réversibles
+  des instances et prefabs ; profondeur, sélection, visibilité et verrouillage
+  des calques sont maintenant commandables, avec translation multi-sélection
+  atomique, verrouillage effectif, duplication et réordonnancement.
+
+Map Studio expose maintenant un formulaire typé pour éditer les overrides de
+prefabs : booléen, entier, réel, texte, `Vec2` et référence de ressource.
+Les propriétés effectives d’une instance prefab sont visibles et les valeurs
+locales peuvent remplacer un override hérité depuis le même panneau.
+Les triggers sont maintenant créables et supprimables depuis le panneau, avec
+référence explicite à un événement et à une collision ; ces actions passent
+par l’historique réversible de `MapSession`.
+Les collisions sont également listées avec leur index, leur forme, leur couche,
+leur centre, leurs dimensions et leur statut capteur/solide afin de rendre les
+références de triggers vérifiables dans l’éditeur.
+Une collision sélectionnée peut maintenant être modifiée depuis l’inspecteur
+(centre, rayon, longueur de capsule et statut capteur) puis enregistrée comme
+une commande réversible ; les calques verrouillés refusent la mutation.
+Les points des polygones et chaînes sont également éditables, ajoutables et
+supprimables en respectant leur nombre minimal.
+Les poignées de points du canvas permettent en plus de déplacer directement
+un sommet sélectionné, avec un commit atomique.
+Les triggers sont maintenant sélectionnables, éditables (événement et
+collision référencée) et annotés dans le canvas avec le nom de leur événement.
+Les payloads d’événements sont maintenant éditables avec les six types de
+propriété partagés, remplaçables par identifiant et visibles depuis le trigger
+qui les consomme.
+Un calque peut être choisi comme calque actif ; les instances sélectionnées
+peuvent y être déplacées en une commande atomique, avec refus des calques
+verrouillés.
+Le placement interactif permet maintenant de choisir un identifiant, une
+ressource `entity` ou `prefab`, puis de créer l’instance au clic dans le
+canvas avec snapping et historique.
+`Ctrl + clic` duplique directement l’instance sélectionnée à la position du
+curseur, en conservant le snapping et l’historique déterministe.
+
+Map Studio édite également la propriété d’instance réservée `animation` avec
+un type de référence explicite ; le Preview Runtime la résout directement ou
+depuis les overrides du prefab.
+Un glisser dans le canvas sélectionne maintenant les instances visibles dans
+un rectangle ; Shift ajoute ou retire la zone de la sélection existante.
+Une sélection multiple peut être déplacée en glissant n’importe quelle
+instance du groupe ; le delta commun est soumis au snapping et enregistré en
+une seule commande.
+Le canvas accepte maintenant `Delete`, les flèches directionnelles et `Ctrl+D`
+pour supprimer, nudger ou dupliquer la sélection, avec la même validation et
+le même historique que les boutons.
+`F` cadre la sélection et `Home` cadre toutes les instances visibles sans
+capturer les touches pendant l’édition de texte.
+- [x] Ajouter un canvas 2D avec grille adaptative, pan au bouton milieu, zoom
+  centré sous le curseur, rendu des instances/collisions et sélection au clic.
+  Le panneau `Transform gizmo` permet maintenant d’éditer position, rotation,
+  échelle et pivot d’une instance sélectionnée, chaque modification étant
+  enregistrée par `MapSession`.
+  Les poignées du canvas permettent aussi de translater, faire pivoter et
+  mettre à l’échelle directement une instance ; le geste est enregistré en
+  une seule commande à son relâchement.
+  La translation dispose maintenant d’un snapping activable avec taille de
+  grille et origine configurables ; rotation et échelle restent continues.
+  Les commandes `Frame selection` et `Frame all` centrent désormais le canvas
+  et ajustent automatiquement le zoom sur les instances visibles.
+- [x] Intégrer Box2D 3.1.1 dans `fabric_physics` avec monde possédé, pas fixe
+  et validation headless, puis instancier les formes/capteurs map validés.
+- [x] Appliquer commandes, autosave, récupération proposée et validation
+  headless à toutes les opérations de `MapSession`.
+
+`MapSession` écrit désormais les maps dirty dans le miroir autosave après
+inactivité, valide le document avant publication atomique et propose la
+récupération uniquement pour un autosave valide plus récent. Le document
+principal reste inchangé jusqu’à un Save explicite.
+
+Gate : une map vectorielle de référence est éditable, sauvegardée, validée et
+inspectable avec collisions et événements.
+
+## Étape H — Preview Runtime
+
+- [x] Valider tout le graphe avant création de la fenêtre.
+- [x] Charger et évaluer les `AnimationClip v1` du projet avant création de la
+  fenêtre ; l’évaluation headless reste disponible par `ResourceId`.
+- [x] Relier une instance de map à un `AnimationClip v1` par sa propriété
+  réservée `animation` et appliquer sa position animée aux draw packets.
+- [x] Appliquer aussi rotation et échelle des pistes `transform` aux draw
+  packets d’une instance liée.
+- [x] Appliquer couleur et opacité des pistes `material` aux draw packets
+  vectoriels d’une instance liée.
+- [x] Appliquer les pistes `transform` aux poses de déformation avant le calcul
+  des sommets animés.
+- [x] Réévaluer l’ordre pistes → contraintes → IK → poses de déformation à
+  chaque instant headless ou frame runtime.
+- [x] Partager les nœuds résolus avec les draw packets visuels des instances.
+- [x] Mettre en cache les évaluations animation et nœuds par instance et
+  instant de frame.
+- [x] Mettre en cache les assets vectoriels convertis et leur géométrie native
+  partagée entre instances.
+- [ ] Charger artworks natifs, fills image, matériaux, entités, animations,
+  maps, contraintes et solveurs sans conversion manuelle.
+- [x] Ajouter cache vectoriel, batching des fills image, culling par chunk, tri
+  stable et caméra interpolée.
+- [x] Appliquer le tri stable couche → profondeur → Z → identifiant aux packets
+  du Preview Runtime.
+- [x] Exécuter Box2D et XPBD à 60 Hz fixe puis rendre l’état XPBD avec interpolation.
+- [x] Ajouter smoke test, benchmark et replay par checkpoints.
+- [x] Réduire les draw calls des packets contigus compatibles par batching stable
+- [x] Mettre en cache les uniform locations OpenGL et réutiliser la capacité des VBO/IBO
+- [x] Utiliser l’index des chunks et les bounds précalculés pour limiter les
+  instances et packets statiques candidats au culling
+- [x] Ajouter un benchmark OpenGL synthétique à 10 000 packets avec p95 et draw calls
+- [x] Ajouter un benchmark Preview Runtime avec projet temporaire et map dense
+- [ ] Mesurer puis tenir 60 FPS p95 à 1440 × 900 avec 10 000 éléments visibles sur la scène
+  de référence.
+
+Gate : une map produite par les deux ateliers fonctionne directement sur les
+trois plateformes.
+
+## Étape I — Runtime jouable
+
+- [x] Ajouter actions clavier/manette, scènes, transitions et points d’entrée.
+- [x] Ajouter contrôleur de personnage, caméra, zones et événements en
+  réutilisant les propriétés et animations génériques.
+- [x] Ajouter audio PCM WAV, progression versionnée atomique et replay gameplay.
+
+Le runtime accepte désormais `--audio <wav>`, `--save-slot <slot>`,
+`--replay <id>` et `--character` ; les formats et leurs tests headless sont
+validés dans `npm run validate`.
+
+Les actions clavier/manette, les scènes, les transitions headless, la caméra et
+le contrôleur SDL sont implémentés. Les événements de zones peuvent maintenant
+déclencher une transition de scène via un hand-off propre ; les autres
+événements gameplay restent ouverts.
+
+`game_runtime` expose aussi le suivi de caméra et les limites monde via des
+options CLI validées.
+Les bindings d’actions peuvent être fournis par `--bind` sans modifier le
+programme.
+Asset Studio peut créer et modifier ces bindings dans des `InputDocument v2`
+persistants, avec undo/redo et autosave atomique.
+Les bindings peuvent maintenant être publiés dans `assets/input/<id>.input.json`
+et chargés automatiquement par `PreviewRuntime` via `default` ou `--input <id>`.
+- [ ] Créer uniquement des niveaux, personnages et artworks originaux.
+
+Gate final : prototype original jouable, déterministe et construit uniquement
+depuis les documents produits par Asset Studio et Map Studio.
+
+## Validation continue
+
+- [ ] Mettre à jour ADR et C4 avant chaque nouveau contrat, module ou dépendance.
+- [ ] Ajouter migration, round-trip, parseur strict et validateur pour chaque
+  version de document.
+- [ ] Tester chaque commande d’éditeur avec execute, undo, redo, merge et
+  restauration de l’état clean.
+- [ ] Tester autosave, récupération et sauvegarde atomique sans fenêtre.
+- [ ] Exécuter `npm run validate` avant chaque commit.
+- [ ] Exiger macOS, Windows et Linux verts avant de cocher un gate.
+- [x] Retirer le code sprite uniquement après inventaire et confirmation
+  explicite, sans toucher à des ressources utilisateur.

@@ -1,0 +1,114 @@
+{
+  "anchors": [
+    {
+      "id": "center",
+      "name": "Center",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    }
+  ],
+  "bounds": {
+    "origin": {
+      "x": -1.0,
+      "y": -0.75
+    },
+    "size": {
+      "x": 2.0,
+      "y": 1.5
+    }
+  },
+  "composition": {
+    "expectedType": "visualComposition",
+    "id": "head-eye-composition"
+  },
+  "id": "head-eye",
+  "name": "Head Eye",
+  "parameters": [
+    {
+      "animatable": true,
+      "default": {
+        "type": "vec2",
+        "value": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "id": "scale",
+      "name": "Scale",
+      "target": {
+        "componentId": "transform",
+        "nodeId": "eye",
+        "propertyId": "scale"
+      },
+      "type": "vec2"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "angle",
+        "value": 0.0
+      },
+      "id": "rotation",
+      "name": "Rotation",
+      "target": {
+        "componentId": "transform",
+        "nodeId": "eye",
+        "propertyId": "rotationDegrees"
+      },
+      "type": "angle"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "scalar",
+        "value": 1.0
+      },
+      "id": "opacity",
+      "name": "Opacity",
+      "target": {
+        "componentId": "layer",
+        "nodeId": "eye",
+        "propertyId": "opacity"
+      },
+      "type": "scalar"
+    }
+  ],
+  "schemaVersion": 1,
+  "type": "visualComponent",
+  "variants": [
+    {
+      "id": "sleepy",
+      "name": "Sleepy",
+      "overrides": [
+        {
+          "parameterId": "scale",
+          "value": {
+            "type": "vec2",
+            "value": {
+              "x": 1.0,
+              "y": 0.550000011920929
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "wide",
+      "name": "Wide",
+      "overrides": [
+        {
+          "parameterId": "scale",
+          "value": {
+            "type": "vec2",
+            "value": {
+              "x": 1.2000000476837158,
+              "y": 1.100000023841858
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

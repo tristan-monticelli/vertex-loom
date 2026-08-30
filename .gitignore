@@ -14,3 +14,4 @@ docs/**/*.svg
 *.bak
 *.old
 *~
+imgui.ini

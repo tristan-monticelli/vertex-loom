@@ -6,25 +6,42 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
 Vertex Loom is a cross-platform C++20 foundation for a 2D engine and native
-authoring tools focused on original textile, sprite, and vector worlds.
+authoring tools focused on original textile and resolution-independent vector
+worlds.
 
 The project prioritizes Asset Studio and Map Studio quality before a complete
-game runtime. The current milestone provides the shared project format and
-validation core; the editor and runtime executables are intentionally minimal.
+game runtime. The shared project format is complete and Phase 2 now has its
+first native Asset Studio workspace.
 
 ## Current capabilities
 
 - Versioned JSON project manifests shared by tools and runtime.
 - Strict resource identifiers and portable local asset paths.
-- Explicit schema migration from the prototype format to version 1.
+- Typed resource registry with duplicate, missing reference, and cycle checks.
+- Sequential schema migration from prototype v0 and project v1 to version 2.
 - Atomic manifest replacement on macOS, Linux, and Windows.
 - Human-readable and JSON Lines diagnostics.
 - Headless project validation.
+- Native SDL2/OpenGL/Dear ImGui Asset Studio shell with project inspection.
+- Typed Create, Import, and Add existing hub with isolated prompt state.
+- Safe project creation with scale presets, live validation, and final review.
+- Persistent PNG and SVG imports with versioned asset documents and OpenGL previews.
+- Non-destructive raster views with source-pixel crop, pivot, transform and
+  Asset Studio preview controls, shared draw packets, and runtime pixel parity.
+- Strict VisualComposition v1 documents with ordered raster, vector,
+  component, and textured-path layers.
+- Reusable VisualComponent v1 resources with typed parameters, variants,
+  anchors, instance overrides, bounds, and animatable property discovery.
 - Unified CMake, CTest, Node governance, architecture, and documentation checks.
 
 ## Build and test
 
-Requirements: CMake 3.24+, a C++20 compiler, Node.js 22+, and npm 10+.
+Requirements: CMake 3.24+, a C++20 compiler, Node.js 22+, npm 10+, and OpenGL
+development files. On Ubuntu, install them with:
+
+```sh
+sudo apt-get install libgl1-mesa-dev libgtk-3-dev libsdl2-dev
+```
 
 ```sh
 npm install
@@ -35,6 +52,13 @@ For the C++ suite only:
 
 ```sh
 npm run validate:cpp
+```
+
+Open Asset Studio, optionally with a project directory:
+
+```sh
+./build/asset_studio
+./build/asset_studio tests/fixtures/valid-project
 ```
 
 ## Validate a project
@@ -51,10 +75,13 @@ and `schemas` directories. See the
 
 ## Roadmap
 
-1. Asset Studio static authoring and import pipeline.
-2. Hierarchical animation and textile deformation controls.
-3. Map Studio composition, collisions, triggers, and events.
+1. Native vector documents, typed creation prompts, and the integrated customizer.
+2. Generic property-bound keyframes, hierarchical animation, and textile deformation.
+3. Map Studio composition, collisions, triggers, and events without sprite dependencies.
 4. Preview runtime, followed by the game runtime.
+
+The sprite pipeline has been removed. Local PNG textures and linked SVG sources
+remain supported without an atlas or automatic vector conversion.
 
 Vertex Loom does not include or reproduce Nintendo characters or assets.
 

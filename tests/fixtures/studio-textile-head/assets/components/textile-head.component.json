@@ -1,0 +1,32 @@
+{
+  "anchors": [
+    {
+      "id": "center",
+      "name": "Center",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    }
+  ],
+  "bounds": {
+    "origin": {
+      "x": -4.0,
+      "y": -3.0
+    },
+    "size": {
+      "x": 8.0,
+      "y": 6.0
+    }
+  },
+  "composition": {
+    "expectedType": "visualComposition",
+    "id": "textile-head-composition"
+  },
+  "id": "textile-head",
+  "name": "Textile Head",
+  "parameters": [],
+  "schemaVersion": 1,
+  "type": "visualComponent",
+  "variants": []
+}

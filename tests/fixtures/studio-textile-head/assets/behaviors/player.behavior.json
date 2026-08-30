@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "type": "behavior",
+  "id": "player",
+  "name": "Player behavior",
+  "parameters": [],
+  "nodes": [
+    {
+      "id": "move-source",
+      "nodeType": "action_source",
+      "ports": [
+        {"id": "out", "direction": "output", "valueType": "signal"}
+      ],
+      "properties": [
+        {"id": "semantic_id", "value": {"type": "text", "value": "move"}}
+      ]
+    }
+  ],
+  "connections": []
+}

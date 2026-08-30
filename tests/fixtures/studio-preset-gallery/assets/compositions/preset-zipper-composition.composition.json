@@ -1,0 +1,415 @@
+{
+  "id": "preset-zipper-composition",
+  "layers": [
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "left-rail",
+      "kind": "texturedPath",
+      "name": "Left rail",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "texturedPath",
+        "id": "preset-zipper-left-rail"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 0.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "right-rail",
+      "kind": "texturedPath",
+      "name": "Right rail",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "texturedPath",
+        "id": "preset-zipper-right-rail"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 0.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-1",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -1.75
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-2",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -1.3611111640930176
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-3",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -0.9722222089767456
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-4",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -0.5833333134651184
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-5",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": -0.1944444179534912
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-6",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.194444477558136
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-7",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.5833333730697632
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-8",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.9722222685813904
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-9",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 1.3611111640930176
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "tooth-10",
+      "kind": "vector",
+      "name": "Tooth",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-tooth"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 1.75
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 1.0
+    },
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "slider",
+      "kind": "vector",
+      "name": "Slider",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "vector",
+        "id": "preset-zipper-slider"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 2.0
+    }
+  ],
+  "name": "Zipper Composition",
+  "schemaVersion": 1,
+  "size": {
+    "x": 1.600000023841858,
+    "y": 4.400000095367432
+  },
+  "type": "visualComposition"
+}

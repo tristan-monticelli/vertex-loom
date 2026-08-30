@@ -1,0 +1,43 @@
+{
+  "id": "beam-composition",
+  "layers": [
+    {
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "id": "seam",
+      "kind": "texturedPath",
+      "name": "Seam",
+      "opacity": 1.0,
+      "resource": {
+        "expectedType": "texturedPath",
+        "id": "beam-rail"
+      },
+      "transform": {
+        "pivot": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "position": {
+          "x": 0.0,
+          "y": 0.0
+        },
+        "rotationDegrees": 0.0,
+        "scale": {
+          "x": 1.0,
+          "y": 1.0
+        }
+      },
+      "visible": true,
+      "zOrder": 0.0
+    }
+  ],
+  "name": "Beam Composition",
+  "schemaVersion": 1,
+  "size": {
+    "x": 4.0,
+    "y": 0.800000011920929
+  },
+  "type": "visualComposition"
+}

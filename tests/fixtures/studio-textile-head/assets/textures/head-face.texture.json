@@ -1,0 +1,10 @@
+{
+  "height": 2,
+  "id": "head-face",
+  "name": "Head Face",
+  "pixelFormat": "rgba8",
+  "schemaVersion": 1,
+  "source": "assets/textures/head-face.png",
+  "type": "texture",
+  "width": 2
+}

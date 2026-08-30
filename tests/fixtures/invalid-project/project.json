@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "invalid-project",
   "name": "Invalid Project",
+  "pixelsPerUnit": 100.0,
   "directories": {
     "assets": "../outside",
     "entities": "entities",

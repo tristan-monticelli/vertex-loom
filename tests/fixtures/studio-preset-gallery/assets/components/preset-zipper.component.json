@@ -1,0 +1,81 @@
+{
+  "anchors": [
+    {
+      "id": "center",
+      "name": "Center",
+      "position": {
+        "x": 0.0,
+        "y": 0.0
+      }
+    }
+  ],
+  "bounds": {
+    "origin": {
+      "x": -0.800000011920929,
+      "y": -2.200000047683716
+    },
+    "size": {
+      "x": 1.600000023841858,
+      "y": 4.400000095367432
+    }
+  },
+  "composition": {
+    "expectedType": "visualComposition",
+    "id": "preset-zipper-composition"
+  },
+  "id": "preset-zipper",
+  "name": "Zipper",
+  "parameters": [
+    {
+      "animatable": true,
+      "default": {
+        "type": "vec2",
+        "value": {
+          "x": 0.0,
+          "y": 0.0
+        }
+      },
+      "id": "slider-position",
+      "name": "Slider position",
+      "target": {
+        "componentId": "transform",
+        "nodeId": "slider",
+        "propertyId": "position"
+      },
+      "type": "vec2"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "angle",
+        "value": 0.0
+      },
+      "id": "slider-rotation",
+      "name": "Slider rotation",
+      "target": {
+        "componentId": "transform",
+        "nodeId": "slider",
+        "propertyId": "rotationDegrees"
+      },
+      "type": "angle"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "scalar",
+        "value": 1.0
+      },
+      "id": "slider-opacity",
+      "name": "Slider opacity",
+      "target": {
+        "componentId": "layer",
+        "nodeId": "slider",
+        "propertyId": "opacity"
+      },
+      "type": "scalar"
+    }
+  ],
+  "schemaVersion": 1,
+  "type": "visualComponent",
+  "variants": []
+}

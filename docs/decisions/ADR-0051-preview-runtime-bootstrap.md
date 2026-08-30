@@ -1,0 +1,20 @@
+# ADR-0051 — Bootstrap du Preview Runtime
+
+## Statut
+
+Accepté.
+
+## Décision
+
+`game_runtime` utilise `fabric_runtime::PreviewRuntime`. Le chargement complet
+du projet et de la map, ainsi que la construction du monde Box2D, précèdent
+`SDL_Init` et toute création de fenêtre. Une erreur de validation empêche donc
+le runtime d’atteindre l’interface graphique.
+
+Le mode `--smoke-test` exécute un nombre fini de frames sans interaction et le
+mode `--benchmark` exécute par défaut 600 frames. Le runtime expose les packets
+de la dernière frame via `last_frame_packets()` pour permettre une inspection
+headless des drawables, matériaux et animations appliqués. La physique avance
+avec un pas fixe de 1/60 seconde ;
+les modes finis rapportent les frames, pas physiques, draw calls, triangles, la
+durée mesurée et le p95 du temps de frame.

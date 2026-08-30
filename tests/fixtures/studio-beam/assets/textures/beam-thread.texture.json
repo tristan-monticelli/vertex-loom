@@ -1,0 +1,10 @@
+{
+  "height": 2,
+  "id": "beam-thread",
+  "name": "Beam Thread",
+  "pixelFormat": "rgba8",
+  "schemaVersion": 1,
+  "source": "assets/textures/beam-thread.png",
+  "type": "texture",
+  "width": 2
+}

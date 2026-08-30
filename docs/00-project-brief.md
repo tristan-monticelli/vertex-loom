@@ -3,9 +3,18 @@
 ## Summary
 
 - Name: Vertex Loom
-- Problem solved: moteur 2D natif et outils pour un jeu de plateformes original inspiré d'une esthétique textile et diorama.
-- Users: développeur moteur, artiste technique et level designer.
-- In scope: runtime 2D, rendu avec profondeur, entités, animations, physique, ressources textiles, Asset Studio et Map Studio.
+- Problem solved: moteur 2D natif et ateliers de création pour un jeu de
+  plateformes original à rendu vectoriel, inspiré d'une esthétique textile et
+  diorama.
+- Users: développeur moteur, artiste technique, level designer puis créateur
+  de maps utilisant les mêmes capacités d'authoring depuis le jeu.
+- In scope: runtime 2D, rendu avec profondeur, artworks vectoriels natifs,
+  images recadrées sans altération de leur source, compositions par calques,
+  composants visuels paramétriques, chemins texturés, personnalisateur intégré,
+  keyframes génériques, mécaniques physiques composables, entités, Asset Studio,
+  Map Studio, comportements génériques attachables aux entités, transformations
+  atomiques entre entités et publication portable de maps vers un catalogue
+  intégré au jeu.
 - Out of scope: assets ou personnages de Nintendo, backend en ligne, consoles et outil 3D généraliste.
 
 ## Constraints
@@ -29,6 +38,19 @@
 
 - Le runtime charge un projet et maintient 60 FPS sur une scène de référence.
 - Une entité peut être créée, transformée, animée, sauvegardée puis rechargée.
+- Le même BehaviorGraph peut piloter une instance depuis une action physique,
+  une décision IA ou un événement, sans branche joueur/monstre dans le runtime.
+- Une transformation remplace atomiquement l'entité d'une instance selon une
+  politique de transfert versionnée et reproductible après publication.
+- Un artwork peut combiner un contour vectoriel et une image remplissante,
+  puis animer leurs transforms indépendamment sans spritesheet.
+- Une texture importée reste intacte ; son recadrage et ses overlays sont
+  éditables, réversibles et reproduits à l'identique par les studios et le
+  runtime.
+- Une fonctionnalité jouable n'est livrée qu'après authoring, preview,
+  sauvegarde et validation dans le studio qui la possède.
 - Une map peut être composée, validée, sauvegardée et exécutée dans le runtime.
+- Une map publiée résout ses dépendances dans un paquet portable et constitue
+  l'unité de contenu proposée au catalogue du jeu.
 - Les deux éditeurs et le runtime lisent le même format de projet versionné.
 - Collisions, sérialisation et validation des ressources sont testées automatiquement.

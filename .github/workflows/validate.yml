@@ -28,6 +28,10 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Install Linux desktop development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev
+
       - name: Set up and validate starter
         run: npm run setup
 
@@ -37,3 +41,173 @@ jobs:
       - name: Check POSIX hook syntax
         if: runner.os != 'Windows'
         run: sh -n .githooks/pre-commit .githooks/pre-push .githooks/commit-msg
+
+  runtime-benchmark:
+    name: Preview Runtime benchmark / ${{ matrix.os }}
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Linux OpenGL and virtual display dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev xvfb
+
+      - name: Configure runtime benchmark
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
+
+      - name: Build runtime benchmark
+        run: cmake --build build --config Release --target fabric_runtime_benchmark fabric_render_benchmark --parallel
+
+      - name: Run runtime benchmark on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./build/fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60 --report runtime-benchmark-linux.json
+
+      - name: Run runtime benchmark on macOS
+        if: runner.os == 'macOS'
+        run: ./build/fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60 --report runtime-benchmark-macos.json
+
+      - name: Run runtime benchmark on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\Release\fabric_runtime_benchmark.exe --instances 10000 --frames 600 --min-fps 60 --report runtime-benchmark-windows.json
+
+      - name: Run renderer benchmark on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./build/fabric_render_benchmark --packets 10000 --frames 600 --report render-benchmark-linux.json
+
+      - name: Run renderer benchmark on macOS
+        if: runner.os == 'macOS'
+        run: ./build/fabric_render_benchmark --packets 10000 --frames 600 --report render-benchmark-macos.json
+
+      - name: Run renderer benchmark on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\Release\fabric_render_benchmark.exe --packets 10000 --frames 600 --report render-benchmark-windows.json
+
+      - name: Archive benchmark reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-benchmark-${{ runner.os }}
+          path: '*-benchmark-*.json'
+          if-no-files-found: error
+
+  textile-reference-benchmark:
+    name: Textile reference benchmark / ${{ matrix.os }}
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Linux OpenGL and virtual display dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev xvfb
+
+      - name: Configure reference benchmark
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
+
+      - name: Build reference benchmark
+        run: cmake --build build --config Release --target fabric_runtime_benchmark --parallel
+
+      - name: Run textile reference benchmark on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./build/fabric_runtime_benchmark --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60 --report textile-reference-benchmark-linux.json
+
+      - name: Run textile reference benchmark on macOS
+        if: runner.os == 'macOS'
+        run: ./build/fabric_runtime_benchmark --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60 --report textile-reference-benchmark-macos.json
+
+      - name: Run textile reference benchmark on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\Release\fabric_runtime_benchmark.exe --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60 --report textile-reference-benchmark-windows.json
+
+      - name: Archive textile reference report
+        uses: actions/upload-artifact@v4
+        with:
+          name: textile-reference-benchmark-${{ runner.os }}
+          path: textile-reference-benchmark-*.json
+          if-no-files-found: error
+
+  publish-portable-map-package:
+    name: Publish portable map package
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Linux desktop development files
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev
+
+      - name: Configure package exporter
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
+
+      - name: Build package exporter
+        run: cmake --build build --config Release --target fabric_map_package_export --parallel
+
+      - name: Publish textile reference package
+        run: ./build/fabric_map_package_export --map textile-head-preview tests/fixtures/studio-textile-head "$RUNNER_TEMP/studio-package"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-map-package
+          path: ${{ runner.temp }}/studio-package
+          if-no-files-found: error
+
+  portable-map-package:
+    name: Portable map package / ${{ matrix.os }}
+    needs: publish-portable-map-package
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Install Linux desktop development files
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev xvfb
+
+      - name: Configure runtime
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
+
+      - name: Build runtime
+        run: cmake --build build --config Release --target game_runtime --parallel
+
+      - name: Download package produced on Linux
+        uses: actions/download-artifact@v5
+        with:
+          name: portable-map-package
+          path: portable-package
+
+      - name: Load package on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ./build/game_runtime --package portable-package --smoke-test 1
+
+      - name: Load package on macOS
+        if: runner.os == 'macOS'
+        run: ./build/game_runtime --package portable-package --smoke-test 1
+
+      - name: Load package on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .\build\Release\game_runtime.exe --package portable-package --smoke-test 1
