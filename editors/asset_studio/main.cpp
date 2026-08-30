@@ -5322,7 +5322,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             fabric::project::VisualComponentInstance{};
                     const auto added_ok = session.add_selected_entity_node(
                         std::move(added));
-                    if (added_ok) canvas.selected_node = entity.nodes.size();
+                    if (added_ok) canvas.selected_node = entity.nodes.size() - 1U;
                     return added_ok;
                 };
             ImGui::SeparatorText("Entity behavior");
