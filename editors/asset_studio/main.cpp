@@ -1699,15 +1699,17 @@ void draw_prompt_error(const fabric::editor::PromptValidation& validation,
 }
 
 void focus_prompt_field(const fabric::editor::PromptValidation& validation,
-                        const std::string_view field) {
+                        const std::string_view field,
+                        const std::string_view scope) {
     static std::string focused_error;
     if (validation.errors.empty()) {
         focused_error.clear();
         return;
     }
     if (validation.errors.front().field != field) return;
-    const std::string key = std::to_string(ImGui::GetID(std::string(field).c_str())) +
-        ":" + std::string(field) + ":" +
+    const std::string key = std::string(scope) + ":" +
+        std::to_string(ImGui::GetID(std::string(field).c_str())) + ":" +
+        std::string(field) + ":" +
         validation.errors.front().message;
     if (focused_error == key) return;
     ImGui::SetKeyboardFocusHere(-1);
@@ -6929,7 +6931,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::InputText("Parent folder", &destination)) {
             creation.project.parent_directory = destination;
         }
-        focus_prompt_field(validation, "destination");
+        focus_prompt_field(validation, "destination", "project-create");
         ImGui::SameLine();
         if (ImGui::Button("Browse...")) {
             std::array<char, 1024> selected{};
@@ -6938,7 +6940,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         draw_resource_name_field("Name##project-name", creation.project.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "project-create");
         const auto preset_label = std::string(fabric::editor::label(
             creation.project.preset));
         ImGui::SetNextItemWidth(300.0F);
@@ -6967,7 +6969,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.project.preset =
                 fabric::editor::ProjectScalePreset::custom;
         }
-        focus_prompt_field(validation, "pixelsPerUnit");
+        focus_prompt_field(validation, "pixelsPerUnit", "project-create");
         draw_prompt_error(validation, "destination");
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "pixelsPerUnit");
@@ -7013,16 +7015,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.artwork.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##artwork-name", creation.artwork.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "artwork-create");
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Width (world units)", &creation.artwork.width, 1.0, 10.0,
                            "%.2f");
-        focus_prompt_field(validation, "width");
+        focus_prompt_field(validation, "width", "artwork-create");
         ImGui::SameLine();
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Height (world units)", &creation.artwork.height, 1.0, 10.0,
                            "%.2f");
-        focus_prompt_field(validation, "height");
+        focus_prompt_field(validation, "height", "artwork-create");
         ImGui::TextUnformatted("Units: project world units");
         const auto origin_label =
             std::string(fabric::editor::label(creation.artwork.origin));
@@ -7105,7 +7107,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.artwork.image_transform.position = {
                     offset[0], offset[1]};
             }
-            focus_prompt_field(validation, "imageTransform");
+            focus_prompt_field(validation, "imageTransform", "artwork-create");
             float scale[] = {creation.artwork.image_transform.scale.x,
                              creation.artwork.image_transform.scale.y};
             if (ImGui::InputFloat2("Image scale (factor)", scale)) {
@@ -7129,7 +7131,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    "%.2f")) {
                 creation.artwork.image_opacity = opacity;
             }
-            focus_prompt_field(validation, "imageOpacity");
+            focus_prompt_field(validation, "imageOpacity", "artwork-create");
             ImGui::Checkbox("Warp pixels with vector shape (advanced)",
                             &creation.artwork.deform_image_with_shape);
             ImGui::TextDisabled(
@@ -7365,7 +7367,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.material.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##material-name", creation.material.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "material-create");
         float color[] = {creation.material.color.red,
                          creation.material.color.green,
                          creation.material.color.blue,
@@ -7377,7 +7379,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::SliderFloat("Opacity (0–1)", &opacity, 0.0F, 1.0F, "%.2f")) {
             creation.material.opacity = opacity;
         }
-        focus_prompt_field(validation, "opacity");
+        focus_prompt_field(validation, "opacity", "material-create");
         const auto blend_label = std::string(
             fabric::project::to_string(creation.material.blend));
         if (ImGui::BeginCombo("Blend", blend_label.c_str())) {
@@ -7452,10 +7454,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.entity.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##entity-name", creation.entity.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "entity-create");
         draw_resource_name_field("Root node name", creation.entity.node_name,
                                  360.0F);
-        focus_prompt_field(validation, "node_name");
+        focus_prompt_field(validation, "node_name", "entity-create");
         const auto drawable_label = std::string(
             fabric::project::to_string(creation.entity.drawable));
         if (ImGui::BeginCombo("Drawable", drawable_label.c_str())) {
@@ -7512,7 +7514,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::InputFloat2("Position (world units)", position)) {
             creation.entity.transform.position = {position[0], position[1]};
         }
-        focus_prompt_field(validation, "transform");
+        focus_prompt_field(validation, "transform", "entity-create");
         float scale[] = {creation.entity.transform.scale.x,
                          creation.entity.transform.scale.y};
         if (ImGui::InputFloat2("Scale (factor)", scale)) {
@@ -7562,7 +7564,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.animation.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##animation-name", creation.animation.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "animation-create");
         if (ImGui::Checkbox("Generic clip (no preview entity)",
                             &creation.animation.generic_preview) &&
             creation.animation.generic_preview)
@@ -7575,16 +7577,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SetNextItemWidth(220.0F);
         ImGui::InputDouble("Duration (seconds)", &creation.animation.duration,
                            0.1, 1.0, "%.2f");
-        focus_prompt_field(validation, "duration");
+        focus_prompt_field(validation, "duration", "animation-create");
         ImGui::Checkbox("Loop", &creation.animation.loop);
         ImGui::SetNextItemWidth(360.0F);
         ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
-        focus_prompt_field(validation, "marker");
+        focus_prompt_field(validation, "marker", "animation-create");
         if (!creation.animation.marker_id.empty()) {
             ImGui::SetNextItemWidth(220.0F);
             ImGui::InputDouble("Marker time (seconds)", &creation.animation.marker_time,
                                0.1, 1.0, "%.2f");
-            focus_prompt_field(validation, "markerTime");
+            focus_prompt_field(validation, "markerTime", "animation-create");
         }
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
@@ -7622,7 +7624,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto validation = creation.input.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##input-name", creation.input.name);
-        focus_prompt_field(validation, "name");
+        focus_prompt_field(validation, "name", "input-create");
         for (std::size_t action_index = 0;
              action_index < creation.input.actions.size(); ++action_index) {
             auto& action = creation.input.actions[action_index];
@@ -7630,7 +7632,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText(("Action " + std::to_string(action_index + 1)).c_str());
             ImGui::SetNextItemWidth(260.0F);
             ImGui::InputText("Id", &action.id);
-            focus_prompt_field(validation, "actions[" + std::to_string(action_index) + "]");
+        focus_prompt_field(validation,
+                          "actions[" + std::to_string(action_index) + "]",
+                          "input-create");
             ImGui::SameLine();
             if (ImGui::SmallButton("Duplicate")) {
                 auto copy = action;
