@@ -2771,6 +2771,7 @@ int run(const std::filesystem::path& project_root,
             ImGui::SameLine();
             ImGui::SetNextItemWidth(180.0F);
             ImGui::SliderFloat("Preview time (seconds)", &preview_time, 0.0F, 10.0F, "%.2f s");
+            draw_technical_tooltip("Time used to evaluate map animations and preview state.");
             if (preview_playing) preview_time += ImGui::GetIO().DeltaTime;
             map_preview = fabric::render::resolve_map_preview(
                 session.project_root(), *session.manifest(), map, preview_time);
@@ -2912,6 +2913,7 @@ int run(const std::filesystem::path& project_root,
                         ImGui::SetNextItemWidth(220.0F);
                         ImGui::DragFloat2("Point (world units)", &collision_editor.points[point_index].x,
                                           0.1F);
+                        draw_technical_tooltip("Collision polygon or chain point in map world space.");
                         ImGui::PopID();
                     }
                     const auto minimum_points = collision_editor.kind ==

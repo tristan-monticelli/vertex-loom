@@ -166,7 +166,8 @@ C4Component
 - Les paramètres image et stroke des drawables, ainsi que les champs principaux
   de timeline, expliquent leur effet technique au survol.
 - Map Studio expose la même aide contextuelle pour les transforms, la grille,
-  les plateformes de preview et les paramètres de collision.
+  les plateformes de preview, le temps de preview et les paramètres de
+  collision, y compris les points des formes polygonales et des chaînes.
 - Les chemins texturés et les marqueurs/segments d’animation disposent aussi
   d’une aide contextuelle sur leurs paramètres techniques.
 - Les réglages de matériau, contraintes et bindings d’input exposent également
