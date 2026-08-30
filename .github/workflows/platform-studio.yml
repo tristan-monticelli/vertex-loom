@@ -68,7 +68,15 @@ jobs:
           if ($null -eq $mesaOpenGl) {
             throw "Mesa3D opengl32.dll not found under $env:MESA_ROOT"
           }
-          Copy-Item (Join-Path $mesaOpenGl.Directory.FullName '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
+          $mesaDlls = @(Get-ChildItem -Path $mesaOpenGl.Directory.FullName -File -Filter '*.dll')
+          $testDirectories = @(Get-ChildItem -Path "$env:GITHUB_WORKSPACE\build" -Recurse -File -Filter '*.exe' |
+            ForEach-Object { $_.Directory.FullName } | Sort-Object -Unique)
+          if ($testDirectories.Count -eq 0) {
+            throw "No Windows test executables found under $env:GITHUB_WORKSPACE\build"
+          }
+          foreach ($testDirectory in $testDirectories) {
+            Copy-Item $mesaDlls.FullName $testDirectory -Force
+          }
 
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
