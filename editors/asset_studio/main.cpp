@@ -1324,6 +1324,42 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
     }
 }
 
+void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
+                                 SDL_Window* window,
+                                 const std::string& status,
+                                 const fabric::editor::ProjectSession& session) {
+    if (project_path.empty() || window == nullptr) return;
+
+    std::ofstream report(project_path / "asset_studio-e2e-failure.txt");
+    if (report) {
+        report << "status: " << status << '\n';
+        for (const auto& error : session.errors()) {
+            report << fabric::project::to_string(error.code) << " | "
+                   << error.field << " | " << error.message << '\n';
+        }
+    }
+
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    std::ofstream image(project_path / "asset_studio-e2e-failure.ppm",
+                        std::ios::binary);
+    if (!image) return;
+    image << "P6\n" << width << ' ' << height << "\n255\n";
+    const auto row_size = static_cast<std::size_t>(width) * 3U;
+    for (int row = height - 1; row >= 0; --row) {
+        image.write(reinterpret_cast<const char*>(pixels.data() +
+                                                   static_cast<std::size_t>(row) *
+                                                       row_size),
+                    static_cast<std::streamsize>(row_size));
+    }
+}
+
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                           fabric::editor::BehaviorSession& behavior_session,
                           CreationUiState& creation, std::string& status) {
@@ -8135,6 +8171,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             running = running && entity_gizmo_e2e_active;
     }
 
+    const bool e2e_failed =
+        (behavior_e2e && !behavior_e2e_complete) ||
+        (transformation_e2e && !transformation_e2e_complete) ||
+        (entity_e2e && !entity_e2e_complete) ||
+        (animation_e2e && !animation_e2e_complete) ||
+        (texture_e2e && !texture_e2e_complete) ||
+        (vector_e2e && !vector_e2e_complete) ||
+        (vector_canvas_e2e && !vector_canvas_e2e_complete);
+    if (e2e_failed)
+        write_e2e_failure_artifacts(initial_project, window, status, session);
+
     if (preview.texture != 0U) {
         glDeleteTextures(1, &preview.texture);
     }
@@ -8152,14 +8199,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     NFD_Quit();
     SDL_DestroyWindow(window);
     SDL_Quit();
-    return (behavior_e2e && !behavior_e2e_complete) ||
-            (transformation_e2e && !transformation_e2e_complete) ||
-            (entity_e2e && !entity_e2e_complete) ||
-            (animation_e2e && !animation_e2e_complete) ||
-            (texture_e2e && !texture_e2e_complete) ||
-            (vector_e2e && !vector_e2e_complete) ||
-            (vector_canvas_e2e && !vector_canvas_e2e_complete)
-        ? 1 : 0;
+    return e2e_failed ? 1 : 0;
 }
 
 } // namespace

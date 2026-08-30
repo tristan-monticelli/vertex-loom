@@ -165,6 +165,9 @@ C4Component
   puis applique la mutation via `ProjectSession`. Un composant visuel portant
   des overrides est refusé par ce chemin tant que la confirmation de perte n’est
   pas explicitement réutilisée.
+- Les modes E2E SDL écrivent, en cas d’échec, un rapport de diagnostics et une
+  capture PPM du framebuffer dans le projet de test pour rendre l’échec
+  reproductible et inspectable.
 - La duplication de ressources accepte des dépendances explicitement choisies :
   elles sont clonées avec un nouvel identifiant avant la ressource principale,
   puis seules les références de type et d’identifiant correspondants sont
