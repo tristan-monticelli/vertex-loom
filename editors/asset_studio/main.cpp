@@ -5477,16 +5477,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::SeparatorText("Set key");
+            const std::vector<fabric::project::EntityNode>* target_nodes = nullptr;
+            const fabric::project::EntityNode* selected_node = nullptr;
             if (session.selected_entity() &&
                 !session.selected_entity()->nodes.empty()) {
-                const auto& target_nodes = session.selected_entity()->nodes;
-                const auto selected_node = std::ranges::find(
-                    target_nodes, animation_ui.node_id,
+                target_nodes = &session.selected_entity()->nodes;
+                const auto selected_iterator = std::ranges::find(
+                    *target_nodes, animation_ui.node_id,
                     &fabric::project::EntityNode::id);
-                const char* node_label = selected_node == target_nodes.end()
+                selected_node = selected_iterator == target_nodes->end()
+                    ? nullptr : &*selected_iterator;
+                const char* node_label = selected_node == nullptr
                     ? "Choose target node..." : selected_node->name.c_str();
                 if (ImGui::BeginCombo("Target node", node_label)) {
-                    for (const auto& target_node : target_nodes) {
+                    for (const auto& target_node : *target_nodes) {
                         if (ImGui::Selectable(target_node.name.c_str(),
                                 target_node.id == animation_ui.node_id))
                             animation_ui.node_id = target_node.id;
@@ -5499,6 +5503,81 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::TextDisabled(
                     "Choose a preview entity to bind one of its nodes.");
                 animation_ui.node_id.clear();
+            }
+            if (selected_node != nullptr) {
+                fabric::project::PropertyDescriptorRegistry entity_registry;
+                const auto add_entity_property =
+                    [&](const char* component, const char* property,
+                        const char* path, fabric::project::PropertyValueKind kind,
+                        const char* unit = "") {
+                        (void)entity_registry.register_descriptor({
+                            .component_id = component,
+                            .property_id = property,
+                            .display_path = path,
+                            .value_kind = kind,
+                            .readable = true,
+                            .writable = true,
+                            .animatable = true,
+                            .minimum = property == std::string_view{"rotationDegrees"}
+                                ? -360.0F : 0.0F,
+                            .maximum = property == std::string_view{"rotationDegrees"}
+                                ? 360.0F : 1.0F,
+                            .unit = unit});
+                    };
+                using PropertyKind = fabric::project::PropertyValueKind;
+                add_entity_property("transform", "position", "Transform / Position",
+                                    PropertyKind::vec2, "px");
+                add_entity_property("transform", "scale", "Transform / Scale",
+                                    PropertyKind::vec2, "×");
+                add_entity_property("transform", "rotationDegrees",
+                                    "Transform / Rotation", PropertyKind::angle, "°");
+                add_entity_property("transform", "pivot", "Transform / Pivot",
+                                    PropertyKind::vec2, "px");
+                if (selected_node->drawable.material) {
+                    add_entity_property("material", "color", "Material / Color",
+                                        PropertyKind::color);
+                    add_entity_property("material", "opacity", "Material / Opacity",
+                                        PropertyKind::scalar, "%");
+                }
+                if (selected_node->drawable.kind ==
+                    fabric::project::EntityDrawableKind::vector) {
+                    add_entity_property("fill", "color", "Fill / Color",
+                                        PropertyKind::color);
+                    add_entity_property("imageFill", "opacity", "Image fill / Opacity",
+                                        PropertyKind::scalar, "%");
+                    add_entity_property("imageFill", "position", "Image fill / Position",
+                                        PropertyKind::vec2, "px");
+                    add_entity_property("imageFill", "scale", "Image fill / Scale",
+                                        PropertyKind::vec2, "×");
+                    add_entity_property("imageFill", "rotationDegrees",
+                                        "Image fill / Rotation", PropertyKind::angle, "°");
+                    add_entity_property("imageFill", "pivot", "Image fill / Pivot",
+                                        PropertyKind::vec2, "px");
+                }
+                const auto descriptors = entity_registry.animatable();
+                const auto current = std::ranges::find_if(
+                    descriptors, [&](const auto* descriptor) {
+                        return descriptor->component_id == animation_ui.component_id &&
+                            descriptor->property_id == animation_ui.property_id;
+                    });
+                const char* current_label = current == descriptors.end()
+                    ? "Choose an entity property..." : (*current)->display_path.c_str();
+                if (ImGui::BeginCombo("Entity property", current_label)) {
+                    for (const auto* descriptor : descriptors) {
+                        if (ImGui::Selectable(descriptor->display_path.c_str(),
+                                              descriptor == (current == descriptors.end()
+                                                  ? nullptr : *current))) {
+                            animation_ui.component_id = descriptor->component_id;
+                            animation_ui.property_id = descriptor->property_id;
+                            if (descriptor->value_kind == PropertyKind::vec2)
+                                animation_ui.key_kind = 0;
+                            else if (descriptor->value_kind == PropertyKind::color)
+                                animation_ui.key_kind = 2;
+                            else animation_ui.key_kind = 1;
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
             }
             const char* binding_presets[] = {
                 "Custom", "Transform / Position", "Transform / Rotation",

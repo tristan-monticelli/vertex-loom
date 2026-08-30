@@ -179,8 +179,10 @@ C4Component
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.
-  Des presets de binding transform/material accélèrent la création sans
-  supprimer le mode `Custom`, et le scrubber affiche chaque valeur évaluée,
+  Des presets de binding transform/material/fill/image-fill accélèrent la
+  création sans supprimer le mode `Custom`. Le sélecteur typé dérive les
+  propriétés de transform, matériau, fill et image-fill de l’entité cible ; le
+  scrubber affiche chaque valeur évaluée,
   son binding et sa composition. Les clés peuvent être sélectionnées en
   groupe, copiées puis collées avec un décalage relatif ; leur temps peut être
   aimanté à un intervalle configurable avant de passer par `CommandStack`.
@@ -371,9 +373,9 @@ C4Component
   mutation. `MechanicSession` prévisualise une copie effective du graphe avec
   ces valeurs et le transform de l'instance sélectionnée, sans rendre le
   document mécanique dirty.
-- L’inspecteur d’animation expose une première timeline générique : durée,
-  boucle, binding `node/component/property`, interpolation et insertion de
-  clés `Vec2`. Les clips suivent le même historique de commandes, autosave,
+- L’inspecteur d’animation expose une timeline générique : durée, boucle,
+  binding `node/component/property`, interpolation, easing et insertion de
+  clés `Vec2` avec tangentes optionnelles. Les clips suivent le même historique de commandes, autosave,
   récupération et sauvegarde atomique que les autres documents éditables ; les
   clés existantes peuvent être déplacées ou supprimées sauf la dernière clé
   d’une track, un scrubber évalue les propriétés à l’instant courant et les

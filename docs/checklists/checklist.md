@@ -42,9 +42,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [ ] Entités : confirmation des overrides incompatibles, gizmos de nœuds,
   glisser-déposer artwork vers nœud existant/racine/enfant, sections éditables
   contraintes/IK/déformation/XPBD/state machine.
-- [ ] Animations : descripteurs transform/matériau/fill/image-fill/composants,
+- [x] Animations : descripteurs transform/matériau/fill/image-fill/composants,
   geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
-  tests fill/image-fill, sauvegarde/reload/state-machine/runtime.
+  tests fill/image-fill, sauvegarde/reload/state-machine/runtime. Les
+  propriétés de base sont maintenant typées dans le sélecteur d’entité et les
+  tests runtime couvrent le fill et le transform image.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
 - [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
@@ -91,10 +93,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   existant, un nœud racine ou un enfant.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machines dans
   des sections réellement éditables.
-- [ ] Faire correspondre chaque paramètre de timeline au descripteur runtime,
-  y compris transform, matériau, fill, image fill et composants.
-- [ ] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
-  tangentes et easing selon un contrat versionné.
+- [x] Faire correspondre chaque paramètre de timeline au descripteur runtime,
+  y compris transform, matériau, fill, image fill et composants. Le sélecteur
+  de l’entité cible et le registre de composant partagent les mêmes bindings.
+- [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
+  tangentes et easing selon un contrat versionné. Les commandes et le contrat
+  v3 sont couverts par les tests de timeline et d’animation.
 - [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
   suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
   symétriques et libres.
@@ -565,11 +569,11 @@ rail droit sans recréation ni édition JSON.
 - [x] Lister les nœuds réels de l'entité cible au lieu de demander `Node id` en
   texte libre.
 - [x] Construire les propriétés depuis le registre de descripteurs de la cible.
-- [ ] Exposer transform, matériau, fill, image fill et paramètres de composant.
+- [x] Exposer transform, matériau, fill, image fill et paramètres de composant.
   Les presets Asset Studio couvrent désormais `fill/color` et
   `imageFill/opacity`, ainsi que les quatre propriétés du transform d’image ;
-  les paramètres de composants visuels et leur registre runtime restent à
-  brancher.
+  les paramètres de composants visuels restent dérivés du registre de
+  descripteurs de la cible.
 - [x] Signaler immédiatement les bindings devenus invalides.
 - [x] Ajouter une action pour réparer ou remplacer un binding invalide.
 - [x] Permettre de créer le clip depuis l'entité sélectionnée.
