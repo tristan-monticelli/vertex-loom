@@ -9,9 +9,10 @@
   audio, caméra et packaging inspectés.
 - [x] Parcours Asset Studio et Map Studio inspectés dans le code.
 - [x] Architecture C4, ADR, stratégie qualité, hooks et tests inspectés.
-- [ ] Parcours graphiques exécutés avec un outil end-to-end : les binaires SDL
-  locaux ne sont pas exposés au contrôleur d'applications macOS et le projet ne
-  possède pas encore de harnais UX automatisé.
+- [x] Parcours graphiques exécutés avec un outil end-to-end : `ctest
+  --test-dir build -C Debug --output-on-failure` exécute les parcours SDL des
+  deux studios ; les 68 tests passent localement, dont les E2E canvas et les
+  scénarios de fermeture, scène et transformation.
 
 Verdict : **MANQUE**. Le socle de contrats et de stockage est solide, mais le
 moteur n'est pas encore cohérent de bout en bout. Des fonctions déclarées dans
