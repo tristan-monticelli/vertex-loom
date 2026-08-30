@@ -2101,6 +2101,7 @@ int run(const std::filesystem::path& project_root,
         SDL_Quit();
         return 1;
     }
+    SDL_SetWindowMinimumSize(window, 960, 640);
     auto context = SDL_GL_CreateContext(window);
     if (context == nullptr) {
         std::cerr << SDL_GetError() << '\n';

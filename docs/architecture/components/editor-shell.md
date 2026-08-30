@@ -376,6 +376,9 @@ C4Component
   son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
 - Les raccourcis affichent et utilisent `Cmd` sur macOS et `Ctrl` sur Windows
   et Linux. Ils restent inactifs lorsqu'une modale requiert une décision.
+- Les fenêtres Asset Studio et Map Studio imposent respectivement une taille
+  minimale de `900×600` et `960×640` afin de préserver leurs panneaux et leur
+  navigation.
 - Le manifeste constitue le premier document éditable intégré : son nom et ses
   unités passent par commandes, Save remplace `project.json`, et son autosave
   sert de preuve headless du flux commun avant les futurs documents d’asset.
