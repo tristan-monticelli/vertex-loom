@@ -108,6 +108,25 @@ void draw_field_errors(const std::vector<fabric::project::Error>& errors,
     }
 }
 
+void focus_first_field_error(
+    const std::vector<fabric::project::Error>& errors,
+    const std::string_view field) {
+    static std::string focused_error;
+    if (errors.empty()) {
+        focused_error.clear();
+        return;
+    }
+    const auto& first = errors.front();
+    const auto qualified_field = "." + std::string(field);
+    if (first.field != field && !first.field.starts_with(field) &&
+        !first.field.ends_with(qualified_field)) return;
+    const std::string key = first.field + ":" + first.message;
+    if (focused_error == key) return;
+    ImGui::SetKeyboardFocusHere(-1);
+    ImGui::SetScrollHereY(0.0F);
+    focused_error = key;
+}
+
 void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         return;
@@ -719,8 +738,10 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::SeparatorText("Create or open");
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Scene id", &state.new_id);
+    focus_first_field_error(session.errors(), "id");
     ImGui::SameLine();
     draw_resource_name_field("Scene name", state.new_name, 180.0F);
+    focus_first_field_error(session.errors(), "name");
     ImGui::SameLine();
     ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
     if (ImGui::Button("Create scene")) {
@@ -1182,8 +1203,10 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                          "Choose an existing mechanic graph first.");
     ImGui::SetNextItemWidth(140.0F);
     ImGui::InputText("New id", &state.new_id);
+    focus_first_field_error(session.errors(), "id");
     ImGui::SameLine();
     draw_resource_name_field("New name", state.new_name, 160.0F);
+    focus_first_field_error(session.errors(), "name");
     ImGui::SameLine();
     ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
     if (ImGui::Button("Create")) {
@@ -1206,8 +1229,10 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::SeparatorText("Rotating platform preset");
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Platform id", &state.platform.id.value);
+    focus_first_field_error(session.errors(), "id");
     ImGui::SameLine();
     draw_resource_name_field("Platform name", state.platform.name, 170.0F);
+    focus_first_field_error(session.errors(), "name");
     ImGui::Combo("Activation", &state.platform_activation,
                  "Presence sensor\0Map event\0");
     if (state.platform_activation == 1) {
@@ -2714,9 +2739,11 @@ int run(const std::filesystem::path& project_root,
                 draw_disabled_reason(open_map_id.empty(),
                                      "Choose an existing map first.");
                 ImGui::InputText("New map id", &new_map_id);
+                focus_first_field_error(session.errors(), "id");
                 draw_field_errors(session.errors(), "id",
                                   "Use a unique non-empty resource id.");
                 draw_resource_name_field("New map name", new_map_name, 180.0F);
+                focus_first_field_error(session.errors(), "name");
                 draw_field_errors(session.errors(), "name",
                                   "Enter a visible non-empty map name.");
                 ImGui::BeginDisabled(new_map_id.empty() || new_map_name.empty());
@@ -2813,8 +2840,10 @@ int run(const std::filesystem::path& project_root,
             ImGui::Text("Layers (%zu)", map.layers.size());
             ImGui::SetNextItemWidth(120.0F);
             ImGui::InputText("Layer id", &new_layer_id);
+            focus_first_field_error(session.errors(), "id");
             ImGui::SameLine();
             draw_resource_name_field("Layer name", new_layer_name, 140.0F);
+            focus_first_field_error(session.errors(), "name");
             ImGui::SetNextItemWidth(150.0F);
             ImGui::Combo("Layer kind", &new_layer_kind,
                          "visual\0instances\0collision\0triggers\0");
