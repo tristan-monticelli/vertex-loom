@@ -121,6 +121,9 @@ C4Component
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource
   sélectionnable.
+- Les prompts Behavior, Transformation, preset visuel, composition et
+  composant réutilisent le même composant de formulaire pour leur nom et leur
+  identifiant, avec des clés ImGui stables.
 - L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
   opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
   validée passe par le `CommandStack`; sauvegarde, autosave et récupération

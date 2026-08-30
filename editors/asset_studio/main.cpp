@@ -79,6 +79,13 @@ void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     ImGui::SetTooltip("%s", std::string(reason).c_str());
 }
 
+void draw_resource_identity_fields(std::string& name, std::string& id) {
+    ImGui::SetNextItemWidth(560.0F);
+    ImGui::InputText("Name##resource-name", &name);
+    ImGui::SetNextItemWidth(360.0F);
+    ImGui::InputText("Resource id##resource-id", &id);
+}
+
 struct CreationUiState {
     struct BehaviorFields {
         std::string name{"Entity behavior"};
@@ -1452,8 +1459,8 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     if (ImGui::BeginPopupModal("Create behavior", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped("Create a BehaviorGraph v1 attachable to any entity.");
-        ImGui::InputText("Name", &creation.behavior.name);
-        ImGui::InputText("Resource id", &creation.behavior.id);
+        draw_resource_identity_fields(creation.behavior.name,
+                                      creation.behavior.id);
         const bool valid = !creation.behavior.name.empty() &&
             fabric::core::ResourceId::is_valid(creation.behavior.id);
         ImGui::BeginDisabled(!valid);
@@ -1809,8 +1816,8 @@ void draw_transformation_editor(
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextWrapped(
             "Create a reusable atomic EntityTransformation v1 policy.");
-        ImGui::InputText("Name", &creation.transformation.name);
-        ImGui::InputText("Resource id", &creation.transformation.id);
+        draw_resource_identity_fields(creation.transformation.name,
+                                      creation.transformation.id);
         static_cast<void>(draw_project_resource_picker(
             "Source entity", project_session.resources(), Kind::entity,
             creation.transformation.source_id, false));
@@ -6724,10 +6731,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::EndCombo();
         }
-        ImGui::SetNextItemWidth(520.0F);
-        ImGui::InputText("Name", &request.name);
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Resource id", &request.id.value);
+        draw_resource_identity_fields(request.name, request.id.value);
         const bool uses_thread = request.kind ==
                 fabric::editor::VisualPresetKind::seam ||
             request.kind == fabric::editor::VisualPresetKind::zipper;
@@ -6804,8 +6808,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         auto& fields = creation.composition;
         ImGui::TextUnformatted("Create an empty layered visual composition");
-        ImGui::InputText("Name", &fields.name);
-        ImGui::InputText("Resource id", &fields.id);
+        draw_resource_identity_fields(fields.name, fields.id);
         ImGui::InputFloat2("Size", fields.size);
         const bool valid = !fields.name.empty() &&
             fabric::core::ResourceId::is_valid(fields.id) &&
@@ -6838,8 +6841,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         auto& fields = creation.component;
         ImGui::TextUnformatted("Wrap a composition as a reusable component");
-        ImGui::InputText("Name", &fields.name);
-        ImGui::InputText("Resource id", &fields.id);
+        draw_resource_identity_fields(fields.name, fields.id);
         const auto selected_composition = std::ranges::find_if(
             session.resources(), [&](const auto& resource) {
                 return resource.kind ==
