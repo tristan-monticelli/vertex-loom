@@ -1497,6 +1497,48 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(*loaded.asset == *session.selected_animation());
 }
 
+TEST_CASE("creation prompt fields survive entity and animation publication") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateEntityPrompt entity_prompt;
+    entity_prompt.name = "Prompt entity";
+    entity_prompt.node_name = "Prompt root";
+    entity_prompt.transform.position = {12.0F, -4.0F};
+    entity_prompt.transform.scale = {1.5F, 0.75F};
+    entity_prompt.transform.rotation_degrees = 22.0F;
+    entity_prompt.z_order = 3.5F;
+    REQUIRE(session.create_entity(entity_prompt));
+    REQUIRE(session.selected_entity());
+    REQUIRE(session.selected_entity()->nodes.size() == 1U);
+    const auto& node = session.selected_entity()->nodes.front();
+    CHECK(node.name == "Prompt root");
+    CHECK(node.transform.position == entity_prompt.transform.position);
+    CHECK(node.transform.scale == entity_prompt.transform.scale);
+    CHECK(node.transform.rotation_degrees ==
+          entity_prompt.transform.rotation_degrees);
+    CHECK(node.z_order == entity_prompt.z_order);
+
+    fabric::editor::CreateAnimationPrompt animation_prompt;
+    animation_prompt.name = "Prompt animation";
+    animation_prompt.generic_preview = true;
+    animation_prompt.duration = 4.0;
+    animation_prompt.loop = false;
+    animation_prompt.marker_id = "midpoint";
+    animation_prompt.marker_time = 2.25;
+    REQUIRE(session.create_animation(animation_prompt));
+    REQUIRE(session.selected_animation());
+    CHECK(session.selected_animation()->duration == animation_prompt.duration);
+    CHECK(session.selected_animation()->loop == animation_prompt.loop);
+    REQUIRE(session.selected_animation()->markers.size() == 1U);
+    CHECK(session.selected_animation()->markers.front().id ==
+          animation_prompt.marker_id);
+    CHECK(session.selected_animation()->markers.front().time ==
+          animation_prompt.marker_time);
+}
+
 TEST_CASE("undoing to clean neutralizes a previous autosave") {
     using namespace std::chrono_literals;
     const TemporaryDirectory project;

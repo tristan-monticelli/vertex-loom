@@ -129,6 +129,10 @@ C4Component
 - Le hub propose aussi `New entity...`. Le prompt crée un nœud racine avec
   drawable, matériau optionnel et transform, valide les références locales,
   publie atomiquement dans `entities`, puis réindexe l’entité.
+- Les champs du prompt d’entité (nom de nœud, transform et ordre Z) et du prompt
+  d’animation (durée, boucle et marker) sont conservés lors de la publication,
+  avec un round-trip couvert par `creation prompt fields survive entity and
+  animation publication`.
 - Le Resource Explorer analyse les références entrantes avant suppression et
   permet de choisir une ressource de remplacement du même type. Les documents
   entrants sont validés avant publication et la suppression reste bloquée si

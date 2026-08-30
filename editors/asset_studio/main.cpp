@@ -7078,7 +7078,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create animation", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create an AnimationClip v2");
+        ImGui::TextUnformatted("Create an AnimationClip v3");
         ImGui::TextDisabled(
             "The validated clip is published atomically in the open project.");
         ImGui::SetNextItemWidth(560.0F);

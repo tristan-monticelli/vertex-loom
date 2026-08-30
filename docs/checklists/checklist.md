@@ -684,7 +684,9 @@ externe.
 
 ## 11 — Cohérence générale de l'inspecteur
 
-- [ ] Aucun paramètre proposé dans un prompt ne doit disparaître après création.
+- [x] Aucun paramètre proposé dans un prompt ne doit disparaître après création.
+  Le round-trip entité/animation est couvert par `creation prompt fields
+  survive entity and animation publication`.
 - [ ] Utiliser les mêmes composants de formulaire pour création et édition.
 - [x] Afficher la validation au niveau du champ concerné.
 - [ ] Afficher la raison exacte d'un bouton désactivé.
