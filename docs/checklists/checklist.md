@@ -74,11 +74,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `asset_studio_ui_input_e2e`; les parcours comportement monstre et path Bézier
   sont couverts par `asset_studio_behavior_e2e` et
   `asset_studio_vector_canvas_e2e`.
-- [ ] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
-  Linux. macOS/Linux sont verts dans le run CI `33325389481`; les E2E UI
-  Windows restent bloqués par l'absence de chargeur OpenGL du runner.
-- [ ] Documentation et clôture : gates réconciliés et résultat confirmé sur
-  toutes les plateformes ; le reliquat Windows est documenté ci-dessus.
+- [x] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
+  Linux. Le run CI `33335758294` est vert sur les trois plateformes et les
+  parcours UI Windows passent avec le chargeur Mesa logiciel.
+- [x] Documentation et clôture : gates réconciliés et résultat confirmé sur
+  toutes les plateformes dans le run CI `33335758294`; la limite du stencil
+  imbriqué des rasterizers logiciels est documentée dans la stratégie qualité.
 
 ### Différences UX/logiques observées à corriger
 
@@ -136,8 +137,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
   screenshots d'échec ; les registres et captures sont produits par les modes
   UI CTest.
-- [ ] Exécuter les parcours UX sur macOS, Windows et Linux ; run CI
-  `33325389481` vert sur macOS/Linux, E2E UI Windows non exécutés.
+- [x] Exécuter les parcours UX sur macOS, Windows et Linux ; run CI
+  `33335758294` vert sur les trois plateformes, E2E UI Windows exécutés.
 - [x] Vérifier localement aux tailles minimales de fenêtre le focus, le scroll
   automatique, la navigation clavier, les unités, tooltips, raccourcis et le
   contraste via les tests UI Asset Studio ; la répétition multiplateforme reste
@@ -775,8 +776,8 @@ utilisées pour tous les types de ressources.
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
   qu'un diagnostic de processus.
-- [ ] Exécuter les parcours sur macOS, Windows et Linux ; run CI
-  `33325389481` vert sur macOS/Linux, E2E UI Windows non exécutés.
+- [x] Exécuter les parcours sur macOS, Windows et Linux ; run CI
+  `33335758294` vert sur les trois plateformes, E2E UI Windows exécutés.
 - [x] Garder les tests headless de contrats en complément, pas en remplacement.
 
 Gate : les parcours qui ont échoué lors de l'audit sont exécutés
@@ -801,8 +802,8 @@ automatiquement sur les trois plateformes.
 - [x] Vérifier `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json` et les hooks modifiés.
 - [x] Vérifier qu'aucune suppression n'a été réalisée sans confirmation.
 - [x] Faire un commit conventionnel par étape fonctionnelle vérifiée.
-- [ ] Confirmer le résultat visuel et fonctionnel sur toutes les plateformes ;
-  run CI `33325389481` vert sur macOS/Linux et tests locaux passants.
+- [x] Confirmer le résultat visuel et fonctionnel sur toutes les plateformes ;
+  run CI `33335758294` vert sur macOS/Linux/Windows et tests UI Windows passants.
 
 ## Ordre d'exécution recommandé
 
@@ -816,8 +817,9 @@ automatiquement sur les trois plateformes.
 - [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
   transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
   comparaison des draw packets sont validés.
-- [ ] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire
-  ; E2E UI Windows restent à activer sur un runner avec chargeur OpenGL.
+- [x] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire
+  ; run CI `33335758294` vert sur macOS/Linux/Windows, avec Mesa logiciel sur
+  Windows et limite de stencil imbriqué documentée.
 
 Le chantier est terminé uniquement lorsque les huit lots et tous leurs gates
 sont cochés avec preuves de tests et commits associés.
