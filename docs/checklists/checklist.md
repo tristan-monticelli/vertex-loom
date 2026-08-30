@@ -689,14 +689,17 @@ externe.
   survive entity and animation publication`.
 - [ ] Utiliser les mêmes composants de formulaire pour création et édition.
 - [x] Afficher la validation au niveau du champ concerné.
-- [ ] Afficher la raison exacte d'un bouton désactivé.
+- [x] Afficher la raison exacte d'un bouton désactivé. Les `BeginDisabled` des
+  éditeurs et des imports sont suivis d’un tooltip décrivant la précondition.
 - [x] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
 - [ ] Ajouter focus et scroll automatiques vers le premier champ invalide.
 - [ ] Ajouter tooltips pour les propriétés techniques.
 - [ ] Afficher les unités pour toutes les valeurs numériques.
 - [x] Utiliser les noms visibles comme interaction principale et les IDs comme
   information secondaire.
-- [ ] Ajouter raccourcis clavier et commandes de menu cohérents.
+- [x] Ajouter raccourcis clavier et commandes de menu cohérents. Asset Studio
+  et Map Studio partagent les commandes Save/Undo/Redo/Quit et sélectionnent
+  Ctrl ou Cmd selon la plateforme.
 - [x] Rendre les actions destructives visuellement distinctes.
 - [ ] Vérifier le comportement aux tailles minimales de fenêtre.
 - [ ] Vérifier navigation clavier et contraste.
