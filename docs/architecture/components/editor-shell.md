@@ -261,6 +261,9 @@ C4Component
   capture PPM du framebuffer dans le projet de test pour rendre l’échec
   reproductible et inspectable. Le test de registre répète aussi le shell à la
   taille minimale SDL 900×600 et exige une capture de cette frame.
+  Le scénario de focus ouvre un prompt invalide et vérifie que le premier champ
+  en erreur reçoit le focus clavier ainsi qu’une demande de repositionnement du
+  scroll.
 - Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
   `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
   lignes de ressources et des nœuds d’entité, ainsi qu’une capture PPM du frame

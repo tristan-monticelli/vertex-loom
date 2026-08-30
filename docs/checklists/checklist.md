@@ -704,7 +704,9 @@ externe.
 - [x] Afficher la raison exacte d'un bouton désactivé. Les `BeginDisabled` des
   éditeurs et des imports sont suivis d’un tooltip décrivant la précondition.
 - [x] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
-- [ ] Ajouter focus et scroll automatiques vers le premier champ invalide.
+- [x] Ajouter focus et scroll automatiques vers le premier champ invalide ;
+  `asset_studio_ui_focus_e2e` ouvre un prompt invalide et vérifie le focus ainsi
+  que la demande de repositionnement du scroll.
 - [x] Ajouter tooltips pour les propriétés techniques ; transforms, bounds, ordre Z, UV, stroke, chemins, timeline, contraintes et bindings exposent leur sémantique.
 - [x] Afficher les unités pour toutes les valeurs numériques. Les champs fixes
   affichent leur unité ou leur nature, et les valeurs dynamiques indiquent
