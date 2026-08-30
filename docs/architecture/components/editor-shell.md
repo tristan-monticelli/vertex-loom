@@ -216,6 +216,9 @@ C4Component
 - Les extrémités des connexions BehaviorGraph sélectionnent désormais un nœud
   existant par ID/type via un picker recherchable ; les ports restent des champs
   libres car ils dépendent du contrat du nœud choisi.
+- Map Studio applique le même principe aux connexions de `MechanicGraph` : les
+  nœuds source et cible sont sélectionnés dans la liste typée et recherchable,
+  tandis que les ports restent dépendants du nœud choisi.
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.

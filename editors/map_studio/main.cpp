@@ -320,6 +320,54 @@ void draw_resource_picker(const char* label,
     ImGui::PopID();
 }
 
+bool draw_mechanic_node_picker(
+    const char* label,
+    const std::span<const fabric::project::MechanicNodeDefinition> nodes,
+    std::string& selected_id) {
+    const auto selected = std::ranges::find_if(
+        nodes, [&](const auto& node) { return node.id == selected_id; });
+    const std::string preview = selected != nodes.end()
+        ? selected->id
+        : selected_id.empty() ? std::string{"Choose a mechanic node..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(240.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##mechanic-node-search", "Search node ID or type...",
+                                 &filter);
+        bool found = false;
+        for (const auto& node : nodes) {
+            std::string haystack = node.id + " " + node.type;
+            std::ranges::transform(haystack, haystack.begin(), [](const unsigned char value) {
+                return static_cast<char>(std::tolower(value));
+            });
+            std::string needle = filter;
+            std::ranges::transform(needle, needle.begin(), [](const unsigned char value) {
+                return static_cast<char>(std::tolower(value));
+            });
+            if (!needle.empty() && haystack.find(needle) == std::string::npos)
+                continue;
+            found = true;
+            const bool is_selected = node.id == selected_id;
+            const std::string item_label = node.id + " (" + node.type + ")##mechanic-node-option-" +
+                node.id;
+            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                selected_id = node.id;
+                changed = true;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        if (!found) ImGui::TextDisabled("No matching mechanic node.");
+        if (selected == nodes.end() && !selected_id.empty())
+            ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 struct SceneEditorState {
     std::string new_id;
     std::string new_name;
@@ -1020,9 +1068,11 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         }
         ImGui::PopID();
     }
-    ImGui::InputText("From node", &state.from_node);
+    static_cast<void>(draw_mechanic_node_picker(
+        "From node", graph.nodes, state.from_node));
     ImGui::InputText("From port", &state.from_port);
-    ImGui::InputText("To node", &state.to_node);
+    static_cast<void>(draw_mechanic_node_picker(
+        "To node", graph.nodes, state.to_node));
     ImGui::InputText("To port", &state.to_port);
     if (ImGui::Button("Connect ports")) {
         status = session.connect({state.from_node, state.from_port,
