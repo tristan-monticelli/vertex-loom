@@ -117,6 +117,10 @@ C4Component
   préserver une zone centrale minimale et redimensionnables au glisser. Les
   actions du Resource Explorer se réorganisent sur plusieurs lignes lorsque la
   largeur du rail ne permet plus de les afficher côte à côte.
+- Map Studio conserve ses deux panneaux `map-layers-pane` et
+  `map-selection-pane`, avec splitter borné ; les sous-zones `Layers` et
+  `Events` sont repliables et portent des IDs stables pour la navigation clavier
+  dans les cartes volumineuses.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés

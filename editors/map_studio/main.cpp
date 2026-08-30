@@ -2846,7 +2846,10 @@ int run(const std::filesystem::path& project_root,
             ImGui::BeginChild("map-layers-pane",
                               ImVec2{layers_pane_width, 0.0F}, true,
                               ImGuiWindowFlags_HorizontalScrollbar);
-            ImGui::Text("Layers (%zu)", map.layers.size());
+            const bool layers_open = ImGui::CollapsingHeader(
+                ("Layers (" + std::to_string(map.layers.size()) + ")##map-layers-tree").c_str(),
+                ImGuiTreeNodeFlags_DefaultOpen);
+            if (layers_open) {
             ImGui::SetNextItemWidth(120.0F);
             ImGui::InputText("Layer id", &new_layer_id);
             focus_first_field_error(session.errors(), "id", "layer-create");
@@ -2911,6 +2914,7 @@ int run(const std::filesystem::path& project_root,
                 if (layer_changed) break;
             }
             if (layer_changed) ImGui::TextDisabled("Layer edit recorded in undo history");
+            }
             ImGui::SeparatorText("Content");
             ImGui::Text("Instances: %zu", map.instances.size());
             for (const auto& instance : map.instances) {
@@ -3210,7 +3214,10 @@ int run(const std::filesystem::path& project_root,
             ImGui::SameLine(0.0F, 2.0F);
             ImGui::BeginChild("map-selection-pane", ImVec2{0.0F, 0.0F}, true,
                               ImGuiWindowFlags_HorizontalScrollbar);
-            ImGui::SeparatorText("Events");
+            const bool events_open = ImGui::CollapsingHeader(
+                "Events##map-events-tree",
+                ImGuiTreeNodeFlags_DefaultOpen);
+            if (events_open) {
             ImGui::SetNextItemWidth(250.0F);
             ImGui::InputText("New event id", &event_id);
             ImGui::SameLine();
@@ -3350,6 +3357,7 @@ int run(const std::filesystem::path& project_root,
                     ImGui::CloseCurrentPopup();
                 }
                 ImGui::EndPopup();
+            }
             }
             ImGui::SeparatorText("Triggers");
             for (std::size_t trigger_index = 0; trigger_index < map.triggers.size();

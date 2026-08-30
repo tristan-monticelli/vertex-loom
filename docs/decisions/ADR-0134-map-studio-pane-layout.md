@@ -17,4 +17,6 @@ Le contenu de la carte est organisé en deux panneaux persistants :
 `map-selection-pane` pour le contenu et l’inspecteur liés à la sélection. Les
 deux panneaux utilisent des `BeginChild` bordés avec scroll horizontal local.
 Un séparateur horizontal interactif conserve une largeur bornée du panneau des
-calques et expose le curseur de redimensionnement.
+calques et expose le curseur de redimensionnement. Les sous-zones `Layers` et
+`Events` sont des sections repliables avec des IDs stables, afin de garder la
+navigation clavier exploitable quand la carte contient beaucoup de contenu.
