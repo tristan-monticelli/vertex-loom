@@ -1706,7 +1706,8 @@ void focus_prompt_field(const fabric::editor::PromptValidation& validation,
         return;
     }
     if (validation.errors.front().field != field) return;
-    const std::string key = std::string(field) + ":" +
+    const std::string key = std::to_string(ImGui::GetID(std::string(field).c_str())) +
+        ":" + std::string(field) + ":" +
         validation.errors.front().message;
     if (focused_error == key) return;
     ImGui::SetKeyboardFocusHere(-1);
@@ -7513,7 +7514,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create an AnimationClip v3");
         ImGui::TextDisabled(
             "The validated clip is published atomically in the open project.");
+        const auto validation = creation.animation.validate(
+            session.project_root(), *session.manifest());
         draw_resource_name_field("Name##animation-name", creation.animation.name);
+        focus_prompt_field(validation, "name");
         if (ImGui::Checkbox("Generic clip (no preview entity)",
                             &creation.animation.generic_preview) &&
             creation.animation.generic_preview)
@@ -7526,16 +7530,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SetNextItemWidth(220.0F);
         ImGui::InputDouble("Duration (seconds)", &creation.animation.duration,
                            0.1, 1.0, "%.2f");
+        focus_prompt_field(validation, "duration");
         ImGui::Checkbox("Loop", &creation.animation.loop);
         ImGui::SetNextItemWidth(360.0F);
         ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
+        focus_prompt_field(validation, "marker");
         if (!creation.animation.marker_id.empty()) {
             ImGui::SetNextItemWidth(220.0F);
             ImGui::InputDouble("Marker time (seconds)", &creation.animation.marker_time,
                                0.1, 1.0, "%.2f");
+            focus_prompt_field(validation, "markerTime");
         }
-        const auto validation = creation.animation.validate(
-            session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
         draw_prompt_error(validation, "duration");
@@ -7569,7 +7574,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create an InputDocument v1");
         ImGui::TextDisabled(
             "Bindings are saved atomically and can be selected by Preview Runtime.");
+        const auto validation = creation.input.validate(
+            session.project_root(), *session.manifest());
         draw_resource_name_field("Name##input-name", creation.input.name);
+        focus_prompt_field(validation, "name");
         for (std::size_t action_index = 0;
              action_index < creation.input.actions.size(); ++action_index) {
             auto& action = creation.input.actions[action_index];
@@ -7577,6 +7585,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText(("Action " + std::to_string(action_index + 1)).c_str());
             ImGui::SetNextItemWidth(260.0F);
             ImGui::InputText("Id", &action.id);
+            focus_prompt_field(validation, "actions[" + std::to_string(action_index) + "]");
             ImGui::SameLine();
             if (ImGui::SmallButton("Duplicate")) {
                 auto copy = action;
@@ -7657,8 +7666,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         if (creation.input_capture)
             ImGui::TextColored({1.0F, 0.8F, 0.2F, 1.0F}, "Press a key or gamepad button…");
-        const auto validation = creation.input.validate(
-            session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
         for (std::size_t action_index = 0; action_index < creation.input.actions.size(); ++action_index) {
