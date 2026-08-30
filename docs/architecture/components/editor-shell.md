@@ -267,7 +267,10 @@ C4Component
   Le scénario d’accessibilité vérifie l’activation de la navigation clavier
   ImGui et un ratio de contraste texte/fond d’au moins 4,5:1.
   Le scénario drag/drop capture les widgets source et cible réellement rendus,
-  injecte le geste SDL, puis vérifie l’application au nœud existant.
+  injecte le geste SDL, puis vérifie l’application au nœud existant. Deux
+  variantes couvrent aussi la création d’un nœud racine et d’un enfant, avec
+  sauvegarde et rechargement ; chaque artefact encode explicitement sa
+  destination.
 - Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
   `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
   lignes de ressources et des nœuds d’entité, ainsi qu’une capture PPM du frame

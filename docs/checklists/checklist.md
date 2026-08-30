@@ -96,11 +96,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Permettre duplication superficielle/profonde et réécriture sélective des
   références internes. Les options et les tests de réécriture sélective sont
   documentés dans la section 4.
-- [x] Fermer la preuve UX du drag-and-drop des artworks vers un nœud existant ;
-  `asset_studio_ui_drag_e2e` vérifie le payload, la cible `root` et la mutation
-  du document.
-- [ ] Compléter la preuve UX du drag-and-drop vers un nouveau nœud racine ou
-  enfant ; les mutations headless sont déjà vérifiées.
+- [x] Fermer la preuve UX du drag-and-drop des artworks vers un nœud existant,
+  un nœud racine ou un enfant ; `asset_studio_ui_drag_e2e`,
+  `asset_studio_ui_drag_root_e2e` et `asset_studio_ui_drag_child_e2e` vérifient
+  les payloads, les parentés et le reload.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machines dans
   des sections réellement éditables.
 - [x] Faire correspondre chaque paramètre de timeline au descripteur runtime,
@@ -556,12 +555,12 @@ publication.
   sélectionne le nœud, le canvas expose son gizmo de translation et
   `asset_studio_entity_e2e` décrit le drag SDL, la sauvegarde et le reload ;
   son exécution nécessite un écran SDL disponible.
-- [ ] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
+- [x] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
   - [x] un nœud existant ;
   - [x] un nouveau nœud racine ;
   - [x] un nouveau nœud enfant. Les trois mutations sont couvertes par
-    `entity artwork destinations cover existing root and new root or child
-    nodes` ; la preuve du geste UI reste ouverte dans la gate UX E2E.
+    `asset_studio_ui_drag_e2e`, `asset_studio_ui_drag_root_e2e` et
+    `asset_studio_ui_drag_child_e2e`.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
   sections avancées éditables plutôt que seulement dans le contrat JSON. Les
   sections passent par `set_selected_entity_definition`, et

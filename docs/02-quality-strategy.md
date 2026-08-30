@@ -69,6 +69,10 @@ clavier ImGui et un ratio de contraste texte/fond d’au moins 4,5:1.
 Le test `asset_studio_ui_drag_e2e` capture les coordonnées des widgets source et
 cible, injecte un drag SDL de `head-button-artwork` vers le nœud `root`, puis
 exige la mutation confirmée dans `asset-studio-ui-drag.json`.
+Les variantes `asset_studio_ui_drag_root_e2e` et
+`asset_studio_ui_drag_child_e2e` couvrent respectivement l’ajout d’un nouveau
+root et d’un enfant, puis vérifient leur parenté après reload et la destination
+déclarée dans l’artefact.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
 sa primitive en path Bézier, insère et retire un point, convertit un segment,
 modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide

@@ -24,6 +24,7 @@ elseif(NOT FIRST_RESULT EQUAL 0)
         "Asset Studio UI registry E2E failed (${FIRST_RESULT})\n${FIRST_OUTPUT}\n${FIRST_ERROR}")
 endif()
 
+if(NOT DEFINED SKIP_REGISTRY_CHECK)
 set(REGISTRY "${TEST_ROOT}/project/asset-studio-ui-widgets.json")
 if(NOT EXISTS "${REGISTRY}")
     message(FATAL_ERROR "Asset Studio UI test did not produce its registry")
@@ -61,9 +62,11 @@ if(DEFINED DRAG_ARTIFACT)
     endif()
     file(READ "${TEST_ROOT}/project/${DRAG_ARTIFACT}" DRAG_RESULT)
     foreach(REQUIRED_RESULT
+            "\"drop_destination\": \"${DRAG_DESTINATION}\""
             "\"source_widget_seen\": true"
             "\"target_widget_seen\": true"
-            "\"drop_applied_to_existing_node\": true")
+            "\"drop_applied_to_existing_node\": true"
+            "\"drop_persisted_after_reload\": true")
         string(FIND "${DRAG_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)
             message(FATAL_ERROR "Asset Studio drag probe is missing ${REQUIRED_RESULT}")
@@ -82,6 +85,7 @@ foreach(REQUIRED_ID
     endif()
 endforeach()
 
+if(NOT DEFINED DRAG_ARTIFACT)
 execute_process(
     COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT
@@ -91,10 +95,12 @@ if(SECOND_RESULT EQUAL 77)
     message("SKIP: Asset Studio UI registry E2E requires a display")
     return()
 elseif(NOT SECOND_RESULT EQUAL 0)
-    message(FATAL_ERROR
-        "Asset Studio UI registry repeat failed (${SECOND_RESULT})\n${SECOND_OUTPUT}\n${SECOND_ERROR}")
-endif()
+        message(FATAL_ERROR
+            "Asset Studio UI registry repeat failed (${SECOND_RESULT})\n${SECOND_OUTPUT}\n${SECOND_ERROR}")
+    endif()
 file(READ "${REGISTRY}" SECOND_REGISTRY)
 if(NOT FIRST_REGISTRY STREQUAL SECOND_REGISTRY)
     message(FATAL_ERROR "Asset Studio UI registry is not stable across repeated frames")
+endif()
+endif()
 endif()

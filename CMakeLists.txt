@@ -557,6 +557,32 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-drag-e2e
                 -DUI_ARGUMENT=--ui-drag-test
                 -DDRAG_ARTIFACT=asset-studio-ui-drag.json
+                -DDRAG_DESTINATION=existing
+                -DSKIP_REGISTRY_CHECK=1
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
+            NAME asset_studio_ui_drag_root_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-drag-root-e2e
+                -DUI_ARGUMENT=--ui-drag-root-test
+                -DDRAG_ARTIFACT=asset-studio-ui-drag.json
+                -DDRAG_DESTINATION=root
+                -DSKIP_REGISTRY_CHECK=1
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
+            NAME asset_studio_ui_drag_child_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-drag-child-e2e
+                -DUI_ARGUMENT=--ui-drag-child-test
+                -DDRAG_ARTIFACT=asset-studio-ui-drag.json
+                -DDRAG_DESTINATION=child
+                -DSKIP_REGISTRY_CHECK=1
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(

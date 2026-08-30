@@ -59,6 +59,7 @@ bool ui_focus_probe_enabled = false;
 bool ui_focus_probe_succeeded = false;
 bool ui_drag_probe_enabled = false;
 bool ui_drag_probe_applied = false;
+int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
 bool ui_drag_source_seen = false;
@@ -1544,13 +1545,16 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
 
 void write_ui_drag_probe(const std::filesystem::path& project_path,
                          const bool source_seen, const bool target_seen,
-                         const bool applied) {
+                         const bool applied, const bool persisted,
+                         const char* destination) {
     if (project_path.empty()) return;
     nlohmann::json probe = {
         {"schema", "asset-studio-ui-drag-test-v1"},
+        {"drop_destination", destination},
         {"source_widget_seen", source_seen},
         {"target_widget_seen", target_seen},
-        {"drop_applied_to_existing_node", applied}};
+        {"drop_applied_to_existing_node", applied},
+        {"drop_persisted_after_reload", persisted}};
     std::ofstream output(project_path / "asset-studio-ui-drag.json");
     if (output) output << probe.dump(2) << '\n';
 }
@@ -5288,21 +5292,31 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::SameLine();
                 ImGui::Button("Drop artwork as root");
-                ImGui::SameLine();
-                ImGui::TextDisabled("Textures, vectors or visual components");
+                if (ui_drag_probe_enabled && ui_drag_target_mode == 1) {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    ui_drag_target_screen = {(minimum.x + maximum.x) * 0.5F,
+                                             (minimum.y + maximum.y) * 0.5F};
+                    ui_drag_target_seen = true;
+                }
                 if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(
                             "VERTEX_LOOM_RESOURCE");
                         payload && payload->DataSize == sizeof(ResourceDragPayload)) {
                         if (add_dropped_node(std::nullopt,
                                              *static_cast<const ResourceDragPayload*>(
-                                                 payload->Data)))
+                                                 payload->Data))) {
+                            ui_drag_probe_applied = ui_drag_probe_enabled &&
+                                ui_drag_target_mode == 1;
                             status = "Artwork dropped on new root node.";
-                        else
+                        } else {
                             status = "Artwork kind cannot be used on an entity node.";
+                        }
                     }
                     ImGui::EndDragDropTarget();
                 }
+                ImGui::SameLine();
+                ImGui::TextDisabled("Textures, vectors or visual components");
                 ImGui::TextDisabled("This entity has no nodes.");
             } else {
             if (ImGui::Button("Add child")) {
@@ -5326,21 +5340,31 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::SameLine();
             ImGui::Button("Drop artwork as child");
-            ImGui::SameLine();
-            ImGui::TextDisabled("Textures, vectors or visual components");
+            if (ui_drag_probe_enabled && ui_drag_target_mode == 2) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_drag_target_screen = {(minimum.x + maximum.x) * 0.5F,
+                                         (minimum.y + maximum.y) * 0.5F};
+                ui_drag_target_seen = true;
+            }
             if (ImGui::BeginDragDropTarget()) {
                 if (const auto* payload = ImGui::AcceptDragDropPayload(
                         "VERTEX_LOOM_RESOURCE");
                     payload && payload->DataSize == sizeof(ResourceDragPayload)) {
                     if (add_dropped_node(entity.nodes[canvas.selected_node].id,
                                          *static_cast<const ResourceDragPayload*>(
-                                             payload->Data)))
+                                             payload->Data))) {
+                        ui_drag_probe_applied = ui_drag_probe_enabled &&
+                            ui_drag_target_mode == 2;
                         status = "Artwork dropped on new child node.";
-                    else
+                    } else {
                         status = "Artwork kind cannot be used on an entity node.";
+                    }
                 }
                 ImGui::EndDragDropTarget();
             }
+            ImGui::SameLine();
+            ImGui::TextDisabled("Textures, vectors or visual components");
             ImGui::SameLine();
             if (ImGui::Button("Duplicate")) {
                 if (session.duplicate_selected_entity_node(canvas.selected_node)) {
@@ -5401,7 +5425,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                       canvas.selected_node == node_index)) {
                     canvas.selected_node = node_index;
                 }
-                if (ui_drag_probe_enabled && entity.nodes[node_index].id == "root") {
+                if (ui_drag_probe_enabled && ui_drag_target_mode == 0 &&
+                    entity.nodes[node_index].id == "root") {
                     const auto minimum = ImGui::GetItemRectMin();
                     const auto maximum = ImGui::GetItemRectMax();
                     ui_drag_target_screen = {(minimum.x + maximum.x) * 0.5F,
@@ -5416,7 +5441,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 node_index,
                                 *static_cast<const ResourceDragPayload*>(payload->Data))) {
                             canvas.selected_node = node_index;
-                            if (ui_drag_probe_enabled &&
+                            if (ui_drag_probe_enabled && ui_drag_target_mode == 0 &&
                                 entity.nodes[node_index].id == "root")
                                 ui_drag_probe_applied = true;
                             status = "Artwork dropped on existing node.";
@@ -8068,7 +8093,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             status = "Project rejected; inspect the diagnostics.";
         }
     }
-    if ((ui_test_mode || ui_min_window_test) && session.has_project()) {
+    if ((ui_test_mode || ui_min_window_test || ui_drag_test) &&
+        session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
                 session.resources(), [](const auto& resource) {
@@ -8094,6 +8120,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_drag_probe_applied = false;
         ui_drag_source_seen = false;
         ui_drag_target_seen = false;
+        static_cast<void>(session.select_resource(
+            fabric::editor::StudioResourceKind::entity,
+            {.value = "textile-head-entity"}));
+        if (ui_drag_target_mode == 1 && session.selected_entity() &&
+            session.selected_entity()->nodes.size() == 1U)
+            static_cast<void>(session.remove_selected_entity_node(0U));
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
                 session.resources(), [](const auto& resource) {
@@ -8973,8 +9005,31 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (ui_drag_test) {
             ++ui_drag_frame;
             if (ui_drag_frame >= 5U) {
+                bool persisted = ui_drag_probe_applied;
+                if (ui_drag_probe_applied && session.save()) {
+                    fabric::editor::ProjectSession reloaded;
+                    persisted = reloaded.open(initial_project) &&
+                        reloaded.select_resource(
+                            fabric::editor::StudioResourceKind::entity,
+                            {.value = "textile-head-entity"}) &&
+                        reloaded.selected_entity() &&
+                        ((ui_drag_target_mode == 0 &&
+                          reloaded.selected_entity()->nodes.front().drawable.resource &&
+                          reloaded.selected_entity()->nodes.front().drawable.resource->id.value ==
+                              "head-button-artwork") ||
+                         (ui_drag_target_mode == 1 &&
+                          reloaded.selected_entity()->nodes.size() == 1U &&
+                          reloaded.selected_entity()->nodes.front().parent == std::nullopt) ||
+                         (ui_drag_target_mode == 2 &&
+                          reloaded.selected_entity()->nodes.size() >= 2U &&
+                          reloaded.selected_entity()->nodes.back().parent == "root"));
+                }
                 write_ui_drag_probe(initial_project, ui_drag_source_seen,
-                                    ui_drag_target_seen, ui_drag_probe_applied);
+                                    ui_drag_target_seen, ui_drag_probe_applied,
+                                    persisted,
+                                    ui_drag_target_mode == 1 ? "root" :
+                                    ui_drag_target_mode == 2 ? "child" :
+                                    "existing");
                 running = false;
             }
         }
@@ -9104,7 +9159,13 @@ int main(const int argument_count, char** arguments) {
     const bool ui_accessibility_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-accessibility-test";
     const bool ui_drag_test = argument_count == 3 &&
-        std::string_view{arguments[1]} == "--ui-drag-test";
+        (std::string_view{arguments[1]} == "--ui-drag-test" ||
+         std::string_view{arguments[1]} == "--ui-drag-root-test" ||
+         std::string_view{arguments[1]} == "--ui-drag-child-test");
+    const bool ui_drag_root_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-drag-root-test";
+    const bool ui_drag_child_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-drag-child-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
@@ -9121,7 +9182,9 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-test-min-window project-directory\n"
                      "       asset_studio --ui-focus-test project-directory\n"
                      "       asset_studio --ui-accessibility-test project-directory\n"
-                     "       asset_studio --ui-drag-test project-directory\n";
+                     "       asset_studio --ui-drag-test project-directory\n"
+                     "       asset_studio --ui-drag-root-test project-directory\n"
+                     "       asset_studio --ui-drag-child-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
@@ -9132,6 +9195,7 @@ int main(const int argument_count, char** arguments) {
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
+    ui_drag_target_mode = ui_drag_root_test ? 1 : ui_drag_child_test ? 2 : 0;
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
