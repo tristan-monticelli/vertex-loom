@@ -3418,18 +3418,13 @@ int run(const std::filesystem::path& project_root,
             ImGui::SeparatorText("Prefabs");
             ImGui::SetNextItemWidth(160.0F);
             ImGui::InputText("New prefab id", &new_prefab_id);
-            ImGui::SetNextItemWidth(180.0F);
-            ImGui::InputText("Prefab entity", &new_prefab_entity);
-            ImGui::SetNextItemWidth(180.0F);
-            ImGui::InputText("Prefab mechanic (optional)",
-                             &new_prefab_mechanic);
             if (session.manifest()) {
                 draw_resource_picker(
-                    "Asset Studio entities:", session.project_root() /
+                    "Prefab entity:", session.project_root() /
                         session.manifest()->directories.entities,
                     ".entity.json", new_prefab_entity);
                 draw_resource_picker(
-                    "Mechanic graphs:", session.project_root() /
+                    "Prefab mechanic (optional):", session.project_root() /
                         session.manifest()->directories.assets / "mechanics",
                     ".mechanic.json", new_prefab_mechanic);
             }

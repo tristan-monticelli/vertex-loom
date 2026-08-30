@@ -133,6 +133,9 @@ C4Component
   texturedPath, visualComposition, visualComponent, map, scene, mechanic,
   replay ou audio) passe par ce picker ; seuls les types de contrat inconnus
   restent des champs texte diagnostiqués.
+- La création de prefab dans Map Studio sélectionne désormais l’entité et la
+  mécanique via les pickers de ressources ; seul l’identifiant du nouveau
+  prefab est une saisie d’auteur.
 - Les pickers de documents de Map Studio affichent également le type, le chemin,
   la taille en octets et indiquent explicitement lorsqu’une miniature ne
   s’applique pas ; leur action `Open` ouvre le document sélectionné sur disque.
