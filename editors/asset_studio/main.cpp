@@ -3225,12 +3225,13 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
                    mouse.y >= crop_min.y && mouse.y <= crop_max.y) {
             canvas.crop_drag = fabric::editor::RasterCropDrag::move;
         }
-        if (canvas.crop_drag) {
+        if (canvas.crop_drag.has_value()) {
             canvas.crop_start_mouse = mouse;
             canvas.crop_start_view = view;
         }
     }
-    if (canvas.crop_drag && ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    if (canvas.crop_drag.has_value() &&
+        ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
         const fabric::core::Vec2 delta{
             (mouse.x - canvas.crop_start_mouse.x) / scale,
             (mouse.y - canvas.crop_start_mouse.y) / scale};
@@ -5254,7 +5255,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
-            const auto entity = *session.selected_entity();
+            const auto& entity = *session.selected_entity();
             const auto drawable_from_payload =
                 [&](const ResourceDragPayload& payload)
                     -> std::optional<std::pair<fabric::project::EntityDrawableKind,
