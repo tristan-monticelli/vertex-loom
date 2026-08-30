@@ -232,6 +232,8 @@ C4Component
   Des presets de binding transform/material/fill/image-fill accélèrent la
   création sans supprimer le mode `Custom`. Le sélecteur typé dérive les
   propriétés de transform, matériau, fill et image-fill de l’entité cible ; le
+  composant et la propriété sont choisis dans les descripteurs de l’entité ou
+  du composant visuel, sans saisie d’ID libre ; le
   scrubber affiche chaque valeur évaluée,
   son binding et sa composition. Les clés peuvent être sélectionnées en
   groupe, copiées puis collées avec un décalage relatif ; leur temps peut être

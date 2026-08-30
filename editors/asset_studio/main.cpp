@@ -6021,8 +6021,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     break;
                 }
             }
-            ImGui::InputText("Component", &animation_ui.component_id);
-            ImGui::InputText("Property", &animation_ui.property_id);
             ImGui::SeparatorText("Visual component properties");
             const auto selected_component_resource = std::ranges::find_if(
                 session.resources(), [&](const auto& resource) {
