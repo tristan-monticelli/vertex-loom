@@ -821,5 +821,28 @@ automatiquement sur les trois plateformes.
   ; run CI `33335758294` vert sur macOS/Linux/Windows, avec Mesa logiciel sur
   Windows et limite de stencil imbriqué documentée.
 
-Le chantier est terminé uniquement lorsque les huit lots et tous leurs gates
-sont cochés avec preuves de tests et commits associés.
+## 14 — Fin de produit et recette release
+
+Ces contrôles complètent les gates techniques ; ils ne peuvent être cochés
+qu'avec une preuve reproductible et un résultat utilisable par une personne
+qui n'a pas connaissance de l'implémentation.
+
+- [ ] Recette produit complète : créer un projet, éditer une scène, sauvegarder,
+  fermer, rouvrir, modifier et lancer le runtime publié sans perte de contexte.
+- [ ] Rendu GPU natif : valider OpenGL sur un vrai GPU/driver Windows ; Mesa
+  logiciel reste une couverture de secours et ne remplace pas cette recette.
+- [ ] Régression visuelle : comparer les screenshots de référence des écrans,
+  canvas, textures, fills, strokes, clips et transformations.
+- [ ] Robustesse des données : couvrir ressource manquante, fichier invalide,
+  sauvegarde interrompue, récupération et conservation des modifications.
+- [ ] Performance release : mesurer démarrage, FPS, mémoire et temps de chargement
+  sur un petit projet et un projet représentatif de production.
+- [ ] Packaging release : installer, lancer, mettre à jour et désinstaller le
+  produit sur macOS, Windows et Linux avec ses ressources et dépendances.
+- [ ] Accessibilité réelle : vérifier clavier, souris, focus, raccourcis,
+  navigation, contraste et lisibilité sur chaque écran principal.
+- [ ] Recette utilisateur finale : faire valider les critères d'acceptation,
+  les parcours documentés et les messages d'erreur par un utilisateur externe.
+
+Le chantier est terminé uniquement lorsque les huit lots, leurs gates et ces
+huit contrôles de fin de produit sont cochés avec preuves associées.
