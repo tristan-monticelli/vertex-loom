@@ -1,0 +1,54 @@
+if(NOT DEFINED ASSET_STUDIO OR NOT DEFINED SOURCE_FIXTURE OR
+   NOT DEFINED TEST_ROOT)
+    message(FATAL_ERROR "Asset Studio UI registry E2E arguments are required")
+endif()
+
+file(REMOVE_RECURSE "${TEST_ROOT}")
+file(MAKE_DIRECTORY "${TEST_ROOT}")
+file(COPY "${SOURCE_FIXTURE}/" DESTINATION "${TEST_ROOT}/project")
+
+execute_process(
+    COMMAND "${ASSET_STUDIO}" --ui-test "${TEST_ROOT}/project"
+    RESULT_VARIABLE FIRST_RESULT
+    OUTPUT_VARIABLE FIRST_OUTPUT
+    ERROR_VARIABLE FIRST_ERROR)
+if(FIRST_RESULT EQUAL 77)
+    message("SKIP: Asset Studio UI registry E2E requires a display")
+    return()
+elseif(NOT FIRST_RESULT EQUAL 0)
+    message(FATAL_ERROR
+        "Asset Studio UI registry E2E failed (${FIRST_RESULT})\n${FIRST_OUTPUT}\n${FIRST_ERROR}")
+endif()
+
+set(REGISTRY "${TEST_ROOT}/project/asset-studio-ui-widgets.json")
+if(NOT EXISTS "${REGISTRY}")
+    message(FATAL_ERROR "Asset Studio UI test did not produce its registry")
+endif()
+file(READ "${REGISTRY}" FIRST_REGISTRY)
+foreach(REQUIRED_ID
+        "resource-row-head-face"
+        "resource-row-head-button-artwork"
+        "resource-row-textile-head-entity"
+        "entity-node-root")
+    string(FIND "${FIRST_REGISTRY}" "${REQUIRED_ID}" ID_POSITION)
+    if(ID_POSITION LESS 0)
+        message(FATAL_ERROR "UI registry is missing stable ID ${REQUIRED_ID}")
+    endif()
+endforeach()
+
+execute_process(
+    COMMAND "${ASSET_STUDIO}" --ui-test "${TEST_ROOT}/project"
+    RESULT_VARIABLE SECOND_RESULT
+    OUTPUT_VARIABLE SECOND_OUTPUT
+    ERROR_VARIABLE SECOND_ERROR)
+if(SECOND_RESULT EQUAL 77)
+    message("SKIP: Asset Studio UI registry E2E requires a display")
+    return()
+elseif(NOT SECOND_RESULT EQUAL 0)
+    message(FATAL_ERROR
+        "Asset Studio UI registry repeat failed (${SECOND_RESULT})\n${SECOND_OUTPUT}\n${SECOND_ERROR}")
+endif()
+file(READ "${REGISTRY}" SECOND_REGISTRY)
+if(NOT FIRST_REGISTRY STREQUAL SECOND_REGISTRY)
+    message(FATAL_ERROR "Asset Studio UI registry is not stable across repeated frames")
+endif()

@@ -56,6 +56,10 @@ graphique et ne ferme aucune case de couverture visuelle.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame et écrit le
 registre JSON des IDs stables des widgets dans le projet fourni ; il est destiné
 aux contrôleurs UX et ne modifie pas le document projet.
+Le test CTest `asset_studio_ui_registry_e2e` exécute ce mode deux fois sur la
+fixture multi-ressources et exige la présence ainsi que la stabilité des IDs de
+ressources et de nœud d’entité ; il est ignoré avec le code `77` si aucun écran
+ou contexte SDL n’est disponible.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
 sa primitive en path Bézier, insère et retire un point, convertit un segment,
 modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide
