@@ -349,10 +349,35 @@ std::string property_value_text(const fabric::project::MapPropertyValue& value) 
     }, value);
 }
 
+std::string_view resource_kind_label(
+    const fabric::editor::StudioResourceKind kind) noexcept {
+    using Kind = fabric::editor::StudioResourceKind;
+    switch (kind) {
+    case Kind::texture: return "texture";
+    case Kind::vector: return "vector";
+    case Kind::material: return "material";
+    case Kind::entity: return "entity";
+    case Kind::animation: return "animation";
+    case Kind::input: return "input";
+    case Kind::behavior: return "behavior";
+    case Kind::transformation: return "transformation";
+    case Kind::textured_path: return "textured path";
+    case Kind::visual_composition: return "visual composition";
+    case Kind::visual_component: return "visual component";
+    case Kind::map: return "map";
+    case Kind::scene: return "scene";
+    case Kind::mechanic: return "mechanic";
+    case Kind::replay: return "replay";
+    case Kind::audio: return "audio";
+    }
+    return "unknown";
+}
+
 void draw_resource_picker(const char* label,
                           const std::filesystem::path& directory,
                           const std::string_view suffix,
-                          std::string& selected_id) {
+                          std::string& selected_id,
+                          fabric::editor::ProjectSession* catalog = nullptr) {
     std::error_code error;
     if (!std::filesystem::exists(directory, error) || error) return;
     ImGui::TextDisabled("%s", label);
@@ -385,7 +410,22 @@ void draw_resource_picker(const char* label,
         const auto selected_path = directory /
             (selected_id + std::string{suffix});
         if (std::filesystem::is_regular_file(selected_path, error)) {
-            ImGui::TextDisabled("Type: %s", std::string{suffix}.c_str());
+            const fabric::editor::StudioResource* catalog_resource = nullptr;
+            if (catalog != nullptr) {
+                const auto resource = std::ranges::find_if(
+                    catalog->resources(), [&](const auto& item) {
+                        return item.id.value == selected_id &&
+                            item.document_path ==
+                                selected_path.lexically_relative(
+                                    catalog->project_root());
+                    });
+                if (resource != catalog->resources().end())
+                    catalog_resource = &*resource;
+            }
+            const auto type = catalog_resource == nullptr
+                ? std::string{suffix}
+                : std::string{resource_kind_label(catalog_resource->kind)};
+            ImGui::TextDisabled("Type: %s", type.c_str());
             ImGui::TextDisabled("Path: %s", selected_path.generic_string().c_str());
             const auto size = std::filesystem::file_size(selected_path, error);
             if (!error) {
@@ -394,7 +434,31 @@ void draw_resource_picker(const char* label,
             } else {
                 ImGui::TextDisabled("Size: n/a");
             }
-            ImGui::TextDisabled("Preview: n/a (document resource)");
+            ImGui::TextDisabled("Thumbnail: n/a (document resource)");
+            ImGui::TextDisabled("Dimensions: %s",
+                               catalog_resource != nullptr &&
+                                       catalog_resource->width != 0U &&
+                                       catalog_resource->height != 0U
+                                   ? (std::to_string(catalog_resource->width) +
+                                      "x" +
+                                      std::to_string(catalog_resource->height)).c_str()
+                                   : "n/a");
+            ImGui::TextDisabled("Format: %s",
+                               catalog_resource != nullptr &&
+                                       !catalog_resource->format.empty()
+                                   ? catalog_resource->format.c_str()
+                                   : std::string{suffix}.c_str());
+            if (catalog_resource != nullptr && catalog != nullptr) {
+                const auto references = catalog->incoming_references(
+                    catalog_resource->kind, catalog_resource->id);
+                ImGui::TextDisabled(
+                    "Dependencies / incoming references: %s",
+                    references ? std::to_string(references->size()).c_str()
+                               : "unavailable");
+            } else {
+                ImGui::TextDisabled(
+                    "Dependencies / incoming references: unavailable");
+            }
             if (ImGui::SmallButton("Open##resource-picker-open")) {
                 const auto absolute = std::filesystem::absolute(selected_path, error);
                 if (!error) {
@@ -619,7 +683,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
                        const std::filesystem::path& project_root,
                        SDL_Window* window, SceneEditorState& state,
                        std::string& status,
-                       std::vector<fabric::project::Error>& package_errors) {
+                       std::vector<fabric::project::Error>& package_errors,
+                       fabric::editor::ProjectSession& resource_catalog) {
     ImGui::Begin("Scene Studio");
     if (project_root.empty()) {
         ImGui::TextDisabled("Open a project map to author its scenes.");
@@ -681,7 +746,7 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     draw_field_errors(session.errors(), "name",
                       "Enter a visible non-empty scene name.");
     draw_resource_picker("Scenes:", scenes_directory, ".scene.json",
-                         state.open_id);
+                         state.open_id, &resource_catalog);
     ImGui::SameLine();
     ImGui::BeginDisabled(state.open_id.empty());
     if (ImGui::Button("Open scene")) {
@@ -768,7 +833,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
                          "No undone scene changes are available to redo.");
 
     ImGui::SeparatorText("Mounted maps");
-    draw_resource_picker("Maps:", maps_directory, ".map.json", state.map_id);
+    draw_resource_picker("Maps:", maps_directory, ".map.json", state.map_id,
+                         &resource_catalog);
     ImGui::SetNextItemWidth(170.0F);
     ImGui::InputText("Mount id", &state.mount_id);
     ImGui::SameLine();
@@ -855,7 +921,7 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Transition id", &state.transition_id);
     draw_resource_picker("Target scenes:", scenes_directory, ".scene.json",
-                         state.target_scene_id);
+                         state.target_scene_id, &resource_catalog);
     ImGui::SetNextItemWidth(160.0F);
     ImGui::InputText("Entry point", &state.entry_point);
     ImGui::SetNextItemWidth(220.0F);
@@ -1073,7 +1139,8 @@ void draw_mechanic_value_editor(
 void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                           const fabric::editor::MapSession& map_session,
                           MechanicEditorState& state,
-                          std::string& status) {
+                          std::string& status,
+                          fabric::editor::ProjectSession& resource_catalog) {
     ImGui::Begin("Mechanics");
     if (!map_session.map()) {
         ImGui::TextDisabled("Open a map before editing mechanics.");
@@ -1102,7 +1169,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     }
 
     draw_resource_picker("Mechanics:", directory, ".mechanic.json",
-                         state.open_id);
+                         state.open_id, &resource_catalog);
     ImGui::SameLine();
     ImGui::BeginDisabled(state.open_id.empty());
     if (ImGui::Button("Open")) {
@@ -1158,7 +1225,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         const auto directory = map_session.project_root() /
             map_session.manifest()->directories.entities;
         draw_resource_picker("Visual entity (optional):", directory, ".entity.json",
-                             state.platform_visual_entity);
+                             state.platform_visual_entity, &resource_catalog);
     }
     ImGui::DragFloat2("Platform position (world units)",
                       &state.platform.position.x, 0.1F);
@@ -2638,7 +2705,8 @@ int run(const std::filesystem::path& project_root,
             const auto manifest = fabric::project::load_manifest(project_root);
             if (manifest.ok()) {
                 const auto maps_directory = project_root / manifest.manifest->directories.maps;
-                draw_resource_picker("Open map:", maps_directory, ".map.json", open_map_id);
+                draw_resource_picker("Open map:", maps_directory, ".map.json",
+                                     open_map_id, &resource_catalog);
                 ImGui::SameLine();
                 ImGui::BeginDisabled(open_map_id.empty());
                 if (ImGui::Button("Open selected")) {
@@ -2865,7 +2933,7 @@ int run(const std::filesystem::path& project_root,
                 const auto directory = session.project_root() /
                     session.manifest()->directories.entities;
                 draw_resource_picker("Entity resources:", directory, ".entity.json",
-                                     placement_resource_id);
+                                     placement_resource_id, &resource_catalog);
             } else {
                 std::vector<std::string> prefab_ids;
                 prefab_ids.reserve(map.prefabs.size());
@@ -3605,11 +3673,12 @@ int run(const std::filesystem::path& project_root,
                 draw_resource_picker(
                     "Prefab entity:", session.project_root() /
                         session.manifest()->directories.entities,
-                    ".entity.json", new_prefab_entity);
+                    ".entity.json", new_prefab_entity, &resource_catalog);
                 draw_resource_picker(
                     "Prefab mechanic (optional):", session.project_root() /
                         session.manifest()->directories.assets / "mechanics",
-                    ".mechanic.json", new_prefab_mechanic);
+                    ".mechanic.json", new_prefab_mechanic,
+                    &resource_catalog);
             }
             ImGui::BeginDisabled(new_prefab_id.empty() ||
                                  new_prefab_entity.empty());
@@ -3793,9 +3862,10 @@ int run(const std::filesystem::path& project_root,
             draw_errors(session);
         }
         ImGui::End();
-        draw_mechanic_editor(mechanic_session, session, mechanic_editor, status);
+        draw_mechanic_editor(mechanic_session, session, mechanic_editor, status,
+                             resource_catalog);
         draw_scene_editor(scene_session, project_root, window, scene_editor,
-                          status, package_errors);
+                          status, package_errors, resource_catalog);
 
         if (const auto ready = transition_guard.take_ready();
             ready == fabric::editor::SessionAction::quit) {
