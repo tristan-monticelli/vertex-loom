@@ -166,6 +166,8 @@ C4Component
   schéma et expliquent ce domaine au survol.
 - Les paramètres image et stroke des drawables, ainsi que les champs principaux
   de timeline, expliquent leur effet technique au survol.
+- Les valeurs par défaut typées, le crop raster et les transforms image des
+  prompts d’artwork et d’entité exposent également leur sémantique au survol.
 - Map Studio expose la même aide contextuelle pour les transforms, la grille,
   les plateformes de preview, le temps de preview et les paramètres de
   collision, y compris les points des formes polygonales et des chaînes.

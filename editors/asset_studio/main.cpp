@@ -4009,6 +4009,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    &parameter.default_value)) {
                         changed |= ImGui::InputScalar(
                             "Default", ImGuiDataType_S64, value);
+                        ImGui::SetItemTooltip("Default integer used when this component parameter is not overridden; its unit follows the parameter schema.");
                     } else if (auto* value = std::get_if<bool>(
                                    &parameter.default_value)) {
                         changed |= ImGui::Checkbox("Default", value);
@@ -4019,6 +4020,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    &parameter.default_value)) {
                         changed |= ImGui::DragFloat2("Default", &value->x,
                                                      0.05F);
+                        ImGui::SetItemTooltip("Default vector used when this component parameter is not overridden; its unit follows the parameter schema.");
                     } else if (auto* value = std::get_if<fabric::core::Color>(
                                    &parameter.default_value)) {
                         changed |= ImGui::ColorEdit4("Default", &value->red);
@@ -4116,12 +4118,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     raster_view_edit.transform.scale.y};
                 float view_rotation = raster_view_edit.transform.rotation_degrees;
                 ImGui::InputFloat2("Crop origin (pixels)", crop_origin);
+                ImGui::SetItemTooltip("Top-left crop origin measured in source pixels.");
                 ImGui::InputFloat2("Crop size (pixels)", crop_size);
+                ImGui::SetItemTooltip("Crop width and height measured in source pixels.");
                 ImGui::InputFloat2("Pivot (normalized)", crop_pivot);
+                ImGui::SetItemTooltip("Normalized pivot used by the raster view transform.");
                 ImGui::InputFloat2("View position (world units)", view_position);
+                ImGui::SetItemTooltip("Raster view translation in project world units.");
                 ImGui::InputFloat("View rotation (degrees)", &view_rotation);
+                ImGui::SetItemTooltip("Raster view rotation around its normalized pivot.");
                 ImGui::InputFloat2("View scale (factor)", view_scale);
-                draw_technical_tooltip("Crop origin and size use source pixels; pivot is normalized; view transform uses world units and a scale factor.");
+                ImGui::SetItemTooltip("Raster view scale multiplier on each axis.");
                 if (ImGui::Button("Apply crop/view")) {
                     raster_view_edit.crop.origin = {crop_origin[0], crop_origin[1]};
                     raster_view_edit.crop.size = {crop_size[0], crop_size[1]};
@@ -7104,12 +7111,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::InputFloat2("Image scale (factor)", scale)) {
                 creation.artwork.image_transform.scale = {scale[0], scale[1]};
             }
+            ImGui::SetItemTooltip("Scale multiplier applied to the selected image fill.");
             float pivot[] = {creation.artwork.image_transform.pivot.x,
                              creation.artwork.image_transform.pivot.y};
             if (ImGui::InputFloat2("Image pivot (world units)", pivot)) {
                 creation.artwork.image_transform.pivot = {
                     pivot[0], pivot[1]};
             }
+            ImGui::SetItemTooltip("Pivot of the selected image fill in project world units.");
             ImGui::InputFloat(
                 "Image rotation (degrees)",
                 &creation.artwork.image_transform.rotation_degrees,
@@ -7509,11 +7518,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::InputFloat2("Scale (factor)", scale)) {
             creation.entity.transform.scale = {scale[0], scale[1]};
         }
+        ImGui::SetItemTooltip("Entity scale multiplier on each axis.");
         ImGui::InputFloat("Rotation (degrees)",
                           &creation.entity.transform.rotation_degrees,
                           1.0F, 10.0F, "%.2f deg");
+        ImGui::SetItemTooltip("Entity rotation around its pivot, in degrees.");
         ImGui::InputFloat("Z order (world units)", &creation.entity.z_order, 0.1F, 1.0F,
                           "%.2f");
+        ImGui::SetItemTooltip("Entity draw order; larger values render later.");
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "node_name");
         draw_prompt_error(validation, "id");
