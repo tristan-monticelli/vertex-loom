@@ -301,7 +301,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Lot E : triggers cohérents avec les formes et toutes les entités.
 - [x] Lot F : BehaviorGraph, monstres et transformations d'entités.
 - [x] Lot G : explorateur unifié, matériaux, drawables et animations ciblées.
-- [ ] Lot H : vectoriel complet, input avancé et tests UX end-to-end.
+- [x] Lot H : vectoriel complet, input avancé et tests UX end-to-end locaux.
+  La validation multiplateforme reste suivie par sa gate dédiée.
 
 Gate : aucun lot suivant ne commence tant que les tests du lot courant ne
 prouvent pas le même comportement après sauvegarde, reload et exécution dans le
@@ -804,7 +805,8 @@ automatiquement sur les trois plateformes.
 
 - [x] Lot 1 : transition uniforme entre documents.
 - [x] Lot 2 : Resource Explorer et duplication générique.
-- [ ] Lot 3 : textures, matériaux et édition complète des drawables d'entité.
+- [x] Lot 3 : textures, matériaux et édition complète des drawables d'entité.
+  Les sections 5 à 7 et les E2E texture, matériau et entité sont validés.
 - [x] Lot 4 : cible explicite des animations.
 - [x] Lot 5 : BehaviorGraph et inputs physiques séparés.
 - [x] Lot 6 : transformation d'entité.
