@@ -64,11 +64,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $mesaDllRoot = Get-ChildItem -Path $env:MESA_ROOT -Recurse -Directory -Filter 'x64' | Select-Object -First 1
-          if ($null -eq $mesaDllRoot) {
-            throw "Mesa3D x64 directory not found under $env:MESA_ROOT"
+          $mesaOpenGl = Get-ChildItem -Path $env:MESA_ROOT -Recurse -File -Filter 'opengl32.dll' | Select-Object -First 1
+          if ($null -eq $mesaOpenGl) {
+            throw "Mesa3D opengl32.dll not found under $env:MESA_ROOT"
           }
-          Copy-Item (Join-Path $mesaDllRoot.FullName '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
+          Copy-Item (Join-Path $mesaOpenGl.Directory.FullName '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
 
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
