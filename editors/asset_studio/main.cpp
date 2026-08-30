@@ -85,8 +85,9 @@ void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     ImGui::SetTooltip("%s", std::string(reason).c_str());
 }
 
-bool draw_resource_name_field(const char* label, std::string& name) {
-    ImGui::SetNextItemWidth(560.0F);
+bool draw_resource_name_field(const char* label, std::string& name,
+                              const float width = 560.0F) {
+    ImGui::SetNextItemWidth(width);
     return ImGui::InputText(label, &name);
 }
 
@@ -1287,8 +1288,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         } else {
             ImGui::TextDisabled("Stable ID: %s",
                                 rename_request->id.value.c_str());
-            ImGui::SetNextItemWidth(420.0F);
-            ImGui::InputText("Visible name", &rename_value);
+            draw_resource_name_field("Visible name", rename_value, 420.0F);
             ImGui::BeginDisabled(rename_value.empty());
             if (ImGui::Button("Rename", {110.0F, 0.0F})) {
                 const auto target = *rename_request;
@@ -6755,8 +6755,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (ImGui::BeginPopupModal("Project settings", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::SetNextItemWidth(420.0F);
-        ImGui::InputText("Project name", &project_settings.name);
+        draw_resource_name_field("Project name", project_settings.name, 420.0F);
         ImGui::SetNextItemWidth(220.0F);
         ImGui::InputDouble("Pixels per unit",
                            &project_settings.pixels_per_unit, 1.0, 10.0,

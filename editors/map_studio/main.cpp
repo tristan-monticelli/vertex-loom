@@ -117,6 +117,13 @@ void draw_technical_tooltip(const std::string_view text) {
     ImGui::SetItemTooltip("%s", std::string(text).c_str());
 }
 
+bool draw_resource_name_field(const char* label, std::string& name,
+                              const float width = 260.0F,
+                              const ImGuiInputTextFlags flags = 0) {
+    ImGui::SetNextItemWidth(width);
+    return ImGui::InputText(label, &name, flags);
+}
+
 void write_e2e_failure_artifacts(
     const std::filesystem::path& project_path, SDL_Window* window,
     const std::string& status,
@@ -654,9 +661,8 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
                 scene_id.value.c_str(), session.dirty() ? " · dirty" : "");
     if (state.edited_name.empty())
         state.edited_name = session.scene()->document.name;
-    ImGui::SetNextItemWidth(220.0F);
-    if (ImGui::InputText("Name", &state.edited_name,
-                         ImGuiInputTextFlags_EnterReturnsTrue))
+    if (draw_resource_name_field("Name", state.edited_name, 260.0F,
+                                 ImGuiInputTextFlags_EnterReturnsTrue))
         status = session.set_name(state.edited_name)
             ? "Scene name changed" : "Scene name rejected";
     if (ImGui::Button("Save scene"))

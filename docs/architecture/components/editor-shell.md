@@ -148,7 +148,8 @@ C4Component
 - Les prompts Behavior, Transformation, preset visuel, composition, composant,
   matériau, entité, animation et input réutilisent le même composant de
   formulaire pour leur nom ; l’éditeur de matériau réutilise aussi ce champ
-  lors de l’édition, avec des clés ImGui stables.
+  lors de l’édition, avec des clés ImGui stables. Le renommage Asset Studio et
+  le nom de projet/scène utilisent désormais ce même widget dimensionné.
 - Les prompts artwork et entité affichent explicitement les unités de leurs
   dimensions, positions, échelles, rotations et ordre Z ; les valeurs stockées
   restent inchangées.
