@@ -1698,6 +1698,22 @@ void draw_prompt_error(const fabric::editor::PromptValidation& validation,
     }
 }
 
+void focus_prompt_field(const fabric::editor::PromptValidation& validation,
+                        const std::string_view field) {
+    static std::string focused_error;
+    if (validation.errors.empty()) {
+        focused_error.clear();
+        return;
+    }
+    if (validation.errors.front().field != field) return;
+    const std::string key = std::string(field) + ":" +
+        validation.errors.front().message;
+    if (focused_error == key) return;
+    ImGui::SetKeyboardFocusHere(-1);
+    ImGui::SetScrollHereY(0.0F);
+    focused_error = key;
+}
+
 void draw_prompt_summary(const fabric::editor::PromptValidation& validation) {
     ImGui::SeparatorText("Review");
     for (const auto& line : validation.summary) {
@@ -6868,11 +6884,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a versioned Vertex Loom project");
         ImGui::Spacing();
+        const auto validation = creation.project.validate();
         std::string destination = creation.project.parent_directory.string();
         ImGui::SetNextItemWidth(560.0F);
         if (ImGui::InputText("Parent folder", &destination)) {
             creation.project.parent_directory = destination;
         }
+        focus_prompt_field(validation, "destination");
         ImGui::SameLine();
         if (ImGui::Button("Browse...")) {
             std::array<char, 1024> selected{};
@@ -6881,6 +6899,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         draw_resource_name_field("Name##project-name", creation.project.name);
+        focus_prompt_field(validation, "name");
         const auto preset_label = std::string(fabric::editor::label(
             creation.project.preset));
         ImGui::SetNextItemWidth(300.0F);
@@ -6909,7 +6928,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.project.preset =
                 fabric::editor::ProjectScalePreset::custom;
         }
-        const auto validation = creation.project.validate();
+        focus_prompt_field(validation, "pixelsPerUnit");
         draw_prompt_error(validation, "destination");
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "pixelsPerUnit");

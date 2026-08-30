@@ -171,6 +171,9 @@ C4Component
   d’une aide contextuelle sur leurs paramètres techniques.
 - Les réglages de matériau, contraintes et bindings d’input exposent également
   une explication de leurs paramètres numériques.
+- Les prompts de création calculent leur validation avant le rendu des champs :
+  le premier champ invalide reçoit le focus clavier et le scroll s’y repositionne
+  une seule fois par erreur.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.
