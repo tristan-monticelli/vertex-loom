@@ -713,7 +713,7 @@ externe.
   et Map Studio partagent les commandes Save/Undo/Redo/Quit et sélectionnent
   Ctrl ou Cmd selon la plateforme.
 - [x] Rendre les actions destructives visuellement distinctes.
-- [ ] Vérifier le comportement aux tailles minimales de fenêtre.
+- [x] Vérifier le comportement aux tailles minimales de fenêtre ; `asset_studio_ui_min_window_e2e` exécute le shell à 900×600 et exige une capture PPM.
 - [ ] Vérifier navigation clavier et contraste.
 
 Gate : les mêmes conventions de sélection, édition, validation et actions sont
