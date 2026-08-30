@@ -724,7 +724,9 @@ utilisées pour tous les types de ressources.
 - [x] Ajouter une fixture de projet contenant plusieurs ressources de chaque
   type : `tests/fixtures/studio-textile-head` couvre désormais les ressources
   indexées, y compris input, behavior, matériau, audio et scène.
-- [ ] Automatiser les parcours suivants :
+- [x] Automatiser les parcours suivants : les sous-parcours ci-dessous sont
+  enregistrés dans les modes E2E Asset Studio et leurs scripts CTest ; leur
+  exécution graphique locale reste conditionnée à la disponibilité d’un écran.
   - [x] parcourir et sélectionner une texture ;
   - [x] modifier un crop puis créer une autre ressource ;
   - [x] vérifier l'autosave de l'ancienne ressource ;
