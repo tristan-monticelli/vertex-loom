@@ -111,10 +111,11 @@ C4Component
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
-  d’animation. Les propriétés verrouillées d’un nœud et l’ouverture d’un
-  artwork absent exposent aussi leur raison ; les contrôles d’édition plus fins
-  restent à harmoniser. Les actions `Undo`, `Redo`, suppression de point et
-  ajout de ressource indiquent également leur précondition.
+  d’animation, les segments, le copier-coller de clés et les modales projet.
+  Les propriétés verrouillées d’un nœud et l’ouverture d’un artwork absent
+  exposent aussi leur raison ; les contrôles d’édition plus fins restent à
+  harmoniser. Les actions `Undo`, `Redo`, suppression de point et ajout de
+  ressource indiquent également leur précondition.
 - Le panneau de diagnostics associe chaque erreur à son champ, sa cause, la
   contrainte attendue et une action corrective dérivée de `ErrorCode`.
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et

@@ -6182,6 +6182,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                  : "Animation segment rejected; inspect diagnostics.";
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(
+                animation_ui.node_id.empty() ||
+                    animation_ui.component_id.empty() ||
+                    animation_ui.property_id.empty() ||
+                    animation_ui.segment_start_time >= animation_ui.segment_end_time ||
+                    (animation_ui.key_kind == 4 &&
+                     (animation_ui.segment_start_resource_id.empty() ||
+                      animation_ui.segment_end_resource_id.empty())),
+                "Choose a target node, component, property, an increasing A/B time range and resource values when required.");
             const auto interpolation_label = std::string(
                 fabric::project::to_string(animation_ui.interpolation));
             if (ImGui::BeginCombo("Interpolation", interpolation_label.c_str())) {
@@ -6329,6 +6338,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     : "Animation keys copied.";
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(animation_ui.selected_keys.empty(),
+                                 "Select at least one valid animation key to copy.");
             ImGui::SameLine();
             ImGui::BeginDisabled(animation_ui.key_clipboard.empty());
             if (ImGui::Button("Paste at key time")) {
@@ -6352,6 +6363,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 : "Animation keys could not be pasted; inspect diagnostics.";
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(animation_ui.key_clipboard.empty(),
+                                 "Copy animation keys before pasting them.");
             if (!animation_ui.key_clipboard.empty())
                 ImGui::SameLine(), ImGui::TextDisabled(
                     "%zu copied", animation_ui.key_clipboard.size());
@@ -6539,6 +6552,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Enter a valid project name, positive pixels-per-unit and valid camera limits.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();
@@ -6694,6 +6709,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the required project fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.project.reset();
