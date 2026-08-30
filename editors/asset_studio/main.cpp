@@ -4564,6 +4564,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         commit_node(node);
                     }
                     ImGui::EndDisabled();
+                    draw_disabled_reason(!available,
+                                         "Add an indexed texture before choosing an image fill.");
                 }
                 ImGui::EndCombo();
             }
@@ -5333,6 +5335,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         }
                     }
                     ImGui::EndDisabled();
+                    draw_disabled_reason(!available,
+                                         "Add an indexed resource of this drawable kind first.");
                 }
                 ImGui::EndCombo();
             }
@@ -5572,6 +5576,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 commit_entity_node(node);
                             }
                             ImGui::EndDisabled();
+                            draw_disabled_reason(exists,
+                                                 "This component parameter already has an override.");
                         }
                         ImGui::EndCombo();
                     }
