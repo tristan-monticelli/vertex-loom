@@ -79,9 +79,13 @@ void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     ImGui::SetTooltip("%s", std::string(reason).c_str());
 }
 
-void draw_resource_identity_fields(std::string& name, std::string& id) {
+bool draw_resource_name_field(const char* label, std::string& name) {
     ImGui::SetNextItemWidth(560.0F);
-    ImGui::InputText("Name##resource-name", &name);
+    return ImGui::InputText(label, &name);
+}
+
+void draw_resource_identity_fields(std::string& name, std::string& id) {
+    static_cast<void>(draw_resource_name_field("Name##resource-name", name));
     ImGui::SetNextItemWidth(360.0F);
     ImGui::InputText("Resource id##resource-id", &id);
 }
@@ -3347,7 +3351,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText("Material properties");
             auto material = current;
             std::string name = material.document.name;
-            if (ImGui::InputText("Name", &name)) {
+            if (draw_resource_name_field("Name##resource-edit", name)) {
                 material.document.name = std::move(name);
                 commit_material(std::move(material));
             }
@@ -6741,8 +6745,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.project.parent_directory = selected.data();
             }
         }
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.project.name);
+        draw_resource_name_field("Name##project-name", creation.project.name);
         const auto preset_label = std::string(fabric::editor::label(
             creation.project.preset));
         ImGui::SetNextItemWidth(300.0F);
@@ -6814,8 +6817,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::TextUnformatted("Create a native, editable vector artwork");
         ImGui::TextDisabled("The validated document is published atomically in the open project.");
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.artwork.name);
+        draw_resource_name_field("Name##artwork-name", creation.artwork.name);
         ImGui::SetNextItemWidth(180.0F);
         ImGui::InputDouble("Width (world units)", &creation.artwork.width, 1.0, 10.0,
                            "%.2f");
@@ -7158,8 +7160,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create a reusable MaterialDefinition v1");
         ImGui::TextDisabled(
             "The validated material is published atomically in the open project.");
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.material.name);
+        draw_resource_name_field("Name##material-name", creation.material.name);
         float color[] = {creation.material.color.red,
                          creation.material.color.green,
                          creation.material.color.blue,
@@ -7244,8 +7245,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create a reusable EntityDefinition v4");
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.entity.name);
+        draw_resource_name_field("Name##entity-name", creation.entity.name);
         ImGui::SetNextItemWidth(360.0F);
         ImGui::InputText("Root node name", &creation.entity.node_name);
         const auto drawable_label = std::string(
@@ -7349,8 +7349,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create an AnimationClip v3");
         ImGui::TextDisabled(
             "The validated clip is published atomically in the open project.");
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.animation.name);
+        draw_resource_name_field("Name##animation-name", creation.animation.name);
         if (ImGui::Checkbox("Generic clip (no preview entity)",
                             &creation.animation.generic_preview) &&
             creation.animation.generic_preview)
@@ -7406,8 +7405,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create an InputDocument v1");
         ImGui::TextDisabled(
             "Bindings are saved atomically and can be selected by Preview Runtime.");
-        ImGui::SetNextItemWidth(560.0F);
-        ImGui::InputText("Name", &creation.input.name);
+        draw_resource_name_field("Name##input-name", creation.input.name);
         for (std::size_t action_index = 0;
              action_index < creation.input.actions.size(); ++action_index) {
             auto& action = creation.input.actions[action_index];

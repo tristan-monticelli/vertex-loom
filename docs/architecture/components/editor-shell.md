@@ -125,9 +125,10 @@ C4Component
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource
   sélectionnable.
-- Les prompts Behavior, Transformation, preset visuel, composition et
-  composant réutilisent le même composant de formulaire pour leur nom et leur
-  identifiant, avec des clés ImGui stables.
+- Les prompts Behavior, Transformation, preset visuel, composition, composant,
+  matériau, entité, animation et input réutilisent le même composant de
+  formulaire pour leur nom ; l’éditeur de matériau réutilise aussi ce champ
+  lors de l’édition, avec des clés ImGui stables.
 - Les prompts artwork et entité affichent explicitement les unités de leurs
   dimensions, positions, échelles, rotations et ordre Z ; les valeurs stockées
   restent inchangées.
