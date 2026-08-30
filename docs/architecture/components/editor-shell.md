@@ -213,6 +213,9 @@ C4Component
 - Les propriétés `ResourceReference` des BehaviorGraph utilisent le même picker
   typé pour les contrats connus et conservent la saisie libre uniquement pour
   les types de ressource encore inconnus.
+- Les extrémités des connexions BehaviorGraph sélectionnent désormais un nœud
+  existant par ID/type via un picker recherchable ; les ports restent des champs
+  libres car ils dépendent du contrat du nœud choisi.
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.

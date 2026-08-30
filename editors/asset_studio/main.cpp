@@ -143,6 +143,11 @@ bool draw_typed_resource_reference(
     const std::span<const fabric::editor::StudioResource> resources,
     fabric::project::ResourceReference& reference);
 
+bool draw_behavior_node_picker(
+    const char* label,
+    const std::span<const fabric::project::BehaviorNodeDefinition> nodes,
+    std::string& selected_id);
+
 #if defined(__APPLE__)
 constexpr const char* new_shortcut = "Cmd+N";
 constexpr const char* open_shortcut = "Cmd+O";
@@ -1606,9 +1611,11 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         to_node, to_port{"in"};
     ImGui::SeparatorText("Connections");
     ImGui::InputText("Connection id", &connection_id);
-    ImGui::InputText("From node", &from_node); ImGui::SameLine();
+    static_cast<void>(draw_behavior_node_picker(
+        "From node", behavior_session.graph()->nodes, from_node)); ImGui::SameLine();
     ImGui::InputText("From port", &from_port);
-    ImGui::InputText("To node", &to_node); ImGui::SameLine();
+    static_cast<void>(draw_behavior_node_picker(
+        "To node", behavior_session.graph()->nodes, to_node)); ImGui::SameLine();
     ImGui::InputText("To port", &to_port);
     if (ImGui::Button("Connect"))
         static_cast<void>(behavior_session.connect({connection_id, from_node, from_port, to_node, to_port}));
@@ -1827,6 +1834,47 @@ bool draw_entity_node_picker(
             ImGui::SameLine();
             ImGui::TextDisabled("%s", node.id.c_str());
         }
+        if (selected == nodes.end() && !selected_id.empty())
+            ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
+bool draw_behavior_node_picker(
+    const char* label,
+    const std::span<const fabric::project::BehaviorNodeDefinition> nodes,
+    std::string& selected_id) {
+    const auto selected = std::ranges::find_if(
+        nodes, [&](const auto& node) { return node.id == selected_id; });
+    const std::string preview = selected != nodes.end()
+        ? selected->id
+        : selected_id.empty() ? std::string{"Choose a graph node..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(280.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##behavior-node-search", "Search node ID or type...",
+                                 &filter);
+        bool found = false;
+        for (const auto& node : nodes) {
+            if (!text_contains_ascii_insensitive(node.id, filter) &&
+                !text_contains_ascii_insensitive(node.type, filter))
+                continue;
+            found = true;
+            const bool is_selected = node.id == selected_id;
+            const std::string item_label = node.id + " (" + node.type + ")##behavior-node-option-" +
+                node.id;
+            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                selected_id = node.id;
+                changed = true;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+        }
+        if (!found) ImGui::TextDisabled("No matching graph node.");
         if (selected == nodes.end() && !selected_id.empty())
             ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
         ImGui::EndCombo();
