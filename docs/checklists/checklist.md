@@ -75,9 +75,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   sont couverts par `asset_studio_behavior_e2e` et
   `asset_studio_vector_canvas_e2e`.
 - [ ] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
-  Linux.
-- [ ] Documentation et clôture : retirer les gates non prouvés UX, confirmer le
-  résultat visuel/fonctionnel, puis cocher les lots 1–3, 5, 6, 7 et 8.
+  Linux. macOS/Linux sont verts dans le run CI `33325389481`; les E2E UI
+  Windows restent bloqués par l'absence de chargeur OpenGL du runner.
+- [ ] Documentation et clôture : gates réconciliés et résultat confirmé sur
+  toutes les plateformes ; le reliquat Windows est documenté ci-dessus.
 
 ### Différences UX/logiques observées à corriger
 
@@ -135,7 +136,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
   screenshots d'échec ; les registres et captures sont produits par les modes
   UI CTest.
-- [ ] Exécuter les parcours UX sur macOS, Windows et Linux.
+- [ ] Exécuter les parcours UX sur macOS, Windows et Linux ; run CI
+  `33325389481` vert sur macOS/Linux, E2E UI Windows non exécutés.
 - [x] Vérifier localement aux tailles minimales de fenêtre le focus, le scroll
   automatique, la navigation clavier, les unités, tooltips, raccourcis et le
   contraste via les tests UI Asset Studio ; la répétition multiplateforme reste
@@ -773,7 +775,8 @@ utilisées pour tous les types de ressources.
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
   qu'un diagnostic de processus.
-- [ ] Exécuter les parcours sur macOS, Windows et Linux.
+- [ ] Exécuter les parcours sur macOS, Windows et Linux ; run CI
+  `33325389481` vert sur macOS/Linux, E2E UI Windows non exécutés.
 - [x] Garder les tests headless de contrats en complément, pas en remplacement.
 
 Gate : les parcours qui ont échoué lors de l'audit sont exécutés
@@ -798,8 +801,8 @@ automatiquement sur les trois plateformes.
 - [x] Vérifier `AGENTS.md`, `CLAUDE.md`, `.codex/hooks.json` et les hooks modifiés.
 - [x] Vérifier qu'aucune suppression n'a été réalisée sans confirmation.
 - [x] Faire un commit conventionnel par étape fonctionnelle vérifiée.
-- [ ] Confirmer le résultat visuel et fonctionnel avant de déclarer le chantier
-  terminé.
+- [ ] Confirmer le résultat visuel et fonctionnel sur toutes les plateformes ;
+  run CI `33325389481` vert sur macOS/Linux et tests locaux passants.
 
 ## Ordre d'exécution recommandé
 
@@ -813,7 +816,8 @@ automatiquement sur les trois plateformes.
 - [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
   transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
   comparaison des draw packets sont validés.
-- [ ] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire.
+- [ ] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire
+  ; E2E UI Windows restent à activer sur un runner avec chargeur OpenGL.
 
 Le chantier est terminé uniquement lorsque les huit lots et tous leurs gates
 sont cochés avec preuves de tests et commits associés.
