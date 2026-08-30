@@ -376,6 +376,9 @@ C4Component
   son contenu en mémoire, refuser conserve le principal, sans écriture implicite.
 - Les raccourcis affichent et utilisent `Cmd` sur macOS et `Ctrl` sur Windows
   et Linux. Ils restent inactifs lorsqu'une modale requiert une décision.
+- Map Studio expose ces commandes dans sa barre `File/Edit/Help` et affiche
+  l’aide de `F`, `Home`, duplication, déplacement, sauvegarde, historique et
+  fermeture à côté des raccourcis clavier.
 - Les fenêtres Asset Studio et Map Studio imposent respectivement une taille
   minimale de `900×600` et `960×640` afin de préserver leurs panneaux et leur
   navigation.

@@ -2395,6 +2395,34 @@ int run(const std::filesystem::path& project_root,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+        const auto& imgui_io_frame = ImGui::GetIO();
+#if defined(__APPLE__)
+        const bool command_modifier = imgui_io_frame.KeySuper;
+#else
+        const bool command_modifier = imgui_io_frame.KeyCtrl;
+#endif
+        const bool shortcuts_enabled = !imgui_io_frame.WantTextInput &&
+            !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_S, false))
+            status = save_dirty_documents() ? "Documents saved" : "Save failed";
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_Z, false) && session.can_undo()) {
+            static_cast<void>(session.undo());
+            status = "Map change undone";
+        }
+        if (shortcuts_enabled && command_modifier &&
+            (ImGui::IsKeyPressed(ImGuiKey_Y, false) ||
+             (imgui_io_frame.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))) &&
+            session.can_redo()) {
+            static_cast<void>(session.redo());
+            status = "Map change redone";
+        }
+        if (shortcuts_enabled && command_modifier &&
+            ImGui::IsKeyPressed(ImGuiKey_Q, false))
+            transition_guard.request(
+                fabric::editor::SessionAction::quit,
+                session.dirty() || mechanic_session.dirty() || scene_session.dirty());
         if (session.update_autosave() == fabric::editor::AutosaveStatus::failed)
             status = "Map autosave failed";
         if (mechanic_session.update_autosave() ==
@@ -2409,7 +2437,39 @@ int run(const std::filesystem::path& project_root,
         ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize, ImGuiCond_Always);
         ImGui::Begin("Map Studio", nullptr,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                         ImGuiWindowFlags_NoCollapse);
+                         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar);
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("File")) {
+                if (ImGui::MenuItem("Save", "Ctrl+S", false, session.has_map()))
+                    status = save_dirty_documents() ? "Documents saved" : "Save failed";
+                if (ImGui::MenuItem("Quit", "Ctrl+Q"))
+                    transition_guard.request(
+                        fabric::editor::SessionAction::quit,
+                        session.dirty() || mechanic_session.dirty() ||
+                            scene_session.dirty());
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Edit")) {
+                if (ImGui::MenuItem("Undo", "Ctrl+Z", false,
+                                    session.can_undo())) {
+                    static_cast<void>(session.undo());
+                    status = "Map change undone";
+                }
+                if (ImGui::MenuItem("Redo", "Ctrl+Y", false,
+                                    session.can_redo())) {
+                    static_cast<void>(session.redo());
+                    status = "Map change redone";
+                }
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Help")) {
+                ImGui::TextUnformatted("F: frame selection · Home: frame map");
+                ImGui::TextUnformatted("Ctrl+D: duplicate · arrows: nudge · Delete: remove");
+                ImGui::TextUnformatted("Ctrl+S: save · Ctrl+Z/Y: undo/redo · Ctrl+Q: quit");
+                ImGui::EndMenu();
+            }
+            ImGui::EndMainMenuBar();
+        }
         if (!session.has_map()) {
             ImGui::TextUnformatted("Map Studio");
             ImGui::TextDisabled("Select a map or create one without restarting the studio.");
