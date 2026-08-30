@@ -4113,6 +4113,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::PopStyleColor();
                 ImGui::EndDisabled();
+                draw_disabled_reason(references != 0U || pending.locked,
+                                     "Remove child and clip references first, and unlock the node.");
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
                 ImGui::EndPopup();
@@ -5290,6 +5292,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(!valid,
+                                     "Select a valid drawable kind before discarding overrides.");
                 ImGui::SameLine();
                 if (ImGui::Button("Cancel")) {
                     pending_drawable_kind.reset();
@@ -5749,6 +5753,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
             }
             ImGui::EndDisabled();
+            draw_disabled_reason(animation_ui.marker_id.empty(),
+                                 "Enter a marker id before adding a marker.");
             bool marker_removed = false;
             for (const auto& marker : clip.markers) {
                 ImGui::BulletText("%s · %.2f s", marker.id.c_str(), marker.time);
@@ -6872,6 +6878,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the artwork fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.artwork.reset();
@@ -6968,6 +6976,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!built.ok(),
+                             "Resolve the visual preset build errors before creating it.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();
@@ -7002,6 +7012,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Enter a valid name, id and positive finite composition size.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F}))
             ImGui::CloseCurrentPopup();
@@ -7056,6 +7068,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!valid,
+                             "Enter a valid component name, id and positive finite size.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F}))
             ImGui::CloseCurrentPopup();
@@ -7138,6 +7152,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the material fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.material.reset();
@@ -7241,6 +7257,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the entity fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.entity.reset();
@@ -7296,6 +7314,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the animation fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.animation.reset();
@@ -7418,6 +7438,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
+        draw_disabled_reason(!validation.ok(),
+                             "Complete the input binding fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.input.reset();
