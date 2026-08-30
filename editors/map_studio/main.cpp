@@ -720,8 +720,7 @@ void draw_scene_editor(fabric::editor::SceneSession& session,
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Scene id", &state.new_id);
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(180.0F);
-    ImGui::InputText("Scene name", &state.new_name);
+    draw_resource_name_field("Scene name", state.new_name, 180.0F);
     ImGui::SameLine();
     ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
     if (ImGui::Button("Create scene")) {
@@ -1184,8 +1183,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::SetNextItemWidth(140.0F);
     ImGui::InputText("New id", &state.new_id);
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(160.0F);
-    ImGui::InputText("New name", &state.new_name);
+    draw_resource_name_field("New name", state.new_name, 160.0F);
     ImGui::SameLine();
     ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
     if (ImGui::Button("Create")) {
@@ -1209,8 +1207,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Platform id", &state.platform.id.value);
     ImGui::SameLine();
-    ImGui::SetNextItemWidth(170.0F);
-    ImGui::InputText("Platform name", &state.platform.name);
+    draw_resource_name_field("Platform name", state.platform.name, 170.0F);
     ImGui::Combo("Activation", &state.platform_activation,
                  "Presence sensor\0Map event\0");
     if (state.platform_activation == 1) {
@@ -2719,7 +2716,7 @@ int run(const std::filesystem::path& project_root,
                 ImGui::InputText("New map id", &new_map_id);
                 draw_field_errors(session.errors(), "id",
                                   "Use a unique non-empty resource id.");
-                ImGui::InputText("New map name", &new_map_name);
+                draw_resource_name_field("New map name", new_map_name, 180.0F);
                 draw_field_errors(session.errors(), "name",
                                   "Enter a visible non-empty map name.");
                 ImGui::BeginDisabled(new_map_id.empty() || new_map_name.empty());
@@ -2817,8 +2814,7 @@ int run(const std::filesystem::path& project_root,
             ImGui::SetNextItemWidth(120.0F);
             ImGui::InputText("Layer id", &new_layer_id);
             ImGui::SameLine();
-            ImGui::SetNextItemWidth(140.0F);
-            ImGui::InputText("Layer name", &new_layer_name);
+            draw_resource_name_field("Layer name", new_layer_name, 140.0F);
             ImGui::SetNextItemWidth(150.0F);
             ImGui::Combo("Layer kind", &new_layer_kind,
                          "visual\0instances\0collision\0triggers\0");
