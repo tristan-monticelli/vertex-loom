@@ -41,8 +41,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `resource index remains unambiguous with many similar textures` avec 1024
   ressources indexées et sélectionnées par identifiant.
 - [ ] Entités : les overrides incompatibles, gizmos, drop vers nœud
-  existant/racine/enfant et sections avancées sont implémentés et testés ; il
-  reste la preuve UX reproductible du glisser-déposer.
+  existant/racine/enfant et sections avancées sont implémentés et testés ; les
+  trois destinations de drop disposent maintenant d’une preuve UX, tandis que
+  la confirmation UX des overrides incompatibles reste à fermer.
 - [x] Animations : descripteurs transform/matériau/fill/image-fill/composants,
   geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
   tests fill/image-fill, sauvegarde/reload/state-machine/runtime. Les
@@ -120,9 +121,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
   les BehaviorGraph qui consomment chaque action.
-- [ ] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
-  screenshots d'échec, puis exécuter les parcours UX sur macOS, Windows et
-  Linux.
+- [x] Ajouter IDs de widgets stables, fixture multi-ressources, diagnostics et
+  screenshots d'échec ; les registres et captures sont produits par les modes
+  UI CTest.
+- [ ] Exécuter les parcours UX sur macOS, Windows et Linux.
 - [ ] Vérifier aux tailles minimales de fenêtre le focus, le scroll automatique,
   la navigation clavier, les unités, tooltips, raccourcis et le contraste.
 
