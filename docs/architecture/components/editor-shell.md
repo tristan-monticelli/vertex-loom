@@ -165,6 +165,8 @@ C4Component
   schéma et expliquent ce domaine au survol.
 - Les paramètres image et stroke des drawables, ainsi que les champs principaux
   de timeline, expliquent leur effet technique au survol.
+- Map Studio expose la même aide contextuelle pour les transforms, la grille,
+  les plateformes de preview et les paramètres de collision.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.

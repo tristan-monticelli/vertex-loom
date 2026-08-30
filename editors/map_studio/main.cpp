@@ -113,6 +113,10 @@ void draw_disabled_reason(const bool disabled, const std::string_view reason) {
     ImGui::SetTooltip("%s", std::string(reason).c_str());
 }
 
+void draw_technical_tooltip(const std::string_view text) {
+    ImGui::SetItemTooltip("%s", std::string(text).c_str());
+}
+
 void draw_scene_errors(const fabric::editor::SceneSession& session) {
     for (const auto& error : session.errors()) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
@@ -1050,29 +1054,38 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     }
     ImGui::DragFloat2("Platform position (world units)",
                       &state.platform.position.x, 0.1F);
+    draw_technical_tooltip("Initial platform position in map world space.");
     ImGui::DragFloat2("Platform size (world units)", &state.platform.size.x,
                       0.1F, 0.01F, 256.0F);
+    draw_technical_tooltip("Platform dimensions used by the rotating body.");
     ImGui::DragFloat("Speed (deg/s)",
                      &state.platform.speed_degrees_per_second, 1.0F, 0.0F, 3600.0F);
+    draw_technical_tooltip("Angular velocity applied to the platform.");
     ImGui::Combo("Direction", &state.platform_direction,
                  "Counter-clockwise (+1)\0Clockwise (-1)\0");
     ImGui::DragFloat("Acceleration (deg/s2)",
                      &state.platform.acceleration_degrees_per_second_squared,
                      1.0F, 0.0F, 7200.0F);
+    draw_technical_tooltip("Angular acceleration used to reach the target speed.");
     ImGui::DragFloat("Maximum torque (force)", &state.platform.maximum_torque,
                      1.0F, 0.0F, 100000.0F);
+    draw_technical_tooltip("Maximum force available to drive the platform.");
     ImGui::Checkbox("Angular limits", &state.platform.limit_enabled);
     if (state.platform.limit_enabled) {
         ImGui::DragFloat("Minimum angle (degrees)", &state.platform.minimum_angle_degrees,
                          1.0F, -178.0F, 178.0F);
+        draw_technical_tooltip("Lower angular limit when limits are enabled.");
         ImGui::DragFloat("Maximum angle (degrees)", &state.platform.maximum_angle_degrees,
                          1.0F, -178.0F, 178.0F);
+        draw_technical_tooltip("Upper angular limit when limits are enabled.");
     }
     if (state.platform_activation == 0) {
         ImGui::DragFloat2("Sensor center (world units)",
                           &state.platform.sensor_center.x, 0.1F);
+        draw_technical_tooltip("Center of the sensor activation area.");
         ImGui::DragFloat2("Sensor size (world units)", &state.platform.sensor_size.x,
                           0.1F, 0.01F, 256.0F);
+        draw_technical_tooltip("Dimensions of the sensor activation area.");
     }
     if (ImGui::Button("Create rotating platform")) {
         state.platform.activation = state.platform_activation == 0
@@ -1247,11 +1260,14 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     ImGui::DragFloat2("Character position (world units)",
                       &state.preview_character.position.x,
                       0.1F);
+    draw_technical_tooltip("Preview character position in map world space.");
     ImGui::DragFloat2("Character size (world units)", &state.preview_character.size.x,
                       0.05F, 0.05F, 16.0F);
+    draw_technical_tooltip("Preview character collider dimensions.");
     ImGui::DragFloat("Character friction (coefficient)",
                      &state.preview_character.friction,
                      0.05F, 0.0F, 4.0F);
+    draw_technical_tooltip("Friction coefficient used by the preview controller.");
     if (ImGui::Button("Place / reset character"))
         status = session.place_preview_character(state.preview_character)
             ? "Preview character placed" : "Preview character rejected";
@@ -1268,6 +1284,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
             {state.preview_character_speed, 0.0F}));
     ImGui::DragFloat("Character speed (world units/s)", &state.preview_character_speed,
                      0.1F, 0.0F, 20.0F);
+    draw_technical_tooltip("Horizontal velocity used by the preview movement buttons.");
     if (const auto character = simulation.preview_character_state())
         ImGui::BulletText("character  pos %.2f, %.2f  vel %.2f, %.2f",
                           character->position.x, character->position.y,
@@ -1423,24 +1440,28 @@ void draw_transform_editor(fabric::editor::MapSession& session,
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Position transformed" : "Transform rejected (layer locked or invalid)";
     }
+    draw_technical_tooltip("Instance translation in map world space.");
     ImGui::SetNextItemWidth(220.0F);
     if (ImGui::DragFloat("Rotation (degrees)", &state.value.rotation_degrees, 1.0F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Rotation transformed" : "Transform rejected (layer locked or invalid)";
     }
+    draw_technical_tooltip("Instance rotation around its pivot.");
     ImGui::SetNextItemWidth(220.0F);
     if (ImGui::DragFloat2("Scale (factor)", &state.value.scale.x, 0.01F, -32.0F, 32.0F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Scale transformed" : "Transform rejected (layer locked or invalid)";
     }
+    draw_technical_tooltip("Instance scale multiplier on each axis.");
     ImGui::SetNextItemWidth(220.0F);
     if (ImGui::DragFloat2("Pivot (world units)", &state.value.pivot.x, 0.01F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Pivot transformed" : "Transform rejected (layer locked or invalid)";
     }
+    draw_technical_tooltip("Instance pivot in map world space.");
 }
 
 void draw_map_canvas(fabric::editor::MapSession& session,
@@ -1469,9 +1490,11 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100.0F);
     ImGui::DragFloat("Grid size (world units)", &snapping.grid_size, 0.1F, 0.01F, 1024.0F);
+    draw_technical_tooltip("Distance between snap grid lines.");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(150.0F);
     ImGui::DragFloat2("Origin (world units)", &snapping.origin.x, 0.1F);
+    draw_technical_tooltip("World-space origin used by the snap grid.");
     const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
     auto frame_instances = [&](const bool selected_only) {
         float min_x = std::numeric_limits<float>::max();
@@ -2787,15 +2810,18 @@ int run(const std::filesystem::path& project_root,
             ImGui::SetNextItemWidth(220.0F);
             ImGui::DragFloat2("New collision center (world units)",
                               &new_collision_center.x, 0.1F);
+            draw_technical_tooltip("Center of the new collision shape in world space.");
             if (new_collision_kind <= 1) {
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::DragFloat("New collision radius (world units)", &new_collision_radius,
                                  0.1F, 0.01F, 4096.0F);
+                draw_technical_tooltip("Radius of the new circle or capsule shape.");
             }
             if (new_collision_kind == 1) {
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::DragFloat("New capsule length (world units)", &new_collision_length,
                                  0.1F, 0.0F, 4096.0F);
+                draw_technical_tooltip("Straight section length of the new capsule.");
             }
             ImGui::BeginDisabled(new_collision_layer.empty() ||
                                  new_collision_radius <= 0.0F);
@@ -2863,16 +2889,19 @@ int run(const std::filesystem::path& project_root,
                 ImGui::Checkbox("Sensor", &collision_editor.sensor);
                 ImGui::SetNextItemWidth(220.0F);
                 ImGui::DragFloat2("Center (world units)", &collision_editor.center.x, 0.1F);
+                draw_technical_tooltip("Selected collision center in map world space.");
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::circle ||
                     collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
                     ImGui::SetNextItemWidth(220.0F);
                     ImGui::DragFloat("Radius (world units)", &collision_editor.radius, 0.1F, 0.0F,
                                      4096.0F);
+                    draw_technical_tooltip("Selected circle or capsule radius.");
                 }
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
                     ImGui::SetNextItemWidth(220.0F);
                     ImGui::DragFloat("Length (world units)", &collision_editor.length, 0.1F, 0.0F,
                                      4096.0F);
+                    draw_technical_tooltip("Selected capsule straight section length.");
                 }
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::polygon ||
                     collision_editor.kind == fabric::project::CollisionShapeKind::chain) {
