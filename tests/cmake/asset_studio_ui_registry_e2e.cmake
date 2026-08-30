@@ -73,6 +73,21 @@ if(DEFINED DRAG_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED OVERRIDE_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${OVERRIDE_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${OVERRIDE_ARTIFACT}")
+    endif()
+    file(READ "${TEST_ROOT}/project/${OVERRIDE_ARTIFACT}" OVERRIDE_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"confirmation_modal_seen\": true"
+            "\"cancel_preserved_override\": true"
+            "\"confirm_applied\": true")
+        string(FIND "${OVERRIDE_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio override probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"

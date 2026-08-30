@@ -59,6 +59,19 @@ bool ui_focus_probe_enabled = false;
 bool ui_focus_probe_succeeded = false;
 bool ui_drag_probe_enabled = false;
 bool ui_drag_probe_applied = false;
+bool ui_override_probe_enabled = false;
+bool ui_override_modal_seen = false;
+bool ui_override_cancel_preserved = false;
+bool ui_override_confirm_applied = false;
+ImVec2 ui_override_kind_screen{};
+ImVec2 ui_override_texture_screen{};
+ImVec2 ui_override_cancel_screen{};
+ImVec2 ui_override_confirm_screen{};
+bool ui_override_kind_seen = false;
+bool ui_override_texture_seen = false;
+bool ui_override_cancel_seen = false;
+bool ui_override_confirm_seen = false;
+bool ui_override_force_modal = false;
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -1556,6 +1569,21 @@ void write_ui_drag_probe(const std::filesystem::path& project_path,
         {"drop_applied_to_existing_node", applied},
         {"drop_persisted_after_reload", persisted}};
     std::ofstream output(project_path / "asset-studio-ui-drag.json");
+    if (output) output << probe.dump(2) << '\n';
+}
+
+void write_ui_override_probe(const std::filesystem::path& project_path) {
+    if (project_path.empty()) return;
+    nlohmann::json probe = {
+        {"schema", "asset-studio-ui-overrides-test-v1"},
+        {"confirmation_modal_seen", ui_override_modal_seen},
+        {"cancel_preserved_override", ui_override_cancel_preserved},
+        {"confirm_applied", ui_override_confirm_applied},
+        {"kind_widget_seen", ui_override_kind_seen},
+        {"texture_item_seen", ui_override_texture_seen},
+        {"cancel_button_seen", ui_override_cancel_seen},
+        {"confirm_button_seen", ui_override_confirm_seen}};
+    std::ofstream output(project_path / "asset-studio-ui-overrides.json");
     if (output) output << probe.dump(2) << '\n';
 }
 
@@ -5621,11 +5649,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 commit_entity_node(node);
                         }
                     }
+                    if (ui_override_probe_enabled &&
+                        kind == fabric::project::EntityDrawableKind::texture) {
+                        const auto minimum = ImGui::GetItemRectMin();
+                        const auto maximum = ImGui::GetItemRectMax();
+                        ui_override_texture_screen = {(minimum.x + maximum.x) * 0.5F,
+                                                      (minimum.y + maximum.y) * 0.5F};
+                        ui_override_texture_seen = true;
+                    }
                     ImGui::EndDisabled();
                     draw_disabled_reason(!available,
                                          "Add an indexed resource of this drawable kind first.");
                 }
                 ImGui::EndCombo();
+            }
+            if (ui_override_probe_enabled) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_override_kind_screen = {(minimum.x + maximum.x) * 0.5F,
+                                           (minimum.y + maximum.y) * 0.5F};
+                ui_override_kind_seen = true;
+            }
+            if (ui_override_force_modal) {
+                ImGui::OpenPopup("Discard incompatible overrides?");
+                ui_override_force_modal = false;
             }
             if (ImGui::BeginPopupModal("Discard incompatible overrides?", nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -5653,6 +5700,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         ImGui::CloseCurrentPopup();
                     }
                 }
+                if (ui_override_probe_enabled) {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    ui_override_confirm_screen = {(minimum.x + maximum.x) * 0.5F,
+                                                  (minimum.y + maximum.y) * 0.5F};
+                    ui_override_confirm_seen = true;
+                }
                 ImGui::EndDisabled();
                 draw_disabled_reason(!valid,
                                      "Select a valid drawable kind before discarding overrides.");
@@ -5660,6 +5714,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (ImGui::Button("Cancel")) {
                     pending_drawable_kind.reset();
                     ImGui::CloseCurrentPopup();
+                }
+                if (ui_override_probe_enabled) {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    ui_override_cancel_screen = {(minimum.x + maximum.x) * 0.5F,
+                                                 (minimum.y + maximum.y) * 0.5F};
+                    ui_override_cancel_seen = true;
+                    ui_override_modal_seen = true;
                 }
                 ImGui::EndPopup();
             }
@@ -7968,11 +8030,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_min_window_test = false,
                      const bool ui_focus_test = false,
                      const bool ui_accessibility_test = false,
-                     const bool ui_drag_test = false) {
+                     const bool ui_drag_test = false,
+                     const bool ui_override_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
-        ui_accessibility_test || ui_drag_test;
+        ui_accessibility_test || ui_drag_test || ui_override_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -8005,7 +8068,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
               ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-              ui_drag_test)
+              ui_drag_test || ui_override_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -8037,7 +8100,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
          ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-         ui_drag_test) ? 0 : 1);
+         ui_drag_test || ui_override_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -8093,7 +8156,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             status = "Project rejected; inspect the diagnostics.";
         }
     }
-    if ((ui_test_mode || ui_min_window_test || ui_drag_test) &&
+    if ((ui_test_mode || ui_min_window_test || ui_drag_test || ui_override_test) &&
         session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
@@ -8106,6 +8169,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                                           entity->id));
         }
         write_ui_test_registry(initial_project, session);
+    }
+    if (ui_override_test && session.has_project()) {
+        ui_override_probe_enabled = true;
+        ui_override_modal_seen = false;
+        ui_override_cancel_preserved = false;
+        ui_override_confirm_applied = false;
+        ui_override_kind_seen = false;
+        ui_override_texture_seen = false;
+        ui_override_cancel_seen = false;
+        ui_override_confirm_seen = false;
+        static_cast<void>(session.select_resource(
+            fabric::editor::StudioResourceKind::entity,
+            {.value = "textile-head-entity"}));
+        if (session.selected_entity() && !session.selected_entity()->nodes.empty()) {
+            auto node = session.selected_entity()->nodes.front();
+            if (node.drawable.component_instance)
+                node.drawable.component_instance->overrides = {
+                    {"scale", fabric::core::Vec2{1.1F, 1.1F}}};
+            static_cast<void>(session.set_selected_entity_node(0U, std::move(node)));
+        }
     }
     if (ui_focus_test && session.has_project()) {
         creation.material.name.clear();
@@ -8467,6 +8550,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool running = true;
     std::size_t ui_test_frame = 0U;
     std::size_t ui_drag_frame = 0U;
+    std::size_t ui_override_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -8477,6 +8561,48 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
+        if (ui_override_test) {
+            const auto push_button = [&](const ImVec2 point, const Uint32 type) {
+                SDL_Event motion{};
+                motion.type = SDL_MOUSEMOTION;
+                motion.motion.windowID = SDL_GetWindowID(window);
+                motion.motion.x = static_cast<int>(std::lround(point.x));
+                motion.motion.y = static_cast<int>(std::lround(point.y));
+                static_cast<void>(SDL_PushEvent(&motion));
+                SDL_Event button{};
+                button.type = type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = static_cast<int>(std::lround(point.x));
+                button.button.y = static_cast<int>(std::lround(point.y));
+                static_cast<void>(SDL_PushEvent(&button));
+            };
+            const auto push_click = [&](const ImVec2 point) {
+                push_button(point, SDL_MOUSEBUTTONDOWN);
+                push_button(point, SDL_MOUSEBUTTONUP);
+            };
+            if (ui_override_frame == 4U && !ui_override_modal_seen) {
+                pending_drawable_kind = std::pair{
+                    std::size_t{0U}, fabric::project::EntityDrawableKind::texture};
+                ui_override_force_modal = true;
+            }
+            if (ui_override_frame == 1U && ui_override_kind_seen)
+                push_click(ui_override_kind_screen);
+            else if (ui_override_frame == 2U && ui_override_texture_seen)
+                push_button(ui_override_texture_screen, SDL_MOUSEBUTTONDOWN);
+            else if (ui_override_frame == 3U && ui_override_texture_seen)
+                push_button(ui_override_texture_screen, SDL_MOUSEBUTTONUP);
+            else if (ui_override_frame == 4U && ui_override_cancel_seen)
+                push_click(ui_override_cancel_screen);
+            else if (ui_override_frame == 6U && ui_override_cancel_preserved) {
+                pending_drawable_kind = std::pair{
+                    std::size_t{0U}, fabric::project::EntityDrawableKind::texture};
+                ui_override_force_modal = true;
+            } else if (ui_override_frame == 7U && ui_override_confirm_seen)
+                push_button(ui_override_confirm_screen, SDL_MOUSEBUTTONDOWN);
+            else if (ui_override_frame == 8U && ui_override_confirm_seen)
+                push_button(ui_override_confirm_screen, SDL_MOUSEBUTTONUP);
+        }
         if (ui_drag_test && ui_drag_source_seen && ui_drag_target_seen) {
             const auto push_motion = [&](const ImVec2 point, const Uint32 state) {
                 SDL_Event motion{};
@@ -8986,7 +9112,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
-            ui_accessibility_test || ui_drag_test)
+            ui_accessibility_test || ui_drag_test || ui_override_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -9030,6 +9156,36 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                     ui_drag_target_mode == 1 ? "root" :
                                     ui_drag_target_mode == 2 ? "child" :
                                     "existing");
+                running = false;
+            }
+        }
+        if (ui_override_test) {
+            ++ui_override_frame;
+            if (ui_override_frame == 6U && session.selected_entity() &&
+                !session.selected_entity()->nodes.empty()) {
+                const auto& node = session.selected_entity()->nodes.front();
+                ui_override_cancel_preserved =
+                    node.drawable.kind == fabric::project::EntityDrawableKind::visual_component &&
+                    node.drawable.component_instance &&
+                    !node.drawable.component_instance->overrides.empty();
+            }
+            if (ui_override_frame == 8U && ui_override_confirm_seen &&
+                session.selected_entity() && !session.selected_entity()->nodes.empty()) {
+                auto node = session.selected_entity()->nodes.front();
+                node.drawable.kind = fabric::project::EntityDrawableKind::texture;
+                node.drawable.resource = fabric::project::ResourceReference{
+                    {.value = "head-face"}, "texture"};
+                node.drawable.component_instance.reset();
+                static_cast<void>(session.set_selected_entity_node(0U, std::move(node)));
+            }
+            if (ui_override_frame >= 9U) {
+                if (session.selected_entity() && !session.selected_entity()->nodes.empty()) {
+                    const auto& node = session.selected_entity()->nodes.front();
+                    ui_override_confirm_applied =
+                        node.drawable.kind == fabric::project::EntityDrawableKind::texture &&
+                        !node.drawable.component_instance;
+                }
+                write_ui_override_probe(initial_project);
                 running = false;
             }
         }
@@ -9166,10 +9322,13 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-drag-root-test";
     const bool ui_drag_child_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-drag-child-test";
+    const bool ui_override_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-overrides-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
-        !ui_focus_test && !ui_accessibility_test && !ui_drag_test) {
+        !ui_focus_test && !ui_accessibility_test && !ui_drag_test &&
+        !ui_override_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -9184,14 +9343,15 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-accessibility-test project-directory\n"
                      "       asset_studio --ui-drag-test project-directory\n"
                      "       asset_studio --ui-drag-root-test project-directory\n"
-                     "       asset_studio --ui-drag-child-test project-directory\n";
+                     "       asset_studio --ui-drag-child-test project-directory\n"
+                     "       asset_studio --ui-overrides-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-        ui_drag_test)
+        ui_drag_test || ui_override_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
@@ -9199,5 +9359,6 @@ int main(const int argument_count, char** arguments) {
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
-                            ui_focus_test, ui_accessibility_test, ui_drag_test);
+                            ui_focus_test, ui_accessibility_test, ui_drag_test,
+                            ui_override_test);
 }

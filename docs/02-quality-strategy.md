@@ -73,6 +73,10 @@ Les variantes `asset_studio_ui_drag_root_e2e` et
 `asset_studio_ui_drag_child_e2e` couvrent respectivement l’ajout d’un nouveau
 root et d’un enfant, puis vérifient leur parenté après reload et la destination
 déclarée dans l’artefact.
+Le test `asset_studio_ui_overrides_e2e` prépare un override d’instance, rend la
+modale de perte avec ses deux actions, vérifie l’annulation sans perte puis la
+confirmation avec suppression de l’instance dans
+`asset-studio-ui-overrides.json`.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
 sa primitive en path Bézier, insère et retire un point, convertit un segment,
 modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide

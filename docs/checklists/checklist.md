@@ -40,10 +40,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Textures : navigation à grande échelle et noms similaires vérifiés par
   `resource index remains unambiguous with many similar textures` avec 1024
   ressources indexées et sélectionnées par identifiant.
-- [ ] Entités : les overrides incompatibles, gizmos, drop vers nœud
+- [x] Entités : les overrides incompatibles, gizmos, drop vers nœud
   existant/racine/enfant et sections avancées sont implémentés et testés ; les
-  trois destinations de drop disposent maintenant d’une preuve UX, tandis que
-  la confirmation UX des overrides incompatibles reste à fermer.
+  trois destinations de drop disposent d’une preuve UX et
+  `asset_studio_ui_overrides_e2e` vérifie la modale, l’annulation conservatrice
+  et la confirmation de perte.
 - [x] Animations : descripteurs transform/matériau/fill/image-fill/composants,
   geste A→B, sélection multiple, copier/coller, snapping, tangentes/easing,
   tests fill/image-fill, sauvegarde/reload/state-machine/runtime. Les
@@ -551,7 +552,8 @@ publication.
   Studio affiche le nombre d’overrides avant un changement de
   `visualComponent` vers `none`, texture ou vector, et l’annulation conserve le
   nœud ; les tests de session couvrent la mutation, tandis que les E2E
-  graphiques restent conditionnés à un écran SDL disponible.
+  graphiques restent conditionnés à un écran SDL disponible ;
+  `asset_studio_ui_overrides_e2e` produit la preuve UX quand SDL est disponible.
 - [x] Exposer transform, pivot, Z, visibilité et verrouillage du nœud.
 - [x] Ajouter sélection et gizmos de nœud dans le canvas d'entité. L’arbre
   sélectionne le nœud, le canvas expose son gizmo de translation et

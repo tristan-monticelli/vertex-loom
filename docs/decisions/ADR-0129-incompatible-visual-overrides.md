@@ -23,3 +23,9 @@ overrides sont encore compatibles avec le composant sélectionné.
 - La validation, l’undo/redo, l’autosave et la publication restent centralisés
   dans `ProjectSession`.
 - Une migration sélective d’overrides entre composants reste un travail séparé.
+
+## Preuve UX
+
+`asset_studio_ui_overrides_e2e` vérifie la modale rendue, l’annulation qui
+conserve l’override et la confirmation qui retire l’instance avant le passage
+au drawable texture.
