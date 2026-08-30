@@ -86,6 +86,10 @@ void draw_resource_identity_fields(std::string& name, std::string& id) {
     ImGui::InputText("Resource id##resource-id", &id);
 }
 
+void draw_technical_tooltip(const std::string_view text) {
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", std::string(text).c_str());
+}
+
 struct CreationUiState {
     struct BehaviorFields {
         std::string name{"Entity behavior"};
@@ -4092,29 +4096,34 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.transform.position = {position[0], position[1]};
                 commit_node(node);
             }
+            draw_technical_tooltip("Node translation in world units.");
             float scale[]{node.transform.scale.x, node.transform.scale.y};
             if (ImGui::InputFloat2("Scale", scale)) {
                 node.transform.scale = {scale[0], scale[1]};
                 commit_node(node);
             }
+            draw_technical_tooltip("Node scale multiplier.");
             float rotation = node.transform.rotation_degrees;
             if (ImGui::InputFloat("Rotation", &rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
                 node.transform.rotation_degrees = rotation;
                 commit_node(node);
             }
+            draw_technical_tooltip("Node rotation in degrees.");
             float bounds_origin[]{node.shape.bounds.origin.x,
                                   node.shape.bounds.origin.y};
             if (ImGui::InputFloat2("Bounds origin", bounds_origin)) {
                 node.shape.bounds.origin = {bounds_origin[0], bounds_origin[1]};
                 commit_node(node);
             }
+            draw_technical_tooltip("Shape bounds origin in world units.");
             float bounds_size[]{node.shape.bounds.size.x,
                                 node.shape.bounds.size.y};
             if (ImGui::InputFloat2("Bounds size", bounds_size)) {
                 node.shape.bounds.size = {bounds_size[0], bounds_size[1]};
                 commit_node(node);
             }
+            draw_technical_tooltip("Shape bounds size in world units.");
             const auto shape_label = std::string(
                 fabric::project::to_string(node.shape.kind));
             if (ImGui::BeginCombo("Shape", shape_label.c_str())) {
@@ -5030,6 +5039,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.z_order = z_order;
                 commit_entity_node(node);
             }
+            draw_technical_tooltip("Draw order; larger values render later.");
             ImGui::SeparatorText("Drawable");
             const auto drawable_label = std::string(
                 fabric::project::to_string(node.drawable.kind));
