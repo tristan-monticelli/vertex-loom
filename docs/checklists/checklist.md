@@ -75,8 +75,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   active, prochaine action et raccourcis disponibles.
 - [x] Garantir qu'ouvrir, créer, importer, dupliquer et fermer utilisent une
   transition unique `Save/Discard/Cancel/Retry`, sans perte de contexte.
-- [ ] Montrer dans chaque picker le type, le chemin, la miniature, les
-  dimensions, le format, les dépendances et une action d'ouverture.
+- [x] Montrer dans chaque picker le type, le chemin, la miniature, les
+  dimensions, le format, les dépendances et une action d'ouverture ; le picker
+  Asset et les pickers documentaires Map affichent ces métadonnées et `Open`.
 - [x] Remplacer tous les IDs de références libres par des sélecteurs typés avec
   recherche, état manquant et bouton de correction. Les saisies d’IDs qui
   déclarent une nouvelle entité (couche, événement, propriété, nœud ou état)
