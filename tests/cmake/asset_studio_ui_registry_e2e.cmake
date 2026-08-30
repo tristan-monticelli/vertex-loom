@@ -3,12 +3,16 @@ if(NOT DEFINED ASSET_STUDIO OR NOT DEFINED SOURCE_FIXTURE OR
     message(FATAL_ERROR "Asset Studio UI registry E2E arguments are required")
 endif()
 
+if(NOT DEFINED UI_ARGUMENT)
+    set(UI_ARGUMENT "--ui-test")
+endif()
+
 file(REMOVE_RECURSE "${TEST_ROOT}")
 file(MAKE_DIRECTORY "${TEST_ROOT}")
 file(COPY "${SOURCE_FIXTURE}/" DESTINATION "${TEST_ROOT}/project")
 
 execute_process(
-    COMMAND "${ASSET_STUDIO}" --ui-test "${TEST_ROOT}/project"
+    COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE FIRST_RESULT
     OUTPUT_VARIABLE FIRST_OUTPUT
     ERROR_VARIABLE FIRST_ERROR)
@@ -40,7 +44,7 @@ foreach(REQUIRED_ID
 endforeach()
 
 execute_process(
-    COMMAND "${ASSET_STUDIO}" --ui-test "${TEST_ROOT}/project"
+    COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT
     OUTPUT_VARIABLE SECOND_OUTPUT
     ERROR_VARIABLE SECOND_ERROR)

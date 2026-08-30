@@ -7857,10 +7857,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool texture_e2e = false,
                      const bool vector_e2e = false,
                      const bool vector_canvas_e2e = false,
-                     const bool ui_test_mode = false) {
+                     const bool ui_test_mode = false,
+                     const bool ui_min_window_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
-        ui_test_mode;
+        ui_test_mode || ui_min_window_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -7884,12 +7885,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
+    const int window_width = ui_min_window_test ? 900 : 1440;
+    const int window_height = ui_min_window_test ? 600 : 900;
     SDL_Window* window = SDL_CreateWindow(
         "Vertex Loom - Asset Studio", SDL_WINDOWPOS_CENTERED,
-        SDL_WINDOWPOS_CENTERED, 1440, 900,
+        SDL_WINDOWPOS_CENTERED, window_width, window_height,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-              texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode)
+              texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
+              ui_min_window_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7919,7 +7923,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode) ? 0 : 1);
+         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
+         ui_min_window_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -7975,7 +7980,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             status = "Project rejected; inspect the diagnostics.";
         }
     }
-    if (ui_test_mode && session.has_project()) {
+    if ((ui_test_mode || ui_min_window_test) && session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
                 session.resources(), [](const auto& resource) {
@@ -8803,11 +8808,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        if (ui_test_mode)
+        if (ui_test_mode || ui_min_window_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
-        if (ui_test_mode && ++ui_test_frame >= 1U)
+        if ((ui_test_mode || ui_min_window_test) && ++ui_test_frame >= 1U)
             running = false;
         if (vector_canvas_e2e) {
             ++vector_canvas_e2e_frame;
@@ -8928,9 +8933,11 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-vector-canvas";
     const bool ui_test_mode = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-test";
+    const bool ui_min_window_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-test-min-window";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
-        !vector_canvas_e2e && !ui_test_mode) {
+        !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -8939,16 +8946,18 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --e2e-texture project-directory\n"
                      "       asset_studio --e2e-vector project-directory\n"
                      "       asset_studio --e2e-vector-canvas project-directory\n"
-                     "       asset_studio --ui-test project-directory\n";
+                     "       asset_studio --ui-test project-directory\n"
+                     "       asset_studio --ui-test-min-window project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-        texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode)
+        texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
+        ui_min_window_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
-                            vector_canvas_e2e, ui_test_mode);
+                            vector_canvas_e2e, ui_test_mode, ui_min_window_test);
 }

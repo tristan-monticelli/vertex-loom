@@ -259,7 +259,8 @@ C4Component
   pas explicitement réutilisée.
 - Les modes E2E SDL écrivent, en cas d’échec, un rapport de diagnostics et une
   capture PPM du framebuffer dans le projet de test pour rendre l’échec
-  reproductible et inspectable.
+  reproductible et inspectable. Le test de registre répète aussi le shell à la
+  taille minimale SDL 900×600 et exige une capture de cette frame.
 - Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
   `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
   lignes de ressources et des nœuds d’entité, ainsi qu’une capture PPM du frame
