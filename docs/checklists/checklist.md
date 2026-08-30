@@ -60,11 +60,13 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   défaut, géométrie, E2E canvas et comparaison des draw packets. Vérifié par
   les tests géométriques, `asset_studio_vector_canvas_e2e`,
   `fabric_render_gl_smoke`, les tests de presets et les draw packets comparés.
-- [ ] Inspecteur : mêmes formulaires création/édition, raisons des boutons
+- [x] Inspecteur local : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
   deux colonnes monolithiques de Map Studio par des panneaux hiérarchisés,
-  redimensionnables et focalisés sur la sélection.
+  redimensionnables et focalisés sur la sélection. Les preuves sont
+  `asset_studio_ui_focus_e2e`, `asset_studio_ui_accessibility_e2e`,
+  `asset_studio_ui_min_window_e2e` et les E2E Map Studio.
 - [x] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
   crop/input/joueur/monstre/path Bézier, diagnostics et screenshots. Le parcours
   texture/crop dispose maintenant de
@@ -97,10 +99,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Unifier les composants de formulaire entre création et édition et
   conserver toute propriété créée dans l'inspecteur après publication ; le
   widget de nom est partagé et le round-trip entité/animation est testé.
-- [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
+- [x] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
   clavier et cohérent entre Asset Studio, Map Studio et scènes.
-  Map Studio dispose maintenant de sections et pickers hiérarchiques à IDs
-  stables ; la cohérence complète avec Asset Studio et scènes reste à fermer.
+  Asset Studio fournit l’arbre de ressources et ses splitters ; Map Studio et
+  les scènes partagent les pickers triés, repliables et à IDs stables.
 - [x] Ajouter une analyse d'impact avant chaque suppression et proposer
   remplacement, cascade explicitée ou annulation.
 - [x] Permettre duplication superficielle/profonde et réécriture sélective des
@@ -134,8 +136,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   screenshots d'échec ; les registres et captures sont produits par les modes
   UI CTest.
 - [ ] Exécuter les parcours UX sur macOS, Windows et Linux.
-- [ ] Vérifier aux tailles minimales de fenêtre le focus, le scroll automatique,
-  la navigation clavier, les unités, tooltips, raccourcis et le contraste.
+- [x] Vérifier localement aux tailles minimales de fenêtre le focus, le scroll
+  automatique, la navigation clavier, les unités, tooltips, raccourcis et le
+  contraste via les tests UI Asset Studio ; la répétition multiplateforme reste
+  ouverte.
 
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
 
