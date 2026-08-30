@@ -132,6 +132,10 @@ C4Component
   restent inchangées.
 - Map Studio applique la même convention aux transforms, à la grille et aux
   formes de collision ; les temps de preview sont affichés en secondes.
+- Les connexions du graphe mécanique sélectionnent leurs nœuds puis leurs ports
+  typés dans les listes du nœud choisi, avec recherche et état explicite des
+  références absentes ; les ports de sortie et d'entrée sont filtrés selon le
+  côté de la connexion.
 - L’inspecteur Asset Studio l’applique aussi aux UV et aux vues raster ; les
   facteurs, coordonnées normalisées, pixels et unités monde sont distingués.
 - Les propriétés techniques de transform, bounds et ordre Z affichent un

@@ -368,6 +368,70 @@ bool draw_mechanic_node_picker(
     return changed;
 }
 
+bool draw_mechanic_port_picker(
+    const char* label,
+    const std::span<const fabric::project::MechanicNodeDefinition> nodes,
+    const std::string_view node_id,
+    std::string& selected_id,
+    const fabric::project::MechanicPortDirection direction) {
+    const auto node = std::ranges::find_if(
+        nodes, [&](const auto& candidate) { return candidate.id == node_id; });
+    const fabric::project::MechanicPortDefinition* selected = nullptr;
+    if (node != nodes.end()) {
+        const auto selected_it = std::ranges::find_if(node->ports, [&](const auto& port) {
+            return port.id == selected_id && port.direction == direction;
+        });
+        if (selected_it != node->ports.end()) selected = &*selected_it;
+    }
+    const std::string preview = selected != nullptr
+        ? selected->id + " (" + std::string{fabric::project::to_string(selected->type)} + ")"
+        : selected_id.empty() ? std::string{"Choose a mechanic port..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(240.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##mechanic-port-search", "Search port ID, name or type...",
+                                 &filter);
+        bool found = false;
+        if (node != nodes.end()) {
+            for (const auto& port : node->ports) {
+                if (port.direction != direction) continue;
+                std::string haystack = port.id + " " + port.name + " " +
+                    std::string{fabric::project::to_string(port.type)};
+                std::ranges::transform(haystack, haystack.begin(), [](const unsigned char value) {
+                    return static_cast<char>(std::tolower(value));
+                });
+                std::string needle = filter;
+                std::ranges::transform(needle, needle.begin(), [](const unsigned char value) {
+                    return static_cast<char>(std::tolower(value));
+                });
+                if (!needle.empty() && haystack.find(needle) == std::string::npos)
+                    continue;
+                found = true;
+                const bool is_selected = port.id == selected_id;
+                const std::string item_label = port.id + " (" + port.name + ", " +
+                    std::string{fabric::project::to_string(port.type)} + ")##mechanic-port-option-" +
+                    port.id;
+                if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                    selected_id = port.id;
+                    changed = true;
+                }
+                if (is_selected) ImGui::SetItemDefaultFocus();
+            }
+        }
+        if (!found) ImGui::TextDisabled("No matching mechanic port for this node.");
+        if (node == nodes.end())
+            ImGui::TextDisabled("Choose a mechanic node first.");
+        else if (selected == nullptr && !selected_id.empty())
+            ImGui::TextDisabled("Missing port reference: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 struct SceneEditorState {
     std::string new_id;
     std::string new_name;
@@ -1070,10 +1134,14 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     }
     static_cast<void>(draw_mechanic_node_picker(
         "From node", graph.nodes, state.from_node));
-    ImGui::InputText("From port", &state.from_port);
+    static_cast<void>(draw_mechanic_port_picker(
+        "From port", graph.nodes, state.from_node, state.from_port,
+        fabric::project::MechanicPortDirection::output));
     static_cast<void>(draw_mechanic_node_picker(
         "To node", graph.nodes, state.to_node));
-    ImGui::InputText("To port", &state.to_port);
+    static_cast<void>(draw_mechanic_port_picker(
+        "To port", graph.nodes, state.to_node, state.to_port,
+        fabric::project::MechanicPortDirection::input));
     if (ImGui::Button("Connect ports")) {
         status = session.connect({state.from_node, state.from_port,
                                   state.to_node, state.to_port})
