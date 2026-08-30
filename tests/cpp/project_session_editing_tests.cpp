@@ -1304,6 +1304,54 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
     CHECK(*loaded.entity == *session.selected_entity());
 }
 
+TEST_CASE("entity artwork destinations cover existing root and new root or child nodes") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Artwork destinations";
+    prompt.node_name = "Existing";
+    REQUIRE(session.create_entity(prompt));
+
+    auto existing = session.selected_entity()->nodes.front();
+    existing.drawable = {
+        .kind = fabric::project::EntityDrawableKind::texture,
+        .resource = fabric::project::ResourceReference{
+            {.value = "existing-texture"}, "texture"}};
+    REQUIRE(session.set_selected_entity_node(0U, existing));
+
+    fabric::project::EntityNode root_drop{
+        .id = "dropped-root", .name = "Dropped Root",
+        .drawable = {
+            .kind = fabric::project::EntityDrawableKind::vector,
+            .resource = fabric::project::ResourceReference{
+                {.value = "root-artwork"}, "vector"}}};
+    REQUIRE(session.add_selected_entity_node(root_drop));
+
+    fabric::project::EntityNode child_drop{
+        .id = "dropped-child", .name = "Dropped Child",
+        .parent = "root",
+        .drawable = {
+            .kind = fabric::project::EntityDrawableKind::visual_component,
+            .resource = fabric::project::ResourceReference{
+                {.value = "child-component"}, "visualComponent"},
+            .component_instance = fabric::project::VisualComponentInstance{}}};
+    REQUIRE(session.add_selected_entity_node(child_drop));
+
+    REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    CHECK(session.selected_entity()->nodes[0].drawable.resource->id.value ==
+          "existing-texture");
+    CHECK_FALSE(session.selected_entity()->nodes[1].parent.has_value());
+    CHECK(session.selected_entity()->nodes[1].drawable.resource->id.value ==
+          "root-artwork");
+    REQUIRE(session.selected_entity()->nodes[2].parent.has_value());
+    CHECK(*session.selected_entity()->nodes[2].parent == "root");
+    CHECK(session.selected_entity()->nodes[2].drawable.resource->id.value ==
+          "child-component");
+}
+
 TEST_CASE("entity advanced definition edits validate and undo") {
     const TemporaryDirectory project;
     write_project(project.path());

@@ -542,9 +542,11 @@ publication.
   sélectionne le nœud, le canvas expose son gizmo de translation et
   `asset_studio_entity_e2e` vérifie le drag SDL, la sauvegarde et le reload.
 - [ ] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
-  - [ ] un nœud existant ;
-  - [ ] un nouveau nœud racine ;
-  - [ ] un nouveau nœud enfant.
+  - [x] un nœud existant ;
+  - [x] un nouveau nœud racine ;
+  - [x] un nouveau nœud enfant. Les trois mutations sont couvertes par
+    `entity artwork destinations cover existing root and new root or child
+    nodes` ; la preuve du geste UI reste ouverte dans la gate UX E2E.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machine dans des
   sections avancées éditables plutôt que seulement dans le contrat JSON. Les
   sections passent par `set_selected_entity_definition`, et

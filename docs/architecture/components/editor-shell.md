@@ -128,7 +128,7 @@ C4Component
   permet de choisir une ressource de remplacement du même type. Les documents
   entrants sont validés avant publication et la suppression reste bloquée si
   des références subsistent.
-- Le hub propose `New animation...`. Le prompt crée un `AnimationClip v2`
+- Le hub propose `New animation...`. Le prompt crée un `AnimationClip v3`
   avec cible d'entité explicite ou mode générique, durée, boucle et marker
   optionnel, le publie atomiquement dans
   `assets/animations`, puis le réindexe sans imposer de piste métier.

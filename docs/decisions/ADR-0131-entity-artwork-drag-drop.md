@@ -26,5 +26,7 @@ avant d’être autorisé.
 
 - Le geste est disponible sans dupliquer la logique de sélection de ressource.
 - Les ressources non graphiques sont rejetées par le contrat de payload.
-- Les trois parcours doivent encore recevoir une preuve E2E UX avant de fermer
-  les cases correspondantes de la checklist.
+- Le test headless `entity artwork destinations cover existing root and new root
+  or child nodes` vérifie les mutations vers un nœud existant, une racine et un
+  enfant. La preuve reproductible du geste UI depuis le Resource Explorer reste
+  requise avant de fermer la gate UX E2E.
