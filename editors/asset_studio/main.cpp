@@ -8240,6 +8240,30 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     if (ImGui::MenuItem("Entity transformation...")) {
                         creation.request_transformation = true;
                     }
+                    if (ImGui::MenuItem("Visual preset...")) {
+                        creation.request_visual_preset = true;
+                    }
+                    if (ImGui::MenuItem("Visual composition...")) {
+                        creation.request_visual_composition = true;
+                    }
+                    if (ImGui::MenuItem("Visual component...")) {
+                        creation.request_visual_component = true;
+                    }
+                    if (ImGui::MenuItem("Material / fill...")) {
+                        creation.request_material = true;
+                    }
+                    if (ImGui::MenuItem("Entity...")) {
+                        creation.request_entity = true;
+                    }
+                    if (ImGui::MenuItem("Animation...")) {
+                        creation.request_animation = true;
+                    }
+                    if (ImGui::MenuItem("Input bindings...")) {
+                        creation.request_input = true;
+                    }
+                    if (ImGui::MenuItem("Add existing resource...")) {
+                        ImGui::OpenPopup("Add existing resource");
+                    }
                     ImGui::EndMenu();
                 }
                 if (ImGui::BeginMenu("Import", session.has_project())) {

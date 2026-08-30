@@ -95,6 +95,10 @@ C4Component
 - Le hub affiche séparément `Create`, `Import` et `Add existing`. Projet,
   artwork et chaque source d’import possèdent un état isolé. `Add existing`
   ouvre un sélecteur des ressources déjà indexées et ne publie aucun document.
+- Le menu `File > Create` expose les mêmes intentions que le hub pour les
+  presets, compositions, composants, matériaux, entités, animations, bindings
+  d’entrée et ressources existantes ; chaque entrée route vers son prompt ou
+  sélecteur dédié.
   Les actions matériau, entité et animation utilisent leurs prompts typés et
   publient des documents validés avant réindexation.
 - Le rail droit liste les ressources réellement présentes, conserve une
