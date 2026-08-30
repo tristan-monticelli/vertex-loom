@@ -241,13 +241,16 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Afficher les erreurs au niveau du champ dans Map Studio ; les valeurs
   texte parsées des payloads, triggers, instances, overrides et paramètres
   mécaniques affichent maintenant la cause, le format attendu et une correction,
-  avec diagnostics d'id/nom sur les créations carte et scène. Vérifié par le
-  build `map_studio` et les E2E `map_studio_close_e2e`, `map_studio_scene_e2e`,
-  `map_studio_transformation_e2e`, ainsi que `fabric_map_session_tests`.
+  avec diagnostics d'id/nom sur les créations carte et scène. Le build
+  `map_studio` et `fabric_map_session_tests` passent ; les scénarios E2E
+  `map_studio_close_e2e`, `map_studio_scene_e2e` et
+  `map_studio_transformation_e2e` sont présents mais restent non exécutables
+  dans cet environnement sans écran SDL.
 - [x] Remplacer les deux colonnes monolithiques de Map Studio par des panneaux
   hiérarchisés, redimensionnables et focalisés sur la sélection courante. Les
   panneaux `map-layers-pane` et `map-selection-pane` sont séparés par un
-  splitter borné ; les E2E Map Studio ciblés passent.
+  splitter borné ; la preuve automatisée du geste de redimensionnement reste
+  conditionnée à un environnement SDL avec écran.
 
 ### Qualité, architecture et maintenabilité
 
@@ -257,7 +260,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 | CONFORME | Écritures projet atomiques et validation stricte | contrats `fabric_project`, tests de stockage et publication |
 | CONFORME | Défenses de chemins et fermeture transitive des paquets | tests traversal, symlink et `map_package_tests.cpp` |
 | CONFORME | Undo, autosave et récupération sur plusieurs documents | `ProjectSession`, `MapSession`, `MechanicSession`, `SceneSession` et tests headless |
-| PARTIEL | End-to-end graphique | `map_studio_close_e2e` couvre la fermeture réelle et `map_studio_scene_e2e` l'authoring/reload/publication d'une scène ; les autres parcours restent à automatiser |
+| PARTIEL | End-to-end graphique | Les scénarios `map_studio_close_e2e`, `map_studio_scene_e2e` et `map_studio_transformation_e2e` existent, mais l'exécution locale s'arrête avant scénario faute d'écran SDL ; les autres parcours restent à automatiser |
 | CONFORME | Intégration progression dans `game_runtime` | `game_runtime_progress_resume` couvre reprise, conservation, invalidité et amorçage |
 | CONFORME | Intégration mécanique dans Preview Runtime | chargement, compilation, pas fixe et mouvement visuel prouvés depuis un paquet |
 | CONFORME | Fidélité du modèle Scene au runtime | Scene Studio, composition multi-map, mounts, entry points, transitions et paquet de campagne sont prouvés jusqu'au runtime |
@@ -536,11 +539,13 @@ publication.
 - [x] Demander confirmation avant d'effacer des overrides incompatibles. Asset
   Studio affiche le nombre d’overrides avant un changement de
   `visualComponent` vers `none`, texture ou vector, et l’annulation conserve le
-  nœud ; les E2E entité/animation et les tests de session passent.
+  nœud ; les tests de session couvrent la mutation, tandis que les E2E
+  graphiques restent conditionnés à un écran SDL disponible.
 - [x] Exposer transform, pivot, Z, visibilité et verrouillage du nœud.
 - [x] Ajouter sélection et gizmos de nœud dans le canvas d'entité. L’arbre
   sélectionne le nœud, le canvas expose son gizmo de translation et
-  `asset_studio_entity_e2e` vérifie le drag SDL, la sauvegarde et le reload.
+  `asset_studio_entity_e2e` décrit le drag SDL, la sauvegarde et le reload ;
+  son exécution nécessite un écran SDL disponible.
 - [ ] Permettre glisser-déposer d'un artwork depuis le Resource Explorer vers :
   - [x] un nœud existant ;
   - [x] un nouveau nœud racine ;
@@ -747,7 +752,7 @@ automatiquement sur les trois plateformes.
 - [x] Mettre à jour C4 Context et Container avant chaque changement structurel.
 - [x] Ajouter ou mettre à jour les diagrammes de composants concernés.
 - [x] Ajouter un ADR par nouveau contrat ou politique persistante.
-- [ ] Supprimer les affirmations de gate validé qui ne disposent pas d'une
+- [x] Supprimer les affirmations de gate validé qui ne disposent pas d'une
   preuve UX reproductible.
 - [x] Réconcilier cette checklist avec `remaining-roadmap.md`.
 - [x] Réconcilier cette checklist avec `studio-first-vertical-slices.md`.
