@@ -188,6 +188,9 @@ C4Component
 - La machine d’état d’une entité sélectionne son état initial parmi les états
   existants et signale explicitement une référence manquante ; seuls les IDs de
   nouveaux états restent des saisies d’auteur.
+- Les overrides de composants visuels réutilisent le mapping complet des types
+  du registre pour leurs références et refusent explicitement les contrats
+  inconnus au lieu de les interpréter comme des textures.
 - L’inspecteur Asset Studio l’applique aussi aux UV et aux vues raster ; les
   facteurs, coordonnées normalisées, pixels et unités monde sont distingués.
 - Les propriétés techniques de transform, bounds et ordre Z affichent un

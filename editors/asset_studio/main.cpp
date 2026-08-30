@@ -5692,18 +5692,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         else if (auto* value = std::get_if<
                                      fabric::project::ResourceReference>(
                                      &override.value)) {
-                            auto kind = fabric::editor::StudioResourceKind::texture;
-                            if (value->expected_type == "vector")
-                                kind = fabric::editor::StudioResourceKind::vector;
-                            else if (value->expected_type == "material")
-                                kind = fabric::editor::StudioResourceKind::material;
-                            else if (value->expected_type == "visualComponent")
-                                kind = fabric::editor::StudioResourceKind::visual_component;
-                            auto id = value->id.value;
-                            if (draw_project_resource_picker(
-                                    "Value", session.resources(), kind, id, false)) {
-                                value->id = {.value = id};
-                                override_changed = true;
+                            if (const auto kind = resource_kind_for_contract(
+                                    value->expected_type)) {
+                                auto id = value->id.value;
+                                if (draw_project_resource_picker(
+                                        "Value", session.resources(), *kind, id, false)) {
+                                    value->id = {.value = id};
+                                    override_changed = true;
+                                }
+                            } else {
+                                ImGui::TextDisabled(
+                                    "Unsupported resource contract: %s",
+                                    value->expected_type.c_str());
                             }
                         }
                         if (override_changed) {
