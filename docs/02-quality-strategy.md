@@ -232,7 +232,9 @@ de référence réellement échantillonné après crop.
 calques, les références typées, identifiants stables, ancrages, transforms,
 opacité, Z, publication atomique et refus des champs inconnus. Le validateur
 headless résout ses dépendances et vérifie chaque crop local contre les
-dimensions de la texture référencée.
+dimensions de la texture référencée. Les fixtures JSON générées par Studio
+sont comparées après parsing pour neutraliser les différences de formatage
+entre compilateurs ; les assets binaires restent comparés octet par octet.
 `VisualComponent v1` couvre le round-trip des huit types de paramètres,
 bounds, ancrages, bindings, variantes et instances. Les tests vérifient la
 priorité défaut → variante → instance, la découverte des propriétés animables,

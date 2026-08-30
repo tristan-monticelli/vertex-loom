@@ -129,9 +129,11 @@ int main() {
          clipped_outside[1] < 40U);
     const fabric::render::VectorDrawPacket nested_clip{
         .node_id = "nested-clip",
-        .outline = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}},
-        .fill_vertices = {{0.0F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F}},
-        .fill_indices = {0U, 1U, 2U},
+        .outline = {{0.5F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F},
+                    {0.5F, 1.0F}},
+        .fill_vertices = {{0.5F, 0.0F}, {1.0F, 0.0F}, {1.0F, 1.0F},
+                          {0.5F, 1.0F}},
+        .fill_indices = {0U, 1U, 2U, 0U, 2U, 3U},
         .clip_node_id = std::string{"clip"},
         .closed_outline = true,
     };
