@@ -8,7 +8,7 @@
     "expectedType": "entity",
     "id": "textile-head-entity"
   },
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "tracks": [
     {
       "binding": {
@@ -17,6 +17,7 @@
         "property": "offset"
       },
       "composition": "replace",
+      "easing": "linear",
       "interpolation": "linear",
       "keys": [
         {

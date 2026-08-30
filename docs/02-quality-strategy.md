@@ -33,6 +33,9 @@ conservation du dernier projet valide. La coquille
 graphique est compilée sur les trois plateformes de CI ; son lancement visuel
 reste un smoke test de release tant qu'aucun environnement graphique virtuel
 n'est configuré. Deux parcours graphiques locaux sont néanmoins automatisés :
+`PreviewRuntime` en mode `smoke_test` est explicitement headless et exécute les simulations,
+les animations et la production de draw packets sans initialiser SDL vidéo ;
+les assertions OpenGL restent réservées au smoke test graphique dédié.
 `map_studio_close_e2e` injecte les fermetures fenêtre et système et vérifie la
 modale Save/Discard/Cancel ; `map_studio_scene_e2e` lance un shell OpenGL caché,
 crée une scène, monte une map, ajoute une transition, sauvegarde, recharge et

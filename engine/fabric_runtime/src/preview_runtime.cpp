@@ -1794,9 +1794,26 @@ bool PreviewRuntime::run() {
     SDL_SetMainReady();
     const auto sdl_flags = SDL_INIT_VIDEO |
         (options_.enable_character ? SDL_INIT_GAMECONTROLLER : 0U);
-    if (SDL_Init(sdl_flags) != 0) {
-        errors_.push_back(SDL_GetError());
-        return false;
+    const auto headless_flags = SDL_INIT_TIMER |
+        (options_.enable_character ? SDL_INIT_GAMECONTROLLER : 0U);
+    bool headless = options_.mode == RuntimeMode::smoke_test;
+    if (headless) {
+        if (SDL_Init(headless_flags) != 0) {
+            errors_.push_back(SDL_GetError());
+            return false;
+        }
+    } else if (SDL_Init(sdl_flags) != 0) {
+        if (options_.mode == RuntimeMode::interactive) {
+            errors_.push_back(SDL_GetError());
+            return false;
+        }
+        SDL_Quit();
+        SDL_SetMainReady();
+        if (SDL_Init(headless_flags) != 0) {
+            errors_.push_back(SDL_GetError());
+            return false;
+        }
+        headless = true;
     }
     impl_->sdl_initialized = true;
     if (options_.enable_character) {
@@ -1806,11 +1823,13 @@ bool PreviewRuntime::run() {
             if (impl_->controller != nullptr) break;
         }
     }
-    if (!impl_->texture_sources.empty() && (IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) == 0) {
+    if (!headless && !impl_->texture_sources.empty() &&
+        (IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG) == 0) {
         errors_.push_back(IMG_GetError());
         return false;
     }
 
+    if (!headless) {
 #if defined(__APPLE__)
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -1845,9 +1864,10 @@ bool PreviewRuntime::run() {
         return false;
     }
     if (options_.mode == RuntimeMode::benchmark) SDL_GL_SetSwapInterval(0);
+    }
     impl_->camera.set_viewport(options_.width, options_.height);
     impl_->camera.set_limits(options_.camera_limits);
-    if (impl_->audio_clip) {
+    if (!headless && impl_->audio_clip) {
         if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
                                           impl_->audio_clip->channels) ||
             !impl_->audio_device.open(impl_->audio_clip->sample_rate,
@@ -1860,7 +1880,7 @@ bool PreviewRuntime::run() {
         }
     }
 
-    for (const auto& [id, source] : impl_->texture_sources) {
+    if (!headless) for (const auto& [id, source] : impl_->texture_sources) {
         const auto image = render::load_png(source.path);
         if (!image.ok()) {
             errors_.push_back("texture " + id + ": " + image.error->message);
@@ -2416,6 +2436,14 @@ bool PreviewRuntime::run() {
         impl_->last_frame_packets.assign(render_packets.begin(), render_packets.end());
         if (direct_render) ++stats_.direct_render_frames;
         stats_.culled_packets += impl_->packets.size() - render_packets.size();
+        if (headless) {
+            stats_.visible_instances = render_packets.size();
+            ++stats_.frames;
+            frame_times_ms.push_back(static_cast<double>(
+                SDL_GetPerformanceCounter() - frame_start) /
+                performance_frequency * 1000.0);
+            continue;
+        }
         glViewport(0, 0, options_.width, options_.height);
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -2436,7 +2464,7 @@ bool PreviewRuntime::run() {
         stats_.triangles += render_stats.triangles_drawn;
         ++stats_.frames;
         SDL_GL_SwapWindow(impl_->window);
-        if (impl_->audio_clip) {
+        if (!headless && impl_->audio_clip) {
             const auto audio = impl_->audio_mixer.mix(1024);
             if (!audio.empty() && !impl_->audio_device.submit(audio)) {
                 errors_.push_back("audio: could not queue PCM samples");
