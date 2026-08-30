@@ -5023,7 +5023,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::CollapsingHeader("Animation state machine")) {
                 if (entity.animation_state_machine) {
                     auto machine = *entity.animation_state_machine;
-                    ImGui::InputText("Initial state", &machine.initial_state);
+                    const auto initial_state = std::ranges::find_if(
+                        machine.states, [&](const auto& state) {
+                            return state.id == machine.initial_state;
+                        });
+                    const std::string initial_state_label =
+                        initial_state == machine.states.end()
+                        ? machine.initial_state.empty()
+                            ? std::string{"Choose an initial state..."}
+                            : std::string{"Missing: "} + machine.initial_state
+                        : initial_state->id;
+                    if (ImGui::BeginCombo("Initial state", initial_state_label.c_str())) {
+                        if (ImGui::Selectable("No initial state", machine.initial_state.empty()))
+                            machine.initial_state.clear();
+                        for (const auto& state : machine.states) {
+                            const bool selected = state.id == machine.initial_state;
+                            if (ImGui::Selectable(state.id.c_str(), selected))
+                                machine.initial_state = state.id;
+                            if (selected) ImGui::SetItemDefaultFocus();
+                        }
+                        if (initial_state == machine.states.end() && !machine.initial_state.empty())
+                            ImGui::TextDisabled("Missing state: %s", machine.initial_state.c_str());
+                        ImGui::EndCombo();
+                    }
+                    ImGui::SetItemTooltip("Select an existing state-machine state; new state IDs are authored below.");
                     for (std::size_t index = 0; index < machine.states.size(); ++index) {
                         ImGui::PushID(static_cast<int>(index));
                         ImGui::InputText("State id", &machine.states[index].id);

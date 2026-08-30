@@ -182,6 +182,9 @@ C4Component
   typés dans les listes du nœud choisi, avec recherche et état explicite des
   références absentes ; les ports de sortie et d'entrée sont filtrés selon le
   côté de la connexion.
+- La machine d’état d’une entité sélectionne son état initial parmi les états
+  existants et signale explicitement une référence manquante ; seuls les IDs de
+  nouveaux états restent des saisies d’auteur.
 - L’inspecteur Asset Studio l’applique aussi aux UV et aux vues raster ; les
   facteurs, coordonnées normalisées, pixels et unités monde sont distingués.
 - Les propriétés techniques de transform, bounds et ordre Z affichent un
