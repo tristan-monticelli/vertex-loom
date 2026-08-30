@@ -167,6 +167,8 @@ C4Component
   de timeline, expliquent leur effet technique au survol.
 - Map Studio expose la même aide contextuelle pour les transforms, la grille,
   les plateformes de preview et les paramètres de collision.
+- Les chemins texturés et les marqueurs/segments d’animation disposent aussi
+  d’une aide contextuelle sur leurs paramètres techniques.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.

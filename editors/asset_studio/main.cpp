@@ -3560,12 +3560,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     bool command_changed = ImGui::DragFloat2(
                         selected_path_command == 0U ? "Start (world units)" : "Endpoint (world units)",
                         &command.point.x, 0.05F);
+                    draw_technical_tooltip("Position of the selected path command in world space.");
                     if (command.kind ==
                         fabric::project::TexturedPathCommandKind::cubic) {
                         command_changed |= ImGui::DragFloat2(
                             "Handle in (world units)", &command.control1.x, 0.05F);
+                        draw_technical_tooltip("Incoming cubic handle position.");
                         command_changed |= ImGui::DragFloat2(
                             "Handle out (world units)", &command.control2.x, 0.05F);
+                        draw_technical_tooltip("Outgoing cubic handle position.");
                     }
                     if (command_changed) {
                         auto candidate = path;
@@ -3621,15 +3624,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 style_changed |= ImGui::Checkbox("Closed", &style.closed);
                 style_changed |= ImGui::DragFloat(
                     "Width (world units)", &style.width, 0.01F, 0.001F, 1000.0F);
+                draw_technical_tooltip("Ribbon width rendered along the textured path.");
                 style_changed |= ImGui::DragFloat2(
                     "Texture repeat (factor)", &style.uv_scale.x, 0.05F,
                     0.001F, 1000.0F);
+                draw_technical_tooltip("Texture repetition multiplier along the path.");
                 style_changed |= ImGui::DragFloat2(
                     "Texture offset (normalized)", &style.uv_offset.x, 0.01F);
+                draw_technical_tooltip("Normalized offset applied to the path texture.");
                 style_changed |= ImGui::ColorEdit4(
                     "Color", &style.color.red);
                 style_changed |= ImGui::SliderFloat(
                     "Opacity (0–1)", &style.opacity, 0.0F, 1.0F);
+                draw_technical_tooltip("Opacity applied to the textured path.");
                 int uv_mode = style.uv_mode ==
                         fabric::project::TexturedPathUvMode::repeat ? 0 : 1;
                 if (ImGui::Combo("UV mode", &uv_mode,
@@ -3645,6 +3652,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
                 ImGui::DragFloat("Scroll speed (factor/s)", &path_ui.scroll_speed,
                                  0.05F, -100.0F, 100.0F);
+                draw_technical_tooltip("Texture offset speed used by the preview animation.");
                 if (ImGui::Button("Reset preview offset"))
                     path_ui.preview_offset = 0.0F;
             } else if (session.selected_visual_composition()) {
@@ -5922,6 +5930,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                    std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Marker time (seconds)", &animation_ui.marker_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
+            draw_technical_tooltip("Timeline position at which the marker is stored.");
             ImGui::BeginDisabled(animation_ui.marker_id.empty());
             if (ImGui::Button("Add marker")) {
                 if (session.insert_selected_animation_marker(
@@ -6294,8 +6303,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 std::max(0.0F, clip.duration));
             ImGui::InputFloat("A time (seconds)", &animation_ui.segment_start_time,
                               0.1F, 1.0F, "%.2f s");
+            draw_technical_tooltip("Start time of the source segment.");
             ImGui::InputFloat("B time (seconds)", &animation_ui.segment_end_time,
                               0.1F, 1.0F, "%.2f s");
+            draw_technical_tooltip("End time of the destination segment.");
             if (animation_ui.key_kind == 0) {
                 ImGui::InputFloat2("A value (world units)", animation_ui.segment_start_value);
                 ImGui::InputFloat2("B value (world units)", animation_ui.segment_end_value);
