@@ -3877,7 +3877,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     auto anchor = session.selected_visual_component()
                                       ->anchors[selected_anchor];
-                    if (ImGui::DragFloat2("Anchor position",
+                    if (ImGui::DragFloat2("Anchor position (world units)",
                                           &anchor.position.x, 0.05F)) {
                         auto candidate =
                             *session.selected_visual_component();
@@ -4384,7 +4384,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::PushID(static_cast<int>(point_index));
                     float point[]{node.shape.points[point_index].x,
                                   node.shape.points[point_index].y};
-                    if (ImGui::InputFloat2("Point", point)) {
+                    if (ImGui::InputFloat2("Point (world units)", point)) {
                         node.shape.points[point_index] = {point[0], point[1]};
                         commit_node(node);
                     }
@@ -4498,21 +4498,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         ImGui::EndCombo();
                     }
                     float command_point[]{command.point.x, command.point.y};
-                    if (ImGui::InputFloat2("Point", command_point)) {
+                    if (ImGui::InputFloat2("Point (world units)", command_point)) {
                         command.point = {command_point[0], command_point[1]};
                         commit_node(node);
                     }
                     if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
                         float control1[]{command.control1.x, command.control1.y};
                         float control2[]{command.control2.x, command.control2.y};
-                        if (ImGui::InputFloat2("Bezier handle 1", control1)) {
+                        if (ImGui::InputFloat2("Bezier handle 1 (world units)", control1)) {
                             if (fabric::editor::update_bezier_handle(
                                     node.shape, command_index, true,
                                     {control1[0], control1[1]},
                                     canvas.bezier_handle_mode))
                                 commit_node(node);
                         }
-                        if (ImGui::InputFloat2("Bezier handle 2", control2)) {
+                        if (ImGui::InputFloat2("Bezier handle 2 (world units)", control2)) {
                             if (fabric::editor::update_bezier_handle(
                                     node.shape, command_index, false,
                                     {control2[0], control2[1]},
@@ -4630,7 +4630,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 float image_rotation =
                     node.fill.image->transform.rotation_degrees;
-                if (ImGui::InputFloat("Image rotation", &image_rotation,
+                if (ImGui::InputFloat("Image rotation (degrees)", &image_rotation,
                                       1.0F, 10.0F, "%.2f deg")) {
                     node.fill.image->transform.rotation_degrees = image_rotation;
                     commit_node(node);
@@ -4735,24 +4735,24 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     auto& image = *node.stroke->image;
                     float image_offset[]{image.transform.position.x,
                                         image.transform.position.y};
-                    if (ImGui::InputFloat2("Stroke image offset", image_offset)) {
+                    if (ImGui::InputFloat2("Stroke image offset (world units)", image_offset)) {
                         image.transform.position = {image_offset[0], image_offset[1]};
                         commit_node(node);
                     }
                     float image_scale[]{image.transform.scale.x,
                                        image.transform.scale.y};
-                    if (ImGui::InputFloat2("Stroke image scale", image_scale)) {
+                    if (ImGui::InputFloat2("Stroke image scale (factor)", image_scale)) {
                         image.transform.scale = {image_scale[0], image_scale[1]};
                         commit_node(node);
                     }
                     float image_rotation = image.transform.rotation_degrees;
-                    if (ImGui::InputFloat("Stroke image rotation", &image_rotation,
+                    if (ImGui::InputFloat("Stroke image rotation (degrees)", &image_rotation,
                                           1.0F, 10.0F, "%.2f deg")) {
                         image.transform.rotation_degrees = image_rotation;
                         commit_node(node);
                     }
                     float image_opacity = image.opacity;
-                    if (ImGui::SliderFloat("Stroke image opacity", &image_opacity,
+                    if (ImGui::SliderFloat("Stroke image opacity (0–1)", &image_opacity,
                                            0.0F, 1.0F, "%.2f")) {
                         image.opacity = image_opacity;
                         commit_node(node);
@@ -4789,7 +4789,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         "Target node", entity.nodes, constraint.target_node));
                     static_cast<void>(draw_entity_node_picker(
                         "Source node", entity.nodes, constraint.source_node));
-                    ImGui::InputInt("Order", &constraint.order);
+                    ImGui::InputInt("Order (index)", &constraint.order);
                     ImGui::Checkbox("Position", &constraint.constrain_position);
                     ImGui::Checkbox("Rotation", &constraint.constrain_rotation);
                     ImGui::Checkbox("Scale", &constraint.constrain_scale);
@@ -4850,7 +4850,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     for (std::size_t index = 0; index < mesh.vertices.size(); ++index) {
                         ImGui::PushID(static_cast<int>(index));
                         ImGui::Text("Vertex %zu", index);
-                        ImGui::InputFloat2("Rest position", &mesh.vertices[index]
+                        ImGui::InputFloat2("Rest position (world units)", &mesh.vertices[index]
                                                                   .rest_position.x);
                         if (ImGui::Button("Save vertex")) {
                             auto next = entity;
@@ -4876,8 +4876,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::Text("%zu particles", xpbd.particles.size());
                     for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
                         ImGui::PushID(static_cast<int>(index));
-                        ImGui::InputFloat2("Position", &xpbd.particles[index].position.x);
-                        ImGui::InputFloat("Inverse mass", &xpbd.particles[index].inverse_mass);
+                        ImGui::InputFloat2("Position (world units)", &xpbd.particles[index].position.x);
+                        ImGui::InputFloat("Inverse mass (1/kg)", &xpbd.particles[index].inverse_mass);
                         if (ImGui::Button("Save particle")) {
                             auto next = entity;
                             *next.xpbd = std::move(xpbd);
@@ -5231,22 +5231,22 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::EndCombo();
             }
             float position[]{node.transform.position.x, node.transform.position.y};
-            if (ImGui::InputFloat2("Entity position", position)) {
+            if (ImGui::InputFloat2("Entity position (world units)", position)) {
                 node.transform.position = {position[0], position[1]};
                 commit_entity_node(node);
             }
             float scale[]{node.transform.scale.x, node.transform.scale.y};
-            if (ImGui::InputFloat2("Entity scale", scale)) {
+            if (ImGui::InputFloat2("Entity scale (factor)", scale)) {
                 node.transform.scale = {scale[0], scale[1]};
                 commit_entity_node(node);
             }
             float pivot[]{node.transform.pivot.x, node.transform.pivot.y};
-            if (ImGui::InputFloat2("Entity pivot", pivot)) {
+            if (ImGui::InputFloat2("Entity pivot (world units)", pivot)) {
                 node.transform.pivot = {pivot[0], pivot[1]};
                 commit_entity_node(node);
             }
             float rotation = node.transform.rotation_degrees;
-            if (ImGui::InputFloat("Entity rotation", &rotation, 1.0F, 10.0F,
+            if (ImGui::InputFloat("Entity rotation (degrees)", &rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
                 node.transform.rotation_degrees = rotation;
                 commit_entity_node(node);
@@ -5607,7 +5607,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::PushID(static_cast<int>(event_index));
                     ImGui::InputText("Event id", &event.id);
                     ImGui::InputText("Source", &event.source);
-                    ImGui::SliderFloat("Volume", &event.volume, 0.0F, 1.0F);
+                    ImGui::SliderFloat("Volume (0–1)", &event.volume, 0.0F, 1.0F);
                     ImGui::Checkbox("Loop", &event.loop);
                     if (ImGui::Button("Save event") &&
                         !session.set_selected_audio_event(event_index, std::move(event)))
@@ -5742,7 +5742,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (!clip.preview_entity)
                 ImGui::TextDisabled("Generic clip: no entity preview.");
             float duration = clip.duration;
-            if (ImGui::InputFloat("Duration", &duration, 0.1F, 1.0F, "%.2f s")) {
+            if (ImGui::InputFloat("Duration (seconds)", &duration, 0.1F, 1.0F, "%.2f s")) {
                 if (!session.set_selected_animation_duration(duration)) {
                     status = "Animation duration rejected; inspect diagnostics.";
                 }
@@ -6176,11 +6176,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::InputFloat("B time (seconds)", &animation_ui.segment_end_time,
                               0.1F, 1.0F, "%.2f s");
             if (animation_ui.key_kind == 0) {
-                ImGui::InputFloat2("A value", animation_ui.segment_start_value);
-                ImGui::InputFloat2("B value", animation_ui.segment_end_value);
+                ImGui::InputFloat2("A value (world units)", animation_ui.segment_start_value);
+                ImGui::InputFloat2("B value (world units)", animation_ui.segment_end_value);
             } else if (animation_ui.key_kind == 1) {
-                ImGui::InputFloat("A value", &animation_ui.segment_start_scalar);
-                ImGui::InputFloat("B value", &animation_ui.segment_end_scalar);
+                ImGui::InputFloat("A value (scalar)", &animation_ui.segment_start_scalar);
+                ImGui::InputFloat("B value (scalar)", &animation_ui.segment_end_scalar);
             } else if (animation_ui.key_kind == 2) {
                 ImGui::ColorEdit4("A value", animation_ui.segment_start_color);
                 ImGui::ColorEdit4("B value", animation_ui.segment_end_color);
@@ -6901,28 +6901,28 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             float offset[] = {
                 creation.artwork.image_transform.position.x,
                 creation.artwork.image_transform.position.y};
-            if (ImGui::InputFloat2("Image offset", offset)) {
+            if (ImGui::InputFloat2("Image offset (world units)", offset)) {
                 creation.artwork.image_transform.position = {
                     offset[0], offset[1]};
             }
             float scale[] = {creation.artwork.image_transform.scale.x,
                              creation.artwork.image_transform.scale.y};
-            if (ImGui::InputFloat2("Image scale", scale)) {
+            if (ImGui::InputFloat2("Image scale (factor)", scale)) {
                 creation.artwork.image_transform.scale = {scale[0], scale[1]};
             }
             float pivot[] = {creation.artwork.image_transform.pivot.x,
                              creation.artwork.image_transform.pivot.y};
-            if (ImGui::InputFloat2("Image pivot", pivot)) {
+            if (ImGui::InputFloat2("Image pivot (world units)", pivot)) {
                 creation.artwork.image_transform.pivot = {
                     pivot[0], pivot[1]};
             }
             ImGui::InputFloat(
-                "Image rotation",
+                "Image rotation (degrees)",
                 &creation.artwork.image_transform.rotation_degrees,
                 1.0F, 10.0F, "%.2f deg");
             float opacity = static_cast<float>(
                 creation.artwork.image_opacity);
-            if (ImGui::SliderFloat("Image opacity", &opacity, 0.0F, 1.0F,
+            if (ImGui::SliderFloat("Image opacity (0–1)", &opacity, 0.0F, 1.0F,
                                    "%.2f")) {
                 creation.artwork.image_opacity = opacity;
             }
@@ -7365,7 +7365,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
         if (!creation.animation.marker_id.empty()) {
             ImGui::SetNextItemWidth(220.0F);
-            ImGui::InputDouble("Marker time", &creation.animation.marker_time,
+            ImGui::InputDouble("Marker time (seconds)", &creation.animation.marker_time,
                                0.1, 1.0, "%.2f");
         }
         const auto validation = creation.animation.validate(
@@ -7453,10 +7453,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     binding.kind = static_cast<fabric::project::InputBindingKind>(binding_kind);
                 ImGui::SameLine();
                 ImGui::SetNextItemWidth(130.0F);
-                ImGui::InputInt("Code", &binding.code);
+                ImGui::InputInt("Code (platform)", &binding.code);
                 if (binding.kind == fabric::project::InputBindingKind::axis) {
-                    ImGui::InputFloat("Threshold", &binding.threshold, 0.05F, 0.1F, "%.2f");
-                    ImGui::InputFloat("Dead zone", &binding.dead_zone, 0.05F, 0.1F, "%.2f");
+                    ImGui::InputFloat("Threshold (normalized)", &binding.threshold, 0.05F, 0.1F, "%.2f");
+                    ImGui::InputFloat("Dead zone (normalized)", &binding.dead_zone, 0.05F, 0.1F, "%.2f");
                 }
                 ImGui::TextUnformatted("Modifiers");
                 ImGui::SameLine();
