@@ -1965,8 +1965,17 @@ resource_kind_for_contract(const std::string_view expected_type) {
     if (expected_type == "material") return Kind::material;
     if (expected_type == "entity") return Kind::entity;
     if (expected_type == "animation") return Kind::animation;
+    if (expected_type == "input") return Kind::input;
     if (expected_type == "behavior") return Kind::behavior;
     if (expected_type == "transformation") return Kind::transformation;
+    if (expected_type == "texturedPath") return Kind::textured_path;
+    if (expected_type == "visualComposition") return Kind::visual_composition;
+    if (expected_type == "visualComponent") return Kind::visual_component;
+    if (expected_type == "map") return Kind::map;
+    if (expected_type == "scene") return Kind::scene;
+    if (expected_type == "mechanic") return Kind::mechanic;
+    if (expected_type == "replay") return Kind::replay;
+    if (expected_type == "audio") return Kind::audio;
     return std::nullopt;
 }
 

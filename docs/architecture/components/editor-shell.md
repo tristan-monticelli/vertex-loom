@@ -128,6 +128,11 @@ C4Component
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et
   le format (ou `n/a` lorsqu’ils ne s’appliquent pas), les références entrantes
   et l’action d’ouverture dans le Resource Explorer.
+- Toute référence dont le contrat correspond à un type du registre (texture,
+  vector, material, entity, animation, input, behavior, transformation,
+  texturedPath, visualComposition, visualComponent, map, scene, mechanic,
+  replay ou audio) passe par ce picker ; seuls les types de contrat inconnus
+  restent des champs texte diagnostiqués.
 - Les pickers de documents de Map Studio affichent également le type, le chemin,
   la taille en octets et indiquent explicitement lorsqu’une miniature ne
   s’applique pas ; leur action `Open` ouvre le document sélectionné sur disque.
