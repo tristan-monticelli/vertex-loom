@@ -113,7 +113,8 @@ C4Component
   créations de comportements et transformations, ainsi que la pose de clés
   d’animation. Les propriétés verrouillées d’un nœud et l’ouverture d’un
   artwork absent exposent aussi leur raison ; les contrôles d’édition plus fins
-  restent à harmoniser.
+  restent à harmoniser. Les actions `Undo`, `Redo`, suppression de point et
+  ajout de ressource indiquent également leur précondition.
 - Le panneau de diagnostics associe chaque erreur à son champ, sa cause, la
   contrainte attendue et une action corrective dérivée de `ErrorCode`.
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et

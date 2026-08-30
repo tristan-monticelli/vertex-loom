@@ -1483,6 +1483,8 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         }
         ImGui::EndDisabled();
         draw_disabled_reason(!valid,
+                             "Enter a non-empty name and a valid resource ID.");
+        draw_disabled_reason(!valid,
                              "Enter a non-empty name and a valid unique resource id.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
@@ -1512,10 +1514,12 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     ImGui::BeginDisabled(!behavior_session.can_undo());
     if (ImGui::Button("Undo##behavior")) static_cast<void>(behavior_session.undo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!behavior_session.can_undo(), "No behavior edit to undo.");
     ImGui::SameLine();
     ImGui::BeginDisabled(!behavior_session.can_redo());
     if (ImGui::Button("Redo##behavior")) static_cast<void>(behavior_session.redo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!behavior_session.can_redo(), "No behavior edit to redo.");
 
     static int selected_node = -1;
     static int node_type = 0;
@@ -1856,6 +1860,8 @@ void draw_transformation_editor(
         }
         ImGui::EndDisabled();
         draw_disabled_reason(!valid,
+                             "Enter valid IDs and choose distinct source and destination entities.");
+        draw_disabled_reason(!valid,
                              "Enter a valid name/id and choose two different entity resources.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
@@ -1886,10 +1892,14 @@ void draw_transformation_editor(
     if (ImGui::Button("Undo##transformation"))
         static_cast<void>(transformation_session.undo());
     ImGui::EndDisabled(); ImGui::SameLine();
+    draw_disabled_reason(!transformation_session.can_undo(),
+                         "No transformation edit to undo.");
     ImGui::BeginDisabled(!transformation_session.can_redo());
     if (ImGui::Button("Redo##transformation"))
         static_cast<void>(transformation_session.redo());
     ImGui::EndDisabled();
+    draw_disabled_reason(!transformation_session.can_redo(),
+                         "No transformation edit to redo.");
 
     std::string source = current.source_entity.id.value;
     if (draw_project_resource_picker("Source entity##transformation",
@@ -3346,6 +3356,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             session.selected_textured_path()->commands.size() - 1U);
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(path.commands.size() <=
+                                         (path.closed ? 3U : 2U),
+                                     "Keep the minimum number of points for this path.");
 
                 auto style = *session.selected_textured_path();
                 bool style_changed = false;
@@ -3505,6 +3518,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
                 ImGui::EndDisabled();
+                draw_disabled_reason(add_resource == session.resources().end(),
+                                     "Choose a compatible indexed resource first.");
                 if (!composition.layers.empty() &&
                     selected_layer < composition.layers.size()) {
                     if (ImGui::Button("Duplicate layer")) {
