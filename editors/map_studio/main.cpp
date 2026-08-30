@@ -1245,7 +1245,7 @@ void draw_transform_editor(fabric::editor::MapSession& session,
     ImGui::SeparatorText("Transform gizmo");
     ImGui::TextDisabled("Selected: %s", instance_id.c_str());
     ImGui::SetNextItemWidth(220.0F);
-    if (ImGui::DragFloat2("Position", &state.value.position.x, 0.1F) &&
+    if (ImGui::DragFloat2("Position (world units)", &state.value.position.x, 0.1F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Position transformed" : "Transform rejected (layer locked or invalid)";
@@ -1257,13 +1257,13 @@ void draw_transform_editor(fabric::editor::MapSession& session,
             ? "Rotation transformed" : "Transform rejected (layer locked or invalid)";
     }
     ImGui::SetNextItemWidth(220.0F);
-    if (ImGui::DragFloat2("Scale", &state.value.scale.x, 0.01F, -32.0F, 32.0F) &&
+    if (ImGui::DragFloat2("Scale (factor)", &state.value.scale.x, 0.01F, -32.0F, 32.0F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Scale transformed" : "Transform rejected (layer locked or invalid)";
     }
     ImGui::SetNextItemWidth(220.0F);
-    if (ImGui::DragFloat2("Pivot", &state.value.pivot.x, 0.01F) &&
+    if (ImGui::DragFloat2("Pivot (world units)", &state.value.pivot.x, 0.01F) &&
         ImGui::IsItemDeactivatedAfterEdit()) {
         status = session.set_instance_transform({.value = instance_id}, state.value)
             ? "Pivot transformed" : "Transform rejected (layer locked or invalid)";
@@ -1295,10 +1295,10 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     ImGui::Checkbox("Snap translation", &snapping.enabled);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(100.0F);
-    ImGui::DragFloat("Grid size", &snapping.grid_size, 0.1F, 0.01F, 1024.0F);
+    ImGui::DragFloat("Grid size (world units)", &snapping.grid_size, 0.1F, 0.01F, 1024.0F);
     ImGui::SameLine();
     ImGui::SetNextItemWidth(150.0F);
-    ImGui::DragFloat2("Origin", &snapping.origin.x, 0.1F);
+    ImGui::DragFloat2("Origin (world units)", &snapping.origin.x, 0.1F);
     const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
     auto frame_instances = [&](const bool selected_only) {
         float min_x = std::numeric_limits<float>::max();
@@ -2423,7 +2423,7 @@ int run(const std::filesystem::path& project_root,
                 ImGui::SameLine();
                 float depth = layer.depth;
                 ImGui::SetNextItemWidth(90.0F);
-                if (ImGui::DragFloat("##depth", &depth, 0.1F) &&
+                if (ImGui::DragFloat("Depth (world units)##depth", &depth, 0.1F) &&
                     ImGui::IsItemDeactivatedAfterEdit() &&
                     session.set_layer_depth({.value = layer.id}, depth)) {
                     status = "Layer depth changed";
@@ -2504,7 +2504,7 @@ int run(const std::filesystem::path& project_root,
             ImGui::Checkbox("Play visual animation", &preview_playing);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(180.0F);
-            ImGui::SliderFloat("Preview time", &preview_time, 0.0F, 10.0F, "%.2f s");
+            ImGui::SliderFloat("Preview time (seconds)", &preview_time, 0.0F, 10.0F, "%.2f s");
             if (preview_playing) preview_time += ImGui::GetIO().DeltaTime;
             map_preview = fabric::render::resolve_map_preview(
                 session.project_root(), *session.manifest(), map, preview_time);
@@ -2542,16 +2542,16 @@ int run(const std::filesystem::path& project_root,
                 ImGui::TextDisabled("chains are solid and cannot be triggers");
             }
             ImGui::SetNextItemWidth(220.0F);
-            ImGui::DragFloat2("New collision center",
+            ImGui::DragFloat2("New collision center (world units)",
                               &new_collision_center.x, 0.1F);
             if (new_collision_kind <= 1) {
                 ImGui::SetNextItemWidth(180.0F);
-                ImGui::DragFloat("New collision radius", &new_collision_radius,
+                ImGui::DragFloat("New collision radius (world units)", &new_collision_radius,
                                  0.1F, 0.01F, 4096.0F);
             }
             if (new_collision_kind == 1) {
                 ImGui::SetNextItemWidth(180.0F);
-                ImGui::DragFloat("New capsule length", &new_collision_length,
+                ImGui::DragFloat("New capsule length (world units)", &new_collision_length,
                                  0.1F, 0.0F, 4096.0F);
             }
             ImGui::BeginDisabled(new_collision_layer.empty() ||
@@ -2619,16 +2619,16 @@ int run(const std::filesystem::path& project_root,
                 ImGui::Text("Kind: %s", collision_shape_text(collision_editor).c_str());
                 ImGui::Checkbox("Sensor", &collision_editor.sensor);
                 ImGui::SetNextItemWidth(220.0F);
-                ImGui::DragFloat2("Center", &collision_editor.center.x, 0.1F);
+                ImGui::DragFloat2("Center (world units)", &collision_editor.center.x, 0.1F);
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::circle ||
                     collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
                     ImGui::SetNextItemWidth(220.0F);
-                    ImGui::DragFloat("Radius", &collision_editor.radius, 0.1F, 0.0F,
+                    ImGui::DragFloat("Radius (world units)", &collision_editor.radius, 0.1F, 0.0F,
                                      4096.0F);
                 }
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::capsule) {
                     ImGui::SetNextItemWidth(220.0F);
-                    ImGui::DragFloat("Length", &collision_editor.length, 0.1F, 0.0F,
+                    ImGui::DragFloat("Length (world units)", &collision_editor.length, 0.1F, 0.0F,
                                      4096.0F);
                 }
                 if (collision_editor.kind == fabric::project::CollisionShapeKind::polygon ||
@@ -2638,7 +2638,7 @@ int run(const std::filesystem::path& project_root,
                          point_index < collision_editor.points.size(); ++point_index) {
                         ImGui::PushID(static_cast<int>(point_index));
                         ImGui::SetNextItemWidth(220.0F);
-                        ImGui::DragFloat2("Point", &collision_editor.points[point_index].x,
+                        ImGui::DragFloat2("Point (world units)", &collision_editor.points[point_index].x,
                                           0.1F);
                         ImGui::PopID();
                     }

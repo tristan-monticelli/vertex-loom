@@ -129,6 +129,8 @@ C4Component
 - Les prompts artwork et entité affichent explicitement les unités de leurs
   dimensions, positions, échelles, rotations et ordre Z ; les valeurs stockées
   restent inchangées.
+- Map Studio applique la même convention aux transforms, à la grille et aux
+  formes de collision ; les temps de preview sont affichés en secondes.
 - L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
   opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
   validée passe par le `CommandStack`; sauvegarde, autosave et récupération
