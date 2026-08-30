@@ -168,8 +168,11 @@ Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
 étirement, largeur variable, UV continus, raccords, texture manquante et
 séparation stricte entre ruban de rendu et collision.
 Le stroke image vectoriel est couvert par `fabric_render_tests` (texture,
-répétition, UV et transform) et par le preset `beam` de la fixture
-`tests/fixtures/studio-beam`, qui reste visible dans le parcours des presets.
+répétition, UV et transform). Le preset `beam` de la fixture
+`tests/fixtures/studio-beam` combine ce ruban texturé avec un calque vectoriel
+de bordure ; `fabric_visual_composition_renderer_tests` vérifie les deux
+packets et les propriétés du contour, et le résultat reste visible dans le
+parcours des presets.
 Le graphe de mécaniques couvre validation des ports, références, cycles
 interdits, ordre déterministe, corps et joints invalides, capteurs, moteurs,
 undo/redo et reconstruction du monde après reset de preview. La première
@@ -377,8 +380,9 @@ le registre de propriétés, sélectionné comme binding de timeline et interpol
 par `AnimationClip v3` sans piste ni valeur spécialisée.
 Le resolver animé compose ensuite ces valeurs avec l'instance de composant et
 reconstruit ses packets. Les tests vérifient largeur, offset UV et couleur du
-Beam dans le resolver partagé, puis le remplacement d'une échelle de composant
-sur une frame réellement produite par Preview Runtime.
+ruban Beam, ainsi que la présence de sa bordure vectorielle, dans le resolver
+partagé, puis le remplacement d'une échelle de composant sur une frame
+réellement produite par Preview Runtime.
 Le test de session crée aussi une fermeture depuis le même point d'entrée que
 le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
 resélectionne son composant.

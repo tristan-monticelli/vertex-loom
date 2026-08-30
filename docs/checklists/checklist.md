@@ -56,8 +56,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   poignées liées/symétriques/libres, sélection et transform multi-points,
   transform fill indépendante, clips imbriqués, registre animable, CommandStack,
   géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
-  cap), stroke image avec répétition/UV et preset pédagogique `beam` livré par
-  défaut, géométrie, E2E canvas et comparaison des draw packets. Vérifié par
+  cap), stroke image avec répétition/UV, bordure vectorielle du preset
+  pédagogique `beam` livré par défaut, géométrie, E2E canvas et comparaison des
+  draw packets. Vérifié par
   les tests géométriques, `asset_studio_vector_canvas_e2e`,
   `fabric_render_gl_smoke`, les tests de presets et les draw packets comparés.
 - [x] Inspecteur local : mêmes formulaires création/édition, raisons des boutons
@@ -129,7 +130,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
   renderer les applique désormais dans les draw packets et les chemins OpenGL.
 - [x] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
-  déformation ; livrer un preset `beam` préexistant et visible comme exemple.
+  déformation, ainsi qu'une bordure vectorielle configurable ; livrer un preset
+  `beam` préexistant et visible comme exemple.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher

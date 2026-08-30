@@ -44,6 +44,21 @@ project::VectorNode rectangle(std::string id, std::string name,
             .fill = {.kind = VectorFillKind::solid, .color = color}};
 }
 
+project::VectorNode outlined_rectangle(std::string id, std::string name,
+                                       const core::Rect bounds,
+                                       const core::Color color,
+                                       const float width) {
+    auto node = rectangle(std::move(id), std::move(name), bounds,
+                          {0.0F, 0.0F, 0.0F, 0.0F});
+    node.fill = {.kind = VectorFillKind::none};
+    node.stroke = project::VectorStroke{
+        .color = color,
+        .width = width,
+        .join = project::VectorStrokeJoin::round,
+        .cap = project::VectorStrokeCap::round};
+    return node;
+}
+
 project::VectorAsset vector_asset(const core::ResourceId& id,
                                   std::string name, const core::Vec2 size,
                                   std::vector<project::VectorNode> nodes) {
@@ -210,6 +225,7 @@ project::TexturedPath rail(const core::ResourceId& id, std::string name,
 
 VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     const auto path_id = child_id(request.id, "rail");
+    const auto border_id = child_id(request.id, "border");
     const auto composition_id = child_id(request.id, "composition");
     auto path = rail(path_id, request.name + " Rail",
                      *request.thread_texture, 0.0F);
@@ -217,6 +233,11 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     path.commands.back().point = {2.0F, 0.0F};
     path.commands.back().control1 = {-0.8F, 0.3F};
     path.commands.back().control2 = {0.8F, -0.3F};
+    auto border = vector_asset(
+        border_id, request.name + " Border", {4.0F, 0.8F},
+        {outlined_rectangle("border-shape", "Beam border",
+                            {{-2.0F, -0.4F}, {4.0F, 0.8F}},
+                            {0.08F, 0.04F, 0.02F, 1.0F}, 0.06F)});
     project::VisualComposition composition{
         .document = {.schema_version =
                          project::current_visual_composition_schema_version,
@@ -225,7 +246,9 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
                      .name = request.name + " Composition"},
         .size = {4.0F, 0.8F},
         .layers = {layer("seam", "Seam", VisualLayerKind::textured_path,
-                         path_id, "texturedPath")},
+                         path_id, "texturedPath", {}, 0.0F),
+                   layer("border", "Beam border", VisualLayerKind::vector,
+                         border_id, "vector", {}, 1.0F)},
     };
     using Type = project::VisualParameterType;
     auto component = component_for(
@@ -240,7 +263,8 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
           binding("seam", "texturedPath", "color"), true},
          {"opacity", "Opacity", Type::scalar, path.opacity,
           binding("seam", "texturedPath", "opacity"), true}});
-    return {.textured_paths = {std::move(path)},
+    return {.vectors = {std::move(border)},
+            .textured_paths = {std::move(path)},
             .composition = std::move(composition),
             .component = std::move(component)};
 }

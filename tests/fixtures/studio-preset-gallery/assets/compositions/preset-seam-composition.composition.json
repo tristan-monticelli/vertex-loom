@@ -31,6 +31,22 @@
       },
       "visible": true,
       "zOrder": 0.0
+    },
+    {
+      "anchor": {"x": 0.5, "y": 0.5},
+      "id": "border",
+      "kind": "vector",
+      "name": "Beam border",
+      "opacity": 1.0,
+      "resource": {"expectedType": "vector", "id": "preset-seam-border"},
+      "transform": {
+        "pivot": {"x": 0.0, "y": 0.0},
+        "position": {"x": 0.0, "y": 0.0},
+        "rotationDegrees": 0.0,
+        "scale": {"x": 1.0, "y": 1.0}
+      },
+      "visible": true,
+      "zOrder": 1.0
     }
   ],
   "name": "Seam Composition",

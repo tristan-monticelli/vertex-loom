@@ -85,7 +85,7 @@ TEST_CASE("visual preset components resolve to shared draw packets") {
              std::tuple{fabric::editor::VisualPresetKind::button,
                         "preview-button", 5U},
              std::tuple{fabric::editor::VisualPresetKind::seam,
-                        "preview-seam", 1U},
+                        "preview-seam", 2U},
              std::tuple{fabric::editor::VisualPresetKind::zipper,
                         "preview-zipper", 14U}}) {
         REQUIRE(fabric::editor::publish_visual_preset(
@@ -178,11 +178,13 @@ TEST_CASE("textured layer opacity is applied exactly once") {
     const auto resolved = fabric::render::resolve_visual_composition(
         project.root(), TemporaryProject::manifest(), *loaded.asset);
     REQUIRE(resolved.ok());
-    REQUIRE(resolved.packets.size() == 1U);
+    REQUIRE(resolved.packets.size() == 2U);
     REQUIRE(resolved.packets.front().image_fill.has_value());
     REQUIRE(resolved.packets.front().fill_color.has_value());
     CHECK(resolved.packets.front().image_fill->opacity == Catch::Approx(0.5F));
     CHECK(resolved.packets.front().fill_color->alpha == Catch::Approx(1.0F));
+    REQUIRE(resolved.packets.back().stroke.has_value());
+    CHECK(resolved.packets.back().stroke->width == Catch::Approx(0.06F));
 }
 
 TEST_CASE("animated component parameters rebuild Beam packets generically") {
@@ -206,13 +208,20 @@ TEST_CASE("animated component parameters rebuild Beam packets generically") {
         "beam-node", evaluation);
     REQUIRE(base.ok());
     REQUIRE(animated.ok());
-    REQUIRE(base.packets.size() == 1U);
-    REQUIRE(animated.packets.size() == 1U);
+    REQUIRE(base.packets.size() == 2U);
+    REQUIRE(animated.packets.size() == 2U);
     REQUIRE_FALSE(base.packets.front().fill_uv.empty());
     REQUIRE_FALSE(animated.packets.front().fill_uv.empty());
     CHECK(animated.packets.front().fill_uv.front().x == Catch::Approx(2.0F));
     CHECK(animated.packets.front().fill_color ==
           fabric::core::Color{0.2F, 0.4F, 0.8F, 1.0F});
+    REQUIRE(base.packets.back().stroke.has_value());
+    REQUIRE(animated.packets.back().stroke.has_value());
+    CHECK(base.packets.back().stroke->width == Catch::Approx(0.06F));
+    CHECK(base.packets.back().stroke->join ==
+          fabric::project::VectorStrokeJoin::round);
+    CHECK(base.packets.back().stroke->cap ==
+          fabric::project::VectorStrokeCap::round);
     CHECK(animated.bounds.size.y > base.bounds.size.y);
 }
 
