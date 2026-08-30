@@ -1,0 +1,190 @@
+{
+  "schema": "asset-studio-ui-test-v1",
+  "widgets": [
+    {
+      "id": "resource-row-head-face",
+      "kind": "resource",
+      "resource_id": "head-face",
+      "resource_kind": "texture"
+    },
+    {
+      "id": "resource-row-head-thread",
+      "kind": "resource",
+      "resource_id": "head-thread",
+      "resource_kind": "texture"
+    },
+    {
+      "id": "resource-row-head-button-artwork",
+      "kind": "resource",
+      "resource_id": "head-button-artwork",
+      "resource_kind": "vector"
+    },
+    {
+      "id": "resource-row-head-eye-artwork",
+      "kind": "resource",
+      "resource_id": "head-eye-artwork",
+      "resource_kind": "vector"
+    },
+    {
+      "id": "resource-row-default-material",
+      "kind": "resource",
+      "resource_id": "default-material",
+      "resource_kind": "material"
+    },
+    {
+      "id": "resource-row-rotating-platform-entity",
+      "kind": "resource",
+      "resource_id": "rotating-platform-entity",
+      "resource_kind": "entity"
+    },
+    {
+      "id": "resource-row-textile-head-entity",
+      "kind": "resource",
+      "resource_id": "textile-head-entity",
+      "resource_kind": "entity"
+    },
+    {
+      "id": "resource-row-beam-scroll",
+      "kind": "resource",
+      "resource_id": "beam-scroll",
+      "resource_kind": "animation"
+    },
+    {
+      "id": "resource-row-default",
+      "kind": "resource",
+      "resource_id": "default",
+      "resource_kind": "input"
+    },
+    {
+      "id": "resource-row-player",
+      "kind": "resource",
+      "resource_id": "player",
+      "resource_kind": "behavior"
+    },
+    {
+      "id": "resource-row-beam-rail",
+      "kind": "resource",
+      "resource_id": "beam-rail",
+      "resource_kind": "textured path"
+    },
+    {
+      "id": "resource-row-head-seam-rail",
+      "kind": "resource",
+      "resource_id": "head-seam-rail",
+      "resource_kind": "textured path"
+    },
+    {
+      "id": "resource-row-platform-strip-rail",
+      "kind": "resource",
+      "resource_id": "platform-strip-rail",
+      "resource_kind": "textured path"
+    },
+    {
+      "id": "resource-row-beam-composition",
+      "kind": "resource",
+      "resource_id": "beam-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-head-button-composition",
+      "kind": "resource",
+      "resource_id": "head-button-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-head-eye-composition",
+      "kind": "resource",
+      "resource_id": "head-eye-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-head-seam-composition",
+      "kind": "resource",
+      "resource_id": "head-seam-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-platform-strip-composition",
+      "kind": "resource",
+      "resource_id": "platform-strip-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-textile-head-composition",
+      "kind": "resource",
+      "resource_id": "textile-head-composition",
+      "resource_kind": "composition"
+    },
+    {
+      "id": "resource-row-beam",
+      "kind": "resource",
+      "resource_id": "beam",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-head-button",
+      "kind": "resource",
+      "resource_id": "head-button",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-head-eye",
+      "kind": "resource",
+      "resource_id": "head-eye",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-head-seam",
+      "kind": "resource",
+      "resource_id": "head-seam",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-platform-strip",
+      "kind": "resource",
+      "resource_id": "platform-strip",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-textile-head",
+      "kind": "resource",
+      "resource_id": "textile-head",
+      "resource_kind": "component"
+    },
+    {
+      "id": "resource-row-textile-head-preview",
+      "kind": "resource",
+      "resource_id": "textile-head-preview",
+      "resource_kind": "map"
+    },
+    {
+      "id": "resource-row-preview",
+      "kind": "resource",
+      "resource_id": "preview",
+      "resource_kind": "scene"
+    },
+    {
+      "id": "resource-row-rotating-platform",
+      "kind": "resource",
+      "resource_id": "rotating-platform",
+      "resource_kind": "mechanic"
+    },
+    {
+      "id": "resource-row-textile-head-replay",
+      "kind": "resource",
+      "resource_id": "textile-head-replay",
+      "resource_kind": "replay"
+    },
+    {
+      "id": "resource-row-ui",
+      "kind": "resource",
+      "resource_id": "ui",
+      "resource_kind": "audio"
+    },
+    {
+      "id": "entity-node-root",
+      "kind": "entity_node",
+      "node_id": "root"
+    }
+  ]
+}

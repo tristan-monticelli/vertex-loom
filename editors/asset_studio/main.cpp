@@ -2394,6 +2394,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         pivot_handle = to_screen(
             transform_point(*selected_node, selected_node->transform.pivot));
     }
+    bool path_command_edited = false;
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         const ImVec2 mouse = io.MousePos;
         const auto distance = [](const ImVec2 left, const ImVec2 right) {
@@ -2465,6 +2466,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                             canvas.selected_node, std::move(changed));
                     if (applied) {
                         canvas.selected_path_points = {insert_index};
+                        path_command_edited = true;
                     }
                 }
             }
@@ -2537,7 +2539,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 operation = CanvasUiState::DragOperation::pivot;
             }
         }
-        if (operation == CanvasUiState::DragOperation::none) {
+        if (operation == CanvasUiState::DragOperation::none &&
+            !path_command_edited) {
             const auto world = to_world(mouse);
             const auto hit_node = fabric::editor::topmost_vector_node_at(
                 asset.native->nodes, world, 8.0F / pixels_per_unit);
@@ -2561,7 +2564,10 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             canvas.drag_start_node = *selected_node;
         }
     }
-    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) &&
+    const bool right_click = ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||
+        (io.MouseDown[ImGuiMouseButton_Right] &&
+         io.MouseDownDuration[ImGuiMouseButton_Right] == 0.0F);
+    if (hovered && right_click &&
         selected_node != nullptr && !selected_node->locked &&
         canvas.tool == CanvasUiState::Tool::pen &&
         selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
@@ -2596,11 +2602,15 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         canvas.dragging = false;
         canvas.drag_operation = CanvasUiState::DragOperation::none;
     }
-    if (hovered && canvas.dragging && selected_node != nullptr &&
-        !selected_node->locked &&
+    if (canvas.dragging && !canvas.drag_start_node.locked &&
         (io.MousePos.x != canvas.drag_start_mouse.x ||
          io.MousePos.y != canvas.drag_start_mouse.y)) {
-        auto changed = *selected_node;
+        const bool path_drag =
+            canvas.drag_operation == CanvasUiState::DragOperation::path_selection ||
+            canvas.drag_operation == CanvasUiState::DragOperation::path_point ||
+            canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle1 ||
+            canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle2;
+        auto changed = path_drag ? canvas.drag_start_node : *selected_node;
         const auto& start = canvas.drag_start_transform;
         const auto start_mouse = to_world(canvas.drag_start_mouse);
         const auto current_mouse = to_world(io.MousePos);
@@ -8279,6 +8289,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (converted) {
                 node.shape.kind = fabric::project::VectorShapeKind::path;
                 node.shape.path = *converted;
+                if (node.shape.path.size() > 1U)
+                    static_cast<void>(fabric::project::convert_path_command(
+                        node.shape, 1U,
+                        fabric::project::VectorPathCommandKind::cubic));
                 vector_canvas_e2e_initial_path_size = node.shape.path.size();
                 if (node.shape.path.size() > 1U)
                     vector_canvas_e2e_initial_anchor = node.shape.path[1].point;
@@ -8338,10 +8352,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 const float angle = transformed.rotation_degrees *
                     std::numbers::pi_v<float> / 180.0F;
                 const fabric::core::Vec2 world{
-                    transformed.position.x + local.x * std::cos(angle) -
-                        local.y * std::sin(angle),
-                    transformed.position.y + local.x * std::sin(angle) +
-                        local.y * std::cos(angle)};
+                    transformed.position.x + transformed.pivot.x +
+                        local.x * std::cos(angle) - local.y * std::sin(angle),
+                    transformed.position.y + transformed.pivot.y +
+                        local.x * std::sin(angle) + local.y * std::cos(angle)};
                 const auto& native = *session.created_vector()->native;
                 const float fit = std::min(
                     (canvas.native_size.x - 80.0F) / native.size.x,
@@ -8356,10 +8370,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             };
             const auto& test_node = session.created_vector()->native->nodes.front();
             const auto& test_path = test_node.shape.path;
-            const auto test_point = handle_gesture && test_path.size() > 1U
-                ? (frame >= 10U ? test_path[1].control1 : test_path[1].point)
+            const auto inserted_index = !canvas.selected_path_points.empty()
+                ? canvas.selected_path_points.front() : 1U;
+            const auto test_point = pen_click && test_path.size() > 1U
+                ? (frame >= 4U && inserted_index < test_path.size()
+                       ? test_path[inserted_index].point
+                       : fabric::core::Vec2{
+                             (test_path[0].point.x + test_path[1].point.x) *
+                                 0.5F,
+                             (test_path[0].point.y + test_path[1].point.y) *
+                                 0.5F})
                 : move_gesture && test_path.size() > 1U
-                ? test_path[1].point
+                ? fabric::core::Vec2{
+                      vector_canvas_e2e_initial_anchor.x +
+                          (frame == 6U ? 0.0F : 0.12F),
+                      vector_canvas_e2e_initial_anchor.y +
+                          (frame == 6U ? 0.0F : 0.08F)}
+                : handle_gesture && test_path.size() > 1U
+                ? fabric::core::Vec2{
+                      vector_canvas_e2e_initial_control1.x +
+                          (frame == 9U ? 0.0F : 0.12F),
+                      vector_canvas_e2e_initial_control1.y +
+                          (frame == 9U ? 0.0F : 0.12F)}
                 : fabric::core::Vec2{0.0F, 0.0F};
             const auto mouse = canvas_point(test_point);
             const int mouse_x = static_cast<int>(std::lround(mouse.x));
@@ -8367,6 +8399,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.state = move_gesture || handle_gesture
+                ? SDL_BUTTON_LMASK : 0U;
             motion.motion.x = mouse_x;
             motion.motion.y = mouse_y;
             static_cast<void>(SDL_PushEvent(&motion));

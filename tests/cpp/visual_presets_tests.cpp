@@ -471,7 +471,11 @@ std::vector<std::filesystem::path> fixture_files(
     std::vector<std::filesystem::path> result;
     for (const auto& entry :
          std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file() && entry.path().filename() != ".keep")
+        const auto filename = entry.path().filename().generic_string();
+        if (entry.is_regular_file() && filename != ".keep" &&
+            filename != "asset-studio-ui-widgets.json" &&
+            filename != "asset_studio-e2e-failure.txt" &&
+            filename != "asset_studio-e2e-failure.ppm")
             result.push_back(entry.path().lexically_relative(root));
     }
     std::ranges::sort(result);
