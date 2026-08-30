@@ -64,12 +64,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $mesaOpenGl = Get-ChildItem -Path $env:MESA_ROOT -Recurse -File -Filter 'opengl32.dll' | Select-Object -First 1
+          $mesaOpenGl = Get-ChildItem -Path $env:MESA_ROOT -Recurse -File |
+            Where-Object { $_.Name -ieq 'opengl32.dll' } | Select-Object -First 1
           if ($null -eq $mesaOpenGl) {
             throw "Mesa3D opengl32.dll not found under $env:MESA_ROOT"
           }
-          $mesaDlls = @(Get-ChildItem -Path $mesaOpenGl.Directory.FullName -File -Filter '*.dll')
-          $testDirectories = @(Get-ChildItem -Path "$env:GITHUB_WORKSPACE\build" -Recurse -File -Filter '*.exe' |
+          $mesaDlls = @(Get-ChildItem -Path $mesaOpenGl.Directory.FullName -File |
+            Where-Object { $_.Extension -ieq '.dll' })
+          $testDirectories = @(Get-ChildItem -Path "$env:GITHUB_WORKSPACE\build" -Recurse -File |
+            Where-Object { $_.Extension -ieq '.exe' } |
             ForEach-Object { $_.Directory.FullName } | Sort-Object -Unique)
           if ($testDirectories.Count -eq 0) {
             throw "No Windows test executables found under $env:GITHUB_WORKSPACE\build"
