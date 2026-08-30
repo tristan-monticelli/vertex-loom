@@ -694,7 +694,9 @@ externe.
 - [x] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
 - [ ] Ajouter focus et scroll automatiques vers le premier champ invalide.
 - [ ] Ajouter tooltips pour les propriétés techniques.
-- [ ] Afficher les unités pour toutes les valeurs numériques.
+- [x] Afficher les unités pour toutes les valeurs numériques. Les champs fixes
+  affichent leur unité ou leur nature, et les valeurs dynamiques indiquent
+  qu’elles suivent les unités déclarées par leur schéma.
 - [x] Utiliser les noms visibles comme interaction principale et les IDs comme
   information secondaire.
 - [x] Ajouter raccourcis clavier et commandes de menu cohérents. Asset Studio
