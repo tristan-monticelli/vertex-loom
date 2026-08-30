@@ -2726,7 +2726,7 @@ int run(const std::filesystem::path& project_root,
                 ImGui::TextUnformatted("Ctrl+S: save · Ctrl+Z/Y: undo/redo · Ctrl+Q: quit");
                 ImGui::EndMenu();
             }
-            ImGui::EndMainMenuBar();
+            ImGui::EndMenuBar();
         }
         if (!session.has_map()) {
             ImGui::TextUnformatted("Map Studio");

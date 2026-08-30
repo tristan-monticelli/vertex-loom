@@ -8325,11 +8325,45 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 ? frame % 2U == 0U
                 : (move_gesture ? frame == 6U : frame == 9U);
             const bool right_click = frame == 4U || frame == 5U;
-            const int mouse_x = handle_gesture
-                ? (frame >= 10U ? 1015 : 1035)
-                : (move_gesture && frame >= 7U ? 730 : 705);
-            const int mouse_y = handle_gesture
-                ? (frame >= 10U ? 262 : 282) : 135;
+            const auto canvas_point = [&](const fabric::core::Vec2 point) {
+                const auto& node = session.created_vector()->native->nodes.front();
+                const auto transformed = fabric::core::Transform{
+                    .position = node.transform.position,
+                    .rotation_degrees = node.transform.rotation_degrees,
+                    .scale = node.transform.scale,
+                    .pivot = node.transform.pivot};
+                const auto local = fabric::core::Vec2{
+                    (point.x - transformed.pivot.x) * transformed.scale.x,
+                    (point.y - transformed.pivot.y) * transformed.scale.y};
+                const float angle = transformed.rotation_degrees *
+                    std::numbers::pi_v<float> / 180.0F;
+                const fabric::core::Vec2 world{
+                    transformed.position.x + local.x * std::cos(angle) -
+                        local.y * std::sin(angle),
+                    transformed.position.y + local.x * std::sin(angle) +
+                        local.y * std::cos(angle)};
+                const auto& native = *session.created_vector()->native;
+                const float fit = std::min(
+                    (canvas.native_size.x - 80.0F) / native.size.x,
+                    (canvas.native_size.y - 80.0F) / native.size.y);
+                const float pixels_per_unit = fit * canvas.zoom;
+                const ImVec2 center{
+                    canvas.native_origin.x + canvas.native_size.x * 0.5F,
+                    canvas.native_origin.y + canvas.native_size.y * 0.5F};
+                return ImVec2{
+                    center.x + canvas.pan.x + world.x * pixels_per_unit,
+                    center.y + canvas.pan.y - world.y * pixels_per_unit};
+            };
+            const auto& test_node = session.created_vector()->native->nodes.front();
+            const auto& test_path = test_node.shape.path;
+            const auto test_point = handle_gesture && test_path.size() > 1U
+                ? (frame >= 10U ? test_path[1].control1 : test_path[1].point)
+                : move_gesture && test_path.size() > 1U
+                ? test_path[1].point
+                : fabric::core::Vec2{0.0F, 0.0F};
+            const auto mouse = canvas_point(test_point);
+            const int mouse_x = static_cast<int>(std::lround(mouse.x));
+            const int mouse_y = static_cast<int>(std::lround(mouse.y));
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
