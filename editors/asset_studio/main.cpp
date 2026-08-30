@@ -61,6 +61,12 @@ struct ResourceDragPayload {
     char id[256]{};
 };
 
+bool is_entity_artwork_kind(const fabric::editor::StudioResourceKind kind) {
+    return kind == fabric::editor::StudioResourceKind::texture ||
+        kind == fabric::editor::StudioResourceKind::vector ||
+        kind == fabric::editor::StudioResourceKind::visual_component;
+}
+
 constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
@@ -1052,7 +1058,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
             }
-            if (ImGui::BeginDragDropSource()) {
+            if (is_entity_artwork_kind(resource.kind) &&
+                ImGui::BeginDragDropSource()) {
                 ResourceDragPayload payload;
                 payload.kind = static_cast<int>(resource.kind);
                 std::snprintf(payload.id, sizeof(payload.id), "%s",
@@ -5110,6 +5117,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::SameLine();
                 ImGui::Button("Drop artwork as root");
+                ImGui::SameLine();
+                ImGui::TextDisabled("Textures, vectors or visual components");
                 if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(
                             "VERTEX_LOOM_RESOURCE");
@@ -5146,6 +5155,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::SameLine();
             ImGui::Button("Drop artwork as child");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Textures, vectors or visual components");
             if (ImGui::BeginDragDropTarget()) {
                 if (const auto* payload = ImGui::AcceptDragDropPayload(
                         "VERTEX_LOOM_RESOURCE");

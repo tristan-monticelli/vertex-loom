@@ -155,6 +155,9 @@ C4Component
 - Les contrôles techniques d’IK et d’animation indiquent également leur
   domaine (`iterations`, `world units`, `seconds`, unités de propriété ou
   canaux couleur) et exposent une explication au survol.
+- Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
+  les textures, vectoriels et composants visuels ; les cibles racine, enfant et
+  nœud existant indiquent leur rôle dans la hiérarchie.
 - Les connexions du graphe mécanique sélectionnent leurs nœuds puis leurs ports
   typés dans les listes du nœud choisi, avec recherche et état explicite des
   références absentes ; les ports de sortie et d'entrée sont filtrés selon le
