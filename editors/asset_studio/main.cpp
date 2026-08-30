@@ -7319,7 +7319,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create a reusable MaterialDefinition v1");
         ImGui::TextDisabled(
             "The validated material is published atomically in the open project.");
+        const auto validation = creation.material.validate(
+            session.project_root(), *session.manifest());
         draw_resource_name_field("Name##material-name", creation.material.name);
+        focus_prompt_field(validation, "name");
         float color[] = {creation.material.color.red,
                          creation.material.color.green,
                          creation.material.color.blue,
@@ -7331,6 +7334,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::SliderFloat("Opacity (0–1)", &opacity, 0.0F, 1.0F, "%.2f")) {
             creation.material.opacity = opacity;
         }
+        focus_prompt_field(validation, "opacity");
         const auto blend_label = std::string(
             fabric::project::to_string(creation.material.blend));
         if (ImGui::BeginCombo("Blend", blend_label.c_str())) {
@@ -7370,8 +7374,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::InputFloat("UV rotation (degrees)",
                           &creation.material.uv_transform.rotation_degrees,
                           1.0F, 10.0F, "%.2f deg");
-        const auto validation = creation.material.validate(
-            session.project_root(), *session.manifest());
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
         draw_prompt_error(validation, "opacity");
