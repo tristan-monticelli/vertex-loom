@@ -79,6 +79,9 @@ non destructif borné dans `asset-studio-ui-texture.json`.
 Le test `asset_studio_ui_input_e2e` rend le prompt de bindings, prépare les
 actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
 relecture avec un binding clavier et un binding gamepad.
+Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
+macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
+la gate multiplateforme n’est fermée qu’après un run vert de cette matrice.
 Le test `asset_studio_ui_overrides_e2e` prépare un override d’instance, rend la
 modale de perte avec ses deux actions, vérifie l’annulation sans perte puis la
 confirmation avec suppression de l’instance dans
