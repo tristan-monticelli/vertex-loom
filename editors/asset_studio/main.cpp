@@ -138,6 +138,11 @@ struct CreationUiState {
     bool input_capture_existing{};
 };
 
+bool draw_typed_resource_reference(
+    const char* label,
+    const std::span<const fabric::editor::StudioResource> resources,
+    fabric::project::ResourceReference& reference);
+
 #if defined(__APPLE__)
 constexpr const char* new_shortcut = "Cmd+N";
 constexpr const char* open_shortcut = "Cmd+O";
@@ -1574,7 +1579,8 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                     float values[2]{typed->x, typed->y}; changed = ImGui::InputFloat2(property.id.c_str(), values);
                     *typed = {values[0], values[1]};
                 } else if (auto* typed = std::get_if<fabric::project::ResourceReference>(&value)) {
-                    changed = ImGui::InputText(property.id.c_str(), &typed->id.value);
+                    changed = draw_typed_resource_reference(
+                        property.id.c_str(), project_session.resources(), *typed);
                     ImGui::TextDisabled("expected: %s", typed->expected_type.c_str());
                 }
                 if (changed) static_cast<void>(behavior_session.set_node_property(
@@ -1825,6 +1831,32 @@ bool draw_entity_node_picker(
             ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
         ImGui::EndCombo();
     }
+    return changed;
+}
+
+std::optional<fabric::editor::StudioResourceKind>
+resource_kind_for_contract(const std::string_view expected_type) {
+    using Kind = fabric::editor::StudioResourceKind;
+    if (expected_type == "texture") return Kind::texture;
+    if (expected_type == "vector") return Kind::vector;
+    if (expected_type == "material") return Kind::material;
+    if (expected_type == "entity") return Kind::entity;
+    if (expected_type == "animation") return Kind::animation;
+    if (expected_type == "behavior") return Kind::behavior;
+    if (expected_type == "transformation") return Kind::transformation;
+    return std::nullopt;
+}
+
+bool draw_typed_resource_reference(
+    const char* label,
+    const std::span<const fabric::editor::StudioResource> resources,
+    fabric::project::ResourceReference& reference) {
+    const auto kind = resource_kind_for_contract(reference.expected_type);
+    if (!kind) return ImGui::InputText(label, &reference.id.value);
+    std::string selected_id = reference.id.value;
+    const bool changed = draw_project_resource_picker(
+        label, resources, *kind, selected_id, false);
+    if (changed) reference.id.value = std::move(selected_id);
     return changed;
 }
 
