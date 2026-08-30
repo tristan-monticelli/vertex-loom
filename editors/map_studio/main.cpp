@@ -312,6 +312,14 @@ void draw_resource_picker(const char* label,
         if (std::filesystem::is_regular_file(selected_path, error)) {
             ImGui::TextDisabled("Type: %s", std::string{suffix}.c_str());
             ImGui::TextDisabled("%s", selected_path.generic_string().c_str());
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Open##resource-picker-open")) {
+                const auto absolute = std::filesystem::absolute(selected_path, error);
+                if (!error) {
+                    const auto url = "file://" + absolute.generic_string();
+                    SDL_OpenURL(url.c_str());
+                }
+            }
         } else {
             ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                                "Missing resource: %s", selected_id.c_str());
