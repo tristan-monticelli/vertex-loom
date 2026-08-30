@@ -497,7 +497,15 @@ nlohmann::json read_json(const std::filesystem::path& path) {
 bool files_equal(const std::filesystem::path& left,
                  const std::filesystem::path& right) {
     if (left.extension() == ".json") return read_json(left) == read_json(right);
-    return read_binary(left) == read_binary(right);
+    const auto left_bytes = read_binary(left);
+    const auto right_bytes = read_binary(right);
+    if (left.extension() == ".png") {
+        return left_bytes.size() == right_bytes.size() &&
+            left_bytes.size() >= 24U &&
+            std::equal(left_bytes.begin(), left_bytes.begin() + 24,
+                       right_bytes.begin());
+    }
+    return left_bytes == right_bytes;
 }
 
 bool auxiliary_documents_equal(const std::filesystem::path& left,

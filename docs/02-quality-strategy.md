@@ -44,7 +44,10 @@ opt-in : il crée
 un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
 disponible, puis un crop raster sur une texture bicolore avec lecture du pixel
-attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
+attendu. Le nested clipping est exclu du smoke Linux sous Xvfb, dont le
+rasterizer logiciel ne conserve pas les références stencil imbriquées ; le
+smoke OpenGL caché est exclu de Windows, où le contexte peut bloquer sans
+pilote graphique. Il retourne `77` lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
@@ -224,7 +227,9 @@ clés ; les contrôles d’édition fins restent à couvrir avant la fermeture d
 gate global.
 Les tests actuels couvrent le round-trip `RasterView v1`, les crops hors limites,
 les transformations, le filtrage, undo/redo, autosave, récupération et la
-conservation byte-for-byte de la source PNG. Asset Studio et Preview Runtime
+conservation byte-for-byte de la source PNG. Les fixtures JSON sont comparées
+après parsing et les PNG vérifient taille et en-tête, tandis qu'Asset Studio et
+Preview Runtime
 utilisent le même constructeur de packet raster ; un test d'intégration compare
 le packet runtime au packet studio attendu et le smoke OpenGL vérifie le pixel
 de référence réellement échantillonné après crop.

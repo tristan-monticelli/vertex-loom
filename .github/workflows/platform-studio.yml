@@ -51,7 +51,9 @@ jobs:
 
       - name: Run CTest
         if: runner.os != 'Linux'
-        run: ctest --test-dir build -C Debug --output-on-failure
+        run: >-
+          ctest --test-dir build -C Debug --output-on-failure
+          ${{ runner.os == 'Windows' && '-E fabric_render_gl_smoke' || '' }}
 
       - name: Upload Studio UI and E2E artifacts
         if: always()
