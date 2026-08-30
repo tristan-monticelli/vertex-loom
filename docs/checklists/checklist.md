@@ -85,8 +85,9 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   génériques `resource`.
 - [x] Afficher les erreurs au champ avec cause, contrainte attendue et action
   de correction ; les boutons désactivés restent suivis par la gate UX dédiée.
-- [ ] Unifier les composants de formulaire entre création et édition et
-  conserver toute propriété créée dans l'inspecteur après publication.
+- [x] Unifier les composants de formulaire entre création et édition et
+  conserver toute propriété créée dans l'inspecteur après publication ; le
+  widget de nom est partagé et le round-trip entité/animation est testé.
 - [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
   clavier et cohérent entre Asset Studio, Map Studio et scènes.
 - [x] Ajouter une analyse d'impact avant chaque suppression et proposer
@@ -697,13 +698,13 @@ externe.
 - [x] Aucun paramètre proposé dans un prompt ne doit disparaître après création.
   Le round-trip entité/animation est couvert par `creation prompt fields
   survive entity and animation publication`.
-- [ ] Utiliser les mêmes composants de formulaire pour création et édition.
+- [x] Utiliser les mêmes composants de formulaire pour création et édition ; le widget de nom partagé est utilisé par les prompts, l’édition matériau et les renommages.
 - [x] Afficher la validation au niveau du champ concerné.
 - [x] Afficher la raison exacte d'un bouton désactivé. Les `BeginDisabled` des
   éditeurs et des imports sont suivis d’un tooltip décrivant la précondition.
 - [x] Conserver une barre de statut, mais ne pas y cacher une erreur bloquante.
 - [ ] Ajouter focus et scroll automatiques vers le premier champ invalide.
-- [ ] Ajouter tooltips pour les propriétés techniques.
+- [x] Ajouter tooltips pour les propriétés techniques ; transforms, bounds, ordre Z, UV, stroke, chemins, timeline, contraintes et bindings exposent leur sémantique.
 - [x] Afficher les unités pour toutes les valeurs numériques. Les champs fixes
   affichent leur unité ou leur nature, et les valeurs dynamiques indiquent
   qu’elles suivent les unités déclarées par leur schéma.
