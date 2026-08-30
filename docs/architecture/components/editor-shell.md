@@ -141,7 +141,9 @@ C4Component
 - L’inspecteur Asset Studio l’applique aussi aux UV et aux vues raster ; les
   facteurs, coordonnées normalisées, pixels et unités monde sont distingués.
 - Les propriétés techniques de transform, bounds et ordre Z affichent un
-  tooltip d’aide sur leur unité ou leur effet de rendu.
+  tooltip d’aide sur leur unité ou leur effet de rendu. Les transforms de
+  matériau, de composition, de raster et de chemin exposent également leur
+  sémantique d’édition au survol.
 - L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
   opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
   validée passe par le `CommandStack`; sauvegarde, autosave et récupération

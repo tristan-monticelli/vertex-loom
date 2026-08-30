@@ -3420,6 +3420,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.uv_transform.position = {uv_offset[0], uv_offset[1]};
                 commit_material(std::move(material));
             }
+            draw_technical_tooltip("Normalized texture offset; values wrap with the selected texture.");
             material = current;
             float uv_scale[]{material.uv_transform.scale.x,
                              material.uv_transform.scale.y};
@@ -3427,6 +3428,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.uv_transform.scale = {uv_scale[0], uv_scale[1]};
                 commit_material(std::move(material));
             }
+            draw_technical_tooltip("Texture repetition multiplier in each UV axis.");
             material = current;
             float uv_rotation = material.uv_transform.rotation_degrees;
             if (ImGui::InputFloat("UV rotation (degrees)", &uv_rotation, 1.0F, 10.0F,
@@ -3434,6 +3436,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.uv_transform.rotation_degrees = uv_rotation;
                 commit_material(std::move(material));
             }
+            draw_technical_tooltip("Rotation applied around the UV pivot, in degrees.");
             material = current;
             float uv_pivot[]{material.uv_transform.pivot.x,
                              material.uv_transform.pivot.y};
@@ -3441,6 +3444,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.uv_transform.pivot = {uv_pivot[0], uv_pivot[1]};
                 commit_material(std::move(material));
             }
+            draw_technical_tooltip("Normalized center used by the UV rotation and scale.");
             const ImVec4 swatch{current.color.red, current.color.green,
                                 current.color.blue,
                                 current.color.alpha * current.opacity};
@@ -3747,21 +3751,28 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     changed |= ImGui::Checkbox("Visible", &layer.visible);
                     changed |= ImGui::DragFloat("Z order (world units)", &layer.z_order,
                                                 0.1F);
+                    draw_technical_tooltip("Layer draw order; larger values render later.");
                     changed |= ImGui::SliderFloat("Opacity (0–1)", &layer.opacity,
                                                   0.0F, 1.0F);
+                    draw_technical_tooltip("Layer opacity, from fully transparent to opaque.");
                     changed |= ImGui::SliderFloat2("Anchor (normalized)", &layer.anchor.x,
                                                    0.0F, 1.0F);
+                    draw_technical_tooltip("Normalized anchor used to position the layer transform.");
                     changed |= ImGui::DragFloat2("Position (world units)",
                                                  &layer.transform.position.x,
                                                  0.05F);
+                    draw_technical_tooltip("Layer translation in project world units.");
                     changed |= ImGui::DragFloat(
                         "Rotation (degrees)", &layer.transform.rotation_degrees, 0.5F);
+                    draw_technical_tooltip("Layer rotation around its pivot, in degrees.");
                     changed |= ImGui::DragFloat2("Scale (factor)",
                                                  &layer.transform.scale.x,
                                                  0.01F, 0.001F, 100.0F);
+                    draw_technical_tooltip("Layer scale multiplier on each axis.");
                     changed |= ImGui::DragFloat2("Pivot (world units)",
                                                  &layer.transform.pivot.x,
                                                  0.01F);
+                    draw_technical_tooltip("Layer pivot in project world units.");
                     if (layer.kind ==
                         fabric::project::VisualLayerKind::raster) {
                         const auto texture = fabric::project::load_texture_asset(
@@ -4026,6 +4037,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::InputFloat2("View position (world units)", view_position);
                 ImGui::InputFloat("View rotation (degrees)", &view_rotation);
                 ImGui::InputFloat2("View scale (factor)", view_scale);
+                draw_technical_tooltip("Crop origin and size use source pixels; pivot is normalized; view transform uses world units and a scale factor.");
                 if (ImGui::Button("Apply crop/view")) {
                     raster_view_edit.crop.origin = {crop_origin[0], crop_origin[1]};
                     raster_view_edit.crop.size = {crop_size[0], crop_size[1]};
@@ -4384,10 +4396,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::PushID(static_cast<int>(point_index));
                     float point[]{node.shape.points[point_index].x,
                                   node.shape.points[point_index].y};
-                    if (ImGui::InputFloat2("Point (world units)", point)) {
-                        node.shape.points[point_index] = {point[0], point[1]};
-                        commit_node(node);
-                    }
+            if (ImGui::InputFloat2("Point (world units)", point)) {
+                node.shape.points[point_index] = {point[0], point[1]};
+                commit_node(node);
+            }
+                    draw_technical_tooltip("Polygon vertex in project world units.");
                     ImGui::PopID();
                 }
             } else if (node.shape.kind == fabric::project::VectorShapeKind::path) {
@@ -4502,6 +4515,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         command.point = {command_point[0], command_point[1]};
                         commit_node(node);
                     }
+                    draw_technical_tooltip("Path point in project world units.");
                     if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
                         float control1[]{command.control1.x, command.control1.y};
                         float control2[]{command.control2.x, command.control2.y};
@@ -4512,6 +4526,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     canvas.bezier_handle_mode))
                                 commit_node(node);
                         }
+                        draw_technical_tooltip("Incoming cubic handle in project world units.");
                         if (ImGui::InputFloat2("Bezier handle 2 (world units)", control2)) {
                             if (fabric::editor::update_bezier_handle(
                                     node.shape, command_index, false,
@@ -4519,6 +4534,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     canvas.bezier_handle_mode))
                                 commit_node(node);
                         }
+                        draw_technical_tooltip("Outgoing cubic handle in project world units.");
                     }
                     if (ImGui::SmallButton("Remove command")) {
                         if (fabric::project::remove_path_command(
@@ -5235,22 +5251,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.transform.position = {position[0], position[1]};
                 commit_entity_node(node);
             }
+            draw_technical_tooltip("Entity node translation in project world units.");
             float scale[]{node.transform.scale.x, node.transform.scale.y};
             if (ImGui::InputFloat2("Entity scale (factor)", scale)) {
                 node.transform.scale = {scale[0], scale[1]};
                 commit_entity_node(node);
             }
+            draw_technical_tooltip("Entity node scale multiplier.");
             float pivot[]{node.transform.pivot.x, node.transform.pivot.y};
             if (ImGui::InputFloat2("Entity pivot (world units)", pivot)) {
                 node.transform.pivot = {pivot[0], pivot[1]};
                 commit_entity_node(node);
             }
+            draw_technical_tooltip("Entity node pivot in project world units.");
             float rotation = node.transform.rotation_degrees;
             if (ImGui::InputFloat("Entity rotation (degrees)", &rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
                 node.transform.rotation_degrees = rotation;
                 commit_entity_node(node);
             }
+            draw_technical_tooltip("Entity node rotation around its pivot, in degrees.");
             float z_order = node.z_order;
             if (ImGui::InputFloat("Z order (world units)", &z_order, 0.1F, 1.0F, "%.2f")) {
                 node.z_order = z_order;
