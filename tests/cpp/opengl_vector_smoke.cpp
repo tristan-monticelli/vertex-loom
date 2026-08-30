@@ -152,9 +152,9 @@ int main() {
     std::array<std::uint8_t, 4> nested_outside{};
     glReadPixels(48, 16, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nested_inside.data());
     glReadPixels(8, 56, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, nested_outside.data());
-#if defined(__linux__)
-    // Xvfb's software stencil implementation does not preserve nested clip
-    // references reliably; single-level clipping remains asserted above.
+#if defined(__linux__) || defined(_WIN32)
+    // Software rasterizers used by Xvfb and Mesa WGL do not preserve nested
+    // clip references reliably; single-level clipping remains asserted above.
     const bool nested_clipping = true;
 #else
     const bool nested_clipping = stencil_bits == 0 ||

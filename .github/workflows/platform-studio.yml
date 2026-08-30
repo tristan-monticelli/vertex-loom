@@ -23,6 +23,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Windows software OpenGL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $mesaVersion = '26.2.0'
+          $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/mesa3d-$mesaVersion-release-msvc.7z"
+          $mesaArchive = Join-Path $env:RUNNER_TEMP "mesa3d-$mesaVersion-release-msvc.7z"
+          Invoke-WebRequest -Uri $mesaUrl -OutFile $mesaArchive
+          if ((Get-FileHash $mesaArchive -Algorithm SHA256).Hash.ToLower() -ne 'dcb2719ef346dab5b609fcb193a5f13cfc4b0502e3f4de1ad43d349477402f47') {
+            throw 'Mesa3D archive checksum mismatch'
+          }
+          $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d-$mesaVersion"
+          New-Item -ItemType Directory -Force -Path $mesaRoot | Out-Null
+          7z e $mesaArchive 'x64\*' "-o$mesaRoot" -y
+          Get-ChildItem -Path $mesaRoot -Recurse -File | Select-Object -ExpandProperty FullName
+          "MESA_ROOT=$mesaRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Install Linux graphics dependencies
         if: runner.os == 'Linux'
         run: |
@@ -45,15 +62,37 @@ jobs:
       - name: Build
         run: cmake --build build --config Debug --parallel 2
 
+      - name: Activate Windows software OpenGL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $mesaOpenGl = Get-ChildItem -Path $env:MESA_ROOT -Recurse -File |
+            Where-Object { $_.Name -ieq 'opengl32.dll' } | Select-Object -First 1
+          if ($null -eq $mesaOpenGl) {
+            throw "Mesa3D opengl32.dll not found under $env:MESA_ROOT"
+          }
+          $mesaDlls = @(Get-ChildItem -Path $mesaOpenGl.Directory.FullName -File |
+            Where-Object { $_.Extension -ieq '.dll' })
+          $testDirectories = @(Get-ChildItem -Path "$env:GITHUB_WORKSPACE\build" -Recurse -File |
+            Where-Object { $_.Extension -ieq '.exe' } |
+            ForEach-Object { $_.Directory.FullName } | Sort-Object -Unique)
+          if ($testDirectories.Count -eq 0) {
+            throw "No Windows test executables found under $env:GITHUB_WORKSPACE\build"
+          }
+          foreach ($testDirectory in $testDirectories) {
+            Copy-Item $mesaDlls.FullName $testDirectory -Force
+          }
+
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
         run: xvfb-run --auto-servernum ctest --test-dir build -C Debug --output-on-failure
 
       - name: Run CTest
         if: runner.os != 'Linux'
-        run: >-
-          ctest --test-dir build -C Debug --output-on-failure
-          ${{ runner.os == 'Windows' && '-E "(^asset_studio|^map_studio|fabric_render_gl_smoke)"' || '' }}
+        run: ctest --test-dir build -C Debug --output-on-failure
+        env:
+          GALLIUM_DRIVER: llvmpipe
+          LIBGL_ALWAYS_SOFTWARE: '1'
 
       - name: Upload Studio UI and E2E artifacts
         if: always()

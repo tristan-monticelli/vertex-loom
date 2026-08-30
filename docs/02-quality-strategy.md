@@ -44,11 +44,13 @@ opt-in : il crée
 un contexte SDL caché, rend un draw packet et vérifie les statistiques ainsi
 que la couleur lue ; il teste aussi le clipping stencil lorsqu’un stencil est
 disponible, puis un crop raster sur une texture bicolore avec lecture du pixel
-attendu. Le nested clipping est exclu du smoke Linux sous Xvfb, dont le
-rasterizer logiciel ne conserve pas les références stencil imbriquées ; le
-smoke OpenGL caché et les E2E Asset/Map Studio sont exclus de Windows, où le
-runner ne fournit pas de chargeur OpenGL ; les tests headless restent exécutés.
-Il retourne `77` lorsqu'aucun contexte n'est disponible.
+attendu. Le nested clipping est exclu du smoke sous Xvfb Linux et sous Mesa
+WGL Windows, dont les rasterizers logiciels ne conservent pas les références
+stencil imbriquées ; le clipping simple reste vérifié. Le workflow installe un
+bundle Mesa3D logiciel épinglé sur Windows, puis
+exécute les E2E Asset/Map Studio et le smoke OpenGL avec llvmpipe ; les tests
+headless restent exécutés sur les trois plateformes. Il retourne `77`
+lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
