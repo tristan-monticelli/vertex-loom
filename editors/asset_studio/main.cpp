@@ -1307,6 +1307,59 @@ void draw_existing_resource_popup(fabric::editor::ProjectSession& session,
     ImGui::EndPopup();
 }
 
+std::string_view diagnostic_expectation(const fabric::project::ErrorCode code) {
+    using fabric::project::ErrorCode;
+    switch (code) {
+    case ErrorCode::io_error: return "the file operation is writable";
+    case ErrorCode::invalid_json: return "valid JSON for the resource schema";
+    case ErrorCode::invalid_manifest: return "a valid project manifest";
+    case ErrorCode::unsupported_schema_version:
+        return "a supported schema version";
+    case ErrorCode::invalid_resource_id:
+        return "a non-empty, portable resource ID";
+    case ErrorCode::invalid_path: return "a relative path inside the project";
+    case ErrorCode::missing_file: return "an existing referenced file";
+    case ErrorCode::missing_directory: return "an existing referenced directory";
+    case ErrorCode::directory_not_empty: return "an empty destination directory";
+    case ErrorCode::invalid_asset: return "an asset matching its contract";
+    case ErrorCode::asset_already_exists: return "a unique asset destination";
+    case ErrorCode::duplicate_resource: return "a unique resource identity";
+    case ErrorCode::missing_resource: return "an indexed resource reference";
+    case ErrorCode::resource_type_mismatch:
+        return "a reference with the expected resource type";
+    case ErrorCode::resource_cycle: return "an acyclic resource graph";
+    }
+    return "a valid project value";
+}
+
+std::string_view diagnostic_action(const fabric::project::ErrorCode code) {
+    using fabric::project::ErrorCode;
+    switch (code) {
+    case ErrorCode::io_error: return "check permissions and retry";
+    case ErrorCode::invalid_json: return "correct the document and validate again";
+    case ErrorCode::invalid_manifest:
+    case ErrorCode::unsupported_schema_version:
+        return "restore a supported manifest or migrate the project";
+    case ErrorCode::invalid_resource_id:
+    case ErrorCode::invalid_path:
+        return "edit the value in the indicated field";
+    case ErrorCode::missing_file:
+    case ErrorCode::missing_directory:
+        return "restore the missing project asset or choose another reference";
+    case ErrorCode::directory_not_empty:
+    case ErrorCode::asset_already_exists:
+    case ErrorCode::duplicate_resource:
+        return "choose a different destination or identifier";
+    case ErrorCode::invalid_asset:
+    case ErrorCode::missing_resource:
+    case ErrorCode::resource_type_mismatch:
+        return "choose a compatible resource and validate again";
+    case ErrorCode::resource_cycle:
+        return "remove the cyclic reference";
+    }
+    return "correct the field and validate again";
+}
+
 void draw_diagnostics(const fabric::editor::ProjectSession& session) {
     if (session.errors().empty()) {
         ImGui::TextDisabled("Validation diagnostics will appear here.");
@@ -1319,7 +1372,10 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
                            std::string(fabric::project::to_string(error.code)).c_str(),
                            error.field.c_str());
         ImGui::PopStyleColor();
-        ImGui::TextWrapped("%s", error.message.c_str());
+        ImGui::TextWrapped("Cause: %s", error.message.c_str());
+        ImGui::TextWrapped("Expected: %s",
+                           diagnostic_expectation(error.code).data());
+        ImGui::TextWrapped("Action: %s", diagnostic_action(error.code).data());
         ImGui::Separator();
     }
 }

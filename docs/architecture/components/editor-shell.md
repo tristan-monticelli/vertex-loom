@@ -112,6 +112,8 @@ C4Component
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
   d’animation ; les contrôles d’édition plus fins restent à harmoniser.
+- Le panneau de diagnostics associe chaque erreur à son champ, sa cause, la
+  contrainte attendue et une action corrective dérivée de `ErrorCode`.
 - Le picker typé affiche systématiquement le type, le chemin, les dimensions et
   le format (ou `n/a` lorsqu’ils ne s’appliquent pas), les références entrantes
   et l’action d’ouverture dans le Resource Explorer.

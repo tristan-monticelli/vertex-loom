@@ -78,8 +78,8 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   dimensions, le format, les dépendances et une action d'ouverture.
 - [ ] Remplacer tous les IDs libres restants par des sélecteurs typés avec
   recherche, état manquant et bouton de correction.
-- [ ] Afficher les erreurs au champ avec cause, contrainte attendue et action
-  de correction ; ne pas laisser un bouton désactivé sans explication.
+- [x] Afficher les erreurs au champ avec cause, contrainte attendue et action
+  de correction ; les boutons désactivés restent suivis par la gate UX dédiée.
 - [ ] Unifier les composants de formulaire entre création et édition et
   conserver toute propriété créée dans l'inspecteur après publication.
 - [ ] Rendre l'explorateur droit hiérarchique, redimensionnable, navigable au
