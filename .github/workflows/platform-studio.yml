@@ -64,11 +64,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $mesaDlls = Get-ChildItem -Path $env:MESA_ROOT -Recurse -File -Filter '*.dll'
-          if ($mesaDlls.Count -eq 0) {
-            throw "No Mesa3D DLLs found under $env:MESA_ROOT"
+          $mesaDllRoot = Join-Path $env:MESA_ROOT 'x64'
+          if (-not (Test-Path $mesaDllRoot)) {
+            throw "Mesa3D x64 directory not found at $mesaDllRoot"
           }
-          Copy-Item $mesaDlls.FullName "$env:GITHUB_WORKSPACE\build\Debug" -Force
+          Copy-Item (Join-Path $mesaDllRoot '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
 
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
