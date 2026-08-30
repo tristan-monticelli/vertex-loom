@@ -35,7 +35,7 @@ jobs:
             throw 'Mesa3D archive checksum mismatch'
           }
           $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d-$mesaVersion"
-          7z e $mesaArchive 'x64/*.dll' -o$mesaRoot -y
+          7z x $mesaArchive -o$mesaRoot -y
           "MESA_ROOT=$mesaRoot" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Linux graphics dependencies
@@ -64,11 +64,11 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $mesaDllRoot = $env:MESA_ROOT
-          if (-not (Test-Path (Join-Path $mesaDllRoot 'opengl32.dll'))) {
-            throw "Mesa3D opengl32.dll not found under $mesaDllRoot"
+          $mesaDllRoot = Get-ChildItem -Path $env:MESA_ROOT -Recurse -Directory -Filter 'x64' | Select-Object -First 1
+          if ($null -eq $mesaDllRoot) {
+            throw "Mesa3D x64 directory not found under $env:MESA_ROOT"
           }
-          Copy-Item (Join-Path $mesaDllRoot '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
+          Copy-Item (Join-Path $mesaDllRoot.FullName '*.dll') "$env:GITHUB_WORKSPACE\build\Debug" -Force
 
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
