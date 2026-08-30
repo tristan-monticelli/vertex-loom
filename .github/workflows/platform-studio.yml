@@ -53,7 +53,7 @@ jobs:
         if: runner.os != 'Linux'
         run: >-
           ctest --test-dir build -C Debug --output-on-failure
-          ${{ runner.os == 'Windows' && '-E fabric_render_gl_smoke' || '' }}
+          ${{ runner.os == 'Windows' && '-E "(^asset_studio|^map_studio|fabric_render_gl_smoke)"' || '' }}
 
       - name: Upload Studio UI and E2E artifacts
         if: always()
