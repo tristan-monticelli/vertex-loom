@@ -1,0 +1,59 @@
+name: platform-studio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'CMakeLists.txt'
+      - 'engine/**'
+      - 'editors/**'
+      - 'tests/**'
+      - '.github/workflows/platform-studio.yml'
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux graphics dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            libgl1-mesa-dev libglu1-mesa-dev \
+            xvfb
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+          -DFABRIC_BUILD_TESTS=ON -DFABRIC_BUILD_EDITORS=ON
+          -DFABRIC_BUILD_RUNTIME=ON
+
+      - name: Build
+        run: cmake --build build --config Debug --parallel 2
+
+      - name: Run CTest with virtual display
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Run CTest
+        if: runner.os != 'Linux'
+        run: ctest --test-dir build -C Debug --output-on-failure
+
+      - name: Upload E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-${{ matrix.os }}
+          if-no-files-found: ignore
+          path: |
+            build/**/*e2e-failure.txt
+            build/**/*e2e-failure.ppm

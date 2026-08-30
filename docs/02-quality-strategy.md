@@ -77,6 +77,9 @@ Le workflow manuel `workflow_dispatch` exécute aussi
 macOS, Windows et Linux sous Xvfb, puis archive un rapport JSON par plateforme.
 Ses résultats servent à fermer le gate de performance ; ils ne sont pas
 exécutés sur chaque PR.
+Le workflow `platform-studio.yml` compile et exécute CTest sur macOS, Windows
+et Linux ; Linux utilise Xvfb pour les scénarios SDL. En cas d’échec, il archive
+les rapports texte et captures PPM produits par les éditeurs.
 Le parcours `map_studio_close_e2e` couvre aussi une fermeture propre et une
 fermeture avec sauvegarde réussie, en plus de Cancel/Discard et de l'échec de
 sauvegarde.
