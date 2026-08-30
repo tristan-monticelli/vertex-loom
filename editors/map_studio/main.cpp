@@ -1,6 +1,7 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
+#include "fabric/editor/project_session.hpp"
 #include "fabric/editor/scene_session.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/transformation_session.hpp"
@@ -245,6 +246,29 @@ std::optional<fabric::project::MapPropertyValue> parse_override_value(
     }
 }
 
+std::string_view resource_contract_for_kind(const int kind) {
+    using ResourceKind = fabric::editor::StudioResourceKind;
+    switch (static_cast<ResourceKind>(kind)) {
+    case ResourceKind::texture: return "texture";
+    case ResourceKind::vector: return "vector";
+    case ResourceKind::material: return "material";
+    case ResourceKind::entity: return "entity";
+    case ResourceKind::animation: return "animation";
+    case ResourceKind::input: return "input";
+    case ResourceKind::behavior: return "behavior";
+    case ResourceKind::transformation: return "transformation";
+    case ResourceKind::textured_path: return "texturedPath";
+    case ResourceKind::visual_composition: return "visualComposition";
+    case ResourceKind::visual_component: return "visualComponent";
+    case ResourceKind::map: return "map";
+    case ResourceKind::scene: return "scene";
+    case ResourceKind::mechanic: return "mechanic";
+    case ResourceKind::replay: return "replay";
+    case ResourceKind::audio: return "audio";
+    }
+    return "resource";
+}
+
 std::optional<fabric::project::MechanicValue> parse_mechanic_override_value(
     const fabric::project::MechanicParameterDefinition& parameter,
     const std::string_view text) {
@@ -421,6 +445,44 @@ bool draw_id_picker(const char* label,
             ImGui::TextDisabled("Missing identifier: %s", selected_id.c_str());
         ImGui::EndCombo();
     }
+    return changed;
+}
+
+bool draw_typed_resource_id_picker(
+    const char* label,
+    const std::span<const fabric::editor::StudioResource> resources,
+    int& resource_kind,
+    std::string& selected_id) {
+    using ResourceKind = fabric::editor::StudioResourceKind;
+    constexpr std::array<ResourceKind, 16> kinds{
+        ResourceKind::texture, ResourceKind::vector, ResourceKind::material,
+        ResourceKind::entity, ResourceKind::animation, ResourceKind::input,
+        ResourceKind::behavior, ResourceKind::transformation,
+        ResourceKind::textured_path, ResourceKind::visual_composition,
+        ResourceKind::visual_component, ResourceKind::map, ResourceKind::scene,
+        ResourceKind::mechanic, ResourceKind::replay, ResourceKind::audio};
+    bool changed = false;
+    const auto kind_label = resource_contract_for_kind(resource_kind);
+    if (ImGui::BeginCombo((std::string{label} + " type").c_str(),
+                          kind_label.data())) {
+        for (std::size_t index = 0; index < kinds.size(); ++index) {
+            const bool selected = static_cast<int>(index) == resource_kind;
+            if (ImGui::Selectable(resource_contract_for_kind(
+                                      static_cast<int>(index)).data(), selected)) {
+                resource_kind = static_cast<int>(index);
+                selected_id.clear();
+                changed = true;
+            }
+            if (selected) ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
+    std::vector<std::string> ids;
+    for (const auto& resource : resources)
+        if (resource.kind == kinds[static_cast<std::size_t>(resource_kind)])
+            ids.push_back(resource.id.value);
+    changed |= draw_id_picker(label, ids, selected_id,
+                              "Choose a resource identifier...");
     return changed;
 }
 
@@ -2220,6 +2282,7 @@ int run(const std::filesystem::path& project_root,
 #endif
 
     fabric::editor::MapSession session;
+    fabric::editor::ProjectSession resource_catalog;
     fabric::editor::MechanicSession mechanic_session;
     fabric::editor::SceneSession scene_session;
     fabric::editor::SessionTransitionGuard transition_guard;
@@ -2251,6 +2314,7 @@ int run(const std::filesystem::path& project_root,
     if (!project_root.empty()) {
         if (!session.open(project_root, map_id)) status = "Map could not be opened";
         else status = "Map opened";
+        static_cast<void>(resource_catalog.open(project_root));
     }
     bool e2e_failed = false;
     bool e2e_event_injected = false;
@@ -2397,6 +2461,7 @@ int run(const std::filesystem::path& project_root,
     std::string event_property_id;
     std::string event_property_value;
     int event_property_kind = 2;
+    int event_resource_kind = 3;
     std::string trigger_id;
     std::string trigger_event_id;
     int trigger_collision_index = 0;
@@ -2419,6 +2484,7 @@ int run(const std::filesystem::path& project_root,
     std::string trigger_property_id;
     std::string trigger_property_value;
     int trigger_property_kind = 2;
+    int trigger_resource_kind = 3;
     std::vector<std::string> selected_instances;
     std::string active_layer_id;
     std::string new_layer_id;
@@ -2435,11 +2501,13 @@ int run(const std::filesystem::path& project_root,
     std::string override_id;
     std::string override_value;
     int override_kind = 2;
+    int override_resource_kind = 3;
     std::string mechanic_override_parameter;
     std::string mechanic_override_value;
     std::string instance_property_id;
     std::string instance_property_value;
     int instance_property_kind = 2;
+    int instance_resource_kind = 3;
     std::string transformation_preview_id;
     std::string transformation_preview_result;
     ImVec2 canvas_pan{0.0F, 0.0F};
@@ -3098,7 +3166,12 @@ int run(const std::filesystem::path& project_root,
                     ImGui::Combo("Payload type", &event_property_kind,
                                  "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                     ImGui::SetNextItemWidth(180.0F);
-                    ImGui::InputText("Payload value", &event_property_value);
+                    if (event_property_kind == 5)
+                        static_cast<void>(draw_typed_resource_id_picker(
+                            "Payload resource", resource_catalog.resources(),
+                            event_resource_kind, event_property_value));
+                    else
+                        ImGui::InputText("Payload value", &event_property_value);
                     if (!event_property_value.empty())
                         draw_value_parse_error(
                             parse_override_value(event_property_kind,
@@ -3107,8 +3180,14 @@ int run(const std::filesystem::path& project_root,
                     ImGui::BeginDisabled(event_property_id.empty() ||
                                          event_property_value.empty());
                     if (ImGui::Button("Apply payload property")) {
-                        const auto value = parse_override_value(event_property_kind,
-                                                                 event_property_value);
+                        auto value = parse_override_value(event_property_kind,
+                                                          event_property_value);
+                        if (value && event_property_kind == 5) {
+                            if (auto* reference = std::get_if<
+                                    fabric::project::ResourceReference>(&*value))
+                                reference->expected_type = std::string{
+                                    resource_contract_for_kind(event_resource_kind)};
+                        }
                         if (value) {
                             const auto existing = std::find_if(
                                 event_payload_editor.begin(), event_payload_editor.end(),
@@ -3330,8 +3409,13 @@ int run(const std::filesystem::path& project_root,
                 ImGui::Combo("Trigger property type", &trigger_property_kind,
                              "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                 ImGui::SetNextItemWidth(180.0F);
-                ImGui::InputText("Trigger property value",
-                                 &trigger_property_value);
+                if (trigger_property_kind == 5)
+                    static_cast<void>(draw_typed_resource_id_picker(
+                        "Trigger resource", resource_catalog.resources(),
+                        trigger_resource_kind, trigger_property_value));
+                else
+                    ImGui::InputText("Trigger property value",
+                                     &trigger_property_value);
                 if (!trigger_property_value.empty())
                     draw_value_parse_error(
                         parse_override_value(trigger_property_kind,
@@ -3341,8 +3425,14 @@ int run(const std::filesystem::path& project_root,
                 ImGui::BeginDisabled(trigger_property_id.empty() ||
                                      trigger_property_value.empty());
                 if (ImGui::Button("Set trigger override")) {
-                    const auto value = parse_override_value(
+                    auto value = parse_override_value(
                         trigger_property_kind, trigger_property_value);
+                    if (value && trigger_property_kind == 5) {
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(&*value))
+                            reference->expected_type = std::string{
+                                resource_contract_for_kind(trigger_resource_kind)};
+                    }
                     if (value) {
                         const auto existing = std::ranges::find(
                             trigger_editor.properties, trigger_property_id,
@@ -3465,7 +3555,12 @@ int run(const std::filesystem::path& project_root,
                 ImGui::Combo("Instance type", &instance_property_kind,
                              "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                 ImGui::SetNextItemWidth(180.0F);
-                ImGui::InputText("Instance value", &instance_property_value);
+                if (instance_property_kind == 5)
+                    static_cast<void>(draw_typed_resource_id_picker(
+                        "Instance resource", resource_catalog.resources(),
+                        instance_resource_kind, instance_property_value));
+                else
+                    ImGui::InputText("Instance value", &instance_property_value);
                 if (!instance_property_value.empty())
                     draw_value_parse_error(
                         parse_override_value(instance_property_kind,
@@ -3473,8 +3568,14 @@ int run(const std::filesystem::path& project_root,
                         "Instance value", "Use true/false, a number, x,y, or a resource id.");
                 ImGui::BeginDisabled(instance_property_id.empty() || instance_property_value.empty());
                 if (ImGui::Button("Apply instance property")) {
-                    const auto value = parse_override_value(instance_property_kind,
-                                                             instance_property_value);
+                    auto value = parse_override_value(instance_property_kind,
+                                                      instance_property_value);
+                    if (value && instance_property_kind == 5) {
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(&*value))
+                            reference->expected_type = std::string{
+                                resource_contract_for_kind(instance_resource_kind)};
+                    }
                     auto property = value
                         ? std::optional<fabric::project::MapProperty>{
                               {instance_property_id, *value}}
@@ -3645,14 +3746,25 @@ int run(const std::filesystem::path& project_root,
                 ImGui::Combo("Type", &override_kind,
                              "bool\0integer\0real\0text\0Vec2 (x,y)\0resource\0");
                 ImGui::SetNextItemWidth(180.0F);
-                ImGui::InputText("Value", &override_value);
+                if (override_kind == 5)
+                    static_cast<void>(draw_typed_resource_id_picker(
+                        "Resource value", resource_catalog.resources(),
+                        override_resource_kind, override_value));
+                else
+                    ImGui::InputText("Value", &override_value);
                 if (!override_value.empty())
                     draw_value_parse_error(
                         parse_override_value(override_kind, override_value),
                         "Value", "Use true/false, a number, x,y, or a resource id.");
                 ImGui::BeginDisabled(override_id.empty() || override_value.empty());
                 if (ImGui::Button("Apply override")) {
-                    const auto value = parse_override_value(override_kind, override_value);
+                    auto value = parse_override_value(override_kind, override_value);
+                    if (value && override_kind == 5) {
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(&*value))
+                            reference->expected_type = std::string{
+                                resource_contract_for_kind(override_resource_kind)};
+                    }
                     auto property = value
                         ? std::optional<fabric::project::MapProperty>{
                               {override_id, *value}}

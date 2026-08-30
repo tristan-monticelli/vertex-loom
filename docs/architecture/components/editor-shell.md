@@ -460,6 +460,10 @@ C4Component
 - Les références d’événements de plateforme et de prefabs dans Map Studio
   utilisent maintenant un picker d’identifiants recherchable, avec état explicite
   lorsqu’une référence existante n’est plus disponible.
+- Les propriétés génériques `resource` des payloads d’événement, overrides de
+  trigger et propriétés d’instance choisissent désormais le type attendu dans
+  le catalogue projet, puis l’identifiant via un picker recherchable ; le type
+  persiste dans la `ResourceReference`.
 - Les pickers de documents par suffixe de Map Studio affichent le type, le
   chemin et une action `Open` qui délègue l’ouverture au système.
 - Asset Studio expose un parcours SDL caché de texture qui importe une source,
