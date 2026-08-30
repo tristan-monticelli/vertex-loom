@@ -320,7 +320,7 @@ animables, puis publient les quatre bundles dans un même projet et valident le
 graphe headless complet. Une destination existante est refusée avant écriture.
 Le Beam réutilise le preset couture : son paramètre d'offset est découvert par
 le registre de propriétés, sélectionné comme binding de timeline et interpolé
-par `AnimationClip v1` sans piste ni valeur spécialisée.
+par `AnimationClip v3` sans piste ni valeur spécialisée.
 Le resolver animé compose ensuite ces valeurs avec l'instance de composant et
 reconstruit ses packets. Les tests vérifient largeur, offset UV et couleur du
 Beam dans le resolver partagé, puis le remplacement d'une échelle de composant
@@ -344,13 +344,13 @@ La session éditeur couvre la conversion liée-vers-native, sa publication,
 undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 `fabric_asset_preview` est vérifié headless sur les mêmes draw packets que le
 renderer et refuse les documents liés ou invalides sans créer de fenêtre.
-Les contrats `MaterialDefinition v1` et `EntityDefinition v2` couvrent
+Les contrats `MaterialDefinition v1` et `EntityDefinition v4` couvrent
 round-trip, migration des entités v1, publication atomique, références typées,
 instances de composants visuels, transforms non finies, identifiants dupliqués
 et cycles de parentage. Le validateur headless résout aussi variantes, ancres et
 overrides des composants portés par les entités. Preview Runtime vérifie le
 parcours map → entité → composant jusqu'aux draw packets transformés.
-Le contrat `AnimationClip v1` couvre parseur strict, round-trip, publication
+Le contrat `AnimationClip v3` couvre parseur strict, round-trip, publication
 atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
 interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
 Le registre de descripteurs couvre résolution par binding, propriétés
