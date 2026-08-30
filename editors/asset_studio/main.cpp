@@ -3207,20 +3207,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             material = current;
             float uv_offset[]{material.uv_transform.position.x,
                               material.uv_transform.position.y};
-            if (ImGui::InputFloat2("UV offset", uv_offset)) {
+            if (ImGui::InputFloat2("UV offset (normalized)", uv_offset)) {
                 material.uv_transform.position = {uv_offset[0], uv_offset[1]};
                 commit_material(std::move(material));
             }
             material = current;
             float uv_scale[]{material.uv_transform.scale.x,
                              material.uv_transform.scale.y};
-            if (ImGui::InputFloat2("UV scale", uv_scale)) {
+            if (ImGui::InputFloat2("UV scale (factor)", uv_scale)) {
                 material.uv_transform.scale = {uv_scale[0], uv_scale[1]};
                 commit_material(std::move(material));
             }
             material = current;
             float uv_rotation = material.uv_transform.rotation_degrees;
-            if (ImGui::InputFloat("UV rotation", &uv_rotation, 1.0F, 10.0F,
+            if (ImGui::InputFloat("UV rotation (degrees)", &uv_rotation, 1.0F, 10.0F,
                                   "%.2f deg")) {
                 material.uv_transform.rotation_degrees = uv_rotation;
                 commit_material(std::move(material));
@@ -3228,7 +3228,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             material = current;
             float uv_pivot[]{material.uv_transform.pivot.x,
                              material.uv_transform.pivot.y};
-            if (ImGui::InputFloat2("UV pivot", uv_pivot)) {
+            if (ImGui::InputFloat2("UV pivot (normalized)", uv_pivot)) {
                 material.uv_transform.pivot = {uv_pivot[0], uv_pivot[1]};
                 commit_material(std::move(material));
             }
@@ -3806,12 +3806,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 float view_scale[2]{raster_view_edit.transform.scale.x,
                                     raster_view_edit.transform.scale.y};
                 float view_rotation = raster_view_edit.transform.rotation_degrees;
-                ImGui::InputFloat2("Crop origin (px)", crop_origin);
-                ImGui::InputFloat2("Crop size (px)", crop_size);
+                ImGui::InputFloat2("Crop origin (pixels)", crop_origin);
+                ImGui::InputFloat2("Crop size (pixels)", crop_size);
                 ImGui::InputFloat2("Pivot (normalized)", crop_pivot);
-                ImGui::InputFloat2("View position", view_position);
-                ImGui::InputFloat("View rotation", &view_rotation);
-                ImGui::InputFloat2("View scale", view_scale);
+                ImGui::InputFloat2("View position (world units)", view_position);
+                ImGui::InputFloat("View rotation (degrees)", &view_rotation);
+                ImGui::InputFloat2("View scale (factor)", view_scale);
                 if (ImGui::Button("Apply crop/view")) {
                     raster_view_edit.crop.origin = {crop_origin[0], crop_origin[1]};
                     raster_view_edit.crop.size = {crop_size[0], crop_size[1]};
