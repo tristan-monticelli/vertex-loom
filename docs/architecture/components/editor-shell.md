@@ -112,6 +112,9 @@ C4Component
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
   d’animation ; les contrôles d’édition plus fins restent à harmoniser.
+- Le picker typé affiche systématiquement le type, le chemin, les dimensions et
+  le format (ou `n/a` lorsqu’ils ne s’appliquent pas), les références entrantes
+  et l’action d’ouverture dans le Resource Explorer.
 - Le hub de création sépare maintenant `New material / fill` des imports et
   artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource

@@ -1662,12 +1662,17 @@ bool draw_project_resource_picker(
         }
         ImGui::TextDisabled("Type: %s",
                            studio_resource_kind_label(selected->kind).data());
-        ImGui::TextDisabled("%s",
+        ImGui::TextDisabled("Path: %s",
                             selected->document_path.generic_string().c_str());
-        if (selected->kind == fabric::editor::StudioResourceKind::texture &&
-            selected->width != 0U && selected->height != 0U)
-            ImGui::TextDisabled("%ux%u %s", selected->width, selected->height,
-                                selected->format.empty() ? "texture" : selected->format.c_str());
+        const std::string dimensions =
+            selected->width != 0U && selected->height != 0U
+                ? std::to_string(selected->width) + "x" +
+                    std::to_string(selected->height)
+                : "n/a";
+        ImGui::TextDisabled("Dimensions: %s", dimensions.c_str());
+        ImGui::TextDisabled("Format: %s",
+                            selected->format.empty() ? "n/a" :
+                                                        selected->format.c_str());
         if (active_picker_session != nullptr) {
             const auto references = active_picker_session->incoming_references(
                 selected->kind, selected->id);
