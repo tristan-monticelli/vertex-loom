@@ -187,6 +187,9 @@ C4Component
   tooltip d’aide sur leur unité ou leur effet de rendu. Les transforms de
   matériau, de composition, de raster et de chemin exposent également leur
   sémantique d’édition au survol.
+- Les ancres, paramètres de composants, sommets de déformation, particules
+  XPBD, réglages de caméra et dimensions de compositions exposent également
+  leur sémantique technique au survol.
 - L'inspecteur de matériau réutilise ce même contrat pour éditer nom, couleur,
   opacité, blend, texture, motif vectoriel et transform UV. Chaque mutation
   validée passe par le `CommandStack`; sauvegarde, autosave et récupération

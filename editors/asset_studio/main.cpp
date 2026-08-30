@@ -3978,6 +3978,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         (void)session.set_selected_visual_component(
                             std::move(candidate));
                     }
+                    ImGui::SetItemTooltip("Position of the visual component anchor in project world units.");
                 }
 
                 const auto& current_component =
@@ -4003,6 +4004,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (auto* value = std::get_if<float>(
                             &parameter.default_value)) {
                         changed |= ImGui::DragFloat("Default", value, 0.05F);
+                        ImGui::SetItemTooltip("Default value used when this component parameter is not overridden; its unit follows the parameter schema.");
                     } else if (auto* value = std::get_if<std::int64_t>(
                                    &parameter.default_value)) {
                         changed |= ImGui::InputScalar(
@@ -4965,6 +4967,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         ImGui::Text("Vertex %zu", index);
                         ImGui::InputFloat2("Rest position (world units)", &mesh.vertices[index]
                                                                   .rest_position.x);
+                        ImGui::SetItemTooltip("Rest pose position of this deformation vertex in project world units.");
                         if (ImGui::Button("Save vertex")) {
                             auto next = entity;
                             *next.deformation_mesh = std::move(mesh);
@@ -4990,7 +4993,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
                         ImGui::PushID(static_cast<int>(index));
                         ImGui::InputFloat2("Position (world units)", &xpbd.particles[index].position.x);
+                        ImGui::SetItemTooltip("Current XPBD particle position in project world units.");
                         ImGui::InputFloat("Inverse mass (1/kg)", &xpbd.particles[index].inverse_mass);
+                        ImGui::SetItemTooltip("Inverse particle mass; zero makes the particle static.");
                         if (ImGui::Button("Save particle")) {
                             auto next = entity;
                             *next.xpbd = std::move(xpbd);
@@ -6733,9 +6738,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::InputDouble("Pixels per unit",
                            &project_settings.pixels_per_unit, 1.0, 10.0,
                            "%.2f");
+        ImGui::SetItemTooltip("Pixels represented by one project world unit; this controls raster import and preview scaling.");
         ImGui::SeparatorText("Runtime preview");
         ImGui::Checkbox("Enable character", &project_settings.runtime_enabled);
         ImGui::InputFloat2("Character spawn (world units)", &project_settings.spawn_x);
+        ImGui::SetItemTooltip("Initial character position in project world units.");
         ImGui::InputText("Left action", &project_settings.runtime_actions[0]);
         ImGui::InputText("Right action", &project_settings.runtime_actions[1]);
         ImGui::InputText("Jump action", &project_settings.runtime_actions[2]);
@@ -6743,7 +6750,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::Checkbox("Camera limits", &project_settings.camera_limits_enabled);
         if (project_settings.camera_limits_enabled) {
             ImGui::InputFloat2("Camera origin (world units)", &project_settings.camera_x);
+            ImGui::SetItemTooltip("Camera limits origin in project world units.");
             ImGui::InputFloat2("Camera size (world units)", &project_settings.camera_width);
+            ImGui::SetItemTooltip("Camera limits size in project world units.");
         }
         draw_project_resource_picker(
             "Audio document", session.resources(),
@@ -7230,6 +7239,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create an empty layered visual composition");
         draw_resource_identity_fields(fields.name, fields.id);
         ImGui::InputFloat2("Size (world units)", fields.size);
+        ImGui::SetItemTooltip("Canvas size of the composition in project world units.");
         const bool valid = !fields.name.empty() &&
             fabric::core::ResourceId::is_valid(fields.id) &&
             std::isfinite(fields.size[0]) && std::isfinite(fields.size[1]) &&
@@ -7287,6 +7297,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::EndCombo();
         }
         ImGui::InputFloat2("Bounds size (world units)", fields.size);
+        ImGui::SetItemTooltip("Reusable component bounds in project world units.");
         const bool valid = !fields.name.empty() &&
             fabric::core::ResourceId::is_valid(fields.id) &&
             fabric::core::ResourceId::is_valid(fields.composition_id) &&
