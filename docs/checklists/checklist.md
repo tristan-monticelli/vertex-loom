@@ -76,8 +76,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   transition unique `Save/Discard/Cancel/Retry`, sans perte de contexte.
 - [ ] Montrer dans chaque picker le type, le chemin, la miniature, les
   dimensions, le format, les dépendances et une action d'ouverture.
-- [ ] Remplacer tous les IDs libres restants par des sélecteurs typés avec
-  recherche, état manquant et bouton de correction.
+- [x] Remplacer tous les IDs de références libres par des sélecteurs typés avec
+  recherche, état manquant et bouton de correction. Les saisies d’IDs qui
+  déclarent une nouvelle entité (couche, événement, propriété, nœud ou état)
+  restent volontairement libres ; les valeurs qui référencent une ressource
+  existante passent par les pickers Asset/Map, y compris les propriétés
+  génériques `resource`.
 - [x] Afficher les erreurs au champ avec cause, contrainte attendue et action
   de correction ; les boutons désactivés restent suivis par la gate UX dédiée.
 - [ ] Unifier les composants de formulaire entre création et édition et
