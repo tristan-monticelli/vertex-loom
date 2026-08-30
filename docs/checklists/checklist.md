@@ -707,7 +707,8 @@ utilisées pour tous les types de ressources.
 - [x] Choisir et documenter un outil d'automatisation pour SDL2/Dear ImGui
   (CTest avec fenêtres SDL cachées).
 - [x] Mettre à jour `docs/02-quality-strategy.md` avec la commande réelle.
-- [ ] Ajouter un mode de test avec IDs de widgets stables.
+- [x] Ajouter un mode de test avec IDs de widgets stables. `asset_studio
+  --ui-test <projet>` produit `asset-studio-ui-widgets.json` après une frame.
 - [x] Ajouter une fixture de projet contenant plusieurs ressources de chaque
   type : `tests/fixtures/studio-textile-head` couvre désormais les ressources
   indexées, y compris input, behavior, matériau, audio et scène.

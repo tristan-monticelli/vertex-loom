@@ -1015,7 +1015,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             const auto* selected = session.selected_resource();
             const bool is_selected = selected != nullptr &&
                 selected->kind == resource.kind && selected->id == resource.id;
-            const std::string item_label = resource.name + "##" +
+            const std::string item_label = resource.name + "##resource-row-" +
                 resource.id.value;
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
@@ -1358,6 +1358,32 @@ void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
                                                        row_size),
                     static_cast<std::streamsize>(row_size));
     }
+}
+
+void write_ui_test_registry(const std::filesystem::path& project_path,
+                            const fabric::editor::ProjectSession& session) {
+    if (project_path.empty()) return;
+    nlohmann::json registry = {
+        {"schema", "asset-studio-ui-test-v1"},
+        {"widgets", nlohmann::json::array()}};
+    auto& widgets = registry["widgets"];
+    for (const auto& resource : session.resources()) {
+        widgets.push_back({
+            {"id", "resource-row-" + resource.id.value},
+            {"kind", "resource"},
+            {"resource_kind", studio_resource_kind_label(resource.kind)},
+            {"resource_id", resource.id.value}});
+    }
+    if (session.selected_entity()) {
+        for (const auto& node : session.selected_entity()->nodes) {
+            widgets.push_back({
+                {"id", "entity-node-" + node.id},
+                {"kind", "entity_node"},
+                {"node_id", node.id}});
+        }
+    }
+    std::ofstream output(project_path / "asset-studio-ui-widgets.json");
+    if (output) output << registry.dump(2) << '\n';
 }
 
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
@@ -7262,7 +7288,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool animation_e2e = false,
                      const bool texture_e2e = false,
                      const bool vector_e2e = false,
-                     const bool vector_canvas_e2e = false) {
+                     const bool vector_canvas_e2e = false,
+                     const bool ui_test_mode = false) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::cerr << "SDL initialization failed: " << SDL_GetError() << '\n';
@@ -7290,7 +7317,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_WINDOWPOS_CENTERED, 1440, 900,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-              texture_e2e || vector_e2e || vector_canvas_e2e)
+              texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7320,7 +7347,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_GL_MakeCurrent(window, gl_context);
     SDL_GL_SetSwapInterval(
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-         texture_e2e || vector_e2e || vector_canvas_e2e) ? 0 : 1);
+         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -7375,6 +7402,19 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         } else {
             status = "Project rejected; inspect the diagnostics.";
         }
+    }
+    if (ui_test_mode && session.has_project()) {
+        if (!session.selected_entity()) {
+            const auto entity = std::ranges::find_if(
+                session.resources(), [](const auto& resource) {
+                    return resource.kind ==
+                        fabric::editor::StudioResourceKind::entity;
+                });
+            if (entity != session.resources().end())
+                static_cast<void>(session.select_resource(entity->kind,
+                                                          entity->id));
+        }
+        write_ui_test_registry(initial_project, session);
     }
     bool texture_e2e_complete = false;
     if (texture_e2e && session.has_project()) {
@@ -7700,6 +7740,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
 
     bool running = true;
+    std::size_t ui_test_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -8109,6 +8150,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
+        if (ui_test_mode && ++ui_test_frame >= 1U)
+            running = false;
         if (vector_canvas_e2e) {
             ++vector_canvas_e2e_frame;
             if (vector_canvas_e2e_frame == 4U && session.created_vector()) {
@@ -8226,9 +8269,11 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--e2e-vector";
     const bool vector_canvas_e2e = argument_count == 3 &&
         std::string_view{arguments[1]} == "--e2e-vector-canvas";
+    const bool ui_test_mode = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
-        !vector_canvas_e2e) {
+        !vector_canvas_e2e && !ui_test_mode) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -8236,16 +8281,17 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --e2e-animation project-directory\n"
                      "       asset_studio --e2e-texture project-directory\n"
                      "       asset_studio --e2e-vector project-directory\n"
-                     "       asset_studio --e2e-vector-canvas project-directory\n";
+                     "       asset_studio --e2e-vector-canvas project-directory\n"
+                     "       asset_studio --ui-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
-        texture_e2e || vector_e2e || vector_canvas_e2e)
+        texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
-                            vector_canvas_e2e);
+                            vector_canvas_e2e, ui_test_mode);
 }

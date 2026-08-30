@@ -173,6 +173,9 @@ C4Component
 - Les modes E2E SDL écrivent, en cas d’échec, un rapport de diagnostics et une
   capture PPM du framebuffer dans le projet de test pour rendre l’échec
   reproductible et inspectable.
+- Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
+  `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
+  lignes de ressources et des nœuds d’entité.
 - La duplication de ressources accepte des dépendances explicitement choisies :
   elles sont clonées avec un nouvel identifiant avant la ressource principale,
   puis seules les références de type et d’identifiant correspondants sont

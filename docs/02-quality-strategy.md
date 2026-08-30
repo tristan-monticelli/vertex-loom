@@ -45,6 +45,9 @@ attendu. Il retourne `77` lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
+Le mode `build/asset_studio --ui-test <projet>` rend une frame et écrit le
+registre JSON des IDs stables des widgets dans le projet fourni ; il est destiné
+aux contrôleurs UX et ne modifie pas le document projet.
 Le test CTest `asset_studio_vector_e2e` sélectionne un artwork natif, convertit
 sa primitive en path Bézier, insère et retire un point, convertit un segment,
 modifie une poignée liée, vérifie undo/redo, sauvegarde et reload, puis valide
