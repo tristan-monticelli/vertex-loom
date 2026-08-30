@@ -1788,6 +1788,46 @@ bool draw_project_resource_picker(
     return changed;
 }
 
+bool draw_entity_node_picker(
+    const char* label,
+    const std::span<const fabric::project::EntityNode> nodes,
+    std::string& selected_id) {
+    const auto selected = std::ranges::find_if(
+        nodes, [&](const auto& node) { return node.id == selected_id; });
+    const std::string preview = selected != nodes.end()
+        ? selected->name
+        : selected_id.empty() ? std::string{"Choose an entity node..."}
+                              : std::string{"Missing: "} + selected_id;
+    bool changed = false;
+    ImGui::SetNextItemWidth(420.0F);
+    if (ImGui::BeginCombo(label, preview.c_str())) {
+        static std::unordered_map<ImGuiID, std::string> filters;
+        auto& filter = filters[ImGui::GetID(label)];
+        ImGui::SetNextItemWidth(-1.0F);
+        ImGui::InputTextWithHint("##entity-node-search", "Search by name or id...",
+                                 &filter);
+        for (const auto& node : nodes) {
+            if (!text_contains_ascii_insensitive(node.name, filter) &&
+                !text_contains_ascii_insensitive(node.id, filter))
+                continue;
+            const bool is_selected = node.id == selected_id;
+            const std::string item_label = node.name + "##entity-node-option-" +
+                node.id;
+            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+                selected_id = node.id;
+                changed = true;
+            }
+            if (is_selected) ImGui::SetItemDefaultFocus();
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", node.id.c_str());
+        }
+        if (selected == nodes.end() && !selected_id.empty())
+            ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
+        ImGui::EndCombo();
+    }
+    return changed;
+}
+
 bool draw_transfer_mode(const char* label, fabric::project::TransferMode& value,
                         const bool structural = false,
                         const bool incompatible = false) {
@@ -4586,8 +4626,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     auto constraint = entity.constraints[index];
                     ImGui::PushID(static_cast<int>(index));
                     ImGui::InputText("Id", &constraint.id);
-                    ImGui::InputText("Target node", &constraint.target_node);
-                    ImGui::InputText("Source node", &constraint.source_node);
+                    static_cast<void>(draw_entity_node_picker(
+                        "Target node", entity.nodes, constraint.target_node));
+                    static_cast<void>(draw_entity_node_picker(
+                        "Source node", entity.nodes, constraint.source_node));
                     ImGui::InputInt("Order", &constraint.order);
                     ImGui::Checkbox("Position", &constraint.constrain_position);
                     ImGui::Checkbox("Rotation", &constraint.constrain_rotation);
@@ -4617,7 +4659,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     auto chain = entity.ik_chains[index];
                     ImGui::PushID(static_cast<int>(index));
                     ImGui::InputText("Id", &chain.id);
-                    ImGui::InputText("Target node", &chain.target_node);
+                    static_cast<void>(draw_entity_node_picker(
+                        "Target node", entity.nodes, chain.target_node));
                     auto iterations = static_cast<int>(chain.max_iterations);
                     if (ImGui::InputInt("Max iterations", &iterations))
                         chain.max_iterations = static_cast<std::size_t>(

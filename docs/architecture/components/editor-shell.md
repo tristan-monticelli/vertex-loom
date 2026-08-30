@@ -208,6 +208,8 @@ C4Component
   transformation, chaînes IK, maillage de déformation, système XPBD et machine
   d’états de l’entité. Chaque sauvegarde remplace l’`EntityDefinition` dans
   `ProjectSession`, passe la validation du contrat et reste undoable.
+- Les références source/cible des contraintes et des chaînes IK utilisent un
+  sélecteur de nœud typé avec recherche et état manquant, plutôt qu’un ID libre.
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.
