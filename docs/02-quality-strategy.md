@@ -53,9 +53,10 @@ SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
 échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
 graphique et ne ferme aucune case de couverture visuelle.
-Le mode `build/asset_studio --ui-test <projet>` rend une frame et écrit le
-registre JSON des IDs stables des widgets dans le projet fourni ; il est destiné
-aux contrôleurs UX et ne modifie pas le document projet.
+Le mode `build/asset_studio --ui-test <projet>` rend une frame, écrit le
+registre JSON des IDs stables et capture `asset_studio-ui-test.ppm` dans le
+projet de test ; il est destiné aux contrôleurs UX et ne modifie pas le
+document projet.
 Le test CTest `asset_studio_ui_registry_e2e` exécute ce mode deux fois sur la
 fixture multi-ressources et exige la présence ainsi que la stabilité des IDs de
 ressources et de nœud d’entité ; il est ignoré avec le code `77` si aucun écran

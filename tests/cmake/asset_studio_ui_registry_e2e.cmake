@@ -24,6 +24,9 @@ set(REGISTRY "${TEST_ROOT}/project/asset-studio-ui-widgets.json")
 if(NOT EXISTS "${REGISTRY}")
     message(FATAL_ERROR "Asset Studio UI test did not produce its registry")
 endif()
+if(NOT EXISTS "${TEST_ROOT}/project/asset_studio-ui-test.ppm")
+    message(FATAL_ERROR "Asset Studio UI test did not produce its screenshot")
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"

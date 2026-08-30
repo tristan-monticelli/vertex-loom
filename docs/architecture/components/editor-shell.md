@@ -260,7 +260,8 @@ C4Component
   reproductible et inspectable.
 - Le mode `asset_studio --ui-test <projet>` rend une frame puis produit
   `asset-studio-ui-widgets.json`, un registre versionné des clés stables des
-  lignes de ressources et des nœuds d’entité.
+  lignes de ressources et des nœuds d’entité, ainsi qu’une capture PPM du frame
+  UI rendu pour inspection visuelle du scénario.
 - La duplication de ressources accepte des dépendances explicitement choisies :
   elles sont clonées avec un nouvel identifiant avant la ressource principale,
   puis seules les références de type et d’identifiant correspondants sont

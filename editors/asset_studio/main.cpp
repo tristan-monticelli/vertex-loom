@@ -1419,21 +1419,9 @@ void draw_diagnostics(const fabric::editor::ProjectSession& session) {
     }
 }
 
-void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
-                                 SDL_Window* window,
-                                 const std::string& status,
-                                 const fabric::editor::ProjectSession& session) {
-    if (project_path.empty() || window == nullptr) return;
-
-    std::ofstream report(project_path / "asset_studio-e2e-failure.txt");
-    if (report) {
-        report << "status: " << status << '\n';
-        for (const auto& error : session.errors()) {
-            report << fabric::project::to_string(error.code) << " | "
-                   << error.field << " | " << error.message << '\n';
-        }
-    }
-
+void write_frame_capture(const std::filesystem::path& project_path,
+                         SDL_Window* window, const char* filename) {
+    if (project_path.empty() || window == nullptr || filename == nullptr) return;
     int width = 0;
     int height = 0;
     SDL_GL_GetDrawableSize(window, &width, &height);
@@ -1442,8 +1430,7 @@ void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-    std::ofstream image(project_path / "asset_studio-e2e-failure.ppm",
-                        std::ios::binary);
+    std::ofstream image(project_path / filename, std::ios::binary);
     if (!image) return;
     image << "P6\n" << width << ' ' << height << "\n255\n";
     const auto row_size = static_cast<std::size_t>(width) * 3U;
@@ -1453,6 +1440,22 @@ void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
                                                        row_size),
                     static_cast<std::streamsize>(row_size));
     }
+}
+
+void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
+                                 SDL_Window* window,
+                                 const std::string& status,
+                                 const fabric::editor::ProjectSession& session) {
+    if (project_path.empty() || window == nullptr) return;
+    std::ofstream report(project_path / "asset_studio-e2e-failure.txt");
+    if (report) {
+        report << "status: " << status << '\n';
+        for (const auto& error : session.errors()) {
+            report << fabric::project::to_string(error.code) << " | "
+                   << error.field << " | " << error.message << '\n';
+        }
+    }
+    write_frame_capture(project_path, window, "asset_studio-e2e-failure.ppm");
 }
 
 void write_ui_test_registry(const std::filesystem::path& project_path,
@@ -8795,6 +8798,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (ui_test_mode)
+            write_frame_capture(initial_project, window,
+                                "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
         if (ui_test_mode && ++ui_test_frame >= 1U)
             running = false;
