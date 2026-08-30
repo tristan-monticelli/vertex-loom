@@ -55,6 +55,21 @@ if(DEFINED ACCESSIBILITY_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED DRAG_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${DRAG_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${DRAG_ARTIFACT}")
+    endif()
+    file(READ "${TEST_ROOT}/project/${DRAG_ARTIFACT}" DRAG_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"source_widget_seen\": true"
+            "\"target_widget_seen\": true"
+            "\"drop_applied_to_existing_node\": true")
+        string(FIND "${DRAG_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio drag probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"

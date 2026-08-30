@@ -57,6 +57,12 @@ fabric::editor::ProjectSession* active_picker_session = nullptr;
 std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
 bool ui_focus_probe_enabled = false;
 bool ui_focus_probe_succeeded = false;
+bool ui_drag_probe_enabled = false;
+bool ui_drag_probe_applied = false;
+ImVec2 ui_drag_source_screen{};
+ImVec2 ui_drag_target_screen{};
+bool ui_drag_source_seen = false;
+bool ui_drag_target_seen = false;
 
 struct ResourceDragPayload {
     int kind{};
@@ -1066,6 +1072,13 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
             }
+            if (ui_drag_probe_enabled && resource.id.value == "head-button-artwork") {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_drag_source_screen = {(minimum.x + maximum.x) * 0.5F,
+                                         (minimum.y + maximum.y) * 0.5F};
+                ui_drag_source_seen = true;
+            }
             if (is_entity_artwork_kind(resource.kind) &&
                 ImGui::BeginDragDropSource()) {
                 ResourceDragPayload payload;
@@ -1526,6 +1539,19 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
         {"text_window_contrast", contrast},
         {"text_window_contrast_ok", contrast >= 4.5F}};
     std::ofstream output(project_path / "asset-studio-ui-accessibility.json");
+    if (output) output << probe.dump(2) << '\n';
+}
+
+void write_ui_drag_probe(const std::filesystem::path& project_path,
+                         const bool source_seen, const bool target_seen,
+                         const bool applied) {
+    if (project_path.empty()) return;
+    nlohmann::json probe = {
+        {"schema", "asset-studio-ui-drag-test-v1"},
+        {"source_widget_seen", source_seen},
+        {"target_widget_seen", target_seen},
+        {"drop_applied_to_existing_node", applied}};
+    std::ofstream output(project_path / "asset-studio-ui-drag.json");
     if (output) output << probe.dump(2) << '\n';
 }
 
@@ -5375,6 +5401,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                       canvas.selected_node == node_index)) {
                     canvas.selected_node = node_index;
                 }
+                if (ui_drag_probe_enabled && entity.nodes[node_index].id == "root") {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    ui_drag_target_screen = {(minimum.x + maximum.x) * 0.5F,
+                                             (minimum.y + maximum.y) * 0.5F};
+                    ui_drag_target_seen = true;
+                }
                 if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(
                             "VERTEX_LOOM_RESOURCE");
@@ -5383,6 +5416,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 node_index,
                                 *static_cast<const ResourceDragPayload*>(payload->Data))) {
                             canvas.selected_node = node_index;
+                            if (ui_drag_probe_enabled &&
+                                entity.nodes[node_index].id == "root")
+                                ui_drag_probe_applied = true;
                             status = "Artwork dropped on existing node.";
                         } else if (session.selected_entity()->nodes[node_index]
                                        .drawable.component_instance &&
@@ -7906,11 +7942,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_test_mode = false,
                      const bool ui_min_window_test = false,
                      const bool ui_focus_test = false,
-                     const bool ui_accessibility_test = false) {
+                     const bool ui_accessibility_test = false,
+                     const bool ui_drag_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
-        ui_accessibility_test;
+        ui_accessibility_test || ui_drag_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -7942,7 +7979,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-              ui_min_window_test || ui_focus_test || ui_accessibility_test)
+              ui_min_window_test || ui_focus_test || ui_accessibility_test ||
+              ui_drag_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7973,7 +8011,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     SDL_GL_SetSwapInterval(
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-         ui_min_window_test || ui_focus_test || ui_accessibility_test) ? 0 : 1);
+         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
+         ui_drag_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -8050,6 +8089,22 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
     if (ui_accessibility_test)
         ui_focus_probe_enabled = false;
+    if (ui_drag_test && session.has_project()) {
+        ui_drag_probe_enabled = true;
+        ui_drag_probe_applied = false;
+        ui_drag_source_seen = false;
+        ui_drag_target_seen = false;
+        if (!session.selected_entity()) {
+            const auto entity = std::ranges::find_if(
+                session.resources(), [](const auto& resource) {
+                    return resource.kind ==
+                        fabric::editor::StudioResourceKind::entity;
+                });
+            if (entity != session.resources().end())
+                static_cast<void>(session.select_resource(entity->kind,
+                                                          entity->id));
+        }
+    }
     bool texture_e2e_complete = false;
     if (texture_e2e && session.has_project()) {
         const auto source = initial_project / "assets/textures/head-face.png";
@@ -8379,6 +8434,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     bool running = true;
     std::size_t ui_test_frame = 0U;
+    std::size_t ui_drag_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -8389,6 +8445,38 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
+        if (ui_drag_test && ui_drag_source_seen && ui_drag_target_seen) {
+            const auto push_motion = [&](const ImVec2 point, const Uint32 state) {
+                SDL_Event motion{};
+                motion.type = SDL_MOUSEMOTION;
+                motion.motion.windowID = SDL_GetWindowID(window);
+                motion.motion.state = state;
+                motion.motion.x = static_cast<int>(std::lround(point.x));
+                motion.motion.y = static_cast<int>(std::lround(point.y));
+                static_cast<void>(SDL_PushEvent(&motion));
+            };
+            if (ui_drag_frame == 1U) {
+                push_motion(ui_drag_source_screen, 0U);
+                SDL_Event button{};
+                button.type = SDL_MOUSEBUTTONDOWN;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = static_cast<int>(std::lround(ui_drag_source_screen.x));
+                button.button.y = static_cast<int>(std::lround(ui_drag_source_screen.y));
+                static_cast<void>(SDL_PushEvent(&button));
+            } else if (ui_drag_frame == 2U) {
+                push_motion(ui_drag_target_screen, SDL_BUTTON_LMASK);
+            } else if (ui_drag_frame == 3U) {
+                push_motion(ui_drag_target_screen, 0U);
+                SDL_Event button{};
+                button.type = SDL_MOUSEBUTTONUP;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = static_cast<int>(std::lround(ui_drag_target_screen.x));
+                button.button.y = static_cast<int>(std::lround(ui_drag_target_screen.y));
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 6U)
             canvas.tool = CanvasUiState::Tool::move;
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 9U) {
@@ -8866,7 +8954,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
-            ui_accessibility_test)
+            ui_accessibility_test || ui_drag_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -8881,6 +8969,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 initial_project,
                 (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
             running = false;
+        }
+        if (ui_drag_test) {
+            ++ui_drag_frame;
+            if (ui_drag_frame >= 5U) {
+                write_ui_drag_probe(initial_project, ui_drag_source_seen,
+                                    ui_drag_target_seen, ui_drag_probe_applied);
+                running = false;
+            }
         }
         if (vector_canvas_e2e) {
             ++vector_canvas_e2e_frame;
@@ -9007,10 +9103,12 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-focus-test";
     const bool ui_accessibility_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-accessibility-test";
+    const bool ui_drag_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-drag-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
-        !ui_focus_test && !ui_accessibility_test) {
+        !ui_focus_test && !ui_accessibility_test && !ui_drag_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -9022,18 +9120,20 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-test project-directory\n"
                      "       asset_studio --ui-test-min-window project-directory\n"
                      "       asset_studio --ui-focus-test project-directory\n"
-                     "       asset_studio --ui-accessibility-test project-directory\n";
+                     "       asset_studio --ui-accessibility-test project-directory\n"
+                     "       asset_studio --ui-drag-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
-        ui_min_window_test || ui_focus_test || ui_accessibility_test)
+        ui_min_window_test || ui_focus_test || ui_accessibility_test ||
+        ui_drag_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
     return run_asset_studio(initial_project, behavior_e2e, transformation_e2e,
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
-                            ui_focus_test, ui_accessibility_test);
+                            ui_focus_test, ui_accessibility_test, ui_drag_test);
 }

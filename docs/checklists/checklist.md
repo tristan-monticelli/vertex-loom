@@ -96,8 +96,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Permettre duplication superficielle/profonde et réécriture sélective des
   références internes. Les options et les tests de réécriture sélective sont
   documentés dans la section 4.
-- [ ] Fermer la preuve UX du drag-and-drop des artworks vers un nœud existant,
-  un nœud racine ou un enfant ; les gizmos et les mutations sont déjà vérifiés.
+- [x] Fermer la preuve UX du drag-and-drop des artworks vers un nœud existant ;
+  `asset_studio_ui_drag_e2e` vérifie le payload, la cible `root` et la mutation
+  du document.
+- [ ] Compléter la preuve UX du drag-and-drop vers un nouveau nœud racine ou
+  enfant ; les mutations headless sont déjà vérifiées.
 - [x] Exposer les contraintes, IK, déformation, XPBD et state machines dans
   des sections réellement éditables.
 - [x] Faire correspondre chaque paramètre de timeline au descripteur runtime,

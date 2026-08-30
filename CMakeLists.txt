@@ -550,6 +550,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(
+            NAME asset_studio_ui_drag_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-drag-e2e
+                -DUI_ARGUMENT=--ui-drag-test
+                -DDRAG_ARTIFACT=asset-studio-ui-drag.json
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
             NAME asset_studio_behavior_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
