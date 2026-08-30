@@ -112,6 +112,9 @@ C4Component
   entrantes, refuse une rupture, exige confirmation puis déplace uniquement le
   document dans `.vertex-loom-trash`; Undo le restaure sans supprimer les
   sources PNG ou SVG partagées.
+- Les rails Project et Inspector d’Asset Studio sont séparés du preview par
+  deux splitters `left-panel-splitter` et `right-panel-splitter`, bornés pour
+  préserver une zone centrale minimale et redimensionnables au glisser.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés

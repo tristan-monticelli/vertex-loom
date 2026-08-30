@@ -3113,8 +3113,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
-    const float left_width = std::clamp(viewport->Size.x * 0.22F, 240.0F, 330.0F);
-    const float right_width = std::clamp(viewport->Size.x * 0.24F, 270.0F, 360.0F);
+    static float left_width = 280.0F;
+    static float right_width = 320.0F;
+    const float initial_left_width = std::clamp(viewport->Size.x * 0.22F, 240.0F, 330.0F);
+    const float initial_right_width = std::clamp(viewport->Size.x * 0.24F, 270.0F, 360.0F);
+    static bool panel_widths_initialized = false;
+    if (!panel_widths_initialized) {
+        left_width = initial_left_width;
+        right_width = initial_right_width;
+        panel_widths_initialized = true;
+    }
+    left_width = std::clamp(left_width, 240.0F,
+                            std::max(240.0F, viewport->Size.x - right_width - 320.0F));
+    right_width = std::clamp(right_width, 270.0F,
+                             std::max(270.0F, viewport->Size.x - left_width - 320.0F));
     const float content_height = viewport->Size.y - menu_height - status_height;
 
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
@@ -3324,6 +3336,27 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                            IM_COL32(158, 170, 180, 255), preview_message);
         ImGui::Dummy(available);
     }
+    const auto draw_panel_splitter = [&](const char* id, const float x,
+                                         float& panel_width, const float sign,
+                                         const float minimum, const float maximum) {
+        ImGui::SetCursorScreenPos({x - 3.0F, viewport->Pos.y + menu_height});
+        ImGui::PushID(id);
+        ImGui::InvisibleButton("##splitter", {6.0F, content_height});
+        if (ImGui::IsItemActive()) {
+            panel_width = std::clamp(panel_width + sign * ImGui::GetIO().MouseDelta.x,
+                                     minimum, maximum);
+        }
+        if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+        ImGui::PopID();
+    };
+    draw_panel_splitter("left-panel-splitter", viewport->Pos.x + left_width,
+                        left_width, 1.0F, 240.0F,
+                        std::max(240.0F, viewport->Size.x - right_width - 320.0F));
+    draw_panel_splitter("right-panel-splitter",
+                        viewport->Pos.x + viewport->Size.x - right_width,
+                        right_width, -1.0F, 270.0F,
+                        std::max(270.0F, viewport->Size.x - left_width - 320.0F));
     ImGui::End();
 
     ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
