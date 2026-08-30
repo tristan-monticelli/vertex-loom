@@ -3424,6 +3424,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.opacity = opacity;
                 commit_material(std::move(material));
             }
+            draw_technical_tooltip("Opacity multiplier applied to the material color and texture.");
             material = current;
             const auto blend_label = std::string(
                 fabric::project::to_string(material.blend));
@@ -4880,6 +4881,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     static_cast<void>(draw_entity_node_picker(
                         "Source node", entity.nodes, constraint.source_node));
                     ImGui::InputInt("Order (index)", &constraint.order);
+                    draw_technical_tooltip("Evaluation order for this constraint in the entity.");
                     ImGui::Checkbox("Position", &constraint.constrain_position);
                     ImGui::Checkbox("Rotation", &constraint.constrain_rotation);
                     ImGui::Checkbox("Scale", &constraint.constrain_scale);
@@ -5757,6 +5759,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::SameLine();
                     ImGui::SetNextItemWidth(130.0F);
                     if (ImGui::InputInt("Code (platform)", &code)) changed = true;
+                    draw_technical_tooltip("Keyboard or gamepad code used by this binding.");
                     edited_binding.device = static_cast<fabric::project::InputDevice>(device);
                     edited_binding.code = code;
                     int binding_kind = static_cast<int>(binding.kind);
@@ -5765,7 +5768,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     edited_binding.kind = static_cast<fabric::project::InputBindingKind>(binding_kind);
                     if (edited_binding.kind == fabric::project::InputBindingKind::axis) {
                         if (ImGui::InputFloat("Threshold (normalized)", &edited_binding.threshold, 0.05F, 0.1F, "%.2f")) changed = true;
+                        draw_technical_tooltip("Activation threshold for the analog binding.");
                         if (ImGui::InputFloat("Dead zone (normalized)", &edited_binding.dead_zone, 0.05F, 0.1F, "%.2f")) changed = true;
+                        draw_technical_tooltip("Input range ignored around the analog neutral point.");
                     }
                     if (ImGui::Checkbox("Ctrl", &edited_binding.ctrl)) changed = true;
                     ImGui::SameLine();

@@ -169,6 +169,8 @@ C4Component
   les plateformes de preview et les paramètres de collision.
 - Les chemins texturés et les marqueurs/segments d’animation disposent aussi
   d’une aide contextuelle sur leurs paramètres techniques.
+- Les réglages de matériau, contraintes et bindings d’input exposent également
+  une explication de leurs paramètres numériques.
 - Le drag-and-drop d’artwork du Resource Explorer ne propose comme sources que
   les textures, vectoriels et composants visuels ; les cibles racine, enfant et
   nœud existant indiquent leur rôle dans la hiérarchie.
