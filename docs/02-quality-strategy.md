@@ -64,7 +64,8 @@ et leur probe JSON afin que la preuve visuelle soit récupérable depuis chaque
 run multiplateforme.
 Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
 capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui, vérifie
-un probe pixel de sa zone native, puis rejoue le clic sur un coin existant, sa
+un probe pixel de sa zone native avec un nombre minimal de pixels et une plage
+de canaux suffisante pour exclure un aplat, puis rejoue le clic sur un coin existant, sa
 sélection, `Delete`, la sauvegarde et le reload. Il échoue si une capture est
 absente ou plate, si la sélection n'est pas faite ou si le path supprimé
 réapparaît après reload.

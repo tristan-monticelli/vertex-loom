@@ -39,6 +39,15 @@ string(REGEX MATCH "\"non_background_pixels\"[ \\t\r\n]*:[ \\t\r\n]*([0-9]+)" _ 
 if(NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 LESS 50)
     message(FATAL_ERROR "Vector Canvas E2E canvas appears empty or flat: ${VISUAL_PROBE_CONTENT}")
 endif()
+string(JSON MINIMUM_CHANNEL GET "${VISUAL_PROBE_CONTENT}" minimum_channel)
+string(JSON MAXIMUM_CHANNEL GET "${VISUAL_PROBE_CONTENT}" maximum_channel)
+if(MINIMUM_CHANNEL STREQUAL "" OR MAXIMUM_CHANNEL STREQUAL "")
+    message(FATAL_ERROR "Vector Canvas E2E probe lacks channel range: ${VISUAL_PROBE_CONTENT}")
+endif()
+math(EXPR MIN_CHANNEL_LIMIT "${MINIMUM_CHANNEL} + 40")
+if(MAXIMUM_CHANNEL LESS MIN_CHANNEL_LIMIT)
+    message(FATAL_ERROR "Vector Canvas E2E lacks visible color variation: ${VISUAL_PROBE_CONTENT}")
+endif()
 
 execute_process(
     COMMAND "${PROJECT_VALIDATE}" "${TEST_ROOT}/project"
