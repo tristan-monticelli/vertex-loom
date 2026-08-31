@@ -3022,7 +3022,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
                                {pivot_handle.x, pivot_handle.y + 7.0F},
                                IM_COL32(180, 110, 235, 255), 2.0F);
-        } else if (canvas.tool == CanvasUiState::Tool::move &&
+        } else if ((canvas.tool == CanvasUiState::Tool::move ||
+                    canvas.tool == CanvasUiState::Tool::pen) &&
                    selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
             for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
                 const auto& command = selected_node->shape.path[index];
