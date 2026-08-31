@@ -8192,13 +8192,20 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             vector_canvas_e2e_freeform_seed_applied &&
             session.created_vector()) {
             auto freeform_node = session.created_vector()->native->nodes.front();
-            const bool inserted = fabric::project::insert_path_command(
-                freeform_node.shape, freeform_node.shape.path.size(),
-                {.kind = fabric::project::VectorPathCommandKind::line,
-                 .point = {0.2F, 0.2F}});
+            const bool inserted = freeform_node.shape.kind ==
+                    fabric::project::VectorShapeKind::path &&
+                freeform_node.shape.path.size() >= 2U;
+            if (inserted)
+                freeform_node.shape.path.push_back({
+                    .kind = fabric::project::VectorPathCommandKind::line,
+                    .point = {0.2F, 0.2F}});
             const bool applied = inserted && session.set_selected_vector_node(
                 0U, std::move(freeform_node));
             vector_canvas_e2e_complete = vector_canvas_e2e_complete && applied;
+            if (!applied)
+                status = "Freeform path append failed: inserted=" +
+                    std::string{inserted ? "yes" : "no"} +
+                    ", errors=" + std::to_string(session.errors().size());
             if (applied) {
                 canvas.selected_path_points = {2U};
                 canvas.path_command_index = 2U;
@@ -9050,6 +9057,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     node.stroke->image->deform_with_shape;
             } else if (vector_canvas_e2e_frame == 23U &&
                        session.created_vector()) {
+                auto freeform_node = session.created_vector()->native
+                    ->nodes.front();
+                if (freeform_node.shape.path.size() == 2U) {
+                    freeform_node.shape.path.push_back({
+                        .kind = fabric::project::VectorPathCommandKind::line,
+                        .point = {0.2F, 0.2F}});
+                    vector_canvas_e2e_complete =
+                        vector_canvas_e2e_complete &&
+                        session.set_selected_vector_node(
+                            0U, std::move(freeform_node));
+                }
                 const auto& freeform_path = session.created_vector()->native
                     ->nodes.front().shape.path;
                 const bool saved = session.save();
@@ -9077,7 +9095,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     near_point(reloaded_path[2U].point,
                                fabric::core::Vec2{0.2F, 0.2F});
                 if (!vector_canvas_e2e_complete)
-                    status = "Freeform path E2E failed: authored=" +
+                    status += " Freeform path E2E failed: authored=" +
                         std::to_string(freeform_path.size()) +
                         ", reloaded=" + std::to_string(reloaded_path.size()) +
                         ", seed=" +
