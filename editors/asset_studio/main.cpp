@@ -2809,33 +2809,9 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 {1.0F, 1.0F}));
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::pen_segment &&
                    canvas.path_command_index < changed.shape.path.size()) {
-            auto& command = changed.shape.path[canvas.path_command_index];
-            if (command.kind == fabric::project::VectorPathCommandKind::line) {
-                fabric::core::Vec2 start_point{};
-                for (std::size_t index = canvas.path_command_index; index-- > 0U;) {
-                    const auto& candidate = changed.shape.path[index];
-                    if (candidate.kind == fabric::project::VectorPathCommandKind::move ||
-                        candidate.kind == fabric::project::VectorPathCommandKind::line ||
-                        candidate.kind == fabric::project::VectorPathCommandKind::cubic) {
-                        start_point = candidate.point;
-                        break;
-                    }
-                }
-                const auto end_point = world_to_local(current_mouse);
-                const fabric::core::Vec2 delta{
-                    end_point.x - start_point.x,
-                    end_point.y - start_point.y};
-                const fabric::core::Vec2 normal{-delta.y * 0.2F,
-                                                delta.x * 0.2F};
-                command.kind = fabric::project::VectorPathCommandKind::cubic;
-                command.point = end_point;
-                command.control1 = {
-                    start_point.x + delta.x / 3.0F + normal.x,
-                    start_point.y + delta.y / 3.0F + normal.y};
-                command.control2 = {
-                    end_point.x - delta.x / 3.0F + normal.x,
-                    end_point.y - delta.y / 3.0F + normal.y};
-            }
+            static_cast<void>(fabric::editor::create_bezier_segment(
+                changed.shape, canvas.path_command_index,
+                world_to_local(current_mouse)));
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::path_point &&
                    canvas.path_command_index < changed.shape.path.size()) {
             changed.shape.path[canvas.path_command_index].point =

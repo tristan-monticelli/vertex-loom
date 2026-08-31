@@ -91,6 +91,21 @@ TEST_CASE("Bezier handle modes preserve their editing contract") {
         linked_shape, 0, true, {1.0F, 1.0F}, Mode::linked));
 }
 
+TEST_CASE("Pen drag converts the inserted line into a cubic segment") {
+    using Kind = fabric::project::VectorPathCommandKind;
+    fabric::project::VectorShape shape{
+        .kind = fabric::project::VectorShapeKind::path,
+        .path = {{.kind = Kind::move, .point = {0.0F, 0.0F}},
+                 {.kind = Kind::line, .point = {1.0F, 0.0F}}}};
+
+    REQUIRE(fabric::editor::create_bezier_segment(shape, 1U, {3.0F, 2.0F}));
+    CHECK(shape.path[1].kind == Kind::cubic);
+    CHECK(shape.path[1].point == fabric::core::Vec2{3.0F, 2.0F});
+    CHECK(shape.path[1].control1 != fabric::core::Vec2{});
+    CHECK(shape.path[1].control2 != fabric::core::Vec2{});
+    CHECK_FALSE(fabric::editor::create_bezier_segment(shape, 0U, {1.0F, 1.0F}));
+}
+
 TEST_CASE("raster crop drag stays inside the immutable source") {
     fabric::project::RasterView view{
         .crop = {{10.0F, 10.0F}, {40.0F, 30.0F}},
