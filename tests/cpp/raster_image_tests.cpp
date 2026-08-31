@@ -298,6 +298,34 @@ void native_geometry_preserves_image_fill_payload() {
             "image fill transform was not applied independently to UVs");
 }
 
+void image_fill_mapping_distinguishes_deform_and_fit_modes() {
+    auto deforming = native_geometry_fixture();
+    auto& deforming_fill = deforming.native->nodes.front().fill;
+    deforming_fill.kind = fabric::project::VectorFillKind::image;
+    deforming_fill.color.reset();
+    deforming_fill.image = fabric::project::VectorImageFill{
+        .texture = {{.value = "fabric-photo"}, "texture"},
+        .fit = fabric::project::VectorImageFit::stretch,
+        .deform_with_shape = true,
+    };
+    auto anchored = deforming;
+    anchored.native->nodes.front().fill.image->deform_with_shape = false;
+    const auto deforming_packets = fabric::render::build_native_draw_packets(deforming);
+    const auto anchored_packets = fabric::render::build_native_draw_packets(anchored);
+    require(deforming_packets.ok() && anchored_packets.ok() &&
+                deforming_packets.packets.front().fill_uv !=
+                    anchored_packets.packets.front().fill_uv,
+            "deformWithShape did not change native image UV mapping");
+
+    const auto stretched = fabric::render::apply_image_fill_fit(
+        {0.0F, 0.25F}, fabric::project::VectorImageFit::stretch, 2.0F, 1.0F);
+    const auto covered = fabric::render::apply_image_fill_fit(
+        {0.0F, 0.25F}, fabric::project::VectorImageFit::cover, 2.0F, 1.0F);
+    require(stretched == fabric::core::Vec2{0.0F, 0.25F} &&
+                covered != stretched,
+            "image fit policy did not change normalized UVs");
+}
+
 void native_geometry_builds_textured_stroke_payload() {
     auto asset = native_geometry_fixture();
     asset.native->nodes.front().stroke = fabric::project::VectorStroke{
@@ -454,6 +482,7 @@ int main() {
     raster_views_produce_shared_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
+    image_fill_mapping_distinguishes_deform_and_fit_modes();
     native_geometry_builds_textured_stroke_payload();
     native_geometry_applies_node_and_parent_transforms();
     opengl_vector_renderer_reports_uninitialized_use();

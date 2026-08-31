@@ -57,6 +57,12 @@ struct RasterViewPacketInput {
 [[nodiscard]] VectorGeometryResult build_native_draw_packets(
     const project::VectorAsset& asset, float curve_tolerance = 0.25F);
 
+// Applies the aspect-ratio part of an image-fill fit policy to normalized UVs.
+// `geometry_aspect` and `texture_aspect` are width / height ratios.
+[[nodiscard]] core::Vec2 apply_image_fill_fit(
+    core::Vec2 uv, project::VectorImageFit fit, float geometry_aspect,
+    float texture_aspect) noexcept;
+
 class VectorGeometryCache {
 public:
     [[nodiscard]] VectorGeometryResult get_or_build(

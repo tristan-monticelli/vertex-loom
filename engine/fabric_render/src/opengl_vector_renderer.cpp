@@ -472,6 +472,10 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             }
             vertex_scratch_.clear();
             index_scratch_.clear();
+            const float texture_aspect = texture && texture->height > 0U
+                ? static_cast<float>(texture->width) /
+                      static_cast<float>(texture->height)
+                : 1.0F;
             std::size_t next = packet_index;
             while (next < packets.size()) {
                 const auto& candidate = packets[next];
@@ -484,10 +488,24 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 const auto base = static_cast<std::uint32_t>(vertex_scratch_.size());
                 vertex_scratch_.reserve(vertex_scratch_.size() +
                                         candidate.fill_vertices.size());
+                auto minimum = candidate.outline.empty()
+                    ? core::Vec2{} : candidate.outline.front();
+                auto maximum = minimum;
+                for (const auto point : candidate.outline) {
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.y = std::min(minimum.y, point.y);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.y = std::max(maximum.y, point.y);
+                }
+                const float geometry_aspect = maximum.y - minimum.y > 0.0001F
+                    ? (maximum.x - minimum.x) / (maximum.y - minimum.y) : 1.0F;
                 for (std::size_t index = 0; index < candidate.fill_vertices.size(); ++index) {
                     const auto point = candidate.fill_vertices[index];
                     const auto uv = candidate.image_fill
-                        ? candidate.fill_uv[index] : core::Vec2{};
+                        ? apply_image_fill_fit(candidate.fill_uv[index],
+                                               candidate.image_fill->fit,
+                                               geometry_aspect, texture_aspect)
+                        : core::Vec2{};
                     vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
                 }
                 index_scratch_.reserve(index_scratch_.size() +
@@ -674,11 +692,37 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 ? resolved_image && has_uv
                 : packet.fill_color.has_value()));
         if (!can_draw_fill) return false;
+        float geometry_width = 0.0F;
+        float geometry_height = 0.0F;
+        if (packet.image_fill && packet.outline.size() >= 2U) {
+            auto minimum = packet.outline.front();
+            auto maximum = minimum;
+            for (const auto point : packet.outline) {
+                minimum.x = std::min(minimum.x, point.x);
+                minimum.y = std::min(minimum.y, point.y);
+                maximum.x = std::max(maximum.x, point.x);
+                maximum.y = std::max(maximum.y, point.y);
+            }
+            geometry_width = maximum.x - minimum.x;
+            geometry_height = maximum.y - minimum.y;
+        }
+        const float geometry_aspect = geometry_height > 0.0001F
+            ? geometry_width / geometry_height : 1.0F;
+        const float texture_aspect = texture && texture->height > 0U
+            ? static_cast<float>(texture->width) /
+                  static_cast<float>(texture->height)
+            : 1.0F;
         vertex_scratch_.clear();
         vertex_scratch_.reserve(packet.fill_vertices.size());
         for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index) {
             const auto point = packet.fill_vertices[index];
-            const auto uv = has_uv ? packet.fill_uv[index] : core::Vec2{};
+            const auto uv = has_uv
+                ? apply_image_fill_fit(packet.fill_uv[index],
+                                       packet.image_fill
+                                           ? packet.image_fill->fit
+                                           : project::VectorImageFit::stretch,
+                                       geometry_aspect, texture_aspect)
+                : core::Vec2{};
             vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
         }
         upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),

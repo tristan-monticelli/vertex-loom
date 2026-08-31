@@ -76,7 +76,10 @@ C4Component
   de courbe, ce qui invalide automatiquement une version modifiée ; l’import
   opaque reste fonctionnel. Chaque draw packet porte soit une couleur solide,
   soit la référence texture et les UV transformées du fill image, ainsi que la
-  même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
+  même triangulation de silhouette ; le compositing applique le ratio réel de
+  la texture selon `fit`, tandis que `deformWithShape` choisit entre mapping
+  local à la silhouette et ancrage dans l’espace projet ; aucun atlas ni bitmap
+  dérivé n’est créé.
   Les sommets sont exprimés dans l’espace monde après application du transform
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.
   Le backend OpenGL compile ses shaders et possède ses buffers via les
