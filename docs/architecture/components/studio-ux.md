@@ -48,3 +48,29 @@ C4Component
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne
 doit jamais fermer le document courant. L'interface affiche la ressource, le
 champ et la cause, puis propose `Retry`, `Discard` ou `Cancel`.
+# Asset Studio guided creation workspace
+
+Asset Studio presents user-facing visual creations first: Beam, Button, Eye,
+Artwork and composed Entity. Internal resource types remain available through
+an explicit advanced workspace so existing project contracts stay readable and
+editable without making engine concepts part of the normal creation path.
+
+Beam is the public name for the existing persisted textured-path contract.
+Its preview and published rendering use the shared arc-length ribbon geometry
+builder; the manifest `defaultStrokeTexture` initializes newly created Beam and
+thread-based presets, while a manually selected texture remains local to the
+selected resource.
+
+```mermaid
+flowchart LR
+    Hub[Guided creation hub] --> Beam[Beam]
+    Hub --> Button[Button]
+    Hub --> Eye[Eye]
+    Hub --> Artwork[Artwork]
+    Hub --> Entity[Composed Entity]
+    Hub --> Advanced[Advanced]
+    Advanced --> Technical[Technical resources]
+    Beam --> Shared[Shared textured-path geometry]
+    Shared --> Studio[Asset Studio preview]
+    Shared --> Runtime[Preview and published runtime]
+```

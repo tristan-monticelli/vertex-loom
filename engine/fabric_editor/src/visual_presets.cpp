@@ -233,6 +233,16 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     path.commands.back().point = {2.0F, 0.0F};
     path.commands.back().control1 = {-0.8F, 0.3F};
     path.commands.back().control2 = {0.8F, -0.3F};
+    if (request.guided_beam) {
+        path.color = request.beam_color;
+        path.shader.profile = project::SurfaceShaderProfile::thread;
+        path.shader.classification = project::TextureClassification::beam;
+        path.shader.primary_color = request.beam_color;
+        path.shader.effect_color = request.beam_effect_color;
+        path.shader.shine = request.beam_shine;
+        path.shader.holography = request.beam_holography;
+        path.shader.repetition = {request.beam_repetition, 1.0F};
+    }
     auto border = vector_asset(
         border_id, request.name + " Border", {4.0F, 0.8F},
         {outlined_rectangle("border-shape", "Beam border",
@@ -245,7 +255,8 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
                      .id = composition_id,
                      .name = request.name + " Composition"},
         .size = {4.0F, 0.8F},
-        .layers = {layer("seam", "Seam", VisualLayerKind::textured_path,
+        .layers = {layer("seam", request.guided_beam ? "Beam" : "Seam",
+                         VisualLayerKind::textured_path,
                          path_id, "texturedPath", {}, 0.0F),
                    layer("border", "Beam border", VisualLayerKind::vector,
                          border_id, "vector", {}, 1.0F)},

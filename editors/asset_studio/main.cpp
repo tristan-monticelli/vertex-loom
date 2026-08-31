@@ -979,9 +979,9 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
     const char* kind_filters[] = {
-        "All types", "Textures", "Vector artworks", "Materials / fills",
+        "All types", "Images & textures", "Artwork", "Materials / fills",
         "Entities", "Animations", "Input bindings", "Behaviors",
-        "Transformations", "Textured paths", "Visual compositions",
+        "Transformations", "Beam paths", "Visual compositions",
         "Visual components", "Maps", "Scenes", "Mechanics", "Replays",
         "Audio"};
     ImGui::SetNextItemWidth(-1.0F);
@@ -1117,8 +1117,9 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         }
         ImGui::TreePop();
     };
-    draw_kind("Textures", fabric::editor::StudioResourceKind::texture, 1);
-    draw_kind("Vector artworks", fabric::editor::StudioResourceKind::vector, 2);
+    ImGui::SeparatorText("Guided creations");
+    draw_kind("Images & textures", fabric::editor::StudioResourceKind::texture, 1);
+    draw_kind("Artwork", fabric::editor::StudioResourceKind::vector, 2);
     draw_kind("Materials / fills", fabric::editor::StudioResourceKind::material, 3);
     draw_kind("Entities", fabric::editor::StudioResourceKind::entity, 4);
     draw_kind("Animations", fabric::editor::StudioResourceKind::animation, 5);
@@ -1126,7 +1127,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     draw_kind("Behaviors", fabric::editor::StudioResourceKind::behavior, 7);
     draw_kind("Transformations",
               fabric::editor::StudioResourceKind::transformation, 8);
-    draw_kind("Textured paths",
+    draw_kind("Beam paths",
               fabric::editor::StudioResourceKind::textured_path, 9);
     draw_kind("Visual compositions",
               fabric::editor::StudioResourceKind::visual_composition, 10);
@@ -2641,29 +2642,58 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::OpenPopup("Add resource");
         }
         if (ImGui::BeginPopup("Add resource")) {
-            if (ImGui::MenuItem("New vector artwork...")) {
-                creation.request_artwork = true;
-            }
-            if (ImGui::MenuItem("New visual preset...")) {
+            ImGui::SeparatorText("Create a visual");
+            if (ImGui::MenuItem("Beam / Stroke...")) {
+                creation.visual_preset.kind =
+                    fabric::editor::VisualPresetKind::seam;
+                creation.visual_preset.name = "Beam";
+                creation.visual_preset.id.value = "beam";
+                creation.visual_preset.guided_beam = true;
                 creation.request_visual_preset = true;
             }
-            if (ImGui::MenuItem("New visual composition...")) {
-                creation.request_visual_composition = true;
+            if (ImGui::MenuItem("Button...")) {
+                creation.visual_preset.kind =
+                    fabric::editor::VisualPresetKind::button;
+                creation.visual_preset.name = "Button";
+                creation.visual_preset.id.value = "button";
+                creation.request_visual_preset = true;
             }
-            if (ImGui::MenuItem("New visual component...")) {
-                creation.request_visual_component = true;
+            if (ImGui::MenuItem("Eye...")) {
+                creation.visual_preset.kind =
+                    fabric::editor::VisualPresetKind::eye;
+                creation.visual_preset.name = "Eye";
+                creation.visual_preset.id.value = "eye";
+                creation.request_visual_preset = true;
             }
-            if (ImGui::MenuItem("New material / fill...")) {
-                creation.request_material = true;
+            if (ImGui::MenuItem("Artwork...")) {
+                creation.request_artwork = true;
             }
-            if (ImGui::MenuItem("New entity...")) {
+            if (ImGui::MenuItem("Composed Entity...")) {
                 creation.request_entity = true;
             }
-            if (ImGui::MenuItem("New animation...")) {
-                creation.request_animation = true;
+            ImGui::SeparatorText("Advanced");
+            if (ImGui::BeginMenu("Technical resources")) {
+                if (ImGui::MenuItem("Vector artwork resource..."))
+                    creation.request_artwork = true;
+                if (ImGui::MenuItem("Visual composition..."))
+                    creation.request_visual_composition = true;
+                if (ImGui::MenuItem("Visual component..."))
+                    creation.request_visual_component = true;
+                if (ImGui::MenuItem("Material / fill..."))
+                    creation.request_material = true;
+                if (ImGui::MenuItem("Animation..."))
+                    creation.request_animation = true;
+                if (ImGui::MenuItem("Input bindings..."))
+                    creation.request_input = true;
+                ImGui::EndMenu();
             }
-            if (ImGui::MenuItem("New input bindings...")) {
-                creation.request_input = true;
+            if (ImGui::BeginMenu("Expert entity tools")) {
+                if (ImGui::MenuItem("Entity transformation..."))
+                    creation.request_transformation = true;
+                if (ImGui::MenuItem("Behavior graph..."))
+                    creation.request_behavior = true;
+                ImGui::TextDisabled("Physics and deformation stay available in the entity inspector.");
+                ImGui::EndMenu();
             }
             if (ImGui::MenuItem("Add existing resource...")) {
                 ImGui::OpenPopup("Add existing resource");
@@ -6455,7 +6485,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         creation.request_input = false;
     }
     if (creation.request_visual_preset && session.has_project()) {
-        creation.visual_preset = {};
         ImGui::OpenPopup("Create visual preset");
         creation.request_visual_preset = false;
     }
@@ -6736,10 +6765,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     if (ImGui::BeginPopupModal("Create visual preset", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
         auto& request = creation.visual_preset;
-        ImGui::TextUnformatted("Create a reusable textile visual component");
+        ImGui::TextUnformatted(request.guided_beam
+            ? "Create a Beam visual component"
+            : "Create a reusable textile visual component");
         ImGui::TextDisabled(
             "The preset only assembles generic vectors, paths and layers.");
-        const auto kind_label = std::string(fabric::editor::label(request.kind));
+        const auto user_preset_label = [](const auto kind) {
+            return kind == fabric::editor::VisualPresetKind::seam
+                ? std::string_view{"Beam"}
+                : fabric::editor::label(kind);
+        };
+        const auto kind_label = std::string(user_preset_label(request.kind));
         ImGui::SetNextItemWidth(280.0F);
         if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
             for (const auto kind : {fabric::editor::VisualPresetKind::eye,
@@ -6747,7 +6783,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     fabric::editor::VisualPresetKind::seam,
                                     fabric::editor::VisualPresetKind::zipper}) {
                 const bool selected = request.kind == kind;
-                const auto option = std::string(fabric::editor::label(kind));
+                const auto option = std::string(user_preset_label(kind));
                 if (ImGui::Selectable(option.c_str(), selected)) {
                     request.kind = kind;
                 }
@@ -6788,6 +6824,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (selected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            if (request.kind == fabric::editor::VisualPresetKind::seam) {
+                ImGui::SeparatorText("Beam appearance");
+                ImGui::ColorEdit4("Beam color", &request.beam_color.red);
+                ImGui::ColorEdit4("Effect color", &request.beam_effect_color.red);
+                ImGui::SliderFloat("Shine", &request.beam_shine, 0.0F, 1.0F);
+                ImGui::SliderFloat("Holography", &request.beam_holography, 0.0F, 1.0F);
+                ImGui::DragFloat("Repetition", &request.beam_repetition,
+                                 0.05F, 0.01F, 1000.0F);
+                ImGui::TextDisabled("Orientation follows the Beam path automatically.");
             }
         }
         if (request.kind == fabric::editor::VisualPresetKind::zipper) {

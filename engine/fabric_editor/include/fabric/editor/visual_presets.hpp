@@ -23,6 +23,12 @@ struct VisualPresetRequest {
     std::string name{"Visual preset"};
     std::optional<project::ResourceReference> thread_texture;
     std::size_t zipper_tooth_count{12U};
+    core::Color beam_color{1.0F, 1.0F, 1.0F, 1.0F};
+    core::Color beam_effect_color{1.0F, 1.0F, 1.0F, 1.0F};
+    float beam_shine{};
+    float beam_holography{};
+    float beam_repetition{5.0F};
+    bool guided_beam{};
 };
 
 struct VisualPresetBundle {
