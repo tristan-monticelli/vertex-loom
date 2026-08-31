@@ -119,16 +119,14 @@ flowchart LR
 
 Le menu propose `Beam / Stroke`, `Button`, `Eye`, `Artwork` et `Composed
 Entity`, mais la sélection du type ne conduit pas toujours à un assistant
-complet. Le cas Button route directement vers la création d'Entity et tente
-de deviner la ressource à partir de son nom.
+complet. Le cas Button route directement vers la création d'Entity et doit
+sélectionner explicitement l'image originale fournie.
 
 ### 2. Le Button n'a pas de notion d'asset source obligatoire
 
-Le code cherche un `VisualComponent` dont l'id contient `button` ou dont le nom
-contient `Button`. Cette heuristique n'est pas acceptable pour un asset fourni
-par l'utilisateur : deux ressources peuvent correspondre, le mauvais composant
-peut être pris, et l'absence de correspondance ouvre quand même la modale
-Entity.
+Les anciens assets nommés `head` sont les images de boutons du jeu. Le parcours
+guidé Button les traite donc comme des textures originales et ne fabrique aucun
+motif. La sélection reste explicite : aucune ressource n'est devinée.
 
 ### 3. Beam et Seam doivent rester compatibles sans être confondus
 

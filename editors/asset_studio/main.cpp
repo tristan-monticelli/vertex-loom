@@ -6475,7 +6475,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (creation.guided_button) {
             creation.entity.name = "Button entity";
             creation.entity.drawable =
-                fabric::project::EntityDrawableKind::visual_component;
+                fabric::project::EntityDrawableKind::texture;
             creation.entity.node_name = "Button";
         }
         ImGui::OpenPopup("Create entity");
@@ -7097,9 +7097,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
         if (creation.guided_button) {
-            ImGui::SeparatorText("Provided Button asset");
+            ImGui::SeparatorText("Original Button image");
             ImGui::TextWrapped(
-                "Choose the existing Button visual component supplied by the project. "
+                "Choose the supplied original image used as a Button. "
                 "Asset Studio will not generate or guess a replacement.");
         }
         const auto validation = creation.entity.validate(
@@ -7146,13 +7146,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 : fabric::editor::StudioResourceKind::vector;
             static_cast<void>(draw_project_resource_picker(
                 creation.guided_button
-                    ? "Provided Button component"
+                    ? "Original Button image"
                     : "Drawable resource",
                 session.resources(), resource_kind,
                 creation.entity.resource_id, false));
             if (creation.guided_button && creation.entity.resource_id.empty()) {
                 ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
-                                   "Select the supplied Button component before creating.");
+                                   "Select the supplied original Button image before creating.");
             }
         } else {
             creation.entity.resource_id.clear();

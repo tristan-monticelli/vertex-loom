@@ -36,8 +36,10 @@ Les ressources techniques restent disponibles dans un menu `Advanced` et ne
 sont pas supprimées des projets existants.
 
 Le parcours Button ne synthétise pas une nouvelle illustration : il référence
-un composant Button déjà fourni par le projet. Les presets de formes historiques
-restent uniquement des outils de compatibilité/avancé.
+une texture originale déjà fournie par le projet. Les anciens assets nommés
+`head` sont des images de boutons du jeu et sont sélectionnés comme drawable
+texture. Les motifs de bouton paramétriques historiques restent uniquement des
+outils de compatibilité/avancé et ne sont pas utilisés par ce parcours.
 
 ## Conséquences
 
