@@ -332,7 +332,14 @@ int main() {
         static_cast<std::streamsize>(shader_capture.size()));
     const bool thread_shader_preserves_texture = shader_stats.ok() &&
         shader_left != shader_right && shader_left[2] > shader_left[1] &&
-        shader_right[0] > shader_right[1];
+        shader_right[0] != shader_right[1] &&
+        shader_right[1] != shader_right[2] &&
+        (static_cast<int>(shader_left[0]) +
+         static_cast<int>(shader_left[1]) +
+         static_cast<int>(shader_left[2])) > 90 &&
+        (static_cast<int>(shader_right[0]) +
+         static_cast<int>(shader_right[1]) +
+         static_cast<int>(shader_right[2])) > 90;
     glDeleteTextures(1, &texture);
     renderer.shutdown();
     SDL_GL_DeleteContext(context);

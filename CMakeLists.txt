@@ -755,7 +755,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
-                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-entity-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_entity_e2e.cmake
         )
@@ -764,7 +764,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
-                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-animation-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_animation_e2e.cmake
         )

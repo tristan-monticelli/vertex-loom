@@ -8169,23 +8169,27 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool entity_e2e_complete = false;
     if (entity_e2e && session.has_project()) {
         const fabric::core::ResourceId entity_id{.value =
-            "rotating-platform-entity"};
+            "beam-entity"};
         const bool selected = session.select_resource(
             fabric::editor::StudioResourceKind::entity, entity_id);
         auto node = selected ? session.selected_entity()->nodes.front()
                              : fabric::project::EntityNode{};
-        node.visible = false;
+        node.visible = true;
         node.locked = true;
+        node.transform.position = {0.0F, 0.0F};
+        node.transform.scale = {50.0F, 50.0F};
         node.drawable = {
             .kind = fabric::project::EntityDrawableKind::texture,
             .resource = fabric::project::ResourceReference{
-                {.value = "head-face"}, "texture"}};
+                {.value = "beam-thread"}, "texture"}};
         bool authored = selected && session.set_selected_entity_node(0U, node) &&
             session.add_selected_entity_node({
                 .id = "studio-child", .name = "Studio Child",
                 .parent = node.id});
         if (authored) {
             auto child = session.selected_entity()->nodes[1];
+            child.parent.reset();
+            child.transform.position = {1.35F, 0.0F};
             child.drawable = {
                 .kind = fabric::project::EntityDrawableKind::vector,
                 .resource = fabric::project::ResourceReference{
@@ -8195,6 +8199,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (authored) {
             auto component = session.selected_entity()->nodes[2];
+            component.parent.reset();
+            component.transform.position = {-1.35F, 0.0F};
             component.drawable = {
                 .kind = fabric::project::EntityDrawableKind::visual_component,
                 .resource = fabric::project::ResourceReference{
@@ -8215,14 +8221,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         entity_e2e_complete = reopened &&
             reloaded.selected_entity()->nodes.size() == 3U &&
             reloaded.selected_entity()->nodes.front().locked &&
-            !reloaded.selected_entity()->nodes.front().visible &&
+            reloaded.selected_entity()->nodes.front().visible &&
+            reloaded.selected_entity()->nodes.front().transform.position ==
+                fabric::core::Vec2{0.0F, 0.0F} &&
+            reloaded.selected_entity()->nodes.front().transform.scale ==
+                fabric::core::Vec2{50.0F, 50.0F} &&
             reloaded.selected_entity()->nodes.front().drawable.kind ==
                 fabric::project::EntityDrawableKind::texture &&
             reloaded.selected_entity()->nodes[1].drawable.kind ==
                 fabric::project::EntityDrawableKind::visual_component &&
             reloaded.selected_entity()->nodes[2].drawable.kind ==
                 fabric::project::EntityDrawableKind::vector &&
-            !visual.packets.empty();
+            visual.packets.size() >= 3U;
         if (!entity_e2e_complete)
             std::cerr << "Asset Studio Entity E2E failed\n";
     }
@@ -8241,11 +8251,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     if (animation_e2e && session.has_project()) {
         fabric::editor::CreateAnimationPrompt prompt;
         prompt.name = "Targeted Animation E2E";
-        prompt.preview_entity_id = "textile-head-entity";
+        prompt.preview_entity_id = "beam-entity";
         prompt.duration = 2.0;
         const bool authored = session.create_animation(prompt) &&
-            session.set_selected_animation_preview_entity(std::nullopt) &&
-            session.undo() && session.save();
+            session.set_selected_animation_segment(
+                {.node_id = "root", .component_id = "transform",
+                 .property_id = "position"},
+                0.0F, fabric::core::Vec2{-0.8F, 0.0F},
+                2.0F, fabric::core::Vec2{0.8F, 0.0F},
+                fabric::project::AnimationInterpolation::linear) &&
+            session.save();
         fabric::editor::ProjectSession reloaded;
         const bool reopened = authored && reloaded.open(initial_project) &&
             reloaded.select_resource(
@@ -8257,7 +8272,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         animation_e2e_complete = reopened &&
             reloaded.selected_animation()->preview_entity &&
             reloaded.selected_animation()->preview_entity->id.value ==
-                "textile-head-entity" &&
+                "beam-entity" &&
+            reloaded.selected_animation()->tracks.size() == 1U &&
+            reloaded.selected_animation()->tracks.front().keys.size() == 2U &&
             reloaded.selected_entity() && !visual.packets.empty();
         if (!animation_e2e_complete)
             std::cerr << "Asset Studio Animation E2E failed\n";
@@ -8392,6 +8409,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_input_frame = 0U;
     std::size_t ui_beam_frame = 0U;
     std::size_t ui_button_frame = 0U;
+    bool entity_e2e_capture_written = false;
+    bool animation_e2e_capture_written = false;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -9123,6 +9142,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (entity_e2e && entity_e2e_complete &&
+            !entity_e2e_capture_written) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-entity-e2e.ppm");
+            entity_e2e_capture_written = true;
+        }
+        if (animation_e2e && animation_e2e_complete &&
+            !animation_e2e_capture_written) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-animation-e2e.ppm");
+            animation_e2e_capture_written = true;
+        }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 3U)
             write_frame_capture(initial_project, window,
                                 "asset-studio-vector-canvas-pen.ppm");
@@ -9454,7 +9485,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 const bool reopened = saved && reloaded.open(initial_project) &&
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::entity,
-                        {.value = "rotating-platform-entity"});
+                        {.value = "beam-entity"});
                 entity_e2e_complete = entity_e2e_complete && reopened &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=

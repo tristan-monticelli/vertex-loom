@@ -157,6 +157,9 @@ localise son bouton, injecte un clic souris en trois frames,
 capture le Beam non sélectionné puis recharge le `texturedPath`. Il vérifie la
 texture héritée, l'épaisseur, l'opacité et la répétition sans injecter la
 texture ni appeler directement la factory à la place de l'action UI.
+Le smoke OpenGL vérifie aussi que le profil Thread conserve la variation de
+couleur de l'image tout en produisant un mélange visible entre couleur primaire
+et couleur d'effet ; une sortie presque noire ou uniforme échoue.
 Le test géométrique `Beam keeps repeated texture UVs continuous across
 external segments` couvre aussi une texture externe sur une ligne, une courbe
 et un segment final, avec UV d'arc-length monotones et shader holographique.
@@ -169,6 +172,13 @@ original, ses couleurs et paramètres shader, injecte un clic sur le vrai bouton
 de création, capture le résultat puis recharge l'Entity et son Material v2. Il
 vérifie que la référence reste le PNG choisi et qu'aucune image de substitution
 n'est créée.
+Les E2E `asset_studio_entity_e2e` et `asset_studio_animation_e2e` exigent aussi
+une capture OpenGL dédiée après composition/rechargement ; l’Entity utilise le
+fixture réel `studio-beam` et montre trois blocs indépendants (texture, vecteur
+et Beam), tandis que l’Animation utilise le même Beam avec deux clés de
+position ; les fichiers
+`asset-studio-entity-e2e.ppm` et `asset-studio-animation-e2e.ppm` sont inspectés
+pour vérifier le résultat visuel, pas seulement le JSON sauvegardé.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires

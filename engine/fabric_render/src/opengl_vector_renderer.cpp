@@ -435,10 +435,10 @@ void main() {
         float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
         float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
         vec3 monochrome = shaderPrimary.rgb * luma;
-        vec3 threadColor = mix(shaderPrimary.rgb, shaderEffect.rgb, luma) *
-            (0.35 + 0.65 * luma);
-        threadColor = mix(threadColor,
-            shaderEffect.rgb * (0.45 + 0.55 * luma), holo * band * 0.65);
+        vec3 threadBase = base.rgb *
+            mix(vec3(1.0), shaderPrimary.rgb, 0.55);
+        vec3 threadColor = threadBase * (0.65 + 0.35 * luma) +
+            shaderEffect.rgb * holo * (0.25 + 0.75 * band);
         vec3 plasticColor = base.rgb * shaderPrimary.rgb +
             shaderEffect.rgb * shaderShine * highlight;
         vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
@@ -486,10 +486,10 @@ void main() {
         float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
         float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
         vec3 monochrome = shaderPrimary.rgb * luma;
-        vec3 threadColor = mix(shaderPrimary.rgb, shaderEffect.rgb, luma) *
-            (0.35 + 0.65 * luma);
-        threadColor = mix(threadColor,
-            shaderEffect.rgb * (0.45 + 0.55 * luma), holo * band * 0.65);
+        vec3 threadBase = base.rgb *
+            mix(vec3(1.0), shaderPrimary.rgb, 0.55);
+        vec3 threadColor = threadBase * (0.65 + 0.35 * luma) +
+            shaderEffect.rgb * holo * (0.25 + 0.75 * band);
         vec3 plasticColor = base.rgb * shaderPrimary.rgb +
             shaderEffect.rgb * shaderShine * highlight;
         vec3 customColor = mix(base.rgb * shaderPrimary.rgb,

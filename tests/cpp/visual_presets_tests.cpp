@@ -161,11 +161,19 @@ void create_studio_beam_fixture(const std::filesystem::path& root) {
     std::error_code ignored;
     std::filesystem::remove(source, ignored);
     REQUIRE(studio.create_visual_preset({
-        .kind = fabric::editor::VisualPresetKind::seam,
+        .kind = fabric::editor::VisualPresetKind::beam,
         .id = {.value = "beam"},
         .name = "Beam",
         .thread_texture = fabric::project::ResourceReference{
-            {.value = "beam-thread"}, "texture"}}));
+            {.value = "beam-thread"}, "texture"},
+        .beam_color = {0.2F, 0.35F, 1.0F, 1.0F},
+        .beam_effect_color = {1.0F, 0.1F, 0.8F, 1.0F},
+        .beam_shine = 0.3F,
+        .beam_holography = 0.8F,
+        .beam_repetition = 5.0F,
+        .beam_width = 0.12F,
+        .beam_opacity = 1.0F,
+        .guided_beam = true}));
 
     fabric::editor::CreateEntityPrompt entity;
     entity.name = "Beam Entity";
@@ -440,12 +448,14 @@ std::vector<std::filesystem::path> fixture_files(
     for (const auto& entry :
          std::filesystem::recursive_directory_iterator(root)) {
         const auto filename = entry.path().filename().generic_string();
+        const auto relative = entry.path().lexically_relative(root);
         if (entry.is_regular_file() && filename != ".keep" &&
             filename != ".DS_Store" &&
             filename != "asset-studio-ui-widgets.json" &&
             filename != "asset_studio-e2e-failure.txt" &&
-            filename != "asset_studio-e2e-failure.ppm")
-            result.push_back(entry.path().lexically_relative(root));
+            filename != "asset_studio-e2e-failure.ppm" &&
+            relative != "assets/vectors/beam-border.vector.json")
+            result.push_back(relative);
     }
     std::ranges::sort(result);
     return result;

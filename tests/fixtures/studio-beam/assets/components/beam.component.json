@@ -36,7 +36,7 @@
       "name": "Width",
       "target": {
         "componentId": "texturedPath",
-        "nodeId": "seam",
+        "nodeId": "beam",
         "propertyId": "width"
       },
       "type": "scalar"
@@ -51,7 +51,7 @@
       "name": "Repeat",
       "target": {
         "componentId": "texturedPath",
-        "nodeId": "seam",
+        "nodeId": "beam",
         "propertyId": "uvScaleX"
       },
       "type": "scalar"
@@ -66,7 +66,7 @@
       "name": "Texture offset",
       "target": {
         "componentId": "texturedPath",
-        "nodeId": "seam",
+        "nodeId": "beam",
         "propertyId": "uvOffsetX"
       },
       "type": "scalar"
@@ -78,15 +78,15 @@
         "value": {
           "alpha": 1.0,
           "blue": 1.0,
-          "green": 1.0,
-          "red": 1.0
+          "green": 0.3499999940395355,
+          "red": 0.20000000298023224
         }
       },
       "id": "color",
       "name": "Color",
       "target": {
         "componentId": "texturedPath",
-        "nodeId": "seam",
+        "nodeId": "beam",
         "propertyId": "color"
       },
       "type": "color"
@@ -101,7 +101,7 @@
       "name": "Opacity",
       "target": {
         "componentId": "texturedPath",
-        "nodeId": "seam",
+        "nodeId": "beam",
         "propertyId": "opacity"
       },
       "type": "scalar"

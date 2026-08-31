@@ -4,8 +4,8 @@
   "color": {
     "alpha": 1.0,
     "blue": 1.0,
-    "green": 1.0,
-    "red": 1.0
+    "green": 0.3499999940395355,
+    "red": 0.20000000298023224
   },
   "commands": [
     {
@@ -37,6 +37,34 @@
   "name": "Beam Rail",
   "opacity": 1.0,
   "schemaVersion": 1,
+  "shader": {
+    "classification": "beam",
+    "deformation": {
+      "x": 0.0,
+      "y": 0.0
+    },
+    "effectColor": {
+      "alpha": 1.0,
+      "blue": 0.800000011920929,
+      "green": 0.10000000149011612,
+      "red": 1.0
+    },
+    "holography": 0.800000011920929,
+    "intensity": 1.0,
+    "opacity": 1.0,
+    "primaryColor": {
+      "alpha": 1.0,
+      "blue": 1.0,
+      "green": 0.3499999940395355,
+      "red": 0.20000000298023224
+    },
+    "profile": "Thread",
+    "repetition": {
+      "x": 5.0,
+      "y": 1.0
+    },
+    "shine": 0.30000001192092896
+  },
   "texture": {
     "expectedType": "texture",
     "id": "beam-thread"
