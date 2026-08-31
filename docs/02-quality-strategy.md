@@ -151,6 +151,11 @@ non destructif borné dans `asset-studio-ui-texture.json`.
 Le test `asset_studio_ui_input_e2e` rend le prompt de bindings, prépare les
 actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
 relecture avec un binding clavier et un binding gamepad.
+Le test `asset_studio_ui_beam_e2e` rend l'assistant Beam avec la texture de
+stroke par défaut, localise son bouton, injecte un clic souris en trois frames,
+capture le Beam non sélectionné puis recharge le `texturedPath`. Il vérifie la
+texture héritée, l'épaisseur, l'opacité et la répétition sans injecter la
+texture ni appeler directement la factory à la place de l'action UI.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires

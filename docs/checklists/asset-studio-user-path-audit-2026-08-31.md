@@ -58,11 +58,11 @@ flowchart TD
 | U03 | Importer un PNG original | Partiel | L'import peut définir `defaultStrokeTexture`, mais l'utilisateur ne voit pas clairement que cette image devient la base Beam. | P1 |
 | U04 | Importer plusieurs PNG et choisir le bon | Partiel | Le picker existe, mais il faut contrôler la miniature, le nom et la référence réellement consommée par le Beam. | P1 |
 | U05 | Ajouter une texture existante | Conforme techniquement | Le chemin est couvert par `Add existing`, mais il n'est pas relié explicitement au parcours Beam guidé. | P1 |
-| U06 | Créer un Beam neuf | Partiellement corrigé | Le menu utilise désormais une demande `VisualPresetKind::beam` distincte du legacy `seam`; le contrat JSON et le rendu écran restent à prouver. | P0 |
-| U07 | Créer plusieurs Beams | Partiel | Le fallback utilise `defaultStrokeTexture`, sans preuve que la ressource existe, est chargée et reste la texture attendue. | P0 |
+| U06 | Créer un Beam neuf | Conforme sur le parcours isolé | L'E2E ouvre l'assistant, clique `Create Beam`, capture le Beam texturé puis vérifie son document après reload. | Fermé |
+| U07 | Créer plusieurs Beams | Partiel | Le premier Beam prouve `defaultStrokeTexture`; un scénario multi-Beam avec variante locale reste à ajouter. | P1 |
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
-| U10 | Régler color/effect/shine/holography du Beam | Partiel corrigé | Le shader Thread conserve désormais le motif à holographie maximale et produit une capture OpenGL isolée. Le parcours assistant → reload → runtime reste à prouver. | P0 |
+| U10 | Régler color/effect/shine/holography du Beam | Partiel corrigé | Le shader Thread conserve le motif à holographie maximale ; l'assistant et le reload Studio sont prouvés. La comparaison Preview Runtime/publication reste ouverte. | P1 |
 | U11 | Créer un Button avec l'original fourni | Partiel | Le parcours exige maintenant une texture originale sélectionnée ; l'index est rafraîchi à l'ouverture de l'assistant et signale explicitement l'absence de texture. Le round-trip écran reste à prouver. | P0 |
 | U12 | Créer un Eye | Supprimé | Le faux type Eye, sa factory et ses fixtures ont été retirés ; les originaux concernés passent par Button comme PNG. | Fermé |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
@@ -83,8 +83,9 @@ inspectée après conversion PNG. Elle montre `Beam Border` sélectionné comme 
 grand remplissage bleu dans le canvas vectoriel, tandis que la texture Thread
 n'est pas perceptible. Cette capture ne constitue donc pas une preuve de Beam
 texturé : soit la sélection masque le rendu, soit le rendu image n'est pas
-branché dans cette vue. Le statut U06/U10 reste P0 tant qu'une capture isolée,
-non sélectionnée, montre la texture originale et le shader.
+branché dans cette vue. Cette ancienne capture ne valide toujours pas le Beam,
+mais le nouvel E2E `asset_studio_ui_beam_e2e` produit désormais la preuve
+isolée non sélectionnée attendue.
 
 Le contrôle d'interface macOS n'a pas pu récupérer la fenêtre interactive
 Asset Studio : le processus est lancé, mais l'accessibilité renvoie un

@@ -86,6 +86,11 @@ bool ui_input_probe_enabled = false;
 bool ui_input_modal_seen = false;
 bool ui_input_created = false;
 bool ui_input_reloaded = false;
+bool ui_beam_probe_enabled = false;
+bool ui_beam_create_seen = false;
+bool ui_beam_created = false;
+bool ui_beam_reloaded = false;
+ImVec2 ui_beam_create_screen{};
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -1658,6 +1663,18 @@ void write_ui_input_probe(const std::filesystem::path& project_path) {
         {"reloaded", ui_input_reloaded}};
     std::ofstream output(project_path / "asset-studio-ui-input.json");
     if (output) output << probe.dump(2) << '\n';
+}
+
+void write_ui_beam_probe(const std::filesystem::path& project_path) {
+    std::ofstream output(project_path / "asset-studio-ui-beam.json");
+    output << "{\n"
+           << "  \"create_button_seen\": "
+           << (ui_beam_create_seen ? "true" : "false") << ",\n"
+           << "  \"created_by_click\": "
+           << (ui_beam_created ? "true" : "false") << ",\n"
+           << "  \"reloaded_with_default_texture\": "
+           << (ui_beam_reloaded ? "true" : "false") << "\n"
+           << "}\n";
 }
 
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
@@ -6846,24 +6863,27 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted(request.guided_beam
             ? "Create a Beam visual component"
             : "Create a reusable textile visual component");
-        ImGui::TextDisabled(
-            "The preset only assembles generic vectors, paths and layers.");
+        ImGui::TextDisabled(request.guided_beam
+            ? "The texture repeats along the path and follows every curve automatically."
+            : "The preset assembles reusable paths and layers.");
         const auto user_preset_label = [](const auto kind) {
             return fabric::editor::label(kind);
         };
-        const auto kind_label = std::string(user_preset_label(request.kind));
-        ImGui::SetNextItemWidth(280.0F);
-        if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
-            for (const auto kind : {fabric::editor::VisualPresetKind::beam,
-                                    fabric::editor::VisualPresetKind::zipper}) {
-                const bool selected = request.kind == kind;
-                const auto option = std::string(user_preset_label(kind));
-                if (ImGui::Selectable(option.c_str(), selected)) {
-                    request.kind = kind;
+        if (!request.guided_beam) {
+            const auto kind_label = std::string(user_preset_label(request.kind));
+            ImGui::SetNextItemWidth(280.0F);
+            if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
+                for (const auto kind : {fabric::editor::VisualPresetKind::beam,
+                                        fabric::editor::VisualPresetKind::zipper}) {
+                    const bool selected = request.kind == kind;
+                    const auto option = std::string(user_preset_label(kind));
+                    if (ImGui::Selectable(option.c_str(), selected)) {
+                        request.kind = kind;
+                    }
+                    if (selected) ImGui::SetItemDefaultFocus();
                 }
-                if (selected) ImGui::SetItemDefaultFocus();
+                ImGui::EndCombo();
             }
-            ImGui::EndCombo();
         }
         draw_resource_identity_fields(request.name, request.id.value);
         const bool uses_thread = request.kind ==
@@ -6875,33 +6895,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (!request.thread_texture && session.manifest()->default_stroke_texture)
                 request.thread_texture = fabric::project::ResourceReference{
                     *session.manifest()->default_stroke_texture, "texture"};
-            const auto selected_texture = std::ranges::find_if(
-                session.resources(), [&](const auto& resource) {
+            std::string texture_id = request.thread_texture
+                ? request.thread_texture->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Thread texture", session.resources(),
+                    fabric::editor::StudioResourceKind::texture,
+                    texture_id, false)) {
+                request.thread_texture = fabric::project::ResourceReference{
+                    {.value = std::move(texture_id)}, "texture"};
+            }
+            thread_texture_resolved = request.thread_texture &&
+                std::ranges::any_of(session.resources(), [&](const auto& resource) {
                     return resource.kind ==
                                fabric::editor::StudioResourceKind::texture &&
-                        request.thread_texture &&
                         resource.id == request.thread_texture->id;
                 });
-            const char* texture_label =
-                selected_texture == session.resources().end()
-                ? "Choose a thread texture..."
-                : selected_texture->name.c_str();
-            thread_texture_resolved = selected_texture != session.resources().end();
-            ImGui::SetNextItemWidth(360.0F);
-            if (ImGui::BeginCombo("Thread texture", texture_label)) {
-                for (const auto& resource : session.resources()) {
-                    if (resource.kind !=
-                        fabric::editor::StudioResourceKind::texture) continue;
-                    const bool selected = request.thread_texture &&
-                        request.thread_texture->id == resource.id;
-                    if (ImGui::Selectable(resource.name.c_str(), selected)) {
-                        request.thread_texture = fabric::project::ResourceReference{
-                            resource.id, "texture"};
-                    }
-                    if (selected) ImGui::SetItemDefaultFocus();
-                }
-                ImGui::EndCombo();
-            }
             if (std::ranges::none_of(
                     session.resources(), [](const auto& resource) {
                         return resource.kind ==
@@ -6926,6 +6934,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::ColorEdit4("Effect color", &request.beam_effect_color.red);
                 ImGui::SliderFloat("Shine", &request.beam_shine, 0.0F, 1.0F);
                 ImGui::SliderFloat("Holography", &request.beam_holography, 0.0F, 1.0F);
+                ImGui::DragFloat("Thickness", &request.beam_width,
+                                 0.01F, 0.001F, 1000.0F, "%.3f");
+                ImGui::SliderFloat("Opacity", &request.beam_opacity,
+                                   0.0F, 1.0F, "%.2f");
                 ImGui::DragFloat("Repetition", &request.beam_repetition,
                                  0.05F, 0.01F, 1000.0F);
                 ImGui::TextDisabled("Orientation follows the Beam path automatically.");
@@ -6942,12 +6954,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto built = fabric::editor::build_visual_preset(
             *session.manifest(), request);
         if (built.ok()) {
-            ImGui::SeparatorText("Resources created");
-            ImGui::Text("%zu vector artwork(s)", built.bundle->vectors.size());
-            ImGui::Text("%zu textured path(s)",
-                        built.bundle->textured_paths.size());
-            ImGui::TextUnformatted("1 composition");
-            ImGui::TextUnformatted("1 reusable component");
+            if (ImGui::CollapsingHeader("Advanced resource details")) {
+                ImGui::Text("%zu vector artwork(s)", built.bundle->vectors.size());
+                ImGui::Text("%zu textured path(s)",
+                            built.bundle->textured_paths.size());
+                ImGui::TextUnformatted("1 composition");
+                ImGui::TextUnformatted("1 reusable component");
+            }
         } else {
             for (const auto& error : built.errors) {
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
@@ -6955,8 +6968,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::BeginDisabled(!built.ok() || !thread_texture_resolved);
-        if (ImGui::Button("Create preset", {140.0F, 0.0F})) {
+        const bool create_visual_clicked = ImGui::Button(
+            request.guided_beam ? "Create Beam" : "Create preset",
+            {140.0F, 0.0F});
+        if (ui_beam_probe_enabled && request.guided_beam) {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_beam_create_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_beam_create_seen = true;
+        }
+        if (create_visual_clicked) {
             if (session.create_visual_preset(request)) {
+                if (ui_beam_probe_enabled) ui_beam_created = true;
                 clear_asset_preview(preview);
                 status = "Visual preset created and selected.";
                 ImGui::CloseCurrentPopup();
@@ -7647,12 +7672,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_drag_test = false,
                      const bool ui_override_test = false,
                      const bool ui_texture_test = false,
-                     const bool ui_input_test = false) {
+                     const bool ui_input_test = false,
+                     const bool ui_beam_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
         ui_accessibility_test || ui_drag_test || ui_override_test ||
-        ui_texture_test || ui_input_test;
+        ui_texture_test || ui_input_test || ui_beam_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -7685,7 +7711,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             ((behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
               ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-              ui_drag_test || ui_override_test || ui_texture_test || ui_input_test)
+              ui_drag_test || ui_override_test || ui_texture_test ||
+              ui_input_test || ui_beam_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7717,7 +7744,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
          ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-         ui_drag_test || ui_override_test || ui_texture_test || ui_input_test) ? 0 : 1);
+         ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
+         ui_beam_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -7774,7 +7802,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
     }
     if ((ui_test_mode || ui_min_window_test || ui_drag_test || ui_override_test ||
-         ui_texture_test || ui_input_test) &&
+         ui_texture_test || ui_input_test || ui_beam_test) &&
         session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
@@ -7829,6 +7857,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_input_created = false;
         ui_input_reloaded = false;
         creation.request_input = true;
+    }
+    if (ui_beam_test && session.has_project()) {
+        ui_beam_probe_enabled = true;
+        ui_beam_create_seen = false;
+        ui_beam_created = false;
+        ui_beam_reloaded = false;
+        creation.visual_preset = {};
+        creation.visual_preset.kind = fabric::editor::VisualPresetKind::beam;
+        creation.visual_preset.id.value = "ui-guided-beam";
+        creation.visual_preset.name = "UI Guided Beam";
+        creation.visual_preset.guided_beam = true;
+        creation.visual_preset.thread_texture.reset();
+        creation.visual_preset.beam_color = {0.2F, 0.35F, 1.0F, 1.0F};
+        creation.visual_preset.beam_effect_color = {1.0F, 0.1F, 0.8F, 1.0F};
+        creation.visual_preset.beam_shine = 0.3F;
+        creation.visual_preset.beam_holography = 0.8F;
+        creation.visual_preset.beam_repetition = 7.0F;
+        creation.visual_preset.beam_width = 0.3F;
+        creation.visual_preset.beam_opacity = 0.75F;
+        creation.request_visual_preset = true;
     }
     if (ui_focus_test && session.has_project()) {
         creation.material.name.clear();
@@ -8225,6 +8273,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_override_frame = 0U;
     std::size_t ui_texture_frame = 0U;
     std::size_t ui_input_frame = 0U;
+    std::size_t ui_beam_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -8311,6 +8360,27 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 button.button.windowID = SDL_GetWindowID(window);
                 button.button.x = static_cast<int>(std::lround(ui_texture_crop_target.x));
                 button.button.y = static_cast<int>(std::lround(ui_texture_crop_target.y));
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
+        if (ui_beam_test && ui_beam_create_seen &&
+            ui_beam_frame >= 1U && ui_beam_frame <= 3U) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(ui_beam_create_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(ui_beam_create_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            if (ui_beam_frame >= 2U) {
+                SDL_Event button{};
+                button.type = ui_beam_frame == 2U
+                    ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
                 static_cast<void>(SDL_PushEvent(&button));
             }
         }
@@ -8940,7 +9010,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                 "asset-studio-vector-canvas-advanced.ppm");
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
-            ui_texture_test || ui_input_test)
+            ui_texture_test || ui_input_test || ui_beam_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -9060,6 +9130,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             }
             if (ui_input_frame >= 4U) {
                 write_ui_input_probe(initial_project);
+                running = false;
+            }
+        }
+        if (ui_beam_test) {
+            ++ui_beam_frame;
+            if (ui_beam_frame >= 8U) {
+                fabric::editor::ProjectSession reloaded;
+                ui_beam_reloaded = ui_beam_created &&
+                    reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::textured_path,
+                        {.value = "ui-guided-beam-rail"}) &&
+                    reloaded.selected_textured_path() &&
+                    reloaded.manifest()->default_stroke_texture &&
+                    reloaded.selected_textured_path()->texture.id ==
+                        *reloaded.manifest()->default_stroke_texture &&
+                    reloaded.selected_textured_path()->width == 0.3F &&
+                    reloaded.selected_textured_path()->opacity == 0.75F &&
+                    reloaded.selected_textured_path()->uv_scale.x == 7.0F;
+                write_ui_beam_probe(initial_project);
                 running = false;
             }
         }
@@ -9268,11 +9358,14 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-texture-test";
     const bool ui_input_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-input-test";
+    const bool ui_beam_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-beam-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
         !ui_focus_test && !ui_accessibility_test && !ui_drag_test &&
-        !ui_override_test && !ui_texture_test && !ui_input_test) {
+        !ui_override_test && !ui_texture_test && !ui_input_test &&
+        !ui_beam_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -9290,14 +9383,16 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-drag-child-test project-directory\n"
                      "       asset_studio --ui-overrides-test project-directory\n"
                      "       asset_studio --ui-texture-test project-directory\n"
-                     "       asset_studio --ui-input-test project-directory\n";
+                     "       asset_studio --ui-input-test project-directory\n"
+                     "       asset_studio --ui-beam-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
         (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
-        ui_drag_test || ui_override_test || ui_texture_test || ui_input_test)
+        ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
+        ui_beam_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
@@ -9306,5 +9401,6 @@ int main(const int argument_count, char** arguments) {
                             entity_e2e, animation_e2e, texture_e2e, vector_e2e,
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
                             ui_focus_test, ui_accessibility_test, ui_drag_test,
-                            ui_override_test, ui_texture_test, ui_input_test);
+                            ui_override_test, ui_texture_test, ui_input_test,
+                            ui_beam_test);
 }

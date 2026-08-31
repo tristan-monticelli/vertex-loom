@@ -28,6 +28,8 @@ struct VisualPresetRequest {
     float beam_shine{};
     float beam_holography{};
     float beam_repetition{5.0F};
+    float beam_width{0.12F};
+    float beam_opacity{1.0F};
     bool guided_beam{};
 };
 

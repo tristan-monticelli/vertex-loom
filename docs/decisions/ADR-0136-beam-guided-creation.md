@@ -21,6 +21,11 @@ quand aucune variante locale n’est choisie et persiste son profil Thread,
 classification Beam, couleurs, répétition, brillance et holographie dans le
 chemin texturé produit.
 
+Les nouvelles compositions Beam utilisent aussi l'identifiant de calque
+`beam` pour leurs bindings publics. `seam` reste accepté uniquement dans les
+ressources historiques ; il ne doit plus apparaître dans l'inspecteur d'un
+Beam nouvellement créé.
+
 Le rendu reste partagé par Asset Studio, Preview Runtime et runtime publié via
 la géométrie de ruban par longueur d’arc. La tangente du chemin détermine
 l’orientation ; le choix de texture manuel ne modifie que la ressource
@@ -51,6 +56,8 @@ ADR-0137 et ne font plus partie du produit.
   couverte par les tests de géométrie avant d’être exposée dans l’interface.
 - Le test isolé du Beam vérifie la texture par défaut et les paramètres shader
   avant toute vérification visuelle OpenGL.
+- L'E2E UI Beam ouvre l'assistant, clique réellement sur `Create Beam`, capture
+  le résultat texturé puis recharge épaisseur, opacité, répétition et texture.
 - La session vérifie que la texture sélectionnée, y compris la texture par
   défaut, existe dans l’index du projet avant publication ; une référence
   invalide est affichée comme erreur actionnable.

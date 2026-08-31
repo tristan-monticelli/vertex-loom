@@ -75,6 +75,8 @@ flowchart LR
     Beam --> BeamContract[Beam request]
     BeamContract --> Legacy[Compatible texturedPath contract]
     Beam --> Shared[Shared textured-path geometry]
+    Beam --> BeamE2E[UI click, screenshot and reload proof]
+    BeamE2E --> Shared
     Button --> ButtonTexture[Imported Button PNG]
     ButtonTexture --> Entity
     Shared --> Studio[Asset Studio preview]

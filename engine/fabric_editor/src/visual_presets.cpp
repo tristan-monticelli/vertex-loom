@@ -1,5 +1,6 @@
 #include "fabric/editor/visual_presets.hpp"
 
+#include <cmath>
 #include <utility>
 
 namespace fabric::editor {
@@ -148,6 +149,9 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     path.commands.back().control1 = {-0.8F, 0.3F};
     path.commands.back().control2 = {0.8F, -0.3F};
     if (request.guided_beam) {
+        path.width = request.beam_width;
+        path.opacity = request.beam_opacity;
+        path.uv_scale.x = request.beam_repetition;
         path.color = request.beam_color;
         path.shader.profile = project::SurfaceShaderProfile::thread;
         path.shader.classification = project::TextureClassification::beam;
@@ -162,6 +166,7 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         {outlined_rectangle("border-shape", "Beam border",
                             {{-2.0F, -0.4F}, {4.0F, 0.8F}},
                             {0.08F, 0.04F, 0.02F, 1.0F}, 0.06F)});
+    const std::string layer_id = request.guided_beam ? "beam" : "seam";
     project::VisualComposition composition{
         .document = {.schema_version =
                          project::current_visual_composition_schema_version,
@@ -169,7 +174,7 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
                      .id = composition_id,
                      .name = request.name + " Composition"},
         .size = {4.0F, 0.8F},
-        .layers = {layer("seam", request.guided_beam ? "Beam" : "Seam",
+        .layers = {layer(layer_id, request.guided_beam ? "Beam" : "Seam",
                          VisualLayerKind::textured_path,
                          path_id, "texturedPath", {}, 0.0F)},
     };
@@ -182,15 +187,15 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     auto component = component_for(
         request, composition_id, {{-2.0F, -0.4F}, {4.0F, 0.8F}},
         {{"width", "Width", Type::scalar, path.width,
-          binding("seam", "texturedPath", "width"), true},
+          binding(layer_id, "texturedPath", "width"), true},
          {"repeat", "Repeat", Type::scalar, path.uv_scale.x,
-          binding("seam", "texturedPath", "uvScaleX"), true},
+          binding(layer_id, "texturedPath", "uvScaleX"), true},
          {"offset", "Texture offset", Type::scalar, 0.0F,
-          binding("seam", "texturedPath", "uvOffsetX"), true},
+          binding(layer_id, "texturedPath", "uvOffsetX"), true},
          {"color", "Color", Type::color, path.color,
-          binding("seam", "texturedPath", "color"), true},
+          binding(layer_id, "texturedPath", "color"), true},
          {"opacity", "Opacity", Type::scalar, path.opacity,
-          binding("seam", "texturedPath", "opacity"), true}});
+          binding(layer_id, "texturedPath", "opacity"), true}});
     return {.vectors = request.guided_beam
             ? std::vector<project::VectorAsset>{}
             : std::vector<project::VectorAsset>{std::move(border)},
@@ -331,6 +336,26 @@ VisualPresetResult build_visual_preset(
          effective_request.zipper_tooth_count > 128U)) {
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "zipperToothCount", "tooth count must be between 2 and 128");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_width) ||
+         effective_request.beam_width <= 0.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamWidth", "beam width must be finite and positive");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_repetition) ||
+         effective_request.beam_repetition <= 0.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamRepetition",
+                  "beam repetition must be finite and positive");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_opacity) ||
+         effective_request.beam_opacity < 0.0F ||
+         effective_request.beam_opacity > 1.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamOpacity", "beam opacity must be in [0, 1]");
     }
     if (!result.errors.empty()) return result;
 

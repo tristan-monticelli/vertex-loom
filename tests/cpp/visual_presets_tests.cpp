@@ -578,6 +578,8 @@ TEST_CASE("guided Beam is a textured path with the project default and shader") 
     beam_request.beam_shine = 0.4F;
     beam_request.beam_holography = 0.6F;
     beam_request.beam_repetition = 7.0F;
+    beam_request.beam_width = 0.35F;
+    beam_request.beam_opacity = 0.75F;
     auto project_manifest = manifest();
     project_manifest.default_stroke_texture =
         fabric::core::ResourceId{.value = "project-thread"};
@@ -595,6 +597,25 @@ TEST_CASE("guided Beam is a textured path with the project default and shader") 
     CHECK(beam.shader.primary_color == beam_request.beam_color);
     CHECK(beam.shader.effect_color == beam_request.beam_effect_color);
     CHECK(beam.shader.repetition.x == 7.0F);
+    CHECK(beam.uv_scale.x == 7.0F);
+    CHECK(beam.width == 0.35F);
+    CHECK(beam.opacity == 0.75F);
+    REQUIRE(built.bundle->composition.layers.size() == 1U);
+    CHECK(built.bundle->composition.layers.front().id == "beam");
+    for (const auto& parameter : built.bundle->component.parameters)
+        CHECK(parameter.target.node_id == "beam");
+}
+
+TEST_CASE("guided Beam rejects invalid visible appearance values") {
+    auto beam_request = request(
+        fabric::editor::VisualPresetKind::beam, "invalid-guided-beam");
+    beam_request.beam_width = 0.0F;
+    beam_request.beam_repetition = -1.0F;
+    beam_request.beam_opacity = 2.0F;
+    const auto built = fabric::editor::build_visual_preset(
+        manifest(), beam_request);
+    CHECK_FALSE(built.ok());
+    CHECK(built.errors.size() == 3U);
 }
 
 TEST_CASE("thread presets inherit the project default texture") {

@@ -117,6 +117,21 @@ if(DEFINED INPUT_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED BEAM_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${BEAM_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${BEAM_ARTIFACT}")
+    endif()
+    file(READ "${TEST_ROOT}/project/${BEAM_ARTIFACT}" BEAM_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"create_button_seen\": true"
+            "\"created_by_click\": true"
+            "\"reloaded_with_default_texture\": true")
+        string(FIND "${BEAM_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio Beam probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"
@@ -130,7 +145,8 @@ foreach(REQUIRED_ID
 endforeach()
 
 if(NOT DEFINED DRAG_ARTIFACT AND NOT DEFINED OVERRIDE_ARTIFACT AND
-   NOT DEFINED TEXTURE_ARTIFACT AND NOT DEFINED INPUT_ARTIFACT)
+   NOT DEFINED TEXTURE_ARTIFACT AND NOT DEFINED INPUT_ARTIFACT AND
+   NOT DEFINED BEAM_ARTIFACT)
 execute_process(
     COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT
