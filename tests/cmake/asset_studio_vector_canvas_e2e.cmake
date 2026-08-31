@@ -24,11 +24,19 @@ set(VISUAL_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-final.ppm")
 set(PEN_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-pen.ppm")
 set(HANDLES_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-handles.ppm")
 set(VISUAL_PROBE "${TEST_ROOT}/project/asset-studio-vector-canvas-visual.json")
+set(MITER_BUTT_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-miter-butt.ppm")
+set(ROUND_ROUND_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-round-round.ppm")
+set(BEVEL_SQUARE_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-bevel-square.ppm")
+set(ADVANCED_CAPTURE "${TEST_ROOT}/project/asset-studio-vector-canvas-advanced.ppm")
 if(NOT EXISTS "${VISUAL_CAPTURE}" OR NOT EXISTS "${PEN_CAPTURE}" OR
-   NOT EXISTS "${HANDLES_CAPTURE}" OR NOT EXISTS "${VISUAL_PROBE}")
+   NOT EXISTS "${HANDLES_CAPTURE}" OR NOT EXISTS "${VISUAL_PROBE}" OR
+   NOT EXISTS "${MITER_BUTT_CAPTURE}" OR NOT EXISTS "${ROUND_ROUND_CAPTURE}" OR
+   NOT EXISTS "${BEVEL_SQUARE_CAPTURE}" OR NOT EXISTS "${ADVANCED_CAPTURE}")
     message(FATAL_ERROR "Vector Canvas E2E did not produce visual evidence")
 endif()
-foreach(CAPTURE IN ITEMS "${VISUAL_CAPTURE}" "${PEN_CAPTURE}" "${HANDLES_CAPTURE}")
+foreach(CAPTURE IN ITEMS "${VISUAL_CAPTURE}" "${PEN_CAPTURE}" "${HANDLES_CAPTURE}"
+        "${MITER_BUTT_CAPTURE}" "${ROUND_ROUND_CAPTURE}"
+        "${BEVEL_SQUARE_CAPTURE}" "${ADVANCED_CAPTURE}")
     file(SIZE "${CAPTURE}" CAPTURE_SIZE)
     if(CAPTURE_SIZE LESS 1000)
         message(FATAL_ERROR "Vector Canvas E2E capture is unexpectedly small: ${CAPTURE}")

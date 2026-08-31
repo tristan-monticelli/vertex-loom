@@ -52,7 +52,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tests runtime couvrent le fill et le transform image.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
-- [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
+- [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
   poignées liées/symétriques/libres, sélection et transform multi-points,
   transform fill indépendante, clips imbriqués, registre animable, CommandStack,
   géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
@@ -68,7 +68,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   redimensionnables et focalisés sur la sélection. Les preuves sont
   `asset_studio_ui_focus_e2e`, `asset_studio_ui_accessibility_e2e`,
   `asset_studio_ui_min_window_e2e` et les E2E Map Studio.
-- [ ] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
+- [x] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
   crop/input/joueur/monstre/path Bézier, diagnostics et screenshots. Le parcours
   texture/crop dispose maintenant de
   `asset_studio_ui_texture_e2e` et le parcours input joueur/attaque de
@@ -123,20 +123,20 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné. Les commandes et le contrat
   v3 sont couverts par les tests de timeline et d’animation.
-- [ ] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
+- [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
   suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
-  symétriques et libres. L’édition existante ne crée pas encore une courbe par
-  cliquer-glisser avec la plume.
-- [ ] Rendre la géométrie de stroke effective : largeur, joins `round`,
-  `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
-  renderer les applique désormais dans les draw packets et les chemins OpenGL ;
-  la preuve visuelle de chaque variante dans l’éditeur reste à ajouter.
+  symétriques et libres. Le parcours `asset_studio_vector_canvas_e2e` couvre
+  aussi le cliquer-glisser, la sélection et la suppression après reload.
+- [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
+  `bevel`, `miter` et caps modifient les draw packets et le rendu ; le parcours
+  visuel capture les couples miter/butt, round/round et bevel/square.
 - [x] Ajouter le stroke image avec texture et répétition, ainsi qu'une bordure
   vectorielle configurable ; livrer un preset `beam` préexistant et visible
   comme exemple. Le parcours visuel du stroke texturé est prouvé par la capture
   PPM et le probe pixel de `asset_studio_vector_canvas_e2e`.
-- [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
-  (UV, offset, échelle et déformation), ainsi que chaque variante de join/cap.
+- [x] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
+  (offset, échelle et déformation), ainsi que chaque variante de join/cap ; les
+  captures et le reload sont contrôlés par `asset_studio_vector_canvas_e2e`.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher

@@ -59,9 +59,9 @@ parcours SDL des studios ont un timeout CTest de 180 secondes et le job
 plateforme une limite de 20 minutes afin qu'un blocage de fenêtre, de driver,
 de build ou d'installation devienne un échec diagnostiquable sur Windows.
 Le workflow publie aussi les captures `asset-studio-vector-canvas-pen.ppm`,
-`asset-studio-vector-canvas-handles.ppm`, `asset-studio-vector-canvas-final.ppm`
-et leur probe JSON afin que la preuve visuelle soit récupérable depuis chaque
-run multiplateforme.
+`asset-studio-vector-canvas-handles.ppm`, `asset-studio-vector-canvas-final.ppm`,
+les trois couples join/cap et la variante avancée afin que la preuve visuelle
+soit récupérable depuis chaque run multiplateforme.
 Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
 capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui, vérifie
 un probe pixel de sa zone native avec un nombre minimal de pixels et une plage

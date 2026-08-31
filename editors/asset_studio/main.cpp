@@ -7878,7 +7878,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 if (node.shape.path.size() > 1U)
                     vector_canvas_e2e_initial_control1 =
                         node.shape.path[1].control1;
-                node.fill = fabric::project::VectorFill{};
+                node.fill = fabric::project::VectorFill{
+                    .kind = fabric::project::VectorFillKind::image,
+                    .image = fabric::project::VectorImageFill{
+                        .texture = {{.value = "head-thread"}, "texture"}},
+                };
                 node.stroke = fabric::project::VectorStroke{
                     .color = {1.0F, 1.0F, 1.0F, 1.0F},
                     .width = 0.16F,
@@ -8023,6 +8027,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 9U) {
             canvas.tool = CanvasUiState::Tool::move;
             canvas.bezier_handle_mode = fabric::editor::BezierHandleMode::free;
+        }
+        if (vector_canvas_e2e && vector_canvas_e2e_frame >= 17U &&
+            vector_canvas_e2e_frame <= 20U && session.created_vector()) {
+            auto node = session.created_vector()->native->nodes.front();
+            if (vector_canvas_e2e_frame == 17U) {
+                node.stroke->join = fabric::project::VectorStrokeJoin::miter;
+                node.stroke->cap = fabric::project::VectorStrokeCap::butt;
+            } else if (vector_canvas_e2e_frame == 18U) {
+                node.stroke->join = fabric::project::VectorStrokeJoin::round;
+                node.stroke->cap = fabric::project::VectorStrokeCap::round;
+            } else if (vector_canvas_e2e_frame == 19U) {
+                node.stroke->join = fabric::project::VectorStrokeJoin::bevel;
+                node.stroke->cap = fabric::project::VectorStrokeCap::square;
+            } else if (node.stroke->image) {
+                node.stroke->image->transform.position = {0.35F, -0.15F};
+                node.stroke->image->transform.scale = {1.8F, 0.7F};
+                node.stroke->image->deform_with_shape = true;
+            }
+            static_cast<void>(session.set_selected_vector_node(
+                0U, std::move(node)));
         }
         const bool pen_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 2U && vector_canvas_e2e_frame < 6U;
@@ -8527,6 +8551,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                              canvas.native_origin,
                                              canvas.native_size);
         }
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 17U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-vector-canvas-miter-butt.ppm");
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 18U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-vector-canvas-round-round.ppm");
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 19U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-vector-canvas-bevel-square.ppm");
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 20U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-vector-canvas-advanced.ppm");
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
             ui_texture_test || ui_input_test)
@@ -8688,6 +8724,25 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded_ok &&
                     reloaded.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size - 1U;
+            } else if (vector_canvas_e2e_frame == 21U) {
+                const bool saved = session.save();
+                fabric::editor::ProjectSession reloaded;
+                const bool reloaded_ok = saved && reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::vector,
+                        {.value = "head-button-artwork"}) &&
+                    reloaded.created_vector() && reloaded.created_vector()->native &&
+                    !reloaded.created_vector()->native->nodes.empty();
+                const auto& node = reloaded.created_vector()->native->nodes.front();
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    reloaded_ok && node.stroke && node.stroke->image &&
+                    node.stroke->join == fabric::project::VectorStrokeJoin::bevel &&
+                    node.stroke->cap == fabric::project::VectorStrokeCap::square &&
+                    node.stroke->image->transform.position ==
+                        fabric::core::Vec2{0.35F, -0.15F} &&
+                    node.stroke->image->transform.scale ==
+                        fabric::core::Vec2{1.8F, 0.7F} &&
+                    node.stroke->image->deform_with_shape;
                 running = false;
             }
         }
