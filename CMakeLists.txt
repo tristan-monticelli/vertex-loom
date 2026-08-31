@@ -621,6 +621,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(
+            NAME map_studio_ui_accessibility_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-ui-accessibility-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_ui_accessibility_e2e.cmake
+        )
+        add_test(
             NAME asset_studio_ui_drag_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
@@ -780,6 +788,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             asset_studio_ui_min_window_e2e
             asset_studio_ui_focus_e2e
             asset_studio_ui_accessibility_e2e
+            map_studio_ui_accessibility_e2e
             asset_studio_ui_drag_e2e
             asset_studio_ui_drag_root_e2e
             asset_studio_ui_drag_child_e2e

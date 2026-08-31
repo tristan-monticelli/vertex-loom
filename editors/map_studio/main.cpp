@@ -186,6 +186,52 @@ void write_e2e_failure_artifacts(
     }
 }
 
+float relative_luminance(const ImVec4 color) {
+    const auto linear = [](const float channel) {
+        return channel <= 0.03928F ? channel / 12.92F
+            : std::pow((channel + 0.055F) / 1.055F, 2.4F);
+    };
+    return 0.2126F * linear(color.x) + 0.7152F * linear(color.y) +
+        0.0722F * linear(color.z);
+}
+
+void write_ui_accessibility_probe(const std::filesystem::path& project_path,
+                                  SDL_Window* window,
+                                  const bool keyboard_navigation_enabled) {
+    if (project_path.empty() || window == nullptr) return;
+    const auto& colors = ImGui::GetStyle().Colors;
+    const float background = relative_luminance(colors[ImGuiCol_WindowBg]);
+    const float text = relative_luminance(colors[ImGuiCol_Text]);
+    const float contrast = (std::max(background, text) + 0.05F) /
+        (std::min(background, text) + 0.05F);
+    std::ofstream output(project_path / "map-studio-ui-accessibility.json");
+    if (output) {
+        output << "{\n  \"schema\": \"map-studio-ui-accessibility-test-v1\",\n"
+               << "  \"keyboard_navigation_enabled\": "
+               << (keyboard_navigation_enabled ? "true" : "false") << ",\n"
+               << "  \"text_window_contrast\": " << contrast << ",\n"
+               << "  \"text_window_contrast_ok\": "
+               << (contrast >= 4.5F ? "true" : "false") << "\n}\n";
+    }
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    std::ofstream image(project_path / "map_studio-ui-accessibility.ppm",
+                        std::ios::binary);
+    if (!image) return;
+    image << "P6\n" << width << ' ' << height << "\n255\n";
+    const auto row_size = static_cast<std::size_t>(width) * 3U;
+    for (int row = height - 1; row >= 0; --row)
+        image.write(reinterpret_cast<const char*>(pixels.data() +
+                                                   static_cast<std::size_t>(row) * row_size),
+                    static_cast<std::streamsize>(row_size));
+}
+
 void draw_scene_errors(const fabric::editor::SceneSession& session) {
     for (const auto& error : session.errors()) {
         ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
@@ -2332,9 +2378,11 @@ int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id,
         const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
         const bool scene_e2e = false,
-        const bool transformation_e2e = false) {
+        const bool transformation_e2e = false,
+        const bool ui_accessibility_test = false) {
     const int graphical_failure =
-        (e2e_mode || scene_e2e || transformation_e2e) ? 77 : 1;
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test)
+            ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -2359,7 +2407,8 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        (e2e_mode || scene_e2e || transformation_e2e ? SDL_WINDOW_HIDDEN : 0U);
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test
+             ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
         window_flags);
@@ -4060,6 +4109,12 @@ int run(const std::filesystem::path& project_root,
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
         if (scene_e2e || transformation_e2e) running = false;
+        if (ui_accessibility_test) {
+            write_ui_accessibility_probe(
+                project_root, window,
+                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
+            running = false;
+        }
     }
 
     const bool e2e_incomplete = e2e_failed ||
@@ -4090,25 +4145,31 @@ int main(int argc, char** argv) {
         std::string_view{argv[1]} == "--e2e-scene";
     const bool transformation_e2e = argc == 4 &&
         std::string_view{argv[1]} == "--e2e-transformation";
+    const bool ui_accessibility_test = argc == 3 &&
+        std::string_view{argv[1]} == "--ui-accessibility-test";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
     if ((argc != 1 && argc != 3 && !e2e && !scene_e2e &&
-         !transformation_e2e) ||
+         !transformation_e2e && !ui_accessibility_test) ||
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
                      "<clean|window|shortcut|save|save-failure> project-directory map-id\n"
                      "       map_studio --e2e-scene project-directory map-id\n"
                      "       map_studio --e2e-transformation "
-                     "project-directory map-id\n";
+                     "project-directory map-id\n"
+                     "       map_studio --ui-accessibility-test project-directory\n";
         return 64;
     }
     const std::filesystem::path project = e2e ? argv[3]
         : scene_e2e ? argv[2]
         : transformation_e2e ? argv[2]
+        : ui_accessibility_test ? argv[2]
         : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
         e2e ? argv[4]
         : scene_e2e || transformation_e2e ? argv[3]
+        : ui_accessibility_test ? ""
         : argc == 3 ? argv[2] : ""};
-    return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e);
+    return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e,
+               ui_accessibility_test);
 }

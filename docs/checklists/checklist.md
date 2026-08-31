@@ -148,7 +148,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `33335758294` vert sur les trois plateformes, E2E UI Windows exécutés.
 - [x] Vérifier localement aux tailles minimales de fenêtre le focus, le scroll
   automatique, la navigation clavier, les unités, tooltips, raccourcis et le
-  contraste via les tests UI Asset Studio ; la répétition multiplateforme reste
+  contraste via les tests UI Asset Studio et Map Studio ; la répétition multiplateforme reste
   ouverte.
 
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
