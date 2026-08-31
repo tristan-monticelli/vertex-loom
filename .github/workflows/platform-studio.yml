@@ -106,3 +106,5 @@ jobs:
             build/**/*e2e-failure.ppm
             build/**/*asset-studio-ui-*.json
             build/**/*asset-studio-ui-*.ppm
+            build/**/*asset-studio-vector-canvas-*.json
+            build/**/*asset-studio-vector-canvas-*.ppm
