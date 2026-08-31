@@ -4233,13 +4233,48 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_node(node);
                 }
             }
+            const auto default_stroke_texture = [&]()
+                -> std::optional<fabric::project::ResourceReference> {
+                const auto first_texture = std::ranges::find_if(
+                    session.resources(), [](const auto& resource) {
+                        return resource.kind ==
+                            fabric::editor::StudioResourceKind::texture;
+                    });
+                if (first_texture == session.resources().end()) return std::nullopt;
+                const auto textile_texture = std::ranges::find_if(
+                    session.resources(), [](const auto& resource) {
+                        if (resource.kind != fabric::editor::StudioResourceKind::texture) return false;
+                        const auto id = resource.id.value;
+                        const auto name = resource.name;
+                        return id.find("thread") != std::string::npos ||
+                            id.find("rope") != std::string::npos ||
+                            id.find("beam") != std::string::npos ||
+                            name.find("Thread") != std::string::npos ||
+                            name.find("Rope") != std::string::npos;
+                    });
+                const auto& selected = textile_texture == session.resources().end()
+                    ? *first_texture : *textile_texture;
+                return fabric::project::ResourceReference{selected.id, "texture"};
+            };
             bool has_stroke = node.stroke.has_value();
             if (ImGui::Checkbox("Stroke", &has_stroke)) {
-                if (has_stroke) node.stroke = fabric::project::VectorStroke{};
+                if (has_stroke) {
+                    node.stroke = fabric::project::VectorStroke{};
+                    if (const auto texture = default_stroke_texture())
+                        node.stroke->image = fabric::project::VectorImageFill{
+                            .texture = *texture};
+                }
                 else node.stroke.reset();
                 commit_node(node);
             }
             if (node.stroke) {
+                if (!node.stroke->image) {
+                    if (const auto texture = default_stroke_texture()) {
+                        node.stroke->image = fabric::project::VectorImageFill{
+                            .texture = *texture};
+                        commit_node(node);
+                    }
+                }
                 float stroke_color[]{node.stroke->color.red,
                                      node.stroke->color.green,
                                      node.stroke->color.blue,
