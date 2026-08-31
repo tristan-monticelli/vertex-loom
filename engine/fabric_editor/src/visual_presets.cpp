@@ -257,10 +257,13 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         .size = {4.0F, 0.8F},
         .layers = {layer("seam", request.guided_beam ? "Beam" : "Seam",
                          VisualLayerKind::textured_path,
-                         path_id, "texturedPath", {}, 0.0F),
-                   layer("border", "Beam border", VisualLayerKind::vector,
-                         border_id, "vector", {}, 1.0F)},
+                         path_id, "texturedPath", {}, 0.0F)},
     };
+    if (!request.guided_beam) {
+        composition.layers.push_back(layer(
+            "border", "Beam border", VisualLayerKind::vector,
+            border_id, "vector", {}, 1.0F));
+    }
     using Type = project::VisualParameterType;
     auto component = component_for(
         request, composition_id, {{-2.0F, -0.4F}, {4.0F, 0.8F}},
@@ -274,7 +277,9 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
           binding("seam", "texturedPath", "color"), true},
          {"opacity", "Opacity", Type::scalar, path.opacity,
           binding("seam", "texturedPath", "opacity"), true}});
-    return {.vectors = {std::move(border)},
+    return {.vectors = request.guided_beam
+            ? std::vector<project::VectorAsset>{}
+            : std::vector<project::VectorAsset>{std::move(border)},
             .textured_paths = {std::move(path)},
             .composition = std::move(composition),
             .component = std::move(component)};

@@ -27,6 +27,10 @@ sélectionnée.
 Les ressources techniques restent disponibles dans un menu `Advanced` et ne
 sont pas supprimées des projets existants.
 
+Le parcours Button ne synthétise pas une nouvelle illustration : il référence
+un composant Button déjà fourni par le projet. Les presets de formes historiques
+restent uniquement des outils de compatibilité/avancé.
+
 ## Conséquences
 
 - Les tests et fixtures peuvent continuer à employer `VisualPresetKind::seam`
@@ -35,3 +39,5 @@ sont pas supprimées des projets existants.
   de création.
 - Toute évolution du calcul UV doit être faite dans le builder partagé et
   couverte par les tests de géométrie avant d’être exposée dans l’interface.
+- Le test isolé du Beam vérifie la texture par défaut et les paramètres shader
+  avant toute vérification visuelle OpenGL.

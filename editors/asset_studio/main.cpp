@@ -183,6 +183,7 @@ struct CreationUiState {
     bool request_visual_component{};
     bool request_behavior{};
     bool request_transformation{};
+    bool guided_button{};
     bool project_publish_attempted{};
     bool input_capture{};
     std::size_t input_capture_action{};
@@ -2652,11 +2653,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.request_visual_preset = true;
             }
             if (ImGui::MenuItem("Button...")) {
-                creation.visual_preset.kind =
-                    fabric::editor::VisualPresetKind::button;
-                creation.visual_preset.name = "Button";
-                creation.visual_preset.id.value = "button";
-                creation.request_visual_preset = true;
+                creation.guided_button = true;
+                creation.request_entity = true;
             }
             if (ImGui::MenuItem("Eye...")) {
                 creation.visual_preset.kind =
@@ -6459,6 +6457,23 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (creation.request_entity && session.has_project()) {
         creation.entity.reset();
+        if (creation.guided_button) {
+            creation.guided_button = false;
+            creation.entity.name = "Button entity";
+            const auto button = std::ranges::find_if(
+                session.resources(), [](const auto& resource) {
+                    return resource.kind ==
+                               fabric::editor::StudioResourceKind::visual_component &&
+                        (resource.id.value.find("button") != std::string::npos ||
+                         resource.name.find("Button") != std::string::npos);
+                });
+            if (button != session.resources().end()) {
+                creation.entity.drawable =
+                    fabric::project::EntityDrawableKind::visual_component;
+                creation.entity.resource_id = button->id.value;
+                creation.entity.node_name = "Button";
+            }
+        }
         ImGui::OpenPopup("Create entity");
         creation.request_entity = false;
     }

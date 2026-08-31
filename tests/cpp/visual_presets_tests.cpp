@@ -624,6 +624,35 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
     CHECK(first.bundle->component.parameters.size() == 5U);
 }
 
+TEST_CASE("guided Beam is a textured path with the project default and shader") {
+    auto beam_request = request(
+        fabric::editor::VisualPresetKind::seam, "guided-beam");
+    beam_request.guided_beam = true;
+    beam_request.thread_texture.reset();
+    beam_request.beam_color = {0.8F, 0.1F, 0.7F, 1.0F};
+    beam_request.beam_effect_color = {0.1F, 0.9F, 1.0F, 1.0F};
+    beam_request.beam_shine = 0.4F;
+    beam_request.beam_holography = 0.6F;
+    beam_request.beam_repetition = 7.0F;
+    auto project_manifest = manifest();
+    project_manifest.default_stroke_texture =
+        fabric::core::ResourceId{.value = "project-thread"};
+    const auto built = fabric::editor::build_visual_preset(
+        project_manifest, beam_request);
+    REQUIRE(built.ok());
+    REQUIRE(built.bundle->textured_paths.size() == 1U);
+    CHECK(built.bundle->vectors.empty());
+    const auto& beam = built.bundle->textured_paths.front();
+    CHECK(beam.texture.id.value == "project-thread");
+    CHECK(beam.shader.profile ==
+          fabric::project::SurfaceShaderProfile::thread);
+    CHECK(beam.shader.classification ==
+          fabric::project::TextureClassification::beam);
+    CHECK(beam.shader.primary_color == beam_request.beam_color);
+    CHECK(beam.shader.effect_color == beam_request.beam_effect_color);
+    CHECK(beam.shader.repetition.x == 7.0F);
+}
+
 TEST_CASE("thread presets inherit the project default texture") {
     auto project_manifest = manifest();
     project_manifest.default_stroke_texture =
