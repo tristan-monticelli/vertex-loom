@@ -160,6 +160,11 @@ ValidationReport validate_manifest(const ProjectManifest& manifest) {
         add_error(report.errors, ErrorCode::invalid_manifest,
                   "pixelsPerUnit", "must be finite and greater than zero");
     }
+    if (manifest.default_stroke_texture &&
+        !core::ResourceId::is_valid(manifest.default_stroke_texture->value)) {
+        add_error(report.errors, ErrorCode::invalid_resource_id,
+                  "defaultStrokeTexture", "must be a valid texture identifier");
+    }
 
     if (manifest.runtime) {
         const auto& runtime = *manifest.runtime;
@@ -237,6 +242,14 @@ ManifestResult parse_manifest(const std::string_view json_text) {
     read_string(document, "name", manifest.name, result.errors);
     read_number(document, "pixelsPerUnit", manifest.pixels_per_unit,
                 result.errors);
+    const auto default_texture = document.find("defaultStrokeTexture");
+    if (default_texture != document.end()) {
+        if (!default_texture->is_string())
+            add_error(result.errors, ErrorCode::invalid_manifest,
+                      "defaultStrokeTexture", "expected a texture identifier string");
+        else manifest.default_stroke_texture =
+            core::ResourceId{default_texture->get<std::string>()};
+    }
 
     const auto directories = document.find("directories");
     if (directories == document.end() || !directories->is_object()) {
@@ -333,6 +346,8 @@ std::string serialize_manifest(const ProjectManifest& manifest) {
             {"schemas", manifest.directories.schemas.generic_string()},
         }},
     };
+    if (manifest.default_stroke_texture)
+        document["defaultStrokeTexture"] = manifest.default_stroke_texture->value;
     if (manifest.runtime) {
         const auto& runtime = *manifest.runtime;
         Json character = {

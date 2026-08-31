@@ -6,6 +6,7 @@
     "scenes": "scenes",
     "schemas": "schemas"
   },
+  "defaultStrokeTexture": "head-face",
   "id": "studio-textile-head",
   "name": "Studio Textile Head",
   "pixelsPerUnit": 100.0,

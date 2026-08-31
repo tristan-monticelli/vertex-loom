@@ -375,6 +375,10 @@ VisualPresetResult build_visual_preset(
     const project::ProjectManifest& manifest,
     const VisualPresetRequest& request) {
     VisualPresetResult result;
+    auto effective_request = request;
+    if (!effective_request.thread_texture && manifest.default_stroke_texture)
+        effective_request.thread_texture = project::ResourceReference{
+            *manifest.default_stroke_texture, "texture"};
     if (!core::ResourceId::is_valid(request.id.value)) {
         add_error(result.errors, project::ErrorCode::invalid_resource_id,
                   "id", "preset id must be a valid resource identifier");
@@ -383,18 +387,18 @@ VisualPresetResult build_visual_preset(
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "name", "preset name must not be empty");
     }
-    const bool uses_thread = request.kind == VisualPresetKind::seam ||
-        request.kind == VisualPresetKind::zipper;
-    if (uses_thread && (!request.thread_texture ||
-        request.thread_texture->expected_type != "texture" ||
-        !core::ResourceId::is_valid(request.thread_texture->id.value))) {
+    const bool uses_thread = effective_request.kind == VisualPresetKind::seam ||
+        effective_request.kind == VisualPresetKind::zipper;
+    if (uses_thread && (!effective_request.thread_texture ||
+        effective_request.thread_texture->expected_type != "texture" ||
+        !core::ResourceId::is_valid(effective_request.thread_texture->id.value))) {
         add_error(result.errors, project::ErrorCode::resource_type_mismatch,
                   "threadTexture",
                   "seam and zipper presets require a texture resource");
     }
-    if (request.kind == VisualPresetKind::zipper &&
-        (request.zipper_tooth_count < 2U ||
-         request.zipper_tooth_count > 128U)) {
+    if (effective_request.kind == VisualPresetKind::zipper &&
+        (effective_request.zipper_tooth_count < 2U ||
+         effective_request.zipper_tooth_count > 128U)) {
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "zipperToothCount", "tooth count must be between 2 and 128");
     }
@@ -402,10 +406,10 @@ VisualPresetResult build_visual_preset(
 
     VisualPresetBundle bundle;
     switch (request.kind) {
-    case VisualPresetKind::eye: bundle = eye_preset(request); break;
-    case VisualPresetKind::button: bundle = button_preset(request); break;
-    case VisualPresetKind::seam: bundle = seam_preset(request); break;
-    case VisualPresetKind::zipper: bundle = zipper_preset(request); break;
+    case VisualPresetKind::eye: bundle = eye_preset(effective_request); break;
+    case VisualPresetKind::button: bundle = button_preset(effective_request); break;
+    case VisualPresetKind::seam: bundle = seam_preset(effective_request); break;
+    case VisualPresetKind::zipper: bundle = zipper_preset(effective_request); break;
     }
     for (const auto& vector : bundle.vectors) {
         append_errors(result.errors,

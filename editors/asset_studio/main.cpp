@@ -4235,26 +4235,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             const auto default_stroke_texture = [&]()
                 -> std::optional<fabric::project::ResourceReference> {
-                const auto first_texture = std::ranges::find_if(
-                    session.resources(), [](const auto& resource) {
+                if (!session.manifest() ||
+                    !session.manifest()->default_stroke_texture) return std::nullopt;
+                const auto selected = std::ranges::find_if(
+                    session.resources(), [&](const auto& resource) {
                         return resource.kind ==
-                            fabric::editor::StudioResourceKind::texture;
+                            fabric::editor::StudioResourceKind::texture &&
+                            resource.id == *session.manifest()->default_stroke_texture;
                     });
-                if (first_texture == session.resources().end()) return std::nullopt;
-                const auto textile_texture = std::ranges::find_if(
-                    session.resources(), [](const auto& resource) {
-                        if (resource.kind != fabric::editor::StudioResourceKind::texture) return false;
-                        const auto id = resource.id.value;
-                        const auto name = resource.name;
-                        return id.find("thread") != std::string::npos ||
-                            id.find("rope") != std::string::npos ||
-                            id.find("beam") != std::string::npos ||
-                            name.find("Thread") != std::string::npos ||
-                            name.find("Rope") != std::string::npos;
-                    });
-                const auto& selected = textile_texture == session.resources().end()
-                    ? *first_texture : *textile_texture;
-                return fabric::project::ResourceReference{selected.id, "texture"};
+                if (selected == session.resources().end()) return std::nullopt;
+                return fabric::project::ResourceReference{selected->id, "texture"};
             };
             bool has_stroke = node.stroke.has_value();
             if (ImGui::Checkbox("Stroke", &has_stroke)) {
@@ -6770,6 +6760,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 fabric::editor::VisualPresetKind::seam ||
             request.kind == fabric::editor::VisualPresetKind::zipper;
         if (uses_thread) {
+            if (!request.thread_texture && session.manifest()->default_stroke_texture)
+                request.thread_texture = fabric::project::ResourceReference{
+                    *session.manifest()->default_stroke_texture, "texture"};
             const auto selected_texture = std::ranges::find_if(
                 session.resources(), [&](const auto& resource) {
                     return resource.kind ==

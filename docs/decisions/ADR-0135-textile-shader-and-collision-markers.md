@@ -18,6 +18,12 @@ de texture, deux couleurs, brillance, holographie, opacité, intensité,
 répétition et déformation ; les valeurs restent des propriétés ordinaires afin
 que les tracks d'animation existants puissent les cibler.
 
+Le manifeste du projet porte aussi une référence optionnelle
+`defaultStrokeTexture`. La première texture importée initialise cette valeur
+si elle est absente ; elle devient la texture de base commune aux nouveaux
+strokes et presets. Les autres textures restent des variantes sélectionnables
+dans le combo du Studio et ne remplacent pas silencieusement cette valeur.
+
 Ajouter à chaque `MapDocument` une configuration de collision par surface,
 avec activation, texture facultative, apparence, orientation, répétition,
 offset et visibilité Studio/runtime. Une configuration d'objet optionnelle

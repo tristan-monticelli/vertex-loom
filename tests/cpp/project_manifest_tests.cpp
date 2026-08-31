@@ -76,7 +76,9 @@ fabric::project::ProjectManifest example_manifest() {
 }
 
 void manifest_round_trip_is_lossless() {
-    const auto expected = example_manifest();
+    auto expected = example_manifest();
+    expected.default_stroke_texture =
+        fabric::core::ResourceId{.value = "cotton-thread"};
     const auto parsed = fabric::project::parse_manifest(
         fabric::project::serialize_manifest(expected));
     require(parsed.ok(), "serialized manifest did not parse");

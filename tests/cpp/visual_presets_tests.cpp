@@ -624,6 +624,22 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
     CHECK(first.bundle->component.parameters.size() == 5U);
 }
 
+TEST_CASE("thread presets inherit the project default texture") {
+    auto project_manifest = manifest();
+    project_manifest.default_stroke_texture =
+        fabric::core::ResourceId{.value = "base-thread"};
+    auto seam_request = request(
+        fabric::editor::VisualPresetKind::seam, "default-thread-seam");
+    seam_request.thread_texture.reset();
+
+    const auto result = fabric::editor::build_visual_preset(
+        project_manifest, seam_request);
+    REQUIRE(result.ok());
+    REQUIRE(result.bundle->textured_paths.size() == 1U);
+    CHECK(result.bundle->textured_paths.front().texture.id.value ==
+          "base-thread");
+}
+
 TEST_CASE("Beam texture offset uses a generic component animation property") {
     const auto beam_request = request(
         fabric::editor::VisualPresetKind::seam, "beam");

@@ -654,6 +654,16 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
         return false;
     }
 
+    if (!manifest_->default_stroke_texture) {
+        manifest_->default_stroke_texture = id;
+        const auto saved_manifest = project::save_manifest_atomic(
+            project_root_, *manifest_);
+        if (!saved_manifest.ok()) {
+            errors_ = saved_manifest.errors;
+            return false;
+        }
+    }
+
     imported_texture_ = ImportedTexture{
         .asset = std::move(*published.asset),
         .image = std::move(*decoded.image),
