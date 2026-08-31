@@ -1486,6 +1486,73 @@ void write_frame_capture(const std::filesystem::path& project_path,
     }
 }
 
+void write_vector_canvas_visual_probe(const std::filesystem::path& project_path,
+                                      SDL_Window* window,
+                                      const ImVec2 origin,
+                                      const ImVec2 size) {
+    if (project_path.empty() || window == nullptr || size.x <= 0.0F ||
+        size.y <= 0.0F)
+        return;
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    const auto display_size = ImGui::GetIO().DisplaySize;
+    const float scale_x = display_size.x > 0.0F
+        ? static_cast<float>(width) / display_size.x : 1.0F;
+    const float scale_y = display_size.y > 0.0F
+        ? static_cast<float>(height) / display_size.y : 1.0F;
+    const int x0 = std::clamp(static_cast<int>(std::floor(origin.x * scale_x)),
+                              0, width - 1);
+    const int x1 = std::clamp(static_cast<int>(std::ceil(
+                                  (origin.x + size.x) * scale_x)),
+                              x0 + 1, width);
+    const int y0 = std::clamp(static_cast<int>(std::floor(
+                                  static_cast<float>(height) -
+                                  (origin.y + size.y) * scale_y)),
+                              0, height - 1);
+    const int y1 = std::clamp(static_cast<int>(std::ceil(
+                                  static_cast<float>(height) - origin.y * scale_y)),
+                              y0 + 1, height);
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    constexpr int clear_red = 9;
+    constexpr int clear_green = 10;
+    constexpr int clear_blue = 13;
+    std::size_t non_background_pixels = 0U;
+    int minimum_channel = 255;
+    int maximum_channel = 0;
+    const auto pixel_at = [&](const int x, const int y, const int channel) {
+        return static_cast<int>(pixels[(static_cast<std::size_t>(y) *
+                                        static_cast<std::size_t>(width) +
+                                        static_cast<std::size_t>(x)) * 3U +
+                                       static_cast<std::size_t>(channel)]);
+    };
+    for (int y = y0; y < y1; ++y) {
+        for (int x = x0; x < x1; ++x) {
+            const int red = pixel_at(x, y, 0);
+            const int green = pixel_at(x, y, 1);
+            const int blue = pixel_at(x, y, 2);
+            minimum_channel = std::min({minimum_channel, red, green, blue});
+            maximum_channel = std::max({maximum_channel, red, green, blue});
+            const int distance = std::abs(red - clear_red) +
+                std::abs(green - clear_green) + std::abs(blue - clear_blue);
+            if (distance > 24) ++non_background_pixels;
+        }
+    }
+    const nlohmann::json probe = {
+        {"schema", "asset-studio-vector-canvas-visual-v1"},
+        {"canvas", {x0, y0, x1 - x0, y1 - y0}},
+        {"non_background_pixels", non_background_pixels},
+        {"minimum_channel", minimum_channel},
+        {"maximum_channel", maximum_channel},
+    };
+    std::ofstream output(project_path / "asset-studio-vector-canvas-visual.json");
+    if (output) output << probe.dump(2) << '\n';
+}
+
 void write_e2e_failure_artifacts(const std::filesystem::path& project_path,
                                  SDL_Window* window,
                                  const std::string& status,
@@ -8651,6 +8718,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 if (node.shape.path.size() > 1U)
                     vector_canvas_e2e_initial_control1 =
                         node.shape.path[1].control1;
+                node.fill = fabric::project::VectorFill{};
+                node.stroke = fabric::project::VectorStroke{
+                    .color = {1.0F, 1.0F, 1.0F, 1.0F},
+                    .width = 0.16F,
+                    .join = fabric::project::VectorStrokeJoin::round,
+                    .cap = fabric::project::VectorStrokeCap::round,
+                    .image = fabric::project::VectorImageFill{
+                        .texture = {{.value = "head-thread"}, "texture"}},
+                    .repeat_texture_x = true,
+                };
                 vector_canvas_e2e_complete =
                     session.set_selected_vector_node(0U, std::move(node));
                 canvas.selected_node = 0U;
@@ -9263,6 +9340,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 11U) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-vector-canvas-final.ppm");
+            write_vector_canvas_visual_probe(initial_project, window,
+                                             canvas.native_origin,
+                                             canvas.native_size);
+        }
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
             ui_texture_test || ui_input_test)

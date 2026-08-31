@@ -54,6 +54,9 @@ lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
+Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
+capture la frame finale du canvas après rendu OpenGL/ImGui et vérifie un probe
+pixel de sa zone native ; il échoue si la capture est absente ou plate.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un

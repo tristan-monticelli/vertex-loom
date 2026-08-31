@@ -131,10 +131,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
   renderer les applique désormais dans les draw packets et les chemins OpenGL ;
   la preuve visuelle de chaque variante dans l’éditeur reste à ajouter.
-- [ ] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
-  déformation, ainsi qu'une bordure vectorielle configurable ; livrer un preset
-  `beam` préexistant et visible comme exemple. Le payload et le renderer sont
-  présents, mais le parcours visuel Asset Studio n’est pas encore fermé.
+- [x] Ajouter le stroke image avec texture et répétition, ainsi qu'une bordure
+  vectorielle configurable ; livrer un preset `beam` préexistant et visible
+  comme exemple. Le parcours visuel du stroke texturé est prouvé par la capture
+  PPM et le probe pixel de `asset_studio_vector_canvas_e2e`.
+- [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
+  (UV, offset, échelle et déformation), ainsi que chaque variante de join/cap.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
@@ -775,9 +777,11 @@ utilisées pour tous les types de ressources.
   - [x] programmer un comportement de joueur ;
   - [x] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
-  - [ ] créer et éditer un path Bézier ; la plume ne crée pas encore les
-    courbes par cliquer-glisser ;
-  - [ ] changer fill, texture et stroke après création avec preuve visuelle.
+- [ ] créer et éditer un path Bézier ; l’insertion et la conversion par
+    cliquer-glisser sont maintenant couvertes par le moteur et l’E2E, mais les
+    coins, poignées et suppressions restent à fermer visuellement ;
+  - [ ] changer fill, texture et stroke après création avec preuve visuelle
+    complète dans l’éditeur.
 - [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
