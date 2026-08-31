@@ -4257,8 +4257,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_node(node);
                 }
                 ImGui::SetItemTooltip("Opacity multiplier applied after image sampling.");
-                bool deform = node.fill.image->deform_with_shape;
-                if (ImGui::Checkbox("Warp pixels with shape (advanced)",
+                    bool deform = node.fill.image->deform_with_shape;
+                ImGui::SeparatorText("Selected block deformation");
+                if (ImGui::Checkbox("Warp pixels with this block shape (advanced)",
                                     &deform)) {
                     node.fill.image->deform_with_shape = deform;
                     commit_node(node);
@@ -4397,7 +4398,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::SetItemTooltip("Opacity multiplier applied to the stroke texture.");
                     bool deform = image.deform_with_shape;
-                    if (ImGui::Checkbox("Deform stroke image with shape", &deform)) {
+                    if (ImGui::Checkbox("Deform stroke image with this block", &deform)) {
                         image.deform_with_shape = deform;
                         commit_node(node);
                     }
@@ -4486,7 +4487,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (entity.ik_chains.empty())
                     ImGui::TextDisabled("No IK chains configured.");
             }
-            if (ImGui::CollapsingHeader("Deformation")) {
+            if (ImGui::CollapsingHeader("Whole Entity deformation (advanced)")) {
                 if (entity.deformation_mesh) {
                     auto mesh = *entity.deformation_mesh;
                     ImGui::Text("%zu vertices, %zu triangles", mesh.vertices.size(),
@@ -4515,7 +4516,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_advanced_entity(std::move(next));
                 }
             }
-            if (ImGui::CollapsingHeader("XPBD")) {
+            if (ImGui::CollapsingHeader("Whole Entity simulation (advanced)")) {
                 if (entity.xpbd) {
                     auto xpbd = *entity.xpbd;
                     ImGui::Text("%zu particles", xpbd.particles.size());
