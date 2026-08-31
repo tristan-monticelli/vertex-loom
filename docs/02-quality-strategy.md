@@ -62,6 +62,8 @@ Le workflow publie aussi les captures `asset-studio-vector-canvas-pen.ppm`,
 `asset-studio-vector-canvas-handles.ppm`, `asset-studio-vector-canvas-final.ppm`,
 les trois couples join/cap et la variante avancée afin que la preuve visuelle
 soit récupérable depuis chaque run multiplateforme.
+Le même parcours mute un vectoriel déjà créé pour appliquer un fill image et un
+stroke image, puis vérifie leur rendu dans les captures finales.
 Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
 capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui, vérifie
 un probe pixel de sa zone native avec un nombre minimal de pixels et une plage

@@ -781,8 +781,9 @@ utilisées pour tous les types de ressources.
   cliquer-glisser, la sélection des coins/poignées et la suppression clavier
   sont couvertes par `asset_studio_vector_canvas_e2e`, y compris la
   persistance après reload ;
-  - [ ] changer fill, texture et stroke après création avec preuve visuelle
-    complète dans l’éditeur.
+  - [x] changer fill, texture et stroke après création avec preuve visuelle
+    complète dans l’éditeur ; le parcours Vector Canvas rend et capture le fill
+    image et le stroke image après mutation.
 - [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
@@ -825,7 +826,7 @@ automatiquement sur les trois plateformes.
 - [x] Lot 4 : cible explicite des animations.
 - [x] Lot 5 : BehaviorGraph et inputs physiques séparés.
 - [x] Lot 6 : transformation d'entité.
-- [ ] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
+- [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
   transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
   comparaison des draw packets sont validés.
 - [x] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire
