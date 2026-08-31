@@ -2657,13 +2657,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.guided_button = true;
                 creation.request_entity = true;
             }
-            if (ImGui::MenuItem("Eye...")) {
-                creation.visual_preset.kind =
-                    fabric::editor::VisualPresetKind::eye;
-                creation.visual_preset.name = "Eye";
-                creation.visual_preset.id.value = "eye";
-                creation.request_visual_preset = true;
-            }
             if (ImGui::MenuItem("Artwork...")) {
                 creation.request_artwork = true;
             }
@@ -6527,6 +6520,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         creation.request_material = false;
     }
     if (creation.request_entity && session.has_project()) {
+        if (!session.refresh_resources()) {
+            status = "Project resources could not be refreshed; inspect diagnostics.";
+        }
         creation.entity.reset();
         if (creation.guided_composed_entity) {
             creation.entity.name = "Composed entity";
@@ -6564,6 +6560,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         creation.request_input = false;
     }
     if (creation.request_visual_preset && session.has_project()) {
+        if (!session.refresh_resources()) {
+            status = "Project resources could not be refreshed; inspect diagnostics.";
+        }
         ImGui::OpenPopup("Create visual preset");
         creation.request_visual_preset = false;
     }
@@ -6855,8 +6854,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto kind_label = std::string(user_preset_label(request.kind));
         ImGui::SetNextItemWidth(280.0F);
         if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
-            for (const auto kind : {fabric::editor::VisualPresetKind::eye,
-                                    fabric::editor::VisualPresetKind::button,
+            for (const auto kind : {fabric::editor::VisualPresetKind::button,
                                     fabric::editor::VisualPresetKind::beam,
                                     fabric::editor::VisualPresetKind::zipper}) {
                 const bool selected = request.kind == kind;
@@ -6904,6 +6902,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (selected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            if (std::ranges::none_of(
+                    session.resources(), [](const auto& resource) {
+                        return resource.kind ==
+                            fabric::editor::StudioResourceKind::texture;
+                    })) {
+                ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
+                                   "No project textures are indexed. Import a PNG or refresh the project.");
             }
             if (!thread_texture_resolved) {
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},

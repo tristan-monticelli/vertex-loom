@@ -22,7 +22,7 @@ flowchart TD
     E --> F[Importer un original]
     E --> G[Créer un Beam]
     E --> H[Créer un Button avec l'original fourni]
-    E --> I[Créer un Eye ou Artwork]
+    E --> I[Créer un Artwork]
     E --> J[Composer une Entity]
     E --> K[Configurer animation/input/comportement]
     F --> L[Resource Explorer]
@@ -63,8 +63,8 @@ flowchart TD
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
 | U10 | Régler color/effect/shine/holography du Beam | Partiel | Les champs sont maintenant disponibles dans l'inspecteur du chemin texturé ; la capture écran shader et le round-trip restent à prouver. | P0 |
-| U11 | Créer un Button avec l'original fourni | Bloqué | Le système cherche implicitement le premier composant contenant `button` et peut créer une Entity vide sans erreur. | P0 |
-| U12 | Créer un Eye | Partiel | Le prompt existe, mais le parcours n'est pas vérifié avec une ressource originale ni une comparaison runtime. | P1 |
+| U11 | Créer un Button avec l'original fourni | Partiel | Le parcours exige maintenant une texture originale sélectionnée ; l'index est rafraîchi à l'ouverture de l'assistant et signale explicitement l'absence de texture. Le round-trip écran reste à prouver. | P0 |
+| U12 | Créer un Eye | Retiré du parcours guidé | Les anciens assets identifiés comme `eye` sont des images de boutons ; ils restent lisibles comme ressources historiques, mais aucune création Eye n'est proposée. | P1 |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
 | U14 | Créer une Entity composée de plusieurs blocs | Bloqué UX | La création démarre avec un drawable et l'ajout des autres blocs est caché dans l'inspecteur, sans assistant de composition. | P1 |
 | U15 | Déformer un bloc uniquement | Non prouvé | Les contrats de déformation existent, mais aucune preuve E2E ne démontre l'isolation visuelle du bloc sélectionné. | P1 |
@@ -117,16 +117,18 @@ flowchart LR
 
 ### 1. Le menu ne suffit pas à constituer un parcours guidé
 
-Le menu propose `Beam / Stroke`, `Button`, `Eye`, `Artwork` et `Composed
-Entity`, mais la sélection du type ne conduit pas toujours à un assistant
+Le menu propose `Beam / Stroke`, `Button`, `Artwork` et `Composed Entity`, mais
+la sélection du type ne conduit pas toujours à un assistant
 complet. Le cas Button route directement vers la création d'Entity et doit
 sélectionner explicitement l'image originale fournie.
 
-### 2. Le Button n'a pas de notion d'asset source obligatoire
+### 2. Le Button utilise une image source obligatoire
 
 Les anciens assets nommés `head` sont les images de boutons du jeu. Le parcours
 guidé Button les traite donc comme des textures originales et ne fabrique aucun
-motif. La sélection reste explicite : aucune ressource n'est devinée.
+motif. La sélection reste explicite : aucune ressource n'est devinée. L'index
+des textures est rafraîchi quand l'assistant s'ouvre afin d'inclure les PNG
+importés depuis l'ouverture précédente.
 
 ### 3. Beam et Seam doivent rester compatibles sans être confondus
 
