@@ -214,6 +214,151 @@ bool same_texture_tint(const VectorDrawPacket& left,
     return texture_tint(left) == texture_tint(right);
 }
 
+struct ClipVertex {
+    core::Vec2 position;
+    core::Vec2 uv;
+};
+
+float polygon_area(const std::vector<core::Vec2>& polygon) {
+    float area = 0.0F;
+    for (std::size_t index = 0; index < polygon.size(); ++index) {
+        const auto& current = polygon[index];
+        const auto& next = polygon[(index + 1U) % polygon.size()];
+        area += current.x * next.y - next.x * current.y;
+    }
+    return area * 0.5F;
+}
+
+bool is_convex_polygon(const std::vector<core::Vec2>& polygon) {
+    if (polygon.size() < 3U) return false;
+    int sign = 0;
+    for (std::size_t index = 0; index < polygon.size(); ++index) {
+        const auto& first = polygon[index];
+        const auto& second = polygon[(index + 1U) % polygon.size()];
+        const auto& third = polygon[(index + 2U) % polygon.size()];
+        const float turn = (second.x - first.x) * (third.y - second.y) -
+            (second.y - first.y) * (third.x - second.x);
+        if (std::abs(turn) <= 1.0e-6F) continue;
+        const int next_sign = turn > 0.0F ? 1 : -1;
+        if (sign != 0 && sign != next_sign) return false;
+        sign = next_sign;
+    }
+    return sign != 0;
+}
+
+std::optional<std::vector<ClipVertex>> clip_convex_polygon(
+    std::vector<ClipVertex> subject, const std::vector<core::Vec2>& clip) {
+    if (!is_convex_polygon(clip) || subject.size() < 3U) return std::nullopt;
+    const float orientation = polygon_area(clip) >= 0.0F ? 1.0F : -1.0F;
+    for (std::size_t edge = 0; edge < clip.size(); ++edge) {
+        const auto edge_start = clip[edge];
+        const auto edge_end = clip[(edge + 1U) % clip.size()];
+        const auto signed_distance = [&](const core::Vec2 point) {
+            return orientation * ((edge_end.x - edge_start.x) *
+                                      (point.y - edge_start.y) -
+                                  (edge_end.y - edge_start.y) *
+                                      (point.x - edge_start.x));
+        };
+        std::vector<ClipVertex> output;
+        for (std::size_t index = 0; index < subject.size(); ++index) {
+            const auto& first = subject[index];
+            const auto& second = subject[(index + 1U) % subject.size()];
+            const float first_distance = signed_distance(first.position);
+            const float second_distance = signed_distance(second.position);
+            const bool first_inside = first_distance >= -1.0e-5F;
+            const bool second_inside = second_distance >= -1.0e-5F;
+            if (first_inside != second_inside) {
+                const float denominator = first_distance - second_distance;
+                const float factor = std::abs(denominator) > 1.0e-6F
+                    ? first_distance / denominator : 0.0F;
+                output.push_back({
+                    .position = {first.position.x +
+                                     (second.position.x - first.position.x) * factor,
+                                 first.position.y +
+                                     (second.position.y - first.position.y) * factor},
+                    .uv = {first.uv.x + (second.uv.x - first.uv.x) * factor,
+                           first.uv.y + (second.uv.y - first.uv.y) * factor}});
+            }
+            if (second_inside) output.push_back(second);
+        }
+        subject = std::move(output);
+        if (subject.size() < 3U) return subject;
+    }
+    return subject;
+}
+
+std::optional<VectorDrawPacket> cpu_clip_packet(
+    const VectorDrawPacket& packet,
+    const std::vector<const VectorDrawPacket*>& clip_chain) {
+    if (packet.fill_vertices.size() < 3U || packet.fill_indices.size() < 3U ||
+        packet.fill_indices.size() % 3U != 0U)
+        return std::nullopt;
+    for (const auto* clip : clip_chain)
+        if (clip == nullptr || !is_convex_polygon(clip->outline))
+            return std::nullopt;
+    VectorDrawPacket result = packet;
+    result.clip_node_id.reset();
+    result.outline.clear();
+    result.fill_vertices.clear();
+    result.fill_uv.clear();
+    result.fill_indices.clear();
+    const auto clip_mesh = [&](const std::vector<core::Vec2>& vertices,
+                               const std::vector<core::Vec2>& uvs,
+                               const std::vector<std::uint32_t>& indices,
+                               std::vector<core::Vec2>& output_vertices,
+                               std::vector<core::Vec2>& output_uvs,
+                               std::vector<std::uint32_t>& output_indices) {
+        if (indices.size() < 3U || indices.size() % 3U != 0U) return false;
+        for (std::size_t index = 0; index < indices.size(); index += 3U) {
+            if (indices[index] >= vertices.size() ||
+                indices[index + 1U] >= vertices.size() ||
+                indices[index + 2U] >= vertices.size()) return false;
+            std::vector<ClipVertex> subject;
+            subject.reserve(3U);
+            for (std::size_t corner = 0; corner < 3U; ++corner) {
+                const auto vertex_index = indices[index + corner];
+                subject.push_back({vertices[vertex_index],
+                                   uvs.size() == vertices.size()
+                                       ? uvs[vertex_index] : core::Vec2{}});
+            }
+            for (const auto* clip : clip_chain) {
+                const auto clipped = clip_convex_polygon(std::move(subject),
+                                                          clip->outline);
+                if (!clipped) return false;
+                subject = *clipped;
+                if (subject.size() < 3U) break;
+            }
+            for (std::uint32_t corner = 1U;
+                 corner + 1U < subject.size(); ++corner) {
+                const auto base = static_cast<std::uint32_t>(output_vertices.size());
+                output_vertices.push_back(subject[0].position);
+                output_vertices.push_back(subject[corner].position);
+                output_vertices.push_back(subject[corner + 1U].position);
+                output_uvs.push_back(subject[0].uv);
+                output_uvs.push_back(subject[corner].uv);
+                output_uvs.push_back(subject[corner + 1U].uv);
+                output_indices.insert(output_indices.end(), {base, base + 1U,
+                                                              base + 2U});
+            }
+        }
+        return true;
+    };
+    if (!clip_mesh(packet.fill_vertices, packet.fill_uv, packet.fill_indices,
+                   result.fill_vertices, result.fill_uv, result.fill_indices))
+        return std::nullopt;
+    if (result.fill_indices.empty()) return std::nullopt;
+    result.outline = result.fill_vertices;
+    if (packet.stroke && !packet.stroke_vertices.empty() &&
+        !packet.stroke_indices.empty()) {
+        if (!clip_mesh(packet.stroke_vertices, packet.stroke_uv,
+                       packet.stroke_indices, result.stroke_vertices,
+                       result.stroke_uv, result.stroke_indices))
+            return std::nullopt;
+    }
+    result.closed_outline = true;
+    return result;
+}
+
 } // namespace
 
 OpenGLVectorRenderer::~OpenGLVectorRenderer() { shutdown(); }
@@ -653,8 +798,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         GLint stencil_bits = 0;
         glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
         if (stencil_bits <= 0) {
-            stats.errors.push_back(
-                "OpenGL vector clipping requires a stencil buffer");
+            // Convex clip chains use the CPU fallback below when the context
+            // has no stencil attachment. Unsupported silhouettes still report
+            // an error when the fallback is attempted.
         } else {
             stencil_ready = true;
             glEnable(GL_STENCIL_TEST);
@@ -951,10 +1097,6 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         }
         bool packet_drawn = false;
         if (packet.clip_node_id.has_value()) {
-            if (!stencil_ready) {
-                ++packet_index;
-                continue;
-            }
             std::vector<const VectorDrawPacket*> clip_chain;
             std::unordered_set<std::string> visited_clips;
             auto next_clip_id = packet.clip_node_id;
@@ -981,6 +1123,20 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 continue;
             }
             std::ranges::reverse(clip_chain);
+            if (!stencil_ready) {
+                const auto clipped = cpu_clip_packet(packet, clip_chain);
+                if (!clipped) {
+                    stats.errors.push_back(
+                        "CPU vector clipping requires convex clip silhouettes");
+                    ++packet_index;
+                    continue;
+                }
+                packet_drawn = draw_fill(*clipped, false, true) ||
+                    draw_stroke(*clipped);
+                if (packet_drawn) ++stats.packets_drawn;
+                ++packet_index;
+                continue;
+            }
             glClearStencil(0);
             glClear(GL_STENCIL_BUFFER_BIT);
             glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);

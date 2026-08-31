@@ -89,5 +89,7 @@ C4Component
   explicitement les fills image tant
   qu’aucun résolveur de textures n’est fourni, mais dessine les contours
   ouverts et fermés avec le même packet. Un `clipNodeId` applique un masque
-  stencil de premier niveau au fill et au contour ; les clips imbriqués ou les
-  contextes sans stencil sont diagnostiqués.
+  stencil de premier niveau au fill et au contour ; les clips imbriqués sont
+  résolus par la chaîne complète. En l’absence de stencil, les clips convexes
+  passent par le fallback CPU avec interpolation des UV ; les silhouettes de
+  clip non convexes sont diagnostiquées au lieu d’être dessinées sans masque.

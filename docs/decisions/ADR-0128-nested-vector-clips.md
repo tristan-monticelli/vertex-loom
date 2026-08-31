@@ -13,9 +13,10 @@ ce qui produit l’intersection de tous les clips.
 
 La chaîne est reconstruite par packet afin de ne pas laisser l’état stencil
 d’un packet contaminer le suivant. Une référence absente ou un cycle est
-rapporté dans `RenderStats::errors` et le packet concerné est ignoré. Le
-renderer conserve la protection existante lorsqu’aucun tampon stencil n’est
-disponible.
+rapporté dans `RenderStats::errors` et le packet concerné est ignoré. Lorsqu’un
+contexte ne fournit pas de tampon stencil, le renderer applique la chaîne par
+clipping CPU pour les silhouettes convexes, en interpolant les UV ; un clip
+non convexe est diagnostiqué plutôt que rendu sans masque.
 
 ## Conséquences
 
