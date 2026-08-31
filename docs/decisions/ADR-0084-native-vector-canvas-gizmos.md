@@ -45,9 +45,11 @@ Le canvas natif expose également un outil `Pen`. Un clic ajoute une commande
 `line` en fin de contour ou l’insère avant le segment visé ; un chemin vide
 commence par une commande `move`. Le cliquer-glisser du nouveau point convertit
 ce segment en `cubic` et initialise ses deux poignées afin que la courbe soit
-visible et éditable immédiatement. Le clic droit sur une ancre retire la
-commande selon les invariants du domaine, tandis que l’outil `Move` conserve le
-déplacement direct des ancres.
+visible et éditable immédiatement. Un clic sur une ancre ou une poignée déjà
+présente en mode `Pen` l’édite au lieu d’insérer un nouveau point ; `Delete` et
+`Backspace` retirent les ancres sélectionnées en conservant la tête `move`. Le
+clic droit sur une ancre retire également la commande selon les invariants du
+domaine, tandis que l’outil `Move` conserve le déplacement direct des ancres.
 
 ## Conséquences
 
