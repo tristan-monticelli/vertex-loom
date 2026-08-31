@@ -1478,6 +1478,9 @@ void write_vector_canvas_visual_probe(const std::filesystem::path& project_path,
     constexpr int clear_green = 10;
     constexpr int clear_blue = 13;
     std::size_t non_background_pixels = 0U;
+    std::size_t anchor_pixels = 0U;
+    std::size_t selected_anchor_pixels = 0U;
+    std::size_t handle_pixels = 0U;
     int minimum_channel = 255;
     int maximum_channel = 0;
     const auto pixel_at = [&](const int x, const int y, const int channel) {
@@ -1496,12 +1499,25 @@ void write_vector_canvas_visual_probe(const std::filesystem::path& project_path,
             const int distance = std::abs(red - clear_red) +
                 std::abs(green - clear_green) + std::abs(blue - clear_blue);
             if (distance > 24) ++non_background_pixels;
+            const auto near_color = [&](const int target_red,
+                                        const int target_green,
+                                        const int target_blue) {
+                return std::abs(red - target_red) +
+                    std::abs(green - target_green) +
+                    std::abs(blue - target_blue) <= 70;
+            };
+            if (near_color(236, 180, 75)) ++anchor_pixels;
+            if (near_color(100, 210, 255)) ++selected_anchor_pixels;
+            if (near_color(180, 110, 235)) ++handle_pixels;
         }
     }
     const nlohmann::json probe = {
         {"schema", "asset-studio-vector-canvas-visual-v1"},
         {"canvas", {x0, y0, x1 - x0, y1 - y0}},
         {"non_background_pixels", non_background_pixels},
+        {"anchor_pixels", anchor_pixels},
+        {"selected_anchor_pixels", selected_anchor_pixels},
+        {"handle_pixels", handle_pixels},
         {"minimum_channel", minimum_channel},
         {"maximum_channel", maximum_channel},
     };
