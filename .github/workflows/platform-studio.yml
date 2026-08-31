@@ -118,6 +118,11 @@ jobs:
             build/**/*asset-studio-ui-*.ppm
             build/**/*asset-studio-vector-canvas-*.json
             build/**/*asset-studio-vector-canvas-*.ppm
+            build/release-performance-smoke/*.json
+            build/release-recovery-smoke/**/*
+            build/_CPack_Packages/**/*
+            build/*.tar.gz
+            build/*.zip
 
   windows-native-gpu:
     name: windows-native-gpu
