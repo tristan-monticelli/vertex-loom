@@ -56,6 +56,21 @@ TEST_CASE("map document round-trips and publishes atomically") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map persists collision marker surfaces and derives eight positions") {
+    auto source = map();
+    fabric::project::CollisionMarkerConfig marker;
+    marker.enabled = true;
+    marker.visible_in_runtime = true;
+    marker.shader.primary_color = {1.0F, 0.1F, 0.1F, 0.9F};
+    source.collision_surfaces = {marker};
+    source.collisions.front().marker_override = marker;
+    const auto parsed = fabric::project::parse_map(
+        manifest(), fabric::project::serialize_map(source));
+    REQUIRE(parsed.ok());
+    CHECK(*parsed.asset == source);
+    CHECK(fabric::project::collision_marker_positions(source.collisions.front()).size() == 8U);
+}
+
 TEST_CASE("map validation rejects chunk mismatches and missing layers") {
     auto invalid = map();
     invalid.instances.front().chunk_x = 0;

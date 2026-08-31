@@ -3,6 +3,7 @@
 #include "fabric/core/types.hpp"
 #include "fabric/project/asset.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/shader_profile.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -100,6 +101,7 @@ struct VectorStroke {
     VectorStrokeCap cap{VectorStrokeCap::butt};
     std::optional<VectorImageFill> image;
     bool repeat_texture_x{};
+    ShaderSurfaceSettings shader;
 
     friend bool operator==(const VectorStroke&, const VectorStroke&) = default;
 };

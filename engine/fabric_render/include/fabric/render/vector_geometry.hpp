@@ -23,6 +23,7 @@ struct VectorDrawPacket {
     std::vector<core::Vec2> stroke_vertices;
     std::vector<std::uint32_t> stroke_indices;
     std::optional<project::VectorImageFill> stroke_image;
+    std::optional<project::ShaderSurfaceSettings> shader;
     std::vector<core::Vec2> stroke_uv;
     bool stroke_repeat_texture_x{};
     std::vector<core::Vec2> fill_vertices;

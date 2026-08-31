@@ -24,6 +24,11 @@ struct LayerOverrides {
     std::optional<float> path_offset;
     std::optional<core::Color> path_color;
     std::optional<float> path_opacity;
+    std::optional<core::Color> shader_primary;
+    std::optional<core::Color> shader_effect;
+    std::optional<float> shader_shine;
+    std::optional<float> shader_holography;
+    std::optional<float> shader_intensity;
 };
 
 using OverrideMap = std::unordered_map<std::string, LayerOverrides>;
@@ -63,6 +68,7 @@ void transform_packet(VectorDrawPacket& packet,
         packet.fill_color->alpha *= opacity;
     }
     if (packet.stroke) packet.stroke->color.alpha *= opacity;
+    if (packet.shader) packet.shader->opacity *= opacity;
     packet.node_id = prefix + packet.node_id;
     if (packet.parent_id) packet.parent_id = prefix + *packet.parent_id;
     if (packet.clip_node_id) packet.clip_node_id = prefix + *packet.clip_node_id;
@@ -118,6 +124,16 @@ bool apply_parameter(OverrideMap& overrides,
             layer.path_opacity = *value;
             return true;
         }
+    } else if (component == "shader" && property == "primaryColor") {
+        if (const auto* value = std::get_if<core::Color>(&parameter.value)) { layer.shader_primary = *value; return true; }
+    } else if (component == "shader" && property == "effectColor") {
+        if (const auto* value = std::get_if<core::Color>(&parameter.value)) { layer.shader_effect = *value; return true; }
+    } else if (component == "shader" && property == "shine") {
+        if (const auto* value = std::get_if<float>(&parameter.value)) { layer.shader_shine = *value; return true; }
+    } else if (component == "shader" && property == "holography") {
+        if (const auto* value = std::get_if<float>(&parameter.value)) { layer.shader_holography = *value; return true; }
+    } else if (component == "shader" && property == "intensity") {
+        if (const auto* value = std::get_if<float>(&parameter.value)) { layer.shader_intensity = *value; return true; }
     }
     return false;
 }
@@ -143,6 +159,11 @@ void apply_path_overrides(project::TexturedPath& path,
     if (overrides.path_offset) path.uv_offset.x = *overrides.path_offset;
     if (overrides.path_color) path.color = *overrides.path_color;
     if (overrides.path_opacity) path.opacity = *overrides.path_opacity;
+    if (overrides.shader_primary) path.shader.primary_color = *overrides.shader_primary;
+    if (overrides.shader_effect) path.shader.effect_color = *overrides.shader_effect;
+    if (overrides.shader_shine) path.shader.shine = *overrides.shader_shine;
+    if (overrides.shader_holography) path.shader.holography = *overrides.shader_holography;
+    if (overrides.shader_intensity) path.shader.intensity = *overrides.shader_intensity;
 }
 
 void calculate_bounds(VisualCompositionDrawResult& result) {

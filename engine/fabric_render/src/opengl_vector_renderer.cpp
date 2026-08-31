@@ -416,11 +416,21 @@ uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
+uniform int shaderEnabled;
+uniform vec4 shaderPrimary;
+uniform vec4 shaderEffect;
+uniform float shaderShine;
+uniform float shaderHolography;
+uniform float shaderIntensity;
 varying vec2 fragmentUv;
 void main() {
-    gl_FragColor = textured == 1
+    vec4 base = textured == 1
         ? texture2D(imageTexture, fragmentUv) * color * opacity
         : color;
+    if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
+        shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
+        + vec3(shaderShine), base.a);
+    gl_FragColor = base;
 }
 )GLSL"}
         : std::string{
@@ -434,12 +444,22 @@ uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
+uniform int shaderEnabled;
+uniform vec4 shaderPrimary;
+uniform vec4 shaderEffect;
+uniform float shaderShine;
+uniform float shaderHolography;
+uniform float shaderIntensity;
 in vec2 fragmentUv;
 out vec4 fragmentColor;
 void main() {
-    fragmentColor = textured == 1
+    vec4 base = textured == 1
         ? texture(imageTexture, fragmentUv) * color * opacity
         : color;
+    if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
+        shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
+        + vec3(shaderShine), base.a);
+    fragmentColor = base;
 }
 )GLSL"};
     std::string error;
@@ -494,6 +514,12 @@ void main() {
     image_texture_uniform_ = functions.get_uniform_location(program_, "imageTexture");
     textured_uniform_ = functions.get_uniform_location(program_, "textured");
     opacity_uniform_ = functions.get_uniform_location(program_, "opacity");
+    shader_enabled_uniform_ = functions.get_uniform_location(program_, "shaderEnabled");
+    shader_primary_uniform_ = functions.get_uniform_location(program_, "shaderPrimary");
+    shader_effect_uniform_ = functions.get_uniform_location(program_, "shaderEffect");
+    shader_shine_uniform_ = functions.get_uniform_location(program_, "shaderShine");
+    shader_holography_uniform_ = functions.get_uniform_location(program_, "shaderHolography");
+    shader_intensity_uniform_ = functions.get_uniform_location(program_, "shaderIntensity");
     if (world_to_clip_uniform_ < 0 || color_uniform_ < 0 ||
         image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
         functions.delete_buffers(1, &vertex_buffer_);
@@ -527,6 +553,12 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     image_texture_uniform_ = -1;
     textured_uniform_ = -1;
     opacity_uniform_ = -1;
+    shader_enabled_uniform_ = -1;
+    shader_primary_uniform_ = -1;
+    shader_effect_uniform_ = -1;
+    shader_shine_uniform_ = -1;
+    shader_holography_uniform_ = -1;
+    shader_intensity_uniform_ = -1;
     initialization_error_.clear();
     vertex_buffer_capacity_ = 0U;
     index_buffer_capacity_ = 0U;
@@ -811,6 +843,17 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         }
     }
 
+    const auto apply_shader = [&](const VectorDrawPacket& packet) {
+        const auto& shader = packet.shader;
+        functions.uniform_1i(shader_enabled_uniform_, shader ? 1 : 0);
+        if (!shader) return;
+        functions.uniform_4f(shader_primary_uniform_, shader->primary_color.red, shader->primary_color.green, shader->primary_color.blue, shader->primary_color.alpha);
+        functions.uniform_4f(shader_effect_uniform_, shader->effect_color.red, shader->effect_color.green, shader->effect_color.blue, shader->effect_color.alpha);
+        functions.uniform_1f(shader_shine_uniform_, shader->shine);
+        functions.uniform_1f(shader_holography_uniform_, shader->holography);
+        functions.uniform_1f(shader_intensity_uniform_, shader->intensity);
+    };
+
     const auto draw_fill = [&](const VectorDrawPacket& packet,
                                const bool stencil_only,
                                const bool count_stats) {
@@ -908,6 +951,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        apply_shader(packet);
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.fill_indices.size()),
             GL_UNSIGNED_INT, nullptr);
@@ -964,6 +1008,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        apply_shader(packet);
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.stroke_indices.size()),
             GL_UNSIGNED_INT, nullptr);

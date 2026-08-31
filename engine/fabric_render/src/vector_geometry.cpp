@@ -483,6 +483,7 @@ VectorGeometryResult build_native_draw_packets(
             continue;
         }
         if (packet.stroke) {
+            if (!(packet.stroke->shader == project::ShaderSurfaceSettings{})) packet.shader = packet.stroke->shader;
             build_stroke_geometry(packet.outline, *packet.stroke,
                                   packet.closed_outline,
                                   packet.stroke_vertices,

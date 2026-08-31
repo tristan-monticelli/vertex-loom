@@ -76,6 +76,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/progress_save.cpp
     engine/fabric_project/src/resource_registry.cpp
+    engine/fabric_project/src/shader_profile.cpp
     engine/fabric_project/src/replay.cpp
     engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp

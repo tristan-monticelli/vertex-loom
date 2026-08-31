@@ -3,6 +3,7 @@
 #include "fabric/core/types.hpp"
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/shader_profile.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -61,6 +62,7 @@ struct TexturedPath {
     TexturedPathJoin join{TexturedPathJoin::miter};
     TexturedPathCap cap{TexturedPathCap::butt};
     float miter_limit{4.0F};
+    ShaderSurfaceSettings shader;
 
     friend bool operator==(const TexturedPath&, const TexturedPath&) = default;
 };

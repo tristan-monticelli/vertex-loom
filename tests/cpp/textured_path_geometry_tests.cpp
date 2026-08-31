@@ -57,6 +57,18 @@ TEST_CASE("open textured path emits an exact continuous ribbon") {
     CHECK_FALSE(packet.closed_outline);
 }
 
+TEST_CASE("textured path draw packet carries its custom shader settings") {
+    auto path = line_path();
+    path.shader.profile = fabric::project::SurfaceShaderProfile::thread;
+    path.shader.shine = 0.6F;
+    path.shader.holography = 0.25F;
+    path.shader.intensity = 1.3F;
+    const auto result = fabric::render::build_textured_path_draw_packets(path);
+    REQUIRE(result.ok());
+    REQUIRE(result.packets.front().shader.has_value());
+    CHECK(*result.packets.front().shader == path.shader);
+}
+
 TEST_CASE("stretch UVs and width profiles follow normalized path distance") {
     auto path = line_path();
     path.uv_mode = fabric::project::TexturedPathUvMode::stretch;

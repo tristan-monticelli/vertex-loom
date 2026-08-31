@@ -346,6 +346,7 @@ VectorGeometryResult build_textured_path_draw_packets(
         .outline = points,
         .closed_outline = path.closed,
     };
+    if (!(path.shader == project::ShaderSurfaceSettings{})) packet.shader = path.shader;
     packet.fill_vertices.reserve(sections.size() * 2U);
     packet.fill_uv.reserve(sections.size() * 2U);
     for (const auto& section : sections) {

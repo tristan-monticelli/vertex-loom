@@ -5,7 +5,7 @@ C4Context
     title Vertex Loom — contexte système
     Person(creator, "Créateur", "Développe le jeu et crée les assets")
     Person(mapmaker, "Créateur de maps", "Compose, teste et publie du contenu depuis les outils intégrés au jeu")
-    System(fabric, "Vertex Loom", "Runtime 2D et outils de création textile")
+    System(fabric, "Vertex Loom", "Runtime 2D et outils de création textile, profils shader et marqueurs de collision")
     System_Ext(files, "Système de fichiers local", "Projets, textures, sons et exports")
     System_Ext(catalog, "Catalogue du jeu", "Référence des maps portables validées ; le transport en ligne reste hors périmètre")
     Rel(creator, fabric, "Crée assets, comportements et transformations, puis teste")

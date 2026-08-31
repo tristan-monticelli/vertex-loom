@@ -4,6 +4,7 @@
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/mechanic_graph.hpp"
+#include "fabric/project/shader_profile.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -62,6 +63,24 @@ struct MapInstance {
 
 enum class CollisionShapeKind { circle, capsule, polygon, chain };
 
+enum class CollisionSurface { floor, ceiling, left, right, custom };
+
+struct CollisionMarkerConfig {
+    CollisionSurface surface{CollisionSurface::custom};
+    bool enabled{};
+    std::optional<ResourceReference> texture;
+    ShaderSurfaceSettings shader{.profile = SurfaceShaderProfile::custom,
+                                 .classification = TextureClassification::collision_marker};
+    bool auto_orient{true};
+    core::Vec2 scale{1.0F, 1.0F};
+    core::Vec2 spacing{1.0F, 1.0F};
+    core::Vec2 offset;
+    bool visible_in_studio{true};
+    bool visible_in_runtime{};
+
+    friend bool operator==(const CollisionMarkerConfig&, const CollisionMarkerConfig&) = default;
+};
+
 struct CollisionShape {
     CollisionShapeKind kind{CollisionShapeKind::polygon};
     std::string layer_id;
@@ -70,6 +89,7 @@ struct CollisionShape {
     float radius{};
     float length{};
     std::vector<core::Vec2> points;
+    std::optional<CollisionMarkerConfig> marker_override;
     friend bool operator==(const CollisionShape&, const CollisionShape&) = default;
 };
 
@@ -98,6 +118,7 @@ struct MapDocument {
     std::vector<PrefabDefinition> prefabs;
     std::vector<MapInstance> instances;
     std::vector<CollisionShape> collisions;
+    std::vector<CollisionMarkerConfig> collision_surfaces;
     std::vector<TriggerDefinition> triggers;
     std::vector<MapEventDefinition> events;
     friend bool operator==(const MapDocument&, const MapDocument&) = default;
@@ -113,6 +134,7 @@ struct MapResult {
     const ProjectManifest&, const core::ResourceId&);
 [[nodiscard]] ValidationReport validate_map(const ProjectManifest&, const MapDocument&);
 [[nodiscard]] std::vector<ResourceReference> map_resource_references(const MapDocument&);
+[[nodiscard]] std::vector<core::Vec2> collision_marker_positions(const CollisionShape&);
 [[nodiscard]] std::string serialize_map(const MapDocument&);
 [[nodiscard]] MapResult parse_map(const ProjectManifest&, std::string_view);
 [[nodiscard]] MapResult load_map(const std::filesystem::path&, const ProjectManifest&,

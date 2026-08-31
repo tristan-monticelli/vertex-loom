@@ -80,6 +80,12 @@ private:
     std::int32_t image_texture_uniform_{-1};
     std::int32_t textured_uniform_{-1};
     std::int32_t opacity_uniform_{-1};
+    std::int32_t shader_enabled_uniform_{-1};
+    std::int32_t shader_primary_uniform_{-1};
+    std::int32_t shader_effect_uniform_{-1};
+    std::int32_t shader_shine_uniform_{-1};
+    std::int32_t shader_holography_uniform_{-1};
+    std::int32_t shader_intensity_uniform_{-1};
     std::string initialization_error_;
     std::size_t vertex_buffer_capacity_{};
     std::size_t index_buffer_capacity_{};

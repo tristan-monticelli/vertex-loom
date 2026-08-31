@@ -878,3 +878,10 @@ qui n'a pas connaissance de l'implémentation.
 
 Le chantier est terminé uniquement lorsque les huit lots, leurs gates et ces
 huit contrôles de fin de produit sont cochés avec preuves associées.
+
+# Textures, shaders et collisions
+
+- [x] Persister la classification texture et les profils Thread/Plastic/Monochrome/Custom.
+- [x] Transporter les couleurs, brillance, holographie, intensité et opacité dans les draw packets et le shader OpenGL.
+- [x] Persister les configurations de collision par surface et les overrides par objet, avec huit positions déterministes.
+- [x] Couvrir les round-trips, la génération de marqueurs et la compatibilité des fixtures historiques.

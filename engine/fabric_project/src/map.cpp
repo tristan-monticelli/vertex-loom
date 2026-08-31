@@ -91,6 +91,48 @@ bool ref_read(const Json& object, const char* key, std::optional<ResourceReferen
     out = std::move(value);
     return true;
 }
+
+Json collision_marker(const CollisionMarkerConfig& value) {
+    const auto surface = value.surface == CollisionSurface::floor ? "floor" : value.surface == CollisionSurface::ceiling ? "ceiling" : value.surface == CollisionSurface::left ? "left" : value.surface == CollisionSurface::right ? "right" : "custom";
+    Json result{{"surface", surface}, {"enabled", value.enabled}, {"autoOrient", value.auto_orient},
+                {"scale", vec(value.scale)}, {"spacing", vec(value.spacing)},
+                {"offset", vec(value.offset)},
+                {"visibleInStudio", value.visible_in_studio},
+                {"visibleInRuntime", value.visible_in_runtime},
+                {"color", { {"red", value.shader.primary_color.red}, {"green", value.shader.primary_color.green},
+                              {"blue", value.shader.primary_color.blue}, {"alpha", value.shader.primary_color.alpha} }}};
+    if (value.texture) result["texture"] = ref(*value.texture);
+    return result;
+}
+
+void collision_marker_read(const Json& object, CollisionMarkerConfig& out,
+                           std::vector<Error>& errors) {
+    std::string surface;
+    const auto surface_item = object.find("surface");
+    if (surface_item != object.end() && surface_item->is_string()) surface = surface_item->get<std::string>();
+    if (surface == "floor") out.surface = CollisionSurface::floor;
+    else if (surface == "ceiling") out.surface = CollisionSurface::ceiling;
+    else if (surface == "left") out.surface = CollisionSurface::left;
+    else if (surface == "right") out.surface = CollisionSurface::right;
+    else if (!surface.empty() && surface != "custom") error(errors, ErrorCode::invalid_asset, "surface", "unsupported collision surface");
+    const auto enabled = object.find("enabled");
+    if (enabled != object.end() && enabled->is_boolean()) out.enabled = enabled->get<bool>();
+    const auto orient = object.find("autoOrient");
+    if (orient != object.end() && orient->is_boolean()) out.auto_orient = orient->get<bool>();
+    const auto studio = object.find("visibleInStudio");
+    if (studio != object.end() && studio->is_boolean()) out.visible_in_studio = studio->get<bool>();
+    const auto runtime = object.find("visibleInRuntime");
+    if (runtime != object.end() && runtime->is_boolean()) out.visible_in_runtime = runtime->get<bool>();
+    vec_read(object, "scale", out.scale, errors); vec_read(object, "spacing", out.spacing, errors); vec_read(object, "offset", out.offset, errors);
+    ref_read(object, "texture", out.texture, errors);
+    const auto color = object.find("color");
+    if (color != object.end() && color->is_object()) {
+        number(*color, "red", out.shader.primary_color.red, errors);
+        number(*color, "green", out.shader.primary_color.green, errors);
+        number(*color, "blue", out.shader.primary_color.blue, errors);
+        number(*color, "alpha", out.shader.primary_color.alpha, errors);
+    }
+}
 Json property_value(const MapPropertyValue& value) {
     return std::visit([](const auto& item) -> Json {
         using T = std::decay_t<decltype(item)>;
@@ -377,6 +419,13 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
         const auto minimum_points = collision.kind == CollisionShapeKind::polygon ? 3U : (collision.kind == CollisionShapeKind::chain ? 2U : 0U);
         if (collision.points.size() < minimum_points)
             error(report.errors, ErrorCode::invalid_asset, "collisions.points", "shape has too few points");
+        if (collision.marker_override) {
+            const auto& marker = *collision.marker_override;
+            if (!std::isfinite(marker.scale.x) || !std::isfinite(marker.scale.y) || marker.scale.x <= 0.0F || marker.scale.y <= 0.0F)
+                error(report.errors, ErrorCode::invalid_asset, "collisions.markerOverride.scale", "must be finite and positive");
+            if (!std::isfinite(marker.spacing.x) || !std::isfinite(marker.spacing.y) || marker.spacing.x <= 0.0F || marker.spacing.y <= 0.0F)
+                error(report.errors, ErrorCode::invalid_asset, "collisions.markerOverride.spacing", "must be finite and positive");
+        }
     }
     std::set<std::string> trigger_ids;
     std::set<std::string> event_ids;
@@ -414,6 +463,27 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
     return report;
 }
 
+std::vector<core::Vec2> collision_marker_positions(const CollisionShape& collision) {
+    core::Vec2 minimum = collision.center;
+    core::Vec2 maximum = collision.center;
+    if (!collision.points.empty()) {
+        minimum = maximum = collision.points.front();
+        for (const auto point : collision.points) {
+            minimum.x = std::min(minimum.x, point.x); minimum.y = std::min(minimum.y, point.y);
+            maximum.x = std::max(maximum.x, point.x); maximum.y = std::max(maximum.y, point.y);
+        }
+    } else if (collision.kind == CollisionShapeKind::circle) {
+        minimum = {collision.center.x - collision.radius, collision.center.y - collision.radius};
+        maximum = {collision.center.x + collision.radius, collision.center.y + collision.radius};
+    } else if (collision.kind == CollisionShapeKind::capsule) {
+        minimum = {collision.center.x - collision.radius, collision.center.y - collision.length * 0.5F - collision.radius};
+        maximum = {collision.center.x + collision.radius, collision.center.y + collision.length * 0.5F + collision.radius};
+    }
+    const core::Vec2 middle{(minimum.x + maximum.x) * 0.5F, (minimum.y + maximum.y) * 0.5F};
+    return {minimum, {middle.x, minimum.y}, {maximum.x, minimum.y}, {maximum.x, middle.y}, maximum,
+            {middle.x, maximum.y}, {minimum.x, maximum.y}, {minimum.x, middle.y}};
+}
+
 std::vector<ResourceReference> map_resource_references(const MapDocument& map) {
     std::vector<ResourceReference> references;
     for (const auto& prefab : map.prefabs) {
@@ -431,6 +501,11 @@ std::vector<ResourceReference> map_resource_references(const MapDocument& map) {
         for (const auto& property : instance.properties)
             if (const auto* value = std::get_if<ResourceReference>(&property.value)) references.push_back(*value);
     }
+    for (const auto& surface : map.collision_surfaces)
+        if (surface.texture) references.push_back(*surface.texture);
+    for (const auto& collision : map.collisions)
+        if (collision.marker_override && collision.marker_override->texture)
+            references.push_back(*collision.marker_override->texture);
     return references;
 }
 
@@ -440,6 +515,10 @@ std::string serialize_map(const MapDocument& map) {
                  {"chunkSize", map.chunk_size}, {"layers", Json::array()}, {"prefabs", Json::array()},
                  {"instances", Json::array()}, {"collisions", Json::array()}, {"triggers", Json::array()},
                  {"events", Json::array()}};
+    if (!map.collision_surfaces.empty()) {
+        json["collisionSurfaces"] = Json::array();
+        for (const auto& surface : map.collision_surfaces) json["collisionSurfaces"].push_back(collision_marker(surface));
+    }
     for (const auto& layer : map.layers) json["layers"].push_back({{"id", layer.id}, {"name", layer.name}, {"kind", std::string(to_string(layer.kind))}, {"visible", layer.visible}, {"locked", layer.locked}, {"depth", layer.depth}});
     for (const auto& prefab : map.prefabs) {
         Json value{{"id", prefab.id}, {"entity", ref(prefab.entity)},
@@ -459,7 +538,9 @@ std::string serialize_map(const MapDocument& map) {
     }
     for (const auto& collision : map.collisions) {
         Json points = Json::array(); for (const auto point : collision.points) points.push_back(vec(point));
-        json["collisions"].push_back({{"kind", collision.kind == CollisionShapeKind::circle ? "circle" : collision.kind == CollisionShapeKind::capsule ? "capsule" : collision.kind == CollisionShapeKind::polygon ? "polygon" : "chain"}, {"layer", collision.layer_id}, {"sensor", collision.sensor}, {"center", vec(collision.center)}, {"radius", collision.radius}, {"length", collision.length}, {"points", points}});
+        Json stored{{"kind", collision.kind == CollisionShapeKind::circle ? "circle" : collision.kind == CollisionShapeKind::capsule ? "capsule" : collision.kind == CollisionShapeKind::polygon ? "polygon" : "chain"}, {"layer", collision.layer_id}, {"sensor", collision.sensor}, {"center", vec(collision.center)}, {"radius", collision.radius}, {"length", collision.length}, {"points", points}};
+        if (collision.marker_override) stored["markerOverride"] = collision_marker(*collision.marker_override);
+        json["collisions"].push_back(std::move(stored));
     }
     for (const auto& trigger : map.triggers) json["triggers"].push_back({{"id", trigger.id}, {"layer", trigger.layer_id}, {"collision", trigger.collision_index}, {"event", trigger.event_id.value}, {"properties", properties(trigger.properties)}});
     for (const auto& event : map.events) json["events"].push_back({{"id", event.id.value}, {"payload", properties(event.payload)}});
@@ -482,7 +563,9 @@ MapResult parse_map(const ProjectManifest& manifest, std::string_view serialized
     const auto instances = json.find("instances");
     if (instances == json.end() || !instances->is_array()) error(result.errors, ErrorCode::invalid_asset, "instances", "expected an array"); else for (const auto& value : *instances) { MapInstance instance; text(value, "id", instance.id, result.errors); text(value, "layer", instance.layer_id, result.errors); transform_read(value, "transform", instance.transform, result.errors); std::int64_t chunk{}; integer(value, "chunkX", chunk, result.errors); instance.chunk_x = static_cast<std::int32_t>(chunk); integer(value, "chunkY", chunk, result.errors); instance.chunk_y = static_cast<std::int32_t>(chunk); ref_read(value, "entity", instance.entity, result.errors); ref_read(value, "prefab", instance.prefab, result.errors); properties_read(value, "properties", instance.properties, result.errors); map.instances.push_back(std::move(instance)); }
     const auto collisions = json.find("collisions");
-    if (collisions == json.end() || !collisions->is_array()) error(result.errors, ErrorCode::invalid_asset, "collisions", "expected an array"); else for (const auto& value : *collisions) { CollisionShape collision; std::string kind; text(value, "kind", kind, result.errors); if (kind == "circle") collision.kind = CollisionShapeKind::circle; else if (kind == "capsule") collision.kind = CollisionShapeKind::capsule; else if (kind == "polygon") collision.kind = CollisionShapeKind::polygon; else if (kind == "chain") collision.kind = CollisionShapeKind::chain; else error(result.errors, ErrorCode::invalid_asset, "kind", "unsupported collision kind"); text(value, "layer", collision.layer_id, result.errors); const auto sensor = value.find("sensor"); if (sensor == value.end() || !sensor->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "sensor", "expected boolean"); else collision.sensor = sensor->get<bool>(); vec_read(value, "center", collision.center, result.errors); number(value, "radius", collision.radius, result.errors); number(value, "length", collision.length, result.errors); const auto points = value.find("points"); if (points == value.end() || !points->is_array()) error(result.errors, ErrorCode::invalid_asset, "points", "expected an array"); else for (const auto& point : *points) { core::Vec2 parsed{}; if (point.is_object() && number(point, "x", parsed.x, result.errors) && number(point, "y", parsed.y, result.errors)) collision.points.push_back(parsed); } map.collisions.push_back(std::move(collision)); }
+    if (collisions == json.end() || !collisions->is_array()) error(result.errors, ErrorCode::invalid_asset, "collisions", "expected an array"); else for (const auto& value : *collisions) { CollisionShape collision; std::string kind; text(value, "kind", kind, result.errors); if (kind == "circle") collision.kind = CollisionShapeKind::circle; else if (kind == "capsule") collision.kind = CollisionShapeKind::capsule; else if (kind == "polygon") collision.kind = CollisionShapeKind::polygon; else if (kind == "chain") collision.kind = CollisionShapeKind::chain; else error(result.errors, ErrorCode::invalid_asset, "kind", "unsupported collision kind"); text(value, "layer", collision.layer_id, result.errors); const auto sensor = value.find("sensor"); if (sensor == value.end() || !sensor->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "sensor", "expected boolean"); else collision.sensor = sensor->get<bool>(); vec_read(value, "center", collision.center, result.errors); number(value, "radius", collision.radius, result.errors); number(value, "length", collision.length, result.errors); const auto points = value.find("points"); if (points == value.end() || !points->is_array()) error(result.errors, ErrorCode::invalid_asset, "points", "expected an array"); else for (const auto& point : *points) { core::Vec2 parsed{}; if (point.is_object() && number(point, "x", parsed.x, result.errors) && number(point, "y", parsed.y, result.errors)) collision.points.push_back(parsed); } const auto marker = value.find("markerOverride"); if (marker != value.end() && marker->is_object()) { collision.marker_override = CollisionMarkerConfig{}; collision_marker_read(*marker, *collision.marker_override, result.errors); } map.collisions.push_back(std::move(collision)); }
+    const auto surfaces = json.find("collisionSurfaces");
+    if (surfaces != json.end() && surfaces->is_array()) for (const auto& value : *surfaces) { CollisionMarkerConfig config; collision_marker_read(value, config, result.errors); map.collision_surfaces.push_back(std::move(config)); }
     const auto triggers = json.find("triggers");
     if (triggers == json.end() || !triggers->is_array()) error(result.errors, ErrorCode::invalid_asset, "triggers", "expected an array"); else for (const auto& value : *triggers) { TriggerDefinition trigger; text(value, "id", trigger.id, result.errors); text(value, "layer", trigger.layer_id, result.errors); std::int64_t index{}; integer(value, "collision", index, result.errors); trigger.collision_index = static_cast<std::size_t>(std::max<std::int64_t>(0, index)); text(value, "event", trigger.event_id.value, result.errors); properties_read(value, "properties", trigger.properties, result.errors); map.triggers.push_back(std::move(trigger)); }
     const auto events = json.find("events");

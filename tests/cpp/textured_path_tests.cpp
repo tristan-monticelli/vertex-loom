@@ -88,6 +88,23 @@ TEST_CASE("textured path v1 round trips its authoring contract") {
     CHECK(references.front() == source.texture);
 }
 
+TEST_CASE("textured path persists shader profile and animated surface settings") {
+    auto source = textured_path();
+    source.shader.profile = fabric::project::SurfaceShaderProfile::thread;
+    source.shader.classification = fabric::project::TextureClassification::beam;
+    source.shader.primary_color = {0.2F, 0.4F, 0.8F, 1.0F};
+    source.shader.effect_color = {1.0F, 0.2F, 0.7F, 1.0F};
+    source.shader.shine = 0.75F;
+    source.shader.holography = 0.35F;
+    source.shader.intensity = 1.4F;
+    source.shader.repetition = {3.0F, 2.0F};
+    source.shader.deformation = {0.1F, -0.2F};
+    const auto parsed = fabric::project::parse_textured_path(
+        manifest(), fabric::project::serialize_textured_path(source));
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->shader == source.shader);
+}
+
 TEST_CASE("textured path parser is strict") {
     const auto source = textured_path();
     auto serialized = fabric::project::serialize_textured_path(source);
