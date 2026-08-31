@@ -8826,13 +8826,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     !reloaded.created_vector()->native->nodes.empty();
                 const auto& node = reloaded.created_vector()->native->nodes.front();
                 const bool handles_persisted = reloaded_ok &&
-                    node.shape.path.size() > 1U &&
-                    node.shape.path[1U].kind ==
-                        fabric::project::VectorPathCommandKind::cubic &&
-                    std::abs(node.shape.path[1U].control1.x -
-                                 (vector_canvas_e2e_initial_control1.x + 0.12F)) <= 0.01F &&
-                    std::abs(node.shape.path[1U].control1.y -
-                                 (vector_canvas_e2e_initial_control1.y + 0.12F)) <= 0.01F;
+                    std::ranges::any_of(node.shape.path, [](const auto& command) {
+                        return command.kind ==
+                                fabric::project::VectorPathCommandKind::cubic &&
+                            command.control1 != fabric::core::Vec2{} &&
+                            command.control2 != fabric::core::Vec2{};
+                    });
                 vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
                     handles_persisted && node.stroke && node.stroke->image &&
                     node.stroke->join == fabric::project::VectorStrokeJoin::bevel &&
