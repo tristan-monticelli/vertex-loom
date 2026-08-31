@@ -76,6 +76,13 @@ que la machine d'état valide et transforme en commande undoable.
 
 ### P0 — rendre Pen utilisable
 
+État au 31 août 2026 : première tranche implémentée, mais E2E souris dédié
+encore requis. Le canvas expose maintenant `New path` quand Pen est actif,
+permet de convertir la forme sélectionnée en chemin, affiche les commandes de
+fin/annulation et remonte un diagnostic de démarrage. Cette tranche ne ferme
+pas le P0 tant que les événements souris du bouton et le dessin libre ne sont
+pas testés sans mutation directe du modèle.
+
 1. Extraire `CanvasInteractionController` dans le module editor.
 2. Définir les états `idle`, `drawing_path`, `editing_path`, `dragging_anchor`,
    `dragging_handle` et `pending_close`.

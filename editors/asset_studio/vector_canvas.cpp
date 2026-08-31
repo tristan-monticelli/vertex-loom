@@ -23,8 +23,43 @@ ImU32 color_to_u32(const fabric::core::Color& color) {
 
 } // namespace
 
+bool start_new_freeform_path(fabric::editor::ProjectSession& session,
+                             CanvasUiState& canvas, std::string& status) {
+    if (!session.created_vector() || !session.created_vector()->native ||
+        canvas.selected_node >= session.created_vector()->native->nodes.size()) {
+        status = "Select a vector node before starting a path.";
+        return false;
+    }
+    auto node = session.created_vector()->native->nodes[canvas.selected_node];
+    if (node.locked) {
+        status = "The selected vector node is locked.";
+        return false;
+    }
+    const auto original_node = node;
+    const auto origin = node.shape.bounds.origin;
+    node.shape.kind = fabric::project::VectorShapeKind::path;
+    node.shape.path = {{
+        .kind = fabric::project::VectorPathCommandKind::move,
+        .point = origin}, {
+        .kind = fabric::project::VectorPathCommandKind::line,
+        .point = {origin.x + std::max(0.01F, node.shape.bounds.size.x), origin.y}}};
+    if (!session.set_selected_vector_node(canvas.selected_node, std::move(node))) {
+        status = "Could not start the path; inspect the validation error.";
+        return false;
+    }
+    canvas.tool = CanvasUiState::Tool::pen;
+    canvas.pen_start_node = original_node;
+    canvas.selected_path_points = {1U};
+    canvas.path_command_index = 1U;
+    canvas.dragging = false;
+    canvas.drag_operation = CanvasUiState::DragOperation::none;
+    status = "New path started. Click to add points, Enter to finish, Escape to cancel.";
+    return true;
+}
+
 void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
-                               CanvasUiState& canvas, const ImVec2 available) {
+                               CanvasUiState& canvas, const ImVec2 available,
+                               std::string& status) {
     if (!session.created_vector()) return;
     const auto& asset = *session.created_vector();
     if (!asset.native || asset.native->size.x <= 0.0F ||
@@ -357,6 +392,29 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             canvas.drag_start_mouse = mouse;
             canvas.drag_start_transform = selected_node->transform;
             canvas.drag_start_node = *selected_node;
+        }
+    }
+    if (hovered && canvas.tool == CanvasUiState::Tool::pen &&
+        (ImGui::IsKeyPressed(ImGuiKey_Enter) ||
+         ImGui::IsKeyPressed(ImGuiKey_KeypadEnter))) {
+        canvas.dragging = false;
+        canvas.drag_operation = CanvasUiState::DragOperation::none;
+        canvas.selected_path_points.clear();
+        canvas.pen_start_node.reset();
+        status = "Path finished.";
+    }
+    if (hovered && canvas.tool == CanvasUiState::Tool::pen &&
+        ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        canvas.dragging = false;
+        canvas.drag_operation = CanvasUiState::DragOperation::none;
+        canvas.selected_path_points.clear();
+        if (canvas.pen_start_node && session.set_selected_vector_node(
+                canvas.selected_node, std::move(*canvas.pen_start_node))) {
+            canvas.pen_start_node.reset();
+            status = "New path cancelled.";
+        } else {
+            canvas.pen_start_node.reset();
+            status = "Path editing cancelled.";
         }
     }
     const bool right_click = ImGui::IsMouseClicked(ImGuiMouseButton_Right) ||

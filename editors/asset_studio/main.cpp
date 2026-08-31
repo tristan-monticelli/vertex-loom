@@ -2782,11 +2782,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (ImGui::RadioButton("Pen", canvas.tool == CanvasUiState::Tool::pen)) {
             canvas.tool = CanvasUiState::Tool::pen;
         }
+        if (canvas.tool == CanvasUiState::Tool::pen) {
+            ImGui::SameLine();
+            if (ImGui::Button("New path"))
+                static_cast<void>(start_new_freeform_path(session, canvas, status));
+            ImGui::SameLine();
+            ImGui::TextDisabled("click points · Enter finish · Escape cancel");
+        }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
         draw_native_vector_canvas(
             session, canvas,
             {std::max(1.0F, available.x - 16.0F),
-             std::max(1.0F, available.y - 42.0F)});
+             std::max(1.0F, available.y - 42.0F)}, status);
     } else if (visual_selected) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         if (visual_preview.errors.empty()) {

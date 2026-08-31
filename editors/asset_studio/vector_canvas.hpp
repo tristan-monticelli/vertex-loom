@@ -54,6 +54,7 @@ struct CanvasUiState {
     fabric::core::Transform entity_gizmo_start_transform;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;
+    std::optional<fabric::project::VectorNode> pen_start_node;
     ImVec2 native_origin{};
     ImVec2 native_size{};
     fabric::core::Rect native_world_bounds;
@@ -65,6 +66,11 @@ struct CanvasUiState {
 };
 
 void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
-                               CanvasUiState& canvas, ImVec2 available);
+                               CanvasUiState& canvas, ImVec2 available,
+                               std::string& status);
+
+[[nodiscard]] bool start_new_freeform_path(
+    fabric::editor::ProjectSession& session, CanvasUiState& canvas,
+    std::string& status);
 
 } // namespace fabric::asset_studio
