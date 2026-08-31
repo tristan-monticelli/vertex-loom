@@ -132,9 +132,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   alpha OpenGL explicite ; le checker compare les captures `miter`, `round` et
   `bevel` pour empêcher une régression vers une polyline unique.
 - [ ] Ajouter une bordure vectorielle réellement visible au preset `beam` et
-  prouver le stroke image avec texture, répétition, UV et crop dans le renderer.
+  prouver le stroke image dans le parcours du preset avec répétition, UV et
+  crop. Le smoke OpenGL prouve maintenant l’échantillonnage d’une texture de
+  stroke non uniforme ; la preuve visuelle du preset reste à faire.
 - [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
-  (offset, échelle et déformation), avec captures et reload vérifiés.
+  (offset, échelle et déformation), avec une texture non uniforme, captures
+  distinctes et reload vérifiés par le parcours `asset_studio_vector_canvas_e2e`.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher

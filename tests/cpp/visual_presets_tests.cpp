@@ -612,8 +612,15 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
     REQUIRE(second.ok());
     CHECK(*first.bundle == *second.bundle);
     REQUIRE(first.bundle->textured_paths.size() == 1U);
+    REQUIRE(first.bundle->vectors.size() == 1U);
+    REQUIRE(first.bundle->vectors.front().native.has_value());
+    REQUIRE(first.bundle->vectors.front().native->nodes.size() == 1U);
+    CHECK(first.bundle->vectors.front().native->nodes.front().stroke.has_value());
+    CHECK(first.bundle->vectors.front().native->nodes.front().stroke->width > 0.0F);
     CHECK(first.bundle->composition.layers.front().kind ==
           fabric::project::VisualLayerKind::textured_path);
+    CHECK(first.bundle->composition.layers.back().resource.id ==
+          first.bundle->vectors.front().document.id);
     CHECK(first.bundle->component.parameters.size() == 5U);
 }
 

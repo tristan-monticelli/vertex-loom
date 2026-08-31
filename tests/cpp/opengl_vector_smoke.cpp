@@ -164,6 +164,42 @@ int main() {
         255U, 0U, 0U, 255U, 0U, 255U, 0U, 255U};
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 1, 0, GL_RGBA,
                  GL_UNSIGNED_BYTE, reference_pixels.data());
+    const fabric::render::VectorDrawPacket textured_stroke{
+        .node_id = "textured-stroke",
+        .stroke = fabric::project::VectorStroke{
+            .color = fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F},
+            .width = 0.2F,
+            .image = fabric::project::VectorImageFill{
+                .texture = {{.value = "reference-texture"}, "texture"}}},
+        .stroke_vertices = {{-0.5F, -0.1F}, {0.5F, -0.1F},
+                            {0.5F, 0.1F}, {-0.5F, 0.1F}},
+        .stroke_indices = {0U, 1U, 2U, 0U, 2U, 3U},
+        .stroke_image = fabric::project::VectorImageFill{
+            .texture = {{.value = "reference-texture"}, "texture"}},
+        .stroke_uv = {{0.0F, 0.0F}, {1.0F, 0.0F},
+                      {1.0F, 1.0F}, {0.0F, 1.0F}},
+    };
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto textured_stroke_stats = renderer.draw(
+        std::span<const fabric::render::VectorDrawPacket>(&textured_stroke, 1),
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {-0.5F, -0.5F}, .size = {1.0F, 1.0F}}},
+        [texture](const fabric::core::ResourceId& id)
+            -> std::optional<fabric::render::OpenGLTextureHandle> {
+            if (id.value != "reference-texture") return std::nullopt;
+            return fabric::render::OpenGLTextureHandle{
+                .handle = texture, .width = 2U, .height = 1U};
+        });
+    glFinish();
+    std::array<std::uint8_t, 4> stroke_left{};
+    std::array<std::uint8_t, 4> stroke_right{};
+    glReadPixels(16, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, stroke_left.data());
+    glReadPixels(48, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, stroke_right.data());
+    const bool textured_stroke_rendered = textured_stroke_stats.ok() &&
+        textured_stroke_stats.packets_drawn == 1U &&
+        stroke_left[0] > 180U && stroke_left[1] < 80U &&
+        stroke_right[0] < 80U && stroke_right[1] > 180U;
     const auto raster_packets = fabric::render::build_raster_view_draw_packets({
         .node_id = "raster-crop",
         .texture = {{.value = "reference-texture"}, "texture"},
@@ -248,8 +284,9 @@ int main() {
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
-    if (!rendered || !clipping || !nested_clipping || !raster_crop ||
-        !texture_tint || !texture_repeat) {
+    if (!rendered || !clipping || !nested_clipping ||
+        !textured_stroke_rendered || !raster_crop || !texture_tint ||
+        !texture_repeat) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "
                   << stats.packets_drawn << "/" << stats.triangles_drawn
                   << " pixel=" << static_cast<int>(pixel[0]) << ","
@@ -264,7 +301,11 @@ int main() {
                   << stencil_bits << " nested=" << nested_stats.packets_drawn
                   << "/" << nested_stats.triangles_drawn << " inside="
                   << static_cast<int>(nested_inside[1]) << " outside="
-                  << static_cast<int>(nested_outside[1]) << " raster="
+                  << static_cast<int>(nested_outside[1]) << " stroke="
+                  << static_cast<int>(stroke_left[0]) << ","
+                  << static_cast<int>(stroke_left[1]) << "/"
+                  << static_cast<int>(stroke_right[0]) << ","
+                  << static_cast<int>(stroke_right[1]) << " raster="
                   << raster_stats.packets_drawn << "/"
                   << static_cast<int>(raster_pixel[0]) << ","
                   << static_cast<int>(raster_pixel[1]) << ","
