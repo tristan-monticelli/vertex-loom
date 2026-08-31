@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 project(VertexLoom VERSION 0.1.0 LANGUAGES C CXX)
 
+include(GNUInstallDirs)
+
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
 option(FABRIC_BUILD_TESTS "Build the C++ test suite" ON)
@@ -278,6 +280,28 @@ if(FABRIC_BUILD_RUNTIME)
     target_link_libraries(game_runtime PRIVATE fabric_runtime)
 endif()
 
+install(TARGETS fabric_project_validate fabric_map_package_export fabric_asset_preview
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(FABRIC_BUILD_EDITORS)
+    install(TARGETS asset_studio map_studio
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+if(FABRIC_BUILD_RUNTIME)
+    install(TARGETS game_runtime
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+install(DIRECTORY tests/fixtures/studio-textile-head/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/examples/studio-textile-head)
+
+set(CPACK_PACKAGE_NAME "vertex-loom")
+set(CPACK_PACKAGE_VENDOR "Vertex Loom")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Cross-platform 2D engine and authoring tools for textile and vector worlds")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_CONTACT "vertex-loom@example.invalid")
+set(CPACK_GENERATOR "TGZ;ZIP")
+include(CPack)
+
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_core_smoke tests/cpp/core_smoke.cpp)
     target_link_libraries(fabric_core_smoke PRIVATE fabric_core nlohmann_json::nlohmann_json)
@@ -512,6 +536,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/game_runtime_progress_resume.cmake
         )
     endif()
+
+    add_test(
+        NAME package_install_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -DBUILD_DIR=${CMAKE_BINARY_DIR}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DTEST_ROOT=${CMAKE_BINARY_DIR}/package-install-smoke
+            -P ${CMAKE_SOURCE_DIR}/tests/cmake/package_install_smoke.cmake
+    )
 
     if(FABRIC_BUILD_EDITORS)
         add_test(

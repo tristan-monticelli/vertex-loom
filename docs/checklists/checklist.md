@@ -851,6 +851,9 @@ qui n'a pas connaissance de l'implémentation.
   sur un petit projet et un projet représentatif de production.
 - [ ] Packaging release : installer, lancer, mettre à jour et désinstaller le
   produit sur macOS, Windows et Linux avec ses ressources et dépendances.
+  Le smoke CMake/CPack local vérifie déjà l’installation, la validation du
+  projet exemple, le lancement du runtime installé et la génération TGZ/ZIP ;
+  la recette update/uninstall reste à exécuter sur les trois OS.
 - [ ] Accessibilité réelle : vérifier clavier, souris, focus, raccourcis,
   navigation, contraste et lisibilité sur chaque écran principal.
 - [ ] Recette utilisateur finale : faire valider les critères d'acceptation,
