@@ -54,7 +54,8 @@ lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
-Les parcours SDL des studios ont un timeout CTest de 180 secondes et le job
+Le workflow annule automatiquement les runs obsolètes d'une même branche. Les
+parcours SDL des studios ont un timeout CTest de 180 secondes et le job
 plateforme une limite de 20 minutes afin qu'un blocage de fenêtre, de driver,
 de build ou d'installation devienne un échec diagnostiquable sur Windows.
 Le workflow publie aussi les captures `asset-studio-vector-canvas-pen.ppm`,

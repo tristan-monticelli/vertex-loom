@@ -10,6 +10,10 @@ on:
       - 'tests/**'
       - '.github/workflows/platform-studio.yml'
 
+concurrency:
+  group: platform-studio-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-test:
     name: ${{ matrix.os }}
