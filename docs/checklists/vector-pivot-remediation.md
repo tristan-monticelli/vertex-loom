@@ -57,8 +57,10 @@ affiche son résultat exact avant toute écriture.
   toute référence à `SpriteSheetDefinition`, frame ou atlas.
 - [x] Retirer du build, des contrats et du validateur tous les en-têtes et
   documents sprite ; `rg` sur le code produit doit rester vide.
-- [ ] Ajouter une vérification mécanique qui échoue si ces contrats incluent
-  les en-têtes sprite hérités.
+- [x] Ajouter une vérification mécanique qui échoue si ces contrats incluent
+  les identifiants sprite hérités. `no_legacy_sprite_contracts` parcourt les
+  sources produit `engine/`, `editors/`, `game/` et `tools/` à chaque suite
+  CTest.
 - [ ] Construire le renderer vectoriel et ses draw packets sans pipeline atlas.
 - [ ] Vérifier qu’un projet composé uniquement de ressources natives se charge
   lorsque les imports legacy ne sont jamais invoqués.

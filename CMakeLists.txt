@@ -1012,4 +1012,10 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             -DPROJECT=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/invalid-project
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_validator_json_failure.cmake
     )
+    add_test(
+        NAME no_legacy_sprite_contracts
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/no_legacy_sprite_contracts.cmake
+    )
 endif()
