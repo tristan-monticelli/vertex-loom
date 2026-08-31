@@ -59,6 +59,8 @@ require_distinct_capture("${MITER_BUTT_CAPTURE}" "${ROUND_ROUND_CAPTURE}"
                          "miter/round")
 require_distinct_capture("${ROUND_ROUND_CAPTURE}" "${BEVEL_SQUARE_CAPTURE}"
                          "round/bevel")
+require_distinct_capture("${BEVEL_SQUARE_CAPTURE}" "${ADVANCED_CAPTURE}"
+                         "bevel/advanced")
 file(READ "${VISUAL_PROBE}" VISUAL_PROBE_CONTENT)
 string(REGEX MATCH "\"non_background_pixels\"[ \\t\r\n]*:[ \\t\r\n]*([0-9]+)" _ "${VISUAL_PROBE_CONTENT}")
 if(NOT CMAKE_MATCH_1 OR CMAKE_MATCH_1 LESS 50)

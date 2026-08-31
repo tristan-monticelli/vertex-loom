@@ -8094,6 +8094,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             } else if (node.stroke->image) {
                 node.stroke->image->transform.position = {0.35F, -0.15F};
                 node.stroke->image->transform.scale = {1.8F, 0.7F};
+                node.stroke->image->opacity = 0.35F;
                 node.stroke->image->deform_with_shape = true;
             }
             static_cast<void>(session.set_selected_vector_node(
@@ -8793,6 +8794,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::core::Vec2{0.35F, -0.15F} &&
                     node.stroke->image->transform.scale ==
                         fabric::core::Vec2{1.8F, 0.7F} &&
+                    node.stroke->image->opacity == 0.35F &&
                     node.stroke->image->deform_with_shape;
                 running = false;
             }

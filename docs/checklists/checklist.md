@@ -135,9 +135,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   la couvrir par une capture dédiée du parcours Asset Studio. Le smoke OpenGL
   prouve l’échantillonnage d’une texture de stroke non uniforme ; la répétition,
   les UV et le crop restent à compléter dans le parcours visuel.
-- [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
-  (offset, échelle et déformation), avec une texture non uniforme, captures
-  distinctes et reload vérifiés par le parcours `asset_studio_vector_canvas_e2e`.
+- [x] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
+  (offset, échelle, opacité et déformation), avec captures distinctes et reload
+  vérifiés par les parcours `asset_studio_vector_canvas_e2e` et
+  `asset_studio_beam_vector_canvas_e2e`.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
