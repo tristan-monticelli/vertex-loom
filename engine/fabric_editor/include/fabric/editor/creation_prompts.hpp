@@ -141,6 +141,14 @@ struct CreateMaterialPrompt {
         const project::ProjectManifest& manifest) const;
 };
 
+struct EntityCreationBlock {
+    std::string name;
+    project::EntityDrawableKind drawable{project::EntityDrawableKind::none};
+    std::string resource_id;
+    core::Transform transform;
+    float z_order{};
+};
+
 struct CreateEntityPrompt {
     std::string name;
     std::string node_name{"Root"};
@@ -149,6 +157,7 @@ struct CreateEntityPrompt {
     std::string material_id;
     core::Transform transform;
     float z_order{};
+    std::vector<EntityCreationBlock> blocks;
 
     void reset() noexcept;
     [[nodiscard]] PromptValidation validate(

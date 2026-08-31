@@ -77,4 +77,6 @@ flowchart LR
     Beam --> Shared[Shared textured-path geometry]
     Shared --> Studio[Asset Studio preview]
     Shared --> Runtime[Preview and published runtime]
+    Entity --> Blocks[Explicit visual blocks]
+    Blocks --> EntityPreview[Composed Entity preview]
 ```

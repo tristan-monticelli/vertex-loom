@@ -906,6 +906,29 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
             {.value = prompt.material_id}, "material"};
     }
     entity.nodes.push_back(std::move(node));
+    for (std::size_t index = 0; index < prompt.blocks.size(); ++index) {
+        const auto& block = prompt.blocks[index];
+        project::EntityNode child{
+            .id = "block-" + std::to_string(index + 1U),
+            .name = block.name,
+            .parent = "root",
+            .transform = block.transform,
+            .z_order = block.z_order,
+            .drawable = {.kind = block.drawable},
+        };
+        if (!block.resource_id.empty()) {
+            child.drawable.resource = project::ResourceReference{
+                {.value = block.resource_id},
+                block.drawable == project::EntityDrawableKind::texture
+                    ? "texture"
+                    : block.drawable == project::EntityDrawableKind::visual_component
+                    ? "visualComponent" : "vector"};
+            if (block.drawable == project::EntityDrawableKind::visual_component)
+                child.drawable.component_instance =
+                    project::VisualComponentInstance{};
+        }
+        entity.nodes.push_back(std::move(child));
+    }
     const auto published = project::publish_entity(
         project_root_, *manifest_, entity);
     if (!published.ok()) {

@@ -333,6 +333,42 @@ TEST_CASE("resource duplication rewrites only selected dependencies") {
         project.path() / "assets/vectors/source-art-copy.vector.json"));
 }
 
+TEST_CASE("composed entity prompt publishes explicit visual blocks") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Composed artwork";
+    REQUIRE(session.create_vector_artwork(artwork));
+
+    fabric::editor::CreateEntityPrompt entity;
+    entity.name = "Composed entity";
+    entity.node_name = "Root";
+    entity.blocks = {
+        {.name = "Body", .drawable = fabric::project::EntityDrawableKind::vector,
+         .resource_id = "composed-artwork", .z_order = 0.0F},
+        {.name = "Overlay", .drawable = fabric::project::EntityDrawableKind::vector,
+         .resource_id = "composed-artwork", .z_order = 1.0F}};
+    REQUIRE(session.create_entity(entity));
+    REQUIRE(session.selected_entity());
+    REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    CHECK(session.selected_entity()->nodes[1].parent == "root");
+    CHECK(session.selected_entity()->nodes[1].drawable.resource->id.value ==
+          "composed-artwork");
+    CHECK(session.selected_entity()->nodes[2].name == "Overlay");
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::entity,
+        {.value = "composed-entity"}));
+    REQUIRE(reloaded.selected_entity());
+    CHECK(reloaded.selected_entity()->nodes.size() == 3U);
+    CHECK(reloaded.selected_entity()->nodes[2].z_order == 1.0F);
+}
+
 TEST_CASE("selection preserves an invalid dirty document") {
     const TemporaryDirectory project;
     write_project(project.path());

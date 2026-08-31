@@ -184,6 +184,7 @@ struct CreationUiState {
     bool request_behavior{};
     bool request_transformation{};
     bool guided_button{};
+    bool guided_composed_entity{};
     bool project_publish_attempted{};
     bool input_capture{};
     std::size_t input_capture_action{};
@@ -2668,6 +2669,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             if (ImGui::MenuItem("Composed Entity...")) {
                 creation.guided_button = false;
+                creation.guided_composed_entity = true;
                 creation.request_entity = true;
             }
             ImGui::SeparatorText("Advanced");
@@ -6458,6 +6460,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (creation.request_entity && session.has_project()) {
         creation.entity.reset();
+        if (creation.guided_composed_entity) {
+            creation.entity.name = "Composed entity";
+            creation.entity.node_name = "Root";
+        }
         if (creation.guided_button) {
             creation.entity.name = "Button entity";
             creation.entity.drawable =
@@ -7155,6 +7161,74 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::TextDisabled(
                 "The selected visual component owns its composed materials.");
         }
+        if (creation.guided_composed_entity) {
+            ImGui::SeparatorText("Visual blocks");
+            ImGui::TextWrapped(
+                "Add each artwork, image, Beam or component explicitly. Blocks are independent and keep their own transform and draw order.");
+            if (ImGui::Button("Add visual block")) {
+                const auto index = creation.entity.blocks.size() + 1U;
+                creation.entity.blocks.push_back({
+                    .name = "Block " + std::to_string(index),
+                    .drawable = fabric::project::EntityDrawableKind::vector});
+            }
+            for (std::size_t index = 0; index < creation.entity.blocks.size(); ++index) {
+                auto& block = creation.entity.blocks[index];
+                ImGui::PushID(static_cast<int>(index));
+                ImGui::SeparatorText(("Block " + std::to_string(index + 1U)).c_str());
+                draw_resource_name_field("Block name", block.name, 360.0F);
+                const auto block_label = std::string(
+                    fabric::project::to_string(block.drawable));
+                if (ImGui::BeginCombo("Block type", block_label.c_str())) {
+                    for (const auto drawable : {
+                             fabric::project::EntityDrawableKind::vector,
+                             fabric::project::EntityDrawableKind::texture,
+                             fabric::project::EntityDrawableKind::visual_component}) {
+                        const bool selected = block.drawable == drawable;
+                        const auto option = std::string(
+                            fabric::project::to_string(drawable));
+                        if (ImGui::Selectable(option.c_str(), selected)) {
+                            block.drawable = drawable;
+                            block.resource_id.clear();
+                        }
+                        if (selected) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                const auto block_kind = block.drawable ==
+                        fabric::project::EntityDrawableKind::texture
+                    ? fabric::editor::StudioResourceKind::texture
+                    : block.drawable ==
+                          fabric::project::EntityDrawableKind::visual_component
+                    ? fabric::editor::StudioResourceKind::visual_component
+                    : fabric::editor::StudioResourceKind::vector;
+                static_cast<void>(draw_project_resource_picker(
+                    "Block resource", session.resources(), block_kind,
+                    block.resource_id, false));
+                float block_position[] = {block.transform.position.x,
+                                          block.transform.position.y};
+                if (ImGui::InputFloat2("Block position", block_position))
+                    block.transform.position = {block_position[0], block_position[1]};
+                float block_scale[] = {block.transform.scale.x,
+                                       block.transform.scale.y};
+                if (ImGui::InputFloat2("Block scale", block_scale))
+                    block.transform.scale = {block_scale[0], block_scale[1]};
+                ImGui::InputFloat("Block rotation", &block.transform.rotation_degrees,
+                                  1.0F, 10.0F, "%.2f deg");
+                ImGui::InputFloat("Block Z order", &block.z_order, 0.1F, 1.0F,
+                                  "%.2f");
+                if (ImGui::Button("Remove block")) {
+                    creation.entity.blocks.erase(
+                        creation.entity.blocks.begin() +
+                        static_cast<std::ptrdiff_t>(index));
+                    ImGui::PopID();
+                    break;
+                }
+                ImGui::PopID();
+            }
+            if (creation.entity.blocks.empty())
+                ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
+                                   "Add at least one visual block before creating the Entity.");
+        }
         float position[] = {creation.entity.transform.position.x,
                             creation.entity.transform.position.y};
         if (ImGui::InputFloat2("Position (world units)", position)) {
@@ -7181,24 +7255,31 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "material");
         draw_prompt_error(validation, "transform");
         draw_prompt_summary(validation);
-        ImGui::BeginDisabled(!validation.ok());
+        const bool entity_valid = validation.ok() &&
+            (!creation.guided_composed_entity ||
+             !creation.entity.blocks.empty());
+        ImGui::BeginDisabled(!entity_valid);
         if (ImGui::Button("Create entity", {140.0F, 0.0F})) {
             if (session.create_entity(creation.entity)) {
                 clear_asset_preview(preview);
                 status = "Entity created and saved.";
                 creation.guided_button = false;
+                creation.guided_composed_entity = false;
                 ImGui::CloseCurrentPopup();
             } else {
                 status = "Entity creation failed; inspect diagnostics.";
             }
         }
         ImGui::EndDisabled();
-        draw_disabled_reason(!validation.ok(),
-                             "Complete the entity fields and resolve validation errors.");
+        draw_disabled_reason(!entity_valid,
+                             !validation.ok()
+                                 ? "Complete the entity fields and resolve validation errors."
+                                 : "Add at least one visual block before creating the Entity.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.entity.reset();
             creation.guided_button = false;
+            creation.guided_composed_entity = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -8476,6 +8557,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     }
                     if (ImGui::MenuItem("Entity...")) {
                         creation.guided_button = false;
+                        creation.guided_composed_entity = false;
                         creation.request_entity = true;
                     }
                     if (ImGui::BeginMenu("Advanced")) {
