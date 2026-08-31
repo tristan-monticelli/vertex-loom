@@ -849,6 +849,10 @@ qui n'a pas connaissance de l'implémentation.
   canvas, textures, fills, strokes, clips et transformations.
 - [ ] Robustesse des données : couvrir ressource manquante, fichier invalide,
   sauvegarde interrompue, récupération et conservation des modifications.
+  Le checker `release_data_robustness` couvre maintenant les projets invalide
+  et valide ainsi qu’une ressource vectorielle manquante ; les scénarios
+  interruption/récupération restent couverts par les tests de sauvegarde mais
+  doivent encore être rejoués dans une recette release dédiée.
 - [ ] Performance release : mesurer démarrage, FPS, mémoire et temps de chargement
   sur un petit projet et un projet représentatif de production.
 - [ ] Packaging release : installer, lancer, mettre à jour et désinstaller le

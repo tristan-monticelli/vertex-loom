@@ -85,6 +85,9 @@ fixture textile : édition et sauvegarde dans Asset Studio, réouverture et
 validation du projet, puis lancement du Runtime sur la map publiée en mode
 smoke. Il constitue la preuve automatisée du flux produit avant les recettes
 manuelles de release.
+Le test CTest `release_data_robustness` rejette un projet invalide et un projet
+dont une ressource vectorielle référencée a été supprimée, tout en conservant
+le cas valide comme contrôle de non-régression.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un

@@ -560,6 +560,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         set_tests_properties(release_product_recipe PROPERTIES TIMEOUT 180)
     endif()
 
+    add_test(
+        NAME release_data_robustness
+        COMMAND ${CMAKE_COMMAND}
+            "-DVALIDATOR=$<TARGET_FILE:fabric_project_validate>"
+            "-DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head"
+            "-DINVALID_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/invalid-project"
+            "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-data-robustness"
+            -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_data_robustness.cmake
+    )
+
     if(FABRIC_BUILD_EDITORS)
         add_test(
             NAME asset_studio_ui_registry_e2e
