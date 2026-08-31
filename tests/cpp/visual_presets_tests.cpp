@@ -441,6 +441,7 @@ std::vector<std::filesystem::path> fixture_files(
          std::filesystem::recursive_directory_iterator(root)) {
         const auto filename = entry.path().filename().generic_string();
         if (entry.is_regular_file() && filename != ".keep" &&
+            filename != ".DS_Store" &&
             filename != "asset-studio-ui-widgets.json" &&
             filename != "asset_studio-e2e-failure.txt" &&
             filename != "asset_studio-e2e-failure.ppm")
