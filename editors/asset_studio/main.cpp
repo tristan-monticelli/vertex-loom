@@ -3150,6 +3150,66 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 if (style_changed)
                     (void)session.set_selected_textured_path(std::move(style));
+                auto shader_style = *session.selected_textured_path();
+                bool shader_changed = false;
+                ImGui::SeparatorText("Surface color and shader");
+                const auto shader_profile_label = std::string(
+                    fabric::project::to_string(shader_style.shader.profile));
+                if (ImGui::BeginCombo("Shader profile",
+                                      shader_profile_label.c_str())) {
+                    for (const auto profile : {
+                             fabric::project::SurfaceShaderProfile::thread,
+                             fabric::project::SurfaceShaderProfile::plastic,
+                             fabric::project::SurfaceShaderProfile::monochrome,
+                             fabric::project::SurfaceShaderProfile::custom}) {
+                        const bool selected_profile =
+                            shader_style.shader.profile == profile;
+                        const auto label = std::string(
+                            fabric::project::to_string(profile));
+                        if (ImGui::Selectable(label.c_str(), selected_profile)) {
+                            shader_style.shader.profile = profile;
+                            shader_changed = true;
+                        }
+                        if (selected_profile) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                const auto shader_classification_label = std::string(
+                    fabric::project::to_string(shader_style.shader.classification));
+                if (ImGui::BeginCombo("Texture role",
+                                      shader_classification_label.c_str())) {
+                    for (const auto classification : {
+                             fabric::project::TextureClassification::floor,
+                             fabric::project::TextureClassification::rope,
+                             fabric::project::TextureClassification::beam,
+                             fabric::project::TextureClassification::button_eye,
+                             fabric::project::TextureClassification::collision_marker}) {
+                        const bool selected_classification =
+                            shader_style.shader.classification == classification;
+                        const auto label = std::string(
+                            fabric::project::to_string(classification));
+                        if (ImGui::Selectable(label.c_str(), selected_classification)) {
+                            shader_style.shader.classification = classification;
+                            shader_changed = true;
+                        }
+                        if (selected_classification) ImGui::SetItemDefaultFocus();
+                    }
+                    ImGui::EndCombo();
+                }
+                shader_changed |= ImGui::ColorEdit4(
+                    "Primary color", &shader_style.shader.primary_color.red);
+                shader_changed |= ImGui::ColorEdit4(
+                    "Effect color", &shader_style.shader.effect_color.red);
+                shader_changed |= ImGui::SliderFloat(
+                    "Shine", &shader_style.shader.shine, 0.0F, 1.0F);
+                shader_changed |= ImGui::SliderFloat(
+                    "Holography", &shader_style.shader.holography, 0.0F, 1.0F);
+                shader_changed |= ImGui::SliderFloat(
+                    "Shader opacity", &shader_style.shader.opacity, 0.0F, 1.0F);
+                shader_changed |= ImGui::SliderFloat(
+                    "Shader intensity", &shader_style.shader.intensity, 0.0F, 4.0F);
+                if (shader_changed)
+                    (void)session.set_selected_textured_path(std::move(shader_style));
                 ImGui::SeparatorText("Texture animation preview");
                 ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
                 ImGui::DragFloat("Scroll speed (factor/s)", &path_ui.scroll_speed,

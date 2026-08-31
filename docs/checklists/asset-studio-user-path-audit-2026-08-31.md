@@ -62,7 +62,7 @@ flowchart TD
 | U07 | Créer plusieurs Beams | Partiel | Le fallback utilise `defaultStrokeTexture`, sans preuve que la ressource existe, est chargée et reste la texture attendue. | P0 |
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
-| U10 | Régler color/effect/shine/holography du Beam | Non validé UX | Les champs existent, mais la capture écran shader n'est pas encore une preuve stable. | P0 |
+| U10 | Régler color/effect/shine/holography du Beam | Partiel | Les champs sont maintenant disponibles dans l'inspecteur du chemin texturé ; la capture écran shader et le round-trip restent à prouver. | P0 |
 | U11 | Créer un Button avec l'original fourni | Bloqué | Le système cherche implicitement le premier composant contenant `button` et peut créer une Entity vide sans erreur. | P0 |
 | U12 | Créer un Eye | Partiel | Le prompt existe, mais le parcours n'est pas vérifié avec une ressource originale ni une comparaison runtime. | P1 |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
