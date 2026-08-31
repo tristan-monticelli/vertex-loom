@@ -156,6 +156,11 @@ stroke par défaut, localise son bouton, injecte un clic souris en trois frames,
 capture le Beam non sélectionné puis recharge le `texturedPath`. Il vérifie la
 texture héritée, l'épaisseur, l'opacité et la répétition sans injecter la
 texture ni appeler directement la factory à la place de l'action UI.
+Le test `asset_studio_ui_button_e2e` rend l'assistant Button avec un PNG
+original, ses couleurs et paramètres shader, injecte un clic sur le vrai bouton
+de création, capture le résultat puis recharge l'Entity et son Material v2. Il
+vérifie que la référence reste le PNG choisi et qu'aucune image de substitution
+n'est créée.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires
@@ -473,7 +478,7 @@ La session éditeur couvre la conversion liée-vers-native, sa publication,
 undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 `fabric_asset_preview` est vérifié headless sur les mêmes draw packets que le
 renderer et refuse les documents liés ou invalides sans créer de fenêtre.
-Les contrats `MaterialDefinition v1` et `EntityDefinition v4` couvrent
+Les contrats `MaterialDefinition v2` et `EntityDefinition v4` couvrent
 round-trip, migration des entités v1, publication atomique, références typées,
 instances de composants visuels, transforms non finies, identifiants dupliqués
 et cycles de parentage. Le validateur headless résout aussi variantes, ancres et

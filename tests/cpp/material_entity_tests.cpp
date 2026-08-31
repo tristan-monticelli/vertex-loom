@@ -30,6 +30,14 @@ fabric::project::MaterialDefinition material() {
         .blend = fabric::project::MaterialBlendMode::multiply,
         .texture = fabric::project::ResourceReference{
             {.value = "wool-fill"}, "texture"},
+        .shader = fabric::project::ShaderSurfaceSettings{
+            .profile = fabric::project::SurfaceShaderProfile::plastic,
+            .classification = fabric::project::TextureClassification::button_eye,
+            .primary_color = {0.2F, 0.7F, 1.0F, 1.0F},
+            .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
+            .shine = 0.4F,
+            .holography = 0.3F,
+        },
         .uv_transform = {.position = {0.1F, -0.2F},
                          .rotation_degrees = 15.0F,
                          .scale = {1.2F, 0.8F},
@@ -81,6 +89,21 @@ TEST_CASE("material definition round trips and publishes atomically") {
         root / "assets/materials/wool-material.material.json"));
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("material v1 migrates without enabling a surface shader") {
+    auto legacy = material();
+    legacy.shader.reset();
+    auto serialized = fabric::project::serialize_material(legacy);
+    const auto version = serialized.find("\"schemaVersion\": 2");
+    REQUIRE(version != std::string::npos);
+    serialized.replace(version, std::string{"\"schemaVersion\": 2"}.size(),
+                       "\"schemaVersion\": 1");
+    const auto parsed = fabric::project::parse_material(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->document.schema_version ==
+          fabric::project::current_material_schema_version);
+    CHECK_FALSE(parsed.asset->shader.has_value());
 }
 
 TEST_CASE("entity definition round trips and rejects parent cycles") {

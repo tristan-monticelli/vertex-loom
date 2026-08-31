@@ -874,11 +874,42 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
         return false;
     }
     if (!save_before_document_transition()) return false;
+    const auto entity_id = prompt.resource_id_for_document(
+        project_root_, *manifest_);
+    const core::ResourceId appearance_material_id{
+        .value = entity_id.value + "-appearance"};
+    if (prompt.appearance_shader) {
+        const auto material_path = project::material_document_path(
+            *manifest_, appearance_material_id);
+        std::error_code filesystem_error;
+        if (std::filesystem::exists(project_root_ / material_path,
+                                    filesystem_error) || filesystem_error) {
+            errors_ = {{project::ErrorCode::asset_already_exists,
+                        "appearance",
+                        "the Button appearance destination already exists"}};
+            return false;
+        }
+        project::MaterialDefinition appearance{
+            .document = {
+                .schema_version = project::current_material_schema_version,
+                .type = "material",
+                .id = appearance_material_id,
+                .name = prompt.name + " Appearance",
+            },
+            .shader = prompt.appearance_shader,
+        };
+        const auto published_appearance = project::publish_material(
+            project_root_, *manifest_, appearance);
+        if (!published_appearance.ok()) {
+            errors_ = published_appearance.errors;
+            return false;
+        }
+    }
     project::EntityDefinition entity{
         .document = {
             .schema_version = project::current_entity_schema_version,
             .type = "entity",
-            .id = prompt.resource_id_for_document(project_root_, *manifest_),
+            .id = entity_id,
             .name = prompt.name,
         },
     };
@@ -904,6 +935,9 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
     if (!prompt.material_id.empty()) {
         node.drawable.material = project::ResourceReference{
             {.value = prompt.material_id}, "material"};
+    } else if (prompt.appearance_shader) {
+        node.drawable.material = project::ResourceReference{
+            appearance_material_id, "material"};
     }
     entity.nodes.push_back(std::move(node));
     for (std::size_t index = 0; index < prompt.blocks.size(); ++index) {

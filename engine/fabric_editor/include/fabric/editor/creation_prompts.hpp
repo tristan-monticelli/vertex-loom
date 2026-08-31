@@ -155,6 +155,7 @@ struct CreateEntityPrompt {
     project::EntityDrawableKind drawable{project::EntityDrawableKind::none};
     std::string resource_id;
     std::string material_id;
+    std::optional<project::ShaderSurfaceSettings> appearance_shader;
     core::Transform transform;
     float z_order{};
     std::vector<EntityCreationBlock> blocks;

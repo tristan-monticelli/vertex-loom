@@ -369,6 +369,58 @@ TEST_CASE("composed entity prompt publishes explicit visual blocks") {
     CHECK(reloaded.selected_entity()->nodes[2].z_order == 1.0F);
 }
 
+TEST_CASE("guided Button entity preserves its PNG and reloads shader appearance") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    const auto source = project.path() / "original-button.png";
+    std::ofstream{source, std::ios::binary} << "original-png-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), *session.manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "original-button"},
+                      .name = "Original Button"},
+         .source = "assets/textures/original-button.png",
+         .width = 16U,
+         .height = 16U},
+        source).ok());
+    REQUIRE(session.refresh_resources());
+
+    fabric::editor::CreateEntityPrompt button;
+    button.name = "Play Button";
+    button.node_name = "Button";
+    button.drawable = fabric::project::EntityDrawableKind::texture;
+    button.resource_id = "original-button";
+    button.appearance_shader = fabric::project::ShaderSurfaceSettings{
+        .profile = fabric::project::SurfaceShaderProfile::custom,
+        .classification = fabric::project::TextureClassification::button_eye,
+        .primary_color = {0.2F, 0.7F, 1.0F, 1.0F},
+        .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
+        .shine = 0.4F,
+        .holography = 0.3F,
+    };
+    REQUIRE(session.create_entity(button));
+    REQUIRE(session.selected_entity());
+    const auto& drawable = session.selected_entity()->nodes.front().drawable;
+    REQUIRE(drawable.resource);
+    CHECK(drawable.resource->id.value == "original-button");
+    REQUIRE(drawable.material);
+    CHECK(drawable.material->id.value == "play-button-appearance");
+
+    const auto loaded = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded.asset->shader);
+    CHECK(*loaded.asset->shader == *button.appearance_shader);
+    CHECK(std::filesystem::is_regular_file(
+        project.path() / "assets/textures/original-button.png"));
+}
+
 TEST_CASE("selection preserves an invalid dirty document") {
     const TemporaryDirectory project;
     write_project(project.path());

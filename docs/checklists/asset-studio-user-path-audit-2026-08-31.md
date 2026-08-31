@@ -63,7 +63,7 @@ flowchart TD
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
 | U10 | Régler color/effect/shine/holography du Beam | Partiel corrigé | Le shader Thread conserve le motif à holographie maximale ; l'assistant et le reload Studio sont prouvés. La comparaison Preview Runtime/publication reste ouverte. | P1 |
-| U11 | Créer un Button avec l'original fourni | Partiel | Le parcours exige maintenant une texture originale sélectionnée ; l'index est rafraîchi à l'ouverture de l'assistant et signale explicitement l'absence de texture. Le round-trip écran reste à prouver. | P0 |
+| U11 | Créer un Button avec l'original fourni | Conforme sur le parcours isolé | Le parcours conserve le PNG choisi, lui attache un Material v2, expose couleur, effet, brillance, holographie et opacité, puis prouve clic réel, capture et reload. | Fermé |
 | U12 | Créer un Eye | Supprimé | Le faux type Eye, sa factory et ses fixtures ont été retirés ; les originaux concernés passent par Button comme PNG. | Fermé |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
 | U14 | Créer une Entity composée de plusieurs blocs | Bloqué UX | La création démarre avec un drawable et l'ajout des autres blocs est caché dans l'inspecteur, sans assistant de composition. | P1 |
@@ -71,7 +71,7 @@ flowchart TD
 | U16 | Déformer toute l'Entity | Non prouvé | L'ordre composition puis déformation globale n'est pas démontré à l'écran. | P1 |
 | U17 | Créer une animation | Partiel | Le prompt et la timeline sont couverts techniquement ; le ciblage et le résultat visible doivent être rejoués comme utilisateur novice. | P2 |
 | U18 | Créer des inputs et comportements | Partiel | Les prompts existent, mais le lien entre action, consommateur et Preview Runtime n'est pas suffisamment guidé. | P2 |
-| U19 | Sauvegarder, annuler, undo/redo, recharger | Partiel | Les fondations passent ; chaque nouveau parcours Beam/Button/Entity doit encore prouver le round-trip complet. | P1 |
+| U19 | Sauvegarder, annuler, undo/redo, recharger | Partiel | Beam et Button prouvent maintenant leur reload ; Entity composée et les opérations undo/redo guidées restent à fermer. | P1 |
 | U20 | Preview Runtime puis publication | Partiel | Les tests runtime passent, mais aucune comparaison écran systématique ne relie l'écart à un champ utilisateur. | P1 |
 | U21 | Ouvrir Map Studio depuis le projet | Partiel | Le parcours Map est fonctionnel dans les tests, mais il reste séparé du parcours de création visuelle utilisateur. | P2 |
 | U22 | Créer map, scène, mécanique, trigger et publier | Partiel | Les contrats et E2E Map passent ; la découverte des concepts reste trop moteur pour un utilisateur normal. | P2 |
@@ -145,12 +145,21 @@ prouve ni la présence du fichier, ni le chargement GPU, ni le fait que l'image
 choisie par l'utilisateur soit celle réellement visible. Le parcours doit
 afficher la source active et son état de résolution.
 
-### 5. Le shader est testé par données, pas par résultat perceptible
+### 5. Le shader possède désormais une preuve perceptible isolée
 
-Le renderer OpenGL applique le shader aux batches et les tests de presets
-vérifient les paramètres. Il manque toutefois le chemin écran complet : créer
-le Beam dans la modal, observer le shader, sauvegarder, recharger puis comparer
-Preview Runtime et runtime publié.
+Le smoke OpenGL compare des pixels distincts d'une texture asymétrique et écrit
+une capture. Les E2E Beam et Button créent depuis les assistants, capturent le
+résultat puis rechargent leurs paramètres. La comparaison automatisée d'une
+même capture entre Preview Runtime et paquet publié reste ouverte.
+
+### 5.1 Orientation des PNG externes
+
+Le projet utilisateur audité ne contient aucune rotation à 180 degrés sur ses
+textures ou Entities. Le constructeur raster commun mappe le haut de l'image
+sur `v = 0` et le bas sur `v = 1`, avec une compensation verticale unique lors
+de l'upload OpenGL ; le crop déterministe couvre ces UV. Le signalement visuel
+reste à reproduire avec une texture asymétrique à quatre coins dans Studio et
+Preview Runtime avant de modifier la convention globale.
 
 ### 6. La séparation Avancé n'est pas complète
 

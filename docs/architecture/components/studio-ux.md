@@ -78,7 +78,11 @@ flowchart LR
     Beam --> BeamE2E[UI click, screenshot and reload proof]
     BeamE2E --> Shared
     Button --> ButtonTexture[Imported Button PNG]
-    ButtonTexture --> Entity
+    ButtonTexture --> ButtonMaterial[Material v2 appearance<br/>color, effect, shine, holography, opacity]
+    ButtonMaterial --> Entity
+    ButtonMaterial --> Shared
+    Button --> ButtonE2E[UI click, screenshot and reload proof]
+    ButtonE2E --> Shared
     Shared --> Studio[Asset Studio preview]
     Shared --> Runtime[Preview and published runtime]
     Entity --> Blocks[Explicit visual blocks]

@@ -436,7 +436,7 @@ PromptValidation CreateMaterialPrompt::validate(
     const auto destination = project::material_document_path(manifest, id);
     validation.destination = project_root / destination;
     validation.summary = {
-        "Create MaterialDefinition v1: " + name,
+        "Create MaterialDefinition v2: " + name,
         "Id: " + id.value,
         "Destination: " + validation.destination.generic_string(),
         "Blend: " + std::string(project::to_string(blend)),
@@ -503,6 +503,12 @@ PromptValidation CreateEntityPrompt::validate(
         !material_id.empty())
         add_error(validation, "material",
                   "Visual components own their composed materials.");
+    if (appearance_shader && drawable != project::EntityDrawableKind::texture)
+        add_error(validation, "appearance",
+                  "Surface appearance is only available for image drawables.");
+    if (appearance_shader && !material_id.empty())
+        add_error(validation, "appearance",
+                  "Choose either a generated appearance or an existing material.");
     if (!material_id.empty()) {
         if (!core::ResourceId::is_valid(material_id)) {
             add_error(validation, "material", "Material id must be valid.");

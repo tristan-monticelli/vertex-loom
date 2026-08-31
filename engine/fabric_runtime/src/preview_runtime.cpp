@@ -631,7 +631,19 @@ bool PreviewRuntime::Impl::transform_entity_instance(
                                geometry.errors.end());
                 return false;
             }
-            append_packet(std::move(geometry.packets.front()), node, node_index,
+            auto packet = std::move(geometry.packets.front());
+            if (node.drawable.material) {
+                auto loaded = project::load_material(
+                    project_root, *manifest,
+                    project::material_document_path(
+                        *manifest, node.drawable.material->id));
+                if (!loaded.ok()) {
+                    append_errors(*errors, loaded.errors);
+                    return false;
+                }
+                apply_material(packet, *loaded.asset);
+            }
+            append_packet(std::move(packet), node, node_index,
                           destination_instance_id + ":" + node.id);
         }
     }
@@ -876,6 +888,7 @@ void apply_material(render::VectorDrawPacket& packet,
         color.alpha *= material.opacity;
         packet.fill_color = color;
     }
+    if (material.shader) packet.shader = *material.shader;
 }
 
 void generate_planar_uvs(render::VectorDrawPacket& packet) {
@@ -1678,6 +1691,17 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     return false;
                 }
                 auto packet = std::move(geometry.packets.front());
+                if (node.drawable.material) {
+                    auto loaded_material = project::load_material(
+                        options_.project_root, *manifest_,
+                        project::material_document_path(
+                            *manifest_, node.drawable.material->id));
+                    if (!loaded_material.ok()) {
+                        append_errors(errors_, loaded_material.errors);
+                        return false;
+                    }
+                    apply_material(packet, *loaded_material.asset);
+                }
                 transform_packet(packet, resolved_entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
                 impl_->packet_base_transforms.emplace(

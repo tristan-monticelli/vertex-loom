@@ -154,7 +154,7 @@ C4Component
   la taille en octets et indiquent explicitement lorsqu’une miniature ne
   s’applique pas ; leur action `Open` ouvre le document sélectionné sur disque.
 - Le hub de création sépare maintenant `New material / fill` des imports et
-  artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
+  artworks. Le prompt produit un `MaterialDefinition v2` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource
   sélectionnable.
 - Les prompts Behavior, Transformation, preset visuel, composition, composant,

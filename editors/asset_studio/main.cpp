@@ -91,6 +91,11 @@ bool ui_beam_create_seen = false;
 bool ui_beam_created = false;
 bool ui_beam_reloaded = false;
 ImVec2 ui_beam_create_screen{};
+bool ui_button_probe_enabled = false;
+bool ui_button_create_seen = false;
+bool ui_button_created = false;
+bool ui_button_reloaded = false;
+ImVec2 ui_button_create_screen{};
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -405,6 +410,7 @@ void apply_entity_material(fabric::render::VectorDrawPacket& packet,
             }
         }
     }
+    if (material.shader) packet.shader = *material.shader;
 }
 
 EntityPreviewResult build_entity_preview(
@@ -1674,6 +1680,18 @@ void write_ui_beam_probe(const std::filesystem::path& project_path) {
            << (ui_beam_created ? "true" : "false") << ",\n"
            << "  \"reloaded_with_default_texture\": "
            << (ui_beam_reloaded ? "true" : "false") << "\n"
+           << "}\n";
+}
+
+void write_ui_button_probe(const std::filesystem::path& project_path) {
+    std::ofstream output(project_path / "asset-studio-ui-button.json");
+    output << "{\n"
+           << "  \"create_button_seen\": "
+           << (ui_button_create_seen ? "true" : "false") << ",\n"
+           << "  \"created_by_click\": "
+           << (ui_button_created ? "true" : "false") << ",\n"
+           << "  \"reloaded_with_original_texture_and_shader\": "
+           << (ui_button_reloaded ? "true" : "false") << "\n"
            << "}\n";
 }
 
@@ -2952,6 +2970,41 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
                 ImGui::EndCombo();
+            }
+            ImGui::SeparatorText(current.shader &&
+                    current.shader->classification ==
+                        fabric::project::TextureClassification::button_eye
+                ? "Button appearance" : "Surface appearance");
+            bool shader_enabled = current.shader.has_value();
+            if (ImGui::Checkbox("Enable color effects", &shader_enabled)) {
+                material = current;
+                material.shader = shader_enabled
+                    ? std::optional<fabric::project::ShaderSurfaceSettings>{
+                        fabric::project::ShaderSurfaceSettings{
+                            .profile = fabric::project::SurfaceShaderProfile::custom}}
+                    : std::optional<fabric::project::ShaderSurfaceSettings>{};
+                commit_material(std::move(material));
+            }
+            if (current.shader) {
+                auto appearance = *current.shader;
+                bool changed = false;
+                changed |= ImGui::ColorEdit4(
+                    "Primary color", &appearance.primary_color.red);
+                changed |= ImGui::ColorEdit4(
+                    "Effect color", &appearance.effect_color.red);
+                changed |= ImGui::SliderFloat(
+                    "Shine", &appearance.shine, 0.0F, 1.0F);
+                changed |= ImGui::SliderFloat(
+                    "Holography", &appearance.holography, 0.0F, 1.0F);
+                changed |= ImGui::SliderFloat(
+                    "Effect opacity", &appearance.opacity, 0.0F, 1.0F);
+                changed |= ImGui::SliderFloat(
+                    "Intensity", &appearance.intensity, 0.0F, 4.0F);
+                if (changed) {
+                    material = current;
+                    material.shader = appearance;
+                    commit_material(std::move(material));
+                }
             }
             std::string texture_id = current.texture
                 ? current.texture->id.value : std::string{};
@@ -6550,6 +6603,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.entity.drawable =
                 fabric::project::EntityDrawableKind::texture;
             creation.entity.node_name = "Button";
+            creation.entity.appearance_shader =
+                fabric::project::ShaderSurfaceSettings{
+                    .profile = fabric::project::SurfaceShaderProfile::custom,
+                    .classification =
+                        fabric::project::TextureClassification::button_eye,
+                    .primary_color = {1.0F, 1.0F, 1.0F, 1.0F},
+                    .effect_color = {0.2F, 0.8F, 1.0F, 1.0F},
+                    .shine = 0.2F,
+                    .holography = 0.0F,
+                };
         }
         ImGui::OpenPopup("Create entity");
         creation.request_entity = false;
@@ -7096,7 +7159,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create material / fill", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create a reusable MaterialDefinition v1");
+        ImGui::TextUnformatted("Create a reusable MaterialDefinition v2");
         ImGui::TextDisabled(
             "The validated material is published atomically in the open project.");
         const auto validation = creation.material.validate(
@@ -7249,7 +7312,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::TextDisabled(
                 "Choose a drawable to attach an existing project resource.");
         }
-        if (creation.entity.drawable !=
+        if (creation.guided_button && creation.entity.appearance_shader) {
+            auto& appearance = *creation.entity.appearance_shader;
+            ImGui::SeparatorText("Button appearance");
+            ImGui::TextDisabled(
+                "These settings recolor the selected PNG; the source image is never modified.");
+            ImGui::ColorEdit4("Color", &appearance.primary_color.red);
+            ImGui::ColorEdit4("Effect color", &appearance.effect_color.red);
+            ImGui::SliderFloat("Shine", &appearance.shine, 0.0F, 1.0F);
+            ImGui::SliderFloat("Holography", &appearance.holography,
+                               0.0F, 1.0F);
+            ImGui::SliderFloat("Opacity", &appearance.opacity,
+                               0.0F, 1.0F);
+        } else if (creation.entity.drawable !=
             fabric::project::EntityDrawableKind::visual_component) {
             static_cast<void>(draw_project_resource_picker(
                 "Material (optional)", session.resources(),
@@ -7357,8 +7432,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             (!creation.guided_composed_entity ||
              !creation.entity.blocks.empty());
         ImGui::BeginDisabled(!entity_valid);
-        if (ImGui::Button("Create entity", {140.0F, 0.0F})) {
+        const bool create_entity_clicked = ImGui::Button(
+            creation.guided_button ? "Create Button" : "Create entity",
+            {140.0F, 0.0F});
+        if (ui_button_probe_enabled && creation.guided_button) {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_button_create_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_button_create_seen = true;
+        }
+        if (create_entity_clicked) {
             if (session.create_entity(creation.entity)) {
+                if (ui_button_probe_enabled) ui_button_created = true;
                 clear_asset_preview(preview);
                 status = "Entity created and saved.";
                 creation.guided_button = false;
@@ -7673,12 +7760,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_override_test = false,
                      const bool ui_texture_test = false,
                      const bool ui_input_test = false,
-                     const bool ui_beam_test = false) {
+                     const bool ui_beam_test = false,
+                     const bool ui_button_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
         ui_accessibility_test || ui_drag_test || ui_override_test ||
-        ui_texture_test || ui_input_test || ui_beam_test;
+        ui_texture_test || ui_input_test || ui_beam_test || ui_button_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -7712,7 +7800,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
               ui_min_window_test || ui_focus_test || ui_accessibility_test ||
               ui_drag_test || ui_override_test || ui_texture_test ||
-              ui_input_test || ui_beam_test)
+              ui_input_test || ui_beam_test || ui_button_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -7745,7 +7833,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
          ui_min_window_test || ui_focus_test || ui_accessibility_test ||
          ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
-         ui_beam_test) ? 0 : 1);
+         ui_beam_test || ui_button_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -7802,7 +7890,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
     }
     if ((ui_test_mode || ui_min_window_test || ui_drag_test || ui_override_test ||
-         ui_texture_test || ui_input_test || ui_beam_test) &&
+         ui_texture_test || ui_input_test || ui_beam_test || ui_button_test) &&
         session.has_project()) {
         if (!session.selected_entity()) {
             const auto entity = std::ranges::find_if(
@@ -7877,6 +7965,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         creation.visual_preset.beam_width = 0.3F;
         creation.visual_preset.beam_opacity = 0.75F;
         creation.request_visual_preset = true;
+    }
+    if (ui_button_test && session.has_project()) {
+        ui_button_probe_enabled = true;
+        ui_button_create_seen = false;
+        ui_button_created = false;
+        ui_button_reloaded = false;
+        creation.guided_button = true;
+        creation.request_entity = true;
     }
     if (ui_focus_test && session.has_project()) {
         creation.material.name.clear();
@@ -8274,6 +8370,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_texture_frame = 0U;
     std::size_t ui_input_frame = 0U;
     std::size_t ui_beam_frame = 0U;
+    std::size_t ui_button_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -8376,6 +8473,27 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (ui_beam_frame >= 2U) {
                 SDL_Event button{};
                 button.type = ui_beam_frame == 2U
+                    ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
+        if (ui_button_test && ui_button_create_seen &&
+            ui_button_frame >= 3U && ui_button_frame <= 5U) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(ui_button_create_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(ui_button_create_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            if (ui_button_frame >= 4U) {
+                SDL_Event button{};
+                button.type = ui_button_frame == 4U
                     ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
                 button.button.windowID = SDL_GetWindowID(window);
                 button.button.button = SDL_BUTTON_LEFT;
@@ -9010,7 +9128,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                 "asset-studio-vector-canvas-advanced.ppm");
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
-            ui_texture_test || ui_input_test || ui_beam_test)
+            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         SDL_GL_SwapWindow(window);
@@ -9150,6 +9268,49 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.selected_textured_path()->opacity == 0.75F &&
                     reloaded.selected_textured_path()->uv_scale.x == 7.0F;
                 write_ui_beam_probe(initial_project);
+                running = false;
+            }
+        }
+        if (ui_button_test) {
+            ++ui_button_frame;
+            if (ui_button_frame == 1U) {
+                creation.entity.name = "UI Guided Button";
+                creation.entity.resource_id = "head-face";
+                creation.entity.transform.scale = {50.0F, 50.0F};
+                if (creation.entity.appearance_shader) {
+                    creation.entity.appearance_shader->primary_color =
+                        {0.2F, 0.7F, 1.0F, 1.0F};
+                    creation.entity.appearance_shader->effect_color =
+                        {1.0F, 0.2F, 0.8F, 1.0F};
+                    creation.entity.appearance_shader->shine = 0.4F;
+                    creation.entity.appearance_shader->holography = 0.3F;
+                }
+            }
+            if (ui_button_frame >= 12U) {
+                fabric::editor::ProjectSession reloaded;
+                const bool entity_loaded = ui_button_created &&
+                    reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::entity,
+                        {.value = "ui-guided-button"}) &&
+                    reloaded.selected_entity() &&
+                    !reloaded.selected_entity()->nodes.empty();
+                if (entity_loaded) {
+                    const auto& drawable =
+                        reloaded.selected_entity()->nodes.front().drawable;
+                    if (drawable.resource && drawable.material) {
+                        const auto material = fabric::project::load_material(
+                            initial_project, *reloaded.manifest(),
+                            fabric::project::material_document_path(
+                                *reloaded.manifest(), drawable.material->id));
+                        ui_button_reloaded =
+                            drawable.resource->id.value == "head-face" &&
+                            material.ok() && material.asset->shader &&
+                            material.asset->shader->classification ==
+                                fabric::project::TextureClassification::button_eye;
+                    }
+                }
+                write_ui_button_probe(initial_project);
                 running = false;
             }
         }
@@ -9360,12 +9521,14 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-input-test";
     const bool ui_beam_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-beam-test";
+    const bool ui_button_test = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-button-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
         !ui_focus_test && !ui_accessibility_test && !ui_drag_test &&
         !ui_override_test && !ui_texture_test && !ui_input_test &&
-        !ui_beam_test) {
+        !ui_beam_test && !ui_button_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -9384,7 +9547,8 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-overrides-test project-directory\n"
                      "       asset_studio --ui-texture-test project-directory\n"
                      "       asset_studio --ui-input-test project-directory\n"
-                     "       asset_studio --ui-beam-test project-directory\n";
+                     "       asset_studio --ui-beam-test project-directory\n"
+                     "       asset_studio --ui-button-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
@@ -9392,7 +9556,7 @@ int main(const int argument_count, char** arguments) {
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
         ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
-        ui_beam_test)
+        ui_beam_test || ui_button_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
@@ -9402,5 +9566,5 @@ int main(const int argument_count, char** arguments) {
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
                             ui_focus_test, ui_accessibility_test, ui_drag_test,
                             ui_override_test, ui_texture_test, ui_input_test,
-                            ui_beam_test);
+                            ui_beam_test, ui_button_test);
 }

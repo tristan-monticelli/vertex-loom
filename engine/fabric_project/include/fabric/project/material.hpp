@@ -2,6 +2,7 @@
 
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/shader_profile.hpp"
 #include "fabric/core/types.hpp"
 
 #include <filesystem>
@@ -11,7 +12,7 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_material_schema_version = 1;
+inline constexpr std::uint32_t current_material_schema_version = 2;
 
 enum class MaterialBlendMode { normal, additive, multiply, screen };
 
@@ -27,6 +28,7 @@ struct MaterialDefinition {
     MaterialBlendMode blend{MaterialBlendMode::normal};
     std::optional<ResourceReference> texture;
     std::optional<ResourceReference> vector_pattern;
+    std::optional<ShaderSurfaceSettings> shader;
     core::Transform uv_transform;
 
     friend bool operator==(const MaterialDefinition&, const MaterialDefinition&) = default;

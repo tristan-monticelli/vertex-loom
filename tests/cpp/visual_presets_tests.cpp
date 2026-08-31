@@ -335,7 +335,8 @@ void add_textile_head_runtime_documents(const std::filesystem::path& root) {
                 .ok());
     REQUIRE(fabric::project::publish_material(
         root, manifest(),
-        {.document = {.schema_version = 1,
+        {.document = {.schema_version =
+                          fabric::project::current_material_schema_version,
                       .type = "material",
                       .id = {.value = "default-material"},
                       .name = "Default material"}})

@@ -110,7 +110,7 @@ runtime et chaque futur document possède un propriétaire clair.
 - [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation ; les
   trois créations publient désormais leurs documents atomiquement.
 
-Asset Studio publie désormais un `MaterialDefinition v1` depuis un prompt
+Asset Studio publie désormais un `MaterialDefinition v2` depuis un prompt
 dédié : couleur, opacité, blend, références locales optionnelles et transform
 UV sont validés, écrits atomiquement et réindexés sans créer de bitmap.
 Il publie également un `EntityDefinition v1` mono-nœud avec drawable, matériau
