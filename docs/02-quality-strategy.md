@@ -116,6 +116,12 @@ SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
 échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
 graphique et ne ferme aucune case de couverture visuelle.
+
+Le smoke OpenGL des profils shader vérifie que le profil Thread conserve les
+variations de la texture quand l'holographie vaut `1`, contrôle les canaux de
+deux pixels distincts et produit `fabric-render-shader-smoke.ppm` pour
+inspection isolée. La seule présence des paramètres dans un draw packet ou un
+document JSON ne constitue pas une preuve de coloring.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame, écrit le
 registre JSON des IDs stables et capture `asset_studio-ui-test.ppm` dans le
 projet de test ; il est destiné aux contrôleurs UX et ne modifie pas le

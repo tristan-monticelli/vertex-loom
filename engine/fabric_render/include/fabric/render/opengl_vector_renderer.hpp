@@ -81,6 +81,7 @@ private:
     std::int32_t textured_uniform_{-1};
     std::int32_t opacity_uniform_{-1};
     std::int32_t shader_enabled_uniform_{-1};
+    std::int32_t shader_profile_uniform_{-1};
     std::int32_t shader_primary_uniform_{-1};
     std::int32_t shader_effect_uniform_{-1};
     std::int32_t shader_shine_uniform_{-1};

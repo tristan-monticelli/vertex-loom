@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 #include <span>
 #include <vector>
@@ -279,6 +280,59 @@ int main() {
     const bool texture_repeat = repeated_stats.ok() &&
         repeated_pixel[0] > 200U && repeated_pixel[1] < 40U &&
         repeated_pixel[2] < 40U;
+
+    auto shader_packets = fabric::render::build_raster_view_draw_packets({
+        .node_id = "shader-thread",
+        .texture = {{.value = "reference-texture"}, "texture"},
+        .source_width = 2U,
+        .source_height = 1U,
+        .pixels_per_unit = 2.0F,
+    }).packets;
+    shader_packets.front().shader = fabric::project::ShaderSurfaceSettings{
+        .profile = fabric::project::SurfaceShaderProfile::thread,
+        .classification = fabric::project::TextureClassification::beam,
+        .primary_color = {0.1F, 0.2F, 1.0F, 1.0F},
+        .effect_color = {1.0F, 0.1F, 0.8F, 1.0F},
+        .holography = 1.0F,
+    };
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    const auto shader_stats = renderer.draw(
+        shader_packets,
+        {.width = 64,
+         .height = 64,
+         .world_bounds = {.origin = {-0.5F, -0.5F},
+                          .size = {1.0F, 1.0F}}},
+        [texture](const fabric::core::ResourceId& id)
+            -> std::optional<fabric::render::OpenGLTextureHandle> {
+            if (id.value != "reference-texture") return std::nullopt;
+            return fabric::render::OpenGLTextureHandle{
+                .handle = texture, .width = 2U, .height = 1U};
+        });
+    glFinish();
+    std::array<std::uint8_t, 4> shader_left{};
+    std::array<std::uint8_t, 4> shader_right{};
+    glReadPixels(16, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 shader_left.data());
+    glReadPixels(48, 32, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE,
+                 shader_right.data());
+    std::vector<std::uint8_t> shader_capture(64U * 64U * 3U);
+    std::vector<std::uint8_t> shader_rgba(64U * 64U * 4U);
+    glReadPixels(0, 0, 64, 64, GL_RGBA, GL_UNSIGNED_BYTE,
+                 shader_rgba.data());
+    for (std::size_t index = 0; index < 64U * 64U; ++index) {
+        shader_capture[index * 3U] = shader_rgba[index * 4U];
+        shader_capture[index * 3U + 1U] = shader_rgba[index * 4U + 1U];
+        shader_capture[index * 3U + 2U] = shader_rgba[index * 4U + 2U];
+    }
+    std::ofstream shader_screen{"fabric-render-shader-smoke.ppm",
+                                std::ios::binary | std::ios::trunc};
+    shader_screen << "P6\n64 64\n255\n";
+    shader_screen.write(
+        reinterpret_cast<const char*>(shader_capture.data()),
+        static_cast<std::streamsize>(shader_capture.size()));
+    const bool thread_shader_preserves_texture = shader_stats.ok() &&
+        shader_left != shader_right && shader_left[2] > shader_left[1] &&
+        shader_right[0] > shader_right[1];
     glDeleteTextures(1, &texture);
     renderer.shutdown();
     SDL_GL_DeleteContext(context);
@@ -286,7 +340,7 @@ int main() {
     SDL_Quit();
     if (!rendered || !clipping || !nested_clipping ||
         !textured_stroke_rendered || !raster_crop || !texture_tint ||
-        !texture_repeat) {
+        !texture_repeat || !thread_shader_preserves_texture) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "
                   << stats.packets_drawn << "/" << stats.triangles_drawn
                   << " pixel=" << static_cast<int>(pixel[0]) << ","
@@ -315,7 +369,13 @@ int main() {
                   << static_cast<int>(tinted_pixel[2]) << " repeat="
                   << static_cast<int>(repeated_pixel[0]) << ","
                   << static_cast<int>(repeated_pixel[1]) << ","
-                  << static_cast<int>(repeated_pixel[2]) << "\n";
+                  << static_cast<int>(repeated_pixel[2]) << " shader="
+                  << static_cast<int>(shader_left[0]) << ","
+                  << static_cast<int>(shader_left[1]) << ","
+                  << static_cast<int>(shader_left[2]) << "/"
+                  << static_cast<int>(shader_right[0]) << ","
+                  << static_cast<int>(shader_right[1]) << ","
+                  << static_cast<int>(shader_right[2]) << "\n";
         return 1;
     }
     return 0;

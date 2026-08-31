@@ -417,6 +417,7 @@ uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
 uniform int shaderEnabled;
+uniform int shaderProfile;
 uniform vec4 shaderPrimary;
 uniform vec4 shaderEffect;
 uniform float shaderShine;
@@ -428,10 +429,29 @@ void main() {
     vec4 base = textured == 1
         ? texture2D(imageTexture, fragmentUv) * color * opacity
         : color;
-    if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
-        shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
-        + vec3(shaderShine), mix(base.a * shaderPrimary.a, shaderEffect.a,
-        clamp(shaderHolography, 0.0, 1.0)) * shaderOpacity);
+    if (shaderEnabled == 1) {
+        float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+        float holo = clamp(shaderHolography, 0.0, 1.0);
+        float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
+        float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
+        vec3 monochrome = shaderPrimary.rgb * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb, shaderEffect.rgb, luma) *
+            (0.35 + 0.65 * luma);
+        threadColor = mix(threadColor,
+            shaderEffect.rgb * (0.45 + 0.55 * luma), holo * band * 0.65);
+        vec3 plasticColor = base.rgb * shaderPrimary.rgb +
+            shaderEffect.rgb * shaderShine * highlight;
+        vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.4 + 0.6 * luma), holo * band);
+        vec3 surface = shaderProfile == 0 ? threadColor :
+            shaderProfile == 1 ? plasticColor :
+            shaderProfile == 2 ? monochrome : customColor;
+        if (shaderProfile != 1)
+            surface += vec3(shaderShine * highlight * (0.25 + 0.75 * luma));
+        base = vec4(surface * shaderIntensity,
+            base.a * mix(shaderPrimary.a, shaderEffect.a, holo * band) *
+                shaderOpacity);
+    }
     gl_FragColor = base;
 }
 )GLSL"}
@@ -447,6 +467,7 @@ uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
 uniform int shaderEnabled;
+uniform int shaderProfile;
 uniform vec4 shaderPrimary;
 uniform vec4 shaderEffect;
 uniform float shaderShine;
@@ -459,10 +480,29 @@ void main() {
     vec4 base = textured == 1
         ? texture(imageTexture, fragmentUv) * color * opacity
         : color;
-    if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
-        shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
-        + vec3(shaderShine), mix(base.a * shaderPrimary.a, shaderEffect.a,
-        clamp(shaderHolography, 0.0, 1.0)) * shaderOpacity);
+    if (shaderEnabled == 1) {
+        float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+        float holo = clamp(shaderHolography, 0.0, 1.0);
+        float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
+        float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
+        vec3 monochrome = shaderPrimary.rgb * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb, shaderEffect.rgb, luma) *
+            (0.35 + 0.65 * luma);
+        threadColor = mix(threadColor,
+            shaderEffect.rgb * (0.45 + 0.55 * luma), holo * band * 0.65);
+        vec3 plasticColor = base.rgb * shaderPrimary.rgb +
+            shaderEffect.rgb * shaderShine * highlight;
+        vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.4 + 0.6 * luma), holo * band);
+        vec3 surface = shaderProfile == 0 ? threadColor :
+            shaderProfile == 1 ? plasticColor :
+            shaderProfile == 2 ? monochrome : customColor;
+        if (shaderProfile != 1)
+            surface += vec3(shaderShine * highlight * (0.25 + 0.75 * luma));
+        base = vec4(surface * shaderIntensity,
+            base.a * mix(shaderPrimary.a, shaderEffect.a, holo * band) *
+                shaderOpacity);
+    }
     fragmentColor = base;
 }
 )GLSL"};
@@ -519,6 +559,7 @@ void main() {
     textured_uniform_ = functions.get_uniform_location(program_, "textured");
     opacity_uniform_ = functions.get_uniform_location(program_, "opacity");
     shader_enabled_uniform_ = functions.get_uniform_location(program_, "shaderEnabled");
+    shader_profile_uniform_ = functions.get_uniform_location(program_, "shaderProfile");
     shader_primary_uniform_ = functions.get_uniform_location(program_, "shaderPrimary");
     shader_effect_uniform_ = functions.get_uniform_location(program_, "shaderEffect");
     shader_shine_uniform_ = functions.get_uniform_location(program_, "shaderShine");
@@ -559,6 +600,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     textured_uniform_ = -1;
     opacity_uniform_ = -1;
     shader_enabled_uniform_ = -1;
+    shader_profile_uniform_ = -1;
     shader_primary_uniform_ = -1;
     shader_effect_uniform_ = -1;
     shader_shine_uniform_ = -1;
@@ -853,6 +895,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         const auto& shader = packet.shader;
         functions.uniform_1i(shader_enabled_uniform_, shader ? 1 : 0);
         if (!shader) return;
+        functions.uniform_1i(shader_profile_uniform_,
+                             static_cast<int>(shader->profile));
         functions.uniform_4f(shader_primary_uniform_, shader->primary_color.red, shader->primary_color.green, shader->primary_color.blue, shader->primary_color.alpha);
         functions.uniform_4f(shader_effect_uniform_, shader->effect_color.red, shader->effect_color.green, shader->effect_color.blue, shader->effect_color.alpha);
         functions.uniform_1f(shader_shine_uniform_, shader->shine);

@@ -18,6 +18,15 @@ de texture, deux couleurs, brillance, holographie, opacité, intensité,
 répétition et déformation ; les valeurs restent des propriétés ordinaires afin
 que les tracks d'animation existants puissent les cibler.
 
+Le renderer doit interpréter le profil, pas seulement le sérialiser. `Thread`
+recolore selon la luminance tout en conservant les détails de l'image et ajoute
+une bande iridescente dépendante des UV. `Plastic` conserve la couleur source
+avec un reflet concentré, `Monochrome` applique la couleur principale à la
+luminance et `Custom` mélange les deux couleurs selon les UV et la luminance.
+La brillance est un reflet localisé ; elle ne peut pas être une addition blanche
+uniforme. Une holographie à `1` ne doit jamais remplacer toute la texture par
+une couleur constante.
+
 Le manifeste du projet porte aussi une référence optionnelle
 `defaultStrokeTexture`. La première texture importée initialise cette valeur
 si elle est absente ; elle devient la texture de base commune aux nouveaux
@@ -37,3 +46,7 @@ Studio, Map Studio et Preview Runtime consomment les mêmes paramètres. Le
 renderer peut ignorer les effets avancés sur un backend legacy, mais conserve
 la couleur et l'opacité ; aucune logique de test ne doit injecter la texture
 du beam.
+
+Le smoke OpenGL rend un motif asymétrique avec le profil Thread, compare deux
+pixels issus de texels différents et écrit `fabric-render-shader-smoke.ppm`.
+Cette preuve échoue si l'holographie aplatit de nouveau l'image.
