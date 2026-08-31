@@ -3,6 +3,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <array>
 #include <cmath>
 #include <vector>
 
@@ -104,6 +105,25 @@ TEST_CASE("Pen drag converts the inserted line into a cubic segment") {
     CHECK(shape.path[1].control1 != fabric::core::Vec2{});
     CHECK(shape.path[1].control2 != fabric::core::Vec2{});
     CHECK_FALSE(fabric::editor::create_bezier_segment(shape, 0U, {1.0F, 1.0F}));
+}
+
+TEST_CASE("selected path point removal preserves the move head") {
+    using Kind = fabric::project::VectorPathCommandKind;
+    fabric::project::VectorShape shape{
+        .kind = fabric::project::VectorShapeKind::path,
+        .path = {{.kind = Kind::move, .point = {0.0F, 0.0F}},
+                 {.kind = Kind::line, .point = {1.0F, 0.0F}},
+                 {.kind = Kind::line, .point = {2.0F, 0.0F}},
+                 {.kind = Kind::cubic, .point = {3.0F, 0.0F}}}};
+    const std::array<std::size_t, 2> selected{1U, 3U};
+
+    REQUIRE(fabric::editor::remove_selected_path_points(shape, selected));
+    REQUIRE(shape.path.size() == 2U);
+    CHECK(shape.path.front().kind == Kind::move);
+    CHECK(shape.path.front().point == fabric::core::Vec2{0.0F, 0.0F});
+    CHECK(shape.path.back().point == fabric::core::Vec2{2.0F, 0.0F});
+    const std::array<std::size_t, 1> head_only{0U};
+    CHECK_FALSE(fabric::editor::remove_selected_path_points(shape, head_only));
 }
 
 TEST_CASE("raster crop drag stays inside the immutable source") {

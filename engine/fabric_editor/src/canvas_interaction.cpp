@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <vector>
 
 namespace fabric::editor {
 
@@ -112,6 +113,20 @@ bool create_bezier_segment(project::VectorShape& shape, const std::size_t index,
     command.control2 = {end_point.x - delta.x / 3.0F + normal.x,
                         end_point.y - delta.y / 3.0F + normal.y};
     return true;
+}
+
+bool remove_selected_path_points(project::VectorShape& shape,
+                                 const std::span<const std::size_t> indices) noexcept {
+    if (shape.kind != project::VectorShapeKind::path || indices.empty())
+        return false;
+    std::vector<std::size_t> ordered(indices.begin(), indices.end());
+    std::ranges::sort(ordered, std::greater<>());
+    bool removed = false;
+    for (const auto index : ordered) {
+        if (index > 0U && project::remove_path_command(shape, index))
+            removed = true;
+    }
+    return removed;
 }
 
 project::RasterView drag_raster_crop(

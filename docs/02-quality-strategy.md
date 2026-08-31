@@ -57,6 +57,8 @@ seconde ressource et valide le projet résultant.
 Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
 capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui et vérifie
 un probe pixel de sa zone native ; il échoue si une capture est absente ou plate.
+`fabric_canvas_interaction_tests` vérifie aussi la suppression d’une sélection
+multiple de points, l’ordre d’effacement et la conservation de la tête `move`.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un

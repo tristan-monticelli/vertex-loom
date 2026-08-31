@@ -392,14 +392,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
          ImGui::IsKeyPressed(ImGuiKey_Backspace))) {
         auto changed = *selected_node;
         auto selected = canvas.selected_path_points;
-        std::ranges::sort(selected, std::greater<>());
-        bool removed = false;
-        for (const auto index : selected) {
-            if (index > 0U && fabric::project::remove_path_command(
-                                  changed.shape, index))
-                removed = true;
-        }
-        if (removed) {
+        if (fabric::editor::remove_selected_path_points(changed.shape, selected)) {
             static_cast<void>(session.set_selected_vector_node(
                 canvas.selected_node, std::move(changed)));
             canvas.selected_path_points.clear();
