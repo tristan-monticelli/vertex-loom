@@ -19,6 +19,89 @@ moteur n'est pas encore cohérent de bout en bout. Des fonctions déclarées dan
 les contrats ou les ADR ne sont pas consommées par le runtime, et plusieurs
 parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
+## Réouverture — audit utilisateur Asset Studio du 31 août 2026
+
+### Verdict UX actuel
+
+**Note de départ : 2/10.** Cette note est volontairement sévère : le parcours
+normal ne permet pas encore de garantir qu'un utilisateur crée et retrouve le
+bon asset, avec le bon rendu, sans connaître les structures internes du moteur.
+
+Les cases Beam, Button, Entity composée et shader cochées dans les sections
+historiques ne valent plus preuve d'acceptation. Elles doivent être revalidées
+par un parcours utilisateur complet avec capture écran, sauvegarde, reload et
+publication.
+
+### Blocages fonctionnels à traiter avant toute amélioration cosmétique
+
+- [ ] **P0 — Button : sélectionner explicitement l'asset fourni.** Le parcours
+  ne doit jamais chercher le premier composant dont le nom contient `button`.
+  Il doit proposer un picker typé, afficher la miniature de l'asset choisi et
+  bloquer avec une erreur actionnable si l'asset n'existe pas.
+- [ ] **P0 — Button : interdire l'Entity vide silencieuse.** Une absence de
+  composant fourni doit empêcher la publication et expliquer comment importer
+  ou sélectionner l'original.
+- [ ] **P0 — Beam : définir le contrat utilisateur et le contrat interne.**
+  `Beam` ne doit pas être uniquement un alias d'affichage de `seam`. La
+  compatibilité avec les anciens contrats doit rester documentée et migrée sans
+  suppression automatique.
+- [ ] **P0 — Beam : garantir la texture de base réelle.** Un nouveau Beam doit
+  charger `defaultStrokeTexture`, vérifier que la ressource existe et afficher
+  clairement la texture effectivement utilisée. Une texture manquante doit
+  bloquer avec une correction proposée.
+- [ ] **P0 — Shader : prouver le rendu à l'écran.** Créer un Beam texturé avec
+  couleur principale, couleur d'effet, brillance et holographie, puis vérifier
+  par capture que le shader est visible dans Asset Studio, Preview Runtime et
+  runtime publié.
+- [ ] **P1 — Originales fournies : les utiliser réellement.** Les assets
+  originaux fournis par l'utilisateur doivent être importables, identifiables
+  et sélectionnables sans être remplacés par une forme ou un bouton généré.
+- [ ] **P1 — Zipper : modéliser la différence de comportement.** Zipper et Beam
+  peuvent rester deux parcours utilisateur, mais leur relation doit être
+  explicitement un même système de chemins/segments avec des comportements
+  distincts, et non deux presets techniques sans modèle commun compréhensible.
+- [ ] **P1 — Entity composée : assistant multi-blocs.** Ajouter un bloc, choisir
+  son artwork/image/Beam/composant, le positionner, le redimensionner, régler
+  l'ordre, puis ajouter le bloc suivant dans une preview unique.
+- [ ] **P1 — Déformations : portée explicite.** Le choix doit distinguer
+  `bloc sélectionné` et `structure entière`; une déformation locale ne doit
+  jamais modifier implicitement les autres blocs et la déformation globale doit
+  s'appliquer après composition.
+- [ ] **P1 — Parcours normal : retirer les détails moteur.** Les ressources
+  techniques et les groupes `Visual component`, `Visual composition`,
+  `Transformations`, `Behaviors`, `Maps` et autres doivent rester dans un espace
+  Avancé réellement séparé, pas seulement dans un sous-menu de création.
+
+### Deuxième analyse obligatoire — moyen terme et UX
+
+- [ ] Rejouer le parcours complet comme un nouvel utilisateur, sans connaître
+  les IDs, les types internes ni les noms de fichiers.
+- [ ] Mesurer chaque étape : objectif compris, action disponible, résultat
+  visible, erreur récupérable, sauvegarde, reload et publication.
+- [ ] Produire un diagramme UX versionné avec les chemins nominal, erreur,
+  annulation, retour arrière et asset manquant.
+- [ ] Classer les problèmes en impossibilité fonctionnelle, incohérence de
+  modèle, friction UX, défaut visuel et dette de preuve.
+- [ ] Refaire la note UX après correction des P0, avec captures dédiées Beam,
+  Button, Entity composée, déformation locale et déformation globale.
+- [ ] Définir les critères de sortie : un utilisateur externe doit réussir le
+  parcours sans documentation moteur et sans intervention manuelle dans les
+  fichiers du projet.
+
+### Preuves requises pour fermer cette réouverture
+
+- [ ] E2E isolé Beam : création → texture de base → répétition/orientation →
+  shader visible → sauvegarde → reload → publication.
+- [ ] E2E isolé Button : import/sélection de l'original fourni → Entity →
+  preview → sauvegarde → reload.
+- [ ] E2E Entity composée : au moins trois blocs visuels, ordre et transforms.
+- [ ] E2E déformation locale puis globale avec vérification des autres blocs.
+- [ ] Captures écran comparables entre Asset Studio, Preview Runtime et runtime
+  publié, avec la même fixture et les mêmes fichiers générés.
+- [ ] Test undo/redo et abandon de modification pour chaque parcours guidé.
+- [ ] Relancer le test `asset_studio_beam_vector_canvas_e2e` plusieurs fois et
+  supprimer sa flakiness avant de considérer la preuve fiable.
+
 ### Backlog restant — état de référence
 
 Cette section regroupe toutes les cases encore ouvertes. Une case ne doit être
