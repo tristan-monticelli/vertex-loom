@@ -8,7 +8,8 @@ C4Component
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
         Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
-        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
+        Component(customizer, "Vector inspector", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
+        Component(canvas, "Vector canvas", "C++20 + Dear ImGui + OpenGL", "Prévisualise les paths natifs, sélectionne les coins, édite les poignées Bézier et applique les outils Pen/Move/Rotate/Scale/Pivot")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
@@ -21,6 +22,7 @@ C4Component
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
         Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer ou fermer une ou plusieurs sessions dirty")
     }
+    Rel(customizer, canvas, "Délègue l’authoring direct du path")
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
