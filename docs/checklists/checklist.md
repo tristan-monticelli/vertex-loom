@@ -52,7 +52,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tests runtime couvrent le fill et le transform image.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
-- [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
+- [ ] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
   poignées liées/symétriques/libres, sélection et transform multi-points,
   transform fill indépendante, clips imbriqués, registre animable, CommandStack,
   géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
@@ -68,7 +68,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   redimensionnables et focalisés sur la sélection. Les preuves sont
   `asset_studio_ui_focus_e2e`, `asset_studio_ui_accessibility_e2e`,
   `asset_studio_ui_min_window_e2e` et les E2E Map Studio.
-- [x] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
+- [ ] UX E2E local : IDs widgets stables, fixture multi-ressources, parcours texture/
   crop/input/joueur/monstre/path Bézier, diagnostics et screenshots. Le parcours
   texture/crop dispose maintenant de
   `asset_studio_ui_texture_e2e` et le parcours input joueur/attaque de
@@ -123,15 +123,18 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné. Les commandes et le contrat
   v3 sont couverts par les tests de timeline et d’animation.
-- [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
+- [ ] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
   suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
-  symétriques et libres.
-- [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
+  symétriques et libres. L’édition existante ne crée pas encore une courbe par
+  cliquer-glisser avec la plume.
+- [ ] Rendre la géométrie de stroke effective : largeur, joins `round`,
   `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
-  renderer les applique désormais dans les draw packets et les chemins OpenGL.
-- [x] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
+  renderer les applique désormais dans les draw packets et les chemins OpenGL ;
+  la preuve visuelle de chaque variante dans l’éditeur reste à ajouter.
+- [ ] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
   déformation, ainsi qu'une bordure vectorielle configurable ; livrer un preset
-  `beam` préexistant et visible comme exemple.
+  `beam` préexistant et visible comme exemple. Le payload et le renderer sont
+  présents, mais le parcours visuel Asset Studio n’est pas encore fermé.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
@@ -772,8 +775,9 @@ utilisées pour tous les types de ressources.
   - [x] programmer un comportement de joueur ;
   - [x] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
-  - [x] créer et éditer un path Bézier ;
-  - [x] changer fill, texture et stroke après création.
+  - [ ] créer et éditer un path Bézier ; la plume ne crée pas encore les
+    courbes par cliquer-glisser ;
+  - [ ] changer fill, texture et stroke après création avec preuve visuelle.
 - [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
@@ -816,7 +820,7 @@ automatiquement sur les trois plateformes.
 - [x] Lot 4 : cible explicite des animations.
 - [x] Lot 5 : BehaviorGraph et inputs physiques séparés.
 - [x] Lot 6 : transformation d'entité.
-- [x] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
+- [ ] Lot 7 : personnalisateur vectoriel complet. Les contrats, outils plume,
   transforms multi-points, fills/strokes, clips imbriqués, tests canvas et
   comparaison des draw packets sont validés.
 - [x] Lot 8 : tests end-to-end multiplateformes et réconciliation documentaire
