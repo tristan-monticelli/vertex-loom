@@ -6795,10 +6795,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::EndCombo();
         }
         draw_resource_identity_fields(request.name, request.id.value);
-            const bool uses_thread = request.kind ==
+        const bool uses_thread = request.kind ==
                 fabric::editor::VisualPresetKind::beam ||
                 request.kind == fabric::editor::VisualPresetKind::seam ||
                 request.kind == fabric::editor::VisualPresetKind::zipper;
+        bool thread_texture_resolved = !uses_thread;
         if (uses_thread) {
             if (!request.thread_texture && session.manifest()->default_stroke_texture)
                 request.thread_texture = fabric::project::ResourceReference{
@@ -6814,6 +6815,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 selected_texture == session.resources().end()
                 ? "Choose a thread texture..."
                 : selected_texture->name.c_str();
+            thread_texture_resolved = selected_texture != session.resources().end();
             ImGui::SetNextItemWidth(360.0F);
             if (ImGui::BeginCombo("Thread texture", texture_label)) {
                 for (const auto& resource : session.resources()) {
@@ -6828,6 +6830,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (selected) ImGui::SetItemDefaultFocus();
                 }
                 ImGui::EndCombo();
+            }
+            if (!thread_texture_resolved) {
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                   "The selected project texture is missing. Choose an existing texture.");
+            } else if (session.manifest()->default_stroke_texture &&
+                       request.thread_texture &&
+                       request.thread_texture->id ==
+                           *session.manifest()->default_stroke_texture) {
+                ImGui::TextDisabled("Using the project default thread texture.");
             }
             if (request.kind == fabric::editor::VisualPresetKind::beam ||
                 request.kind == fabric::editor::VisualPresetKind::seam) {
@@ -6864,7 +6875,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                    error.message.c_str());
             }
         }
-        ImGui::BeginDisabled(!built.ok());
+        ImGui::BeginDisabled(!built.ok() || !thread_texture_resolved);
         if (ImGui::Button("Create preset", {140.0F, 0.0F})) {
             if (session.create_visual_preset(request)) {
                 clear_asset_preview(preview);
@@ -6875,8 +6886,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         ImGui::EndDisabled();
-        draw_disabled_reason(!built.ok(),
-                             "Resolve the visual preset build errors before creating it.");
+        draw_disabled_reason(!built.ok() || !thread_texture_resolved,
+                             !thread_texture_resolved
+                                 ? "Choose an existing project texture before creating it."
+                                 : "Resolve the visual preset build errors before creating it.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             ImGui::CloseCurrentPopup();

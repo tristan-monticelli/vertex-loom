@@ -58,7 +58,7 @@ flowchart TD
 | U03 | Importer un PNG original | Partiel | L'import peut définir `defaultStrokeTexture`, mais l'utilisateur ne voit pas clairement que cette image devient la base Beam. | P1 |
 | U04 | Importer plusieurs PNG et choisir le bon | Partiel | Le picker existe, mais il faut contrôler la miniature, le nom et la référence réellement consommée par le Beam. | P1 |
 | U05 | Ajouter une texture existante | Conforme techniquement | Le chemin est couvert par `Add existing`, mais il n'est pas relié explicitement au parcours Beam guidé. | P1 |
-| U06 | Créer un Beam neuf | Non validé UX | Le menu crée un `VisualPresetKind::seam` affiché comme Beam ; le contrat utilisateur et le rendu écran ne sont pas cohérents. | P0 |
+| U06 | Créer un Beam neuf | Partiellement corrigé | Le menu utilise désormais une demande `VisualPresetKind::beam` distincte du legacy `seam`; le contrat JSON et le rendu écran restent à prouver. | P0 |
 | U07 | Créer plusieurs Beams | Partiel | Le fallback utilise `defaultStrokeTexture`, sans preuve que la ressource existe, est chargée et reste la texture attendue. | P0 |
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
@@ -115,12 +115,12 @@ par l'utilisateur : deux ressources peuvent correspondre, le mauvais composant
 peut être pris, et l'absence de correspondance ouvre quand même la modale
 Entity.
 
-### 3. Beam est encore un alias de Seam
+### 3. Beam et Seam doivent rester compatibles sans être confondus
 
-La création guidée donne le nom public Beam, mais conserve
-`VisualPresetKind::seam`, un layer `seam` et le contrat `texturedPath`. C'est
-compatible avec l'existant, mais ce n'est pas encore un modèle Beam clair pour
-l'utilisateur ni pour les outils de diagnostic.
+La création guidée utilise maintenant `VisualPresetKind::beam`, distinct du
+preset historique `seam`. Le contrat JSON reste `texturedPath` pour préserver
+la compatibilité, mais les outils de diagnostic et les captures doivent encore
+prouver que l'utilisateur ne voit pas le legacy `Seam` dans le parcours normal.
 
 ### 4. La texture de base est une référence implicite
 
