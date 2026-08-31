@@ -123,10 +123,11 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné. Les commandes et le contrat
   v3 sont couverts par les tests de timeline et d’animation.
-- [ ] Permettre l'édition Bézier directement sur le canvas sur tous les chemins :
-  la plume, l’insertion, la suppression et les poignées existent dans le
-  parcours nominal ; les coins visibles, les formes libres et la preuve
-  après reload restent à fermer.
+- [x] Permettre l'édition Bézier directement sur le canvas sur tous les chemins :
+  la plume, l’insertion, la suppression, les poignées, les coins visibles et la
+  création de formes libres sont couverts par les parcours vectoriels, avec
+  persistance après reload dans `asset_studio_vector_canvas_e2e` et son fixture
+  Beam.
 - [x] Rendre la géométrie de stroke visible dans le viewport et le runtime :
   le canvas consomme maintenant les triangles de `fabric_render`, avec blending
   alpha OpenGL explicite ; le checker compare les captures `miter`, `round` et

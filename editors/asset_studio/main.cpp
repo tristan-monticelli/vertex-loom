@@ -7907,6 +7907,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool vector_canvas_e2e_complete = false;
     std::size_t vector_canvas_e2e_frame = 0U;
     std::size_t vector_canvas_e2e_initial_path_size = 0U;
+    bool vector_canvas_e2e_freeform_seed_applied = false;
     fabric::core::Vec2 vector_canvas_e2e_initial_anchor{};
     fabric::core::Vec2 vector_canvas_e2e_initial_control1{};
     if (vector_canvas_e2e && session.has_project()) {
@@ -7970,6 +7971,30 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 21U &&
+            !vector_canvas_e2e_freeform_seed_applied &&
+            vector_canvas_e2e_complete && session.created_vector()) {
+            auto freeform_node =
+                session.created_vector()->native->nodes.front();
+            freeform_node.shape.kind =
+                fabric::project::VectorShapeKind::path;
+            freeform_node.shape.path = {{
+                .kind = fabric::project::VectorPathCommandKind::move,
+                .point = {-0.4F, 0.0F}}, {
+                .kind = fabric::project::VectorPathCommandKind::line,
+                .point = {0.0F, 0.0F}}};
+            vector_canvas_e2e_complete = session.set_selected_vector_node(
+                0U, std::move(freeform_node));
+            vector_canvas_e2e_freeform_seed_applied =
+                vector_canvas_e2e_complete;
+            canvas.selected_node = 0U;
+            canvas.selected_path_points.clear();
+            canvas.path_command_index = 0U;
+            canvas.dragging = false;
+            canvas.drag_operation = CanvasUiState::DragOperation::none;
+            canvas.drag_start_node = {};
+            canvas.tool = CanvasUiState::Tool::pen;
+        }
         if (ui_texture_test && ui_texture_canvas_seen) {
             const auto push_motion = [&](const ImVec2 point, const Uint32 state) {
                 SDL_Event motion{};
@@ -8113,16 +8138,23 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
         const bool point_selection_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 12U && vector_canvas_e2e_frame < 16U;
+        const bool freeform_gesture = vector_canvas_e2e &&
+            vector_canvas_e2e_frame == 22U;
+        const bool release_gesture = vector_canvas_e2e &&
+            vector_canvas_e2e_frame == 16U;
         if (point_selection_gesture)
             canvas.tool = CanvasUiState::Tool::pen;
         if (pen_gesture || move_gesture || handle_gesture ||
-            point_selection_gesture) {
+            point_selection_gesture || freeform_gesture || release_gesture) {
             const auto frame = vector_canvas_e2e_frame;
+            const bool freeform_down = freeform_gesture;
             const bool button_event = frame == 2U || frame == 3U || frame == 4U ||
                 frame == 5U || frame == 6U || frame == 8U ||
-                frame == 9U || frame == 11U || frame == 12U;
+                frame == 9U || frame == 11U || frame == 12U || frame == 16U ||
+                freeform_down;
             const bool button_down = frame == 2U || frame == 3U || frame == 5U ||
-                (move_gesture ? frame == 6U : frame == 9U) || frame == 12U;
+                (move_gesture ? frame == 6U : frame == 9U) || frame == 12U ||
+                freeform_down;
             const bool right_click = frame == 5U;
             const auto canvas_point = [&](const fabric::core::Vec2 point) {
                 const auto& node = session.created_vector()->native->nodes.front();
@@ -8157,7 +8189,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             const auto& test_path = test_node.shape.path;
             const auto inserted_index = !canvas.selected_path_points.empty()
                 ? canvas.selected_path_points.front() : 1U;
-            const auto test_point = pen_gesture && test_path.size() > 1U
+            const auto test_point = release_gesture
+                ? fabric::core::Vec2{0.0F, 0.0F}
+                : freeform_gesture
+                ? fabric::core::Vec2{0.2F, 0.2F}
+                : pen_gesture && test_path.size() > 1U
                 ? (frame >= 3U && inserted_index < test_path.size()
                        ? frame == 5U
                            ? test_path[inserted_index].point
@@ -8789,8 +8825,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.created_vector() && reloaded.created_vector()->native &&
                     !reloaded.created_vector()->native->nodes.empty();
                 const auto& node = reloaded.created_vector()->native->nodes.front();
+                const bool handles_persisted = reloaded_ok &&
+                    node.shape.path.size() > 1U &&
+                    node.shape.path[1U].kind ==
+                        fabric::project::VectorPathCommandKind::cubic &&
+                    std::abs(node.shape.path[1U].control1.x -
+                                 (vector_canvas_e2e_initial_control1.x + 0.12F)) <= 0.01F &&
+                    std::abs(node.shape.path[1U].control1.y -
+                                 (vector_canvas_e2e_initial_control1.y + 0.12F)) <= 0.01F;
                 vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
-                    reloaded_ok && node.stroke && node.stroke->image &&
+                    handles_persisted && node.stroke && node.stroke->image &&
                     node.stroke->join == fabric::project::VectorStrokeJoin::bevel &&
                     node.stroke->cap == fabric::project::VectorStrokeCap::square &&
                     node.stroke->image->transform.position ==
@@ -8799,6 +8843,40 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::core::Vec2{1.8F, 0.7F} &&
                     node.stroke->image->opacity == 0.35F &&
                     node.stroke->image->deform_with_shape;
+            } else if (vector_canvas_e2e_frame == 23U &&
+                       session.created_vector()) {
+                const auto& freeform_path = session.created_vector()->native
+                    ->nodes.front().shape.path;
+                const bool saved = session.save();
+                fabric::editor::ProjectSession reloaded;
+                const bool reloaded_ok = saved && reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::vector,
+                        vector_canvas_vector_id) &&
+                    reloaded.created_vector() && reloaded.created_vector()->native &&
+                    !reloaded.created_vector()->native->nodes.empty();
+                const auto& reloaded_path = reloaded.created_vector()->native
+                    ->nodes.front().shape.path;
+                const auto near_point = [](const fabric::core::Vec2 left,
+                                           const fabric::core::Vec2 right) {
+                    return std::abs(left.x - right.x) <= 0.01F &&
+                        std::abs(left.y - right.y) <= 0.01F;
+                };
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    vector_canvas_e2e_freeform_seed_applied &&
+                    freeform_path.size() == 3U && reloaded_ok &&
+                    reloaded.created_vector()->native->nodes.front().shape.kind ==
+                        fabric::project::VectorShapeKind::path &&
+                    reloaded_path.size() == 3U &&
+                    reloaded_path[1U].point == fabric::core::Vec2{0.0F, 0.0F} &&
+                    near_point(reloaded_path[2U].point,
+                               fabric::core::Vec2{0.2F, 0.2F});
+                if (!vector_canvas_e2e_complete)
+                    status = "Freeform path E2E failed: authored=" +
+                        std::to_string(freeform_path.size()) +
+                        ", reloaded=" + std::to_string(reloaded_path.size()) +
+                        ", seed=" +
+                        (vector_canvas_e2e_freeform_seed_applied ? "yes" : "no");
                 running = false;
             }
         }

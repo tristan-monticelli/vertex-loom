@@ -198,8 +198,9 @@ monde ; le cadrage explicite et les interactions de gizmo restent ouverts.
 L’inspecteur permet désormais de choisir le parent et le clip d’un nœud natif
 avec historique et validation ; l’arbre de calques, la sélection multiple et
 les groupes restent ouverts.
-- [ ] Ajouter plume Bézier, primitives, édition des nœuds et poignées
-  liées/libres, ouverture et fermeture de contour.
+- [x] Ajouter plume Bézier, primitives, édition des nœuds et poignées
+  liées/libres, ouverture et fermeture de contour. `asset_studio_vector_canvas_e2e`
+  vérifie aussi la création d’un path libre et sa persistance après reload.
 - [x] Ajouter gizmos rotation, échelle et pivot ; la transform du fill reste
   indépendante du transform de la forme et ouverte.
 - [ ] Ajouter sélecteur de fill : couleur, image, motif et matériau référencé.
