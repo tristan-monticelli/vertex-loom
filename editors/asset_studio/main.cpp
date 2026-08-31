@@ -8123,13 +8123,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             vector_canvas_e2e_frame >= 6U && vector_canvas_e2e_frame < 9U;
         const bool handle_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
-        if (pen_gesture || move_gesture || handle_gesture) {
+        const bool point_selection_gesture = vector_canvas_e2e &&
+            vector_canvas_e2e_frame >= 12U && vector_canvas_e2e_frame < 16U;
+        if (point_selection_gesture)
+            canvas.tool = CanvasUiState::Tool::pen;
+        if (pen_gesture || move_gesture || handle_gesture ||
+            point_selection_gesture) {
             const auto frame = vector_canvas_e2e_frame;
             const bool button_event = frame == 2U || frame == 3U || frame == 4U ||
                 frame == 5U || frame == 6U || frame == 8U ||
-                frame == 9U || frame == 11U;
+                frame == 9U || frame == 11U || frame == 12U;
             const bool button_down = frame == 2U || frame == 3U || frame == 5U ||
-                (move_gesture ? frame == 6U : frame == 9U);
+                (move_gesture ? frame == 6U : frame == 9U) || frame == 12U;
             const bool right_click = frame == 5U;
             const auto canvas_point = [&](const fabric::core::Vec2 point) {
                 const auto& node = session.created_vector()->native->nodes.front();
@@ -8188,6 +8193,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                           (frame == 9U ? 0.0F : 0.12F),
                       vector_canvas_e2e_initial_control1.y +
                           (frame == 9U ? 0.0F : 0.12F)}
+                : point_selection_gesture && test_path.size() > 1U
+                ? test_path[1].point
                 : fabric::core::Vec2{0.0F, 0.0F};
             const auto mouse = canvas_point(test_point);
             const int mouse_x = static_cast<int>(std::lround(mouse.x));
@@ -8210,6 +8217,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 event.button.x = mouse_x;
                 event.button.y = mouse_y;
                 static_cast<void>(SDL_PushEvent(&event));
+            }
+            if (point_selection_gesture && frame == 14U) {
+                SDL_Event key{};
+                key.type = SDL_KEYDOWN;
+                key.key.windowID = SDL_GetWindowID(window);
+                key.key.keysym.sym = SDLK_DELETE;
+                key.key.keysym.scancode = SDL_SCANCODE_DELETE;
+                static_cast<void>(SDL_PushEvent(&key));
             }
         }
         if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 1U &&
@@ -8742,10 +8757,19 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     session.created_vector()->native &&
                     session.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size;
-            } else if (vector_canvas_e2e_frame == 12U) {
+            } else if (vector_canvas_e2e_frame == 13U) {
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    canvas.selected_path_points.size() == 1U &&
+                    canvas.selected_path_points.front() == 1U;
+            } else if (vector_canvas_e2e_frame == 15U && session.created_vector()) {
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    session.created_vector()->native &&
+                    session.created_vector()->native->nodes.front().shape.path.size() ==
+                        vector_canvas_e2e_initial_path_size - 1U;
+            } else if (vector_canvas_e2e_frame == 16U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
-                const auto reloaded_ok = saved && reloaded.open(initial_project) &&
+                const bool reloaded_ok = saved && reloaded.open(initial_project) &&
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::vector,
                         {.value = "head-button-artwork"}) &&
@@ -8754,22 +8778,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
                     reloaded_ok &&
                     reloaded.created_vector()->native->nodes.front().shape.path.size() ==
-                        vector_canvas_e2e_initial_path_size &&
-                    reloaded.created_vector()->native->nodes.front().shape.path[1].point.x !=
-                        vector_canvas_e2e_initial_anchor.x &&
-                    reloaded.created_vector()->native->nodes.front().shape.path[1].control1.x !=
-                        vector_canvas_e2e_initial_control1.x;
-                if (!vector_canvas_e2e_complete) {
-                    const auto current_size = session.created_vector() &&
-                            session.created_vector()->native &&
-                            !session.created_vector()->native->nodes.empty()
-                        ? session.created_vector()->native->nodes.front().shape.path.size()
-                        : 0U;
-                    std::cerr << "Asset Studio Vector Canvas E2E failed: initial="
-                              << vector_canvas_e2e_initial_path_size
-                              << " current=" << current_size
-                              << " frame=" << vector_canvas_e2e_frame << '\n';
-                }
+                        vector_canvas_e2e_initial_path_size - 1U;
                 running = false;
             }
         }

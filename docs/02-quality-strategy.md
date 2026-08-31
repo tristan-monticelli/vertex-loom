@@ -55,8 +55,11 @@ Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
 Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
-capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui et vérifie
-un probe pixel de sa zone native ; il échoue si une capture est absente ou plate.
+capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui, vérifie
+un probe pixel de sa zone native, puis rejoue le clic sur un coin existant, sa
+sélection, `Delete`, la sauvegarde et le reload. Il échoue si une capture est
+absente ou plate, si la sélection n'est pas faite ou si le path supprimé
+réapparaît après reload.
 `fabric_canvas_interaction_tests` vérifie aussi la suppression d’une sélection
 multiple de points, l’ordre d’effacement et la conservation de la tête `move`.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
