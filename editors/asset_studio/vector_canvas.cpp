@@ -692,7 +692,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 ? ImDrawFlags_None
                 : ImDrawFlags_Closed;
         const auto* packet = packet_for(node);
-        if (node.stroke && packet != nullptr &&
+        if (node.stroke && !node.stroke->image && packet != nullptr &&
             packet->stroke_vertices.size() >= 3U &&
             packet->stroke_indices.size() >= 3U) {
             for (std::size_t index = 0;
@@ -709,7 +709,9 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     to_screen(packet->stroke_vertices[second]),
                     to_screen(packet->stroke_vertices[third]), stroke_color);
             }
-        } else {
+        } else if (!node.stroke || packet == nullptr ||
+                   packet->stroke_vertices.size() < 3U ||
+                   packet->stroke_indices.size() < 3U) {
             draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
                                    stroke_color, stroke_flags, stroke_width);
         }
