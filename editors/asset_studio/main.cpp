@@ -3950,6 +3950,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             commit_node(node);
                     }
                 }
+                if (ImGui::Button("Start new freeform path")) {
+                    node.shape.path = {{
+                        .kind = fabric::project::VectorPathCommandKind::move,
+                        .point = node.shape.bounds.origin}};
+                    canvas.selected_path_points.clear();
+                    commit_node(node);
+                }
+                ImGui::SameLine();
+                const bool path_has_move =
+                    !node.shape.path.empty() &&
+                    node.shape.path.front().kind ==
+                        fabric::project::VectorPathCommandKind::move;
+                ImGui::BeginDisabled(!path_has_move);
                 if (ImGui::Button("Add line command")) {
                     const auto point = node.shape.path.empty()
                         ? node.shape.bounds.origin
@@ -3961,6 +3974,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                              .point = point}))
                         commit_node(node);
                 }
+                ImGui::EndDisabled();
+                draw_disabled_reason(!path_has_move,
+                                     "Start a freeform path first so its move head remains valid.");
                 ImGui::SameLine();
                 if (ImGui::Button("Add move command") && node.shape.path.empty()) {
                     node.shape.path.push_back({

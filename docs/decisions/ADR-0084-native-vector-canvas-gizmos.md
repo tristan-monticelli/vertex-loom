@@ -41,7 +41,9 @@ miroite sa position autour de l’ancre et `free` ne modifie que la poignée
 éditée. Cette règle est centralisée dans `fabric_editor` et partagée par le
 canvas et l’inspecteur.
 
-Le canvas natif expose également un outil `Pen`. Un clic ajoute une commande
+Le canvas natif expose également un outil `Pen`. Le bouton `Start new freeform
+path` réinitialise un contour avec une tête `move` réversible par l'historique.
+Un clic ajoute une commande
 `line` en fin de contour ou l’insère avant le segment visé ; un chemin vide
 commence par une commande `move`. Le cliquer-glisser du nouveau point convertit
 ce segment en `cubic` et initialise ses deux poignées afin que la courbe soit
