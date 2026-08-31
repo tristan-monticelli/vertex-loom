@@ -21,6 +21,9 @@ parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
 ## Réouverture — audit utilisateur Asset Studio du 31 août 2026
 
+Le détail des chemins nominal, d'échec et de publication est suivi dans
+[l'audit des chemins utilisateur](asset-studio-user-path-audit-2026-08-31.md).
+
 ### Verdict UX actuel
 
 **Note de départ : 2/10.** Cette note est volontairement sévère : le parcours
