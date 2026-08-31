@@ -54,12 +54,12 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   les BehaviorGraph consommateurs de chaque action.
 - [ ] Vectoriel : le socle natif, l’édition de chemins, la tessellation, le
   stroke et le clipping simple sont partiellement livrés. Restent à prouver dans
-  l’éditeur et le renderer : la visibilité réelle de chaque stroke, les
-  bordures du preset `beam`, la plume sur tous les coins et formes libres, les
+  l’éditeur et le renderer : la plume sur tous les coins et formes libres, les
   poignées après reload, les clips imbriqués sur backend sans stencil et la
   comparaison visuelle des draw packets. Les preuves actuelles sont
-  `asset_studio_vector_canvas_e2e`, `fabric_render_gl_smoke`, les tests
-  géométriques et `no_legacy_sprite_contracts`.
+  `asset_studio_vector_canvas_e2e`, `asset_studio_beam_vector_canvas_e2e`,
+  `fabric_render_gl_smoke`, les tests géométriques et
+  `no_legacy_sprite_contracts`.
 - [x] Inspecteur local : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
@@ -131,10 +131,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   le canvas consomme maintenant les triangles de `fabric_render`, avec blending
   alpha OpenGL explicite ; le checker compare les captures `miter`, `round` et
   `bevel` pour empêcher une régression vers une polyline unique.
-- [ ] Ajouter une bordure vectorielle réellement visible au preset `beam` et
-  prouver le stroke image dans le parcours du preset avec répétition, UV et
-  crop. Le smoke OpenGL prouve maintenant l’échantillonnage d’une texture de
-  stroke non uniforme ; la preuve visuelle du preset reste à faire.
+- [x] Ajouter une bordure vectorielle réellement visible au preset `beam` et
+  la couvrir par une capture dédiée du parcours Asset Studio. Le smoke OpenGL
+  prouve l’échantillonnage d’une texture de stroke non uniforme ; la répétition,
+  les UV et le crop restent à compléter dans le parcours visuel.
 - [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
   (offset, échelle et déformation), avec une texture non uniforme, captures
   distinctes et reload vérifiés par le parcours `asset_studio_vector_canvas_e2e`.

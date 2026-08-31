@@ -7866,14 +7866,32 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (!vector_e2e_complete)
             std::cerr << "Asset Studio Vector E2E failed\n";
     }
+    const auto find_resource_id = [&](
+        const fabric::editor::StudioResourceKind kind,
+        const std::initializer_list<std::string_view> candidates) {
+        for (const auto candidate : candidates) {
+            const auto found = std::ranges::find_if(
+                session.resources(), [&](const auto& resource) {
+                    return resource.kind == kind &&
+                        resource.id.value == candidate;
+                });
+            if (found != session.resources().end()) return found->id;
+        }
+        return fabric::core::ResourceId{};
+    };
+    const auto vector_canvas_vector_id = find_resource_id(
+        fabric::editor::StudioResourceKind::vector,
+        {"head-button-artwork", "beam-border"});
+    const auto vector_canvas_texture_id = find_resource_id(
+        fabric::editor::StudioResourceKind::texture,
+        {"head-thread", "beam-thread"});
     bool vector_canvas_e2e_complete = false;
     std::size_t vector_canvas_e2e_frame = 0U;
     std::size_t vector_canvas_e2e_initial_path_size = 0U;
     fabric::core::Vec2 vector_canvas_e2e_initial_anchor{};
     fabric::core::Vec2 vector_canvas_e2e_initial_control1{};
     if (vector_canvas_e2e && session.has_project()) {
-        const fabric::core::ResourceId vector_id{.value =
-            "head-button-artwork"};
+        const auto vector_id = vector_canvas_vector_id;
         const bool selected = session.select_resource(
             fabric::editor::StudioResourceKind::vector, vector_id);
         if (selected && session.created_vector() &&
@@ -7898,7 +7916,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 node.fill = fabric::project::VectorFill{
                     .kind = fabric::project::VectorFillKind::image,
                     .image = fabric::project::VectorImageFill{
-                        .texture = {{.value = "head-thread"}, "texture"}},
+                        .texture = {vector_canvas_texture_id, "texture"}},
                 };
                 node.stroke = fabric::project::VectorStroke{
                     .color = {1.0F, 1.0F, 1.0F, 1.0F},
@@ -7906,7 +7924,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     .join = fabric::project::VectorStrokeJoin::round,
                     .cap = fabric::project::VectorStrokeCap::round,
                     .image = fabric::project::VectorImageFill{
-                        .texture = {{.value = "head-thread"}, "texture"}},
+                        .texture = {vector_canvas_texture_id, "texture"}},
                     .repeat_texture_x = true,
                 };
                 vector_canvas_e2e_complete =
@@ -8734,7 +8752,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 const bool reloaded_ok = saved && reloaded.open(initial_project) &&
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::vector,
-                        {.value = "head-button-artwork"}) &&
+                        vector_canvas_vector_id) &&
                     reloaded.created_vector() && reloaded.created_vector()->native &&
                     !reloaded.created_vector()->native->nodes.empty();
                 vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
@@ -8747,7 +8765,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 const bool reloaded_ok = saved && reloaded.open(initial_project) &&
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::vector,
-                        {.value = "head-button-artwork"}) &&
+                        vector_canvas_vector_id) &&
                     reloaded.created_vector() && reloaded.created_vector()->native &&
                     !reloaded.created_vector()->native->nodes.empty();
                 const auto& node = reloaded.created_vector()->native->nodes.front();
