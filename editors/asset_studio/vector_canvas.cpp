@@ -376,7 +376,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                 }
             }
         }
-    if (hit) {
+        if (hit) {
             auto changed = *selected_node;
             if (fabric::project::remove_path_command(changed.shape, *hit)) {
                 static_cast<void>(session.set_selected_vector_node(
@@ -400,7 +400,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         }
     }
     if (!canvas.dragging && hovered && selected_node != nullptr &&
-!selected_node->locked && canvas.tool == CanvasUiState::Tool::pen &&
+        !selected_node->locked && canvas.tool == CanvasUiState::Tool::pen &&
         selected_node->shape.kind == fabric::project::VectorShapeKind::path &&
         canvas.selected_path_points.size() == 1U &&
         canvas.path_command_index < selected_node->shape.path.size() &&
@@ -710,6 +710,24 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         } else if ((canvas.tool == CanvasUiState::Tool::move ||
                     canvas.tool == CanvasUiState::Tool::pen) &&
                    selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+            std::optional<std::size_t> hovered_path_point;
+            float hovered_path_distance = 10.0F;
+            for (std::size_t index = 0;
+                 index < selected_node->shape.path.size(); ++index) {
+                const auto& command = selected_node->shape.path[index];
+                if (command.kind != fabric::project::VectorPathCommandKind::move &&
+                    command.kind != fabric::project::VectorPathCommandKind::line &&
+                    command.kind != fabric::project::VectorPathCommandKind::cubic)
+                    continue;
+                const auto point = to_screen(
+                    transform_point(*selected_node, command.point));
+                const float distance = std::hypot(
+                    io.MousePos.x - point.x, io.MousePos.y - point.y);
+                if (hovered && distance <= hovered_path_distance) {
+                    hovered_path_distance = distance;
+                    hovered_path_point = index;
+                }
+            }
             for (std::size_t index = 0; index < selected_node->shape.path.size(); ++index) {
                 const auto& command = selected_node->shape.path[index];
                 if (command.kind == fabric::project::VectorPathCommandKind::move ||
@@ -718,11 +736,16 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     const auto point_selected = std::ranges::find(
                         canvas.selected_path_points, index) !=
                         canvas.selected_path_points.end();
-                    draw_list->AddCircleFilled(
-                        to_screen(transform_point(*selected_node, command.point)),
-                        5.0F, point_selected
-                            ? IM_COL32(100, 210, 255, 255)
-                            : IM_COL32(236, 180, 75, 255));
+                    const auto point = to_screen(
+                        transform_point(*selected_node, command.point));
+                    const auto point_color = point_selected
+                        ? IM_COL32(100, 210, 255, 255)
+                        : IM_COL32(236, 180, 75, 255);
+                    draw_list->AddCircleFilled(point, 5.0F, point_color);
+                    if (hovered_path_point && *hovered_path_point == index)
+                        draw_list->AddCircle(point, 9.0F,
+                                             IM_COL32(255, 255, 255, 255), 16,
+                                             2.0F);
                 }
                 if (command.kind == fabric::project::VectorPathCommandKind::cubic) {
                     const auto anchor = to_screen(

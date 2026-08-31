@@ -276,9 +276,10 @@ C4Component
   assertions du test, pas seulement des artefacts manuels.
 - En mode `Pen`, le canvas distingue désormais le clic sur un coin ou une
   poignée existante du clic d’insertion sur un segment. Les coins sélectionnés
-  gardent leur feedback visuel, les poignées restent éditables selon le mode
-  choisi, et `Delete`/`Backspace` retire les coins sélectionnés sans supprimer
-  le point `move` initial.
+  sont cyan, les coins disponibles ambre et le coin survolé reçoit un anneau
+  blanc ; les poignées restent violettes avec leurs lignes de construction
+  visibles et éditables selon le mode choisi. `Delete`/`Backspace` retire les
+  coins sélectionnés sans supprimer le point `move` initial.
   Le scénario de focus ouvre un prompt invalide et vérifie que le premier champ
   en erreur reçoit le focus clavier ainsi qu’une demande de repositionnement du
   scroll.
