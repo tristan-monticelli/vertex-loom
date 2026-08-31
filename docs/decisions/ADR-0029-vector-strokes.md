@@ -11,6 +11,7 @@ jointure `miter`, `round` ou `bevel`, et une extrémité `butt`, `round` ou
 `square`. Les nœuds sont dessinés dans l’ordre de leur tableau `native.nodes`,
 qui constitue l’ordre de dessin déterministe de la v2.
 
-Le document conserve les paramètres du contour ; le preview actuel applique
-la couleur et la largeur et utilise la primitive de ligne ImGui pour les
-jointures et extrémités jusqu’au renderer triangulé dédié.
+Le document conserve les paramètres du contour ; `fabric_render` produit une
+géométrie triangulée dédiée pour les segments, jointures et extrémités. Les
+préviews Asset Studio et Preview Runtime consomment ensuite ces triangles via
+le renderer OpenGL partagé, avec blending alpha explicite.

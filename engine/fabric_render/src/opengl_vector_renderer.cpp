@@ -769,6 +769,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     }
     const auto functions = load_functions();
     glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     functions.use_program(program_);
     const auto matrix = world_to_clip(viewport);
     functions.uniform_matrix_4fv(world_to_clip_uniform_, 1, GL_FALSE,
@@ -1170,6 +1172,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         ++packet_index;
     }
     if (stencil_ready) glDisable(GL_STENCIL_TEST);
+    glDisable(GL_BLEND);
     if (use_vertex_array_) functions.bind_vertex_array(0U);
     functions.use_program(0U);
     return stats;

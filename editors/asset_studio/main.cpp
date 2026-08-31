@@ -3951,6 +3951,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
                 if (ImGui::Button("Start new freeform path")) {
+                    node.shape.kind = fabric::project::VectorShapeKind::path;
                     node.shape.path = {{
                         .kind = fabric::project::VectorPathCommandKind::move,
                         .point = node.shape.bounds.origin}};
