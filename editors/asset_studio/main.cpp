@@ -256,6 +256,7 @@ struct CanvasUiState {
         pivot,
         path_point,
         path_selection,
+        pen_segment,
         bezier_handle1,
         bezier_handle2,
     };
@@ -2603,11 +2604,19 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                         .point = local};
                     const bool inserted = fabric::project::insert_path_command(
                         changed.shape, insert_index, command);
+                    const auto authored_node = changed;
                     const bool applied = inserted &&
                         session.set_selected_vector_node(
                             canvas.selected_node, std::move(changed));
                     if (applied) {
                         canvas.selected_path_points = {insert_index};
+                        canvas.path_command_index = insert_index;
+                        canvas.dragging = true;
+                        canvas.drag_operation =
+                            CanvasUiState::DragOperation::pen_segment;
+                        canvas.drag_start_mouse = mouse;
+                        canvas.drag_start_transform = authored_node.transform;
+                        canvas.drag_start_node = authored_node;
                         path_command_edited = true;
                     }
                 }
@@ -2740,7 +2749,24 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             canvas.selected_path_points.clear();
         }
     }
-    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+    if (!canvas.dragging && hovered && selected_node != nullptr &&
+        !selected_node->locked && canvas.tool == CanvasUiState::Tool::pen &&
+        selected_node->shape.kind == fabric::project::VectorShapeKind::path &&
+        canvas.selected_path_points.size() == 1U &&
+        canvas.path_command_index < selected_node->shape.path.size() &&
+        selected_node->shape.path[canvas.path_command_index].kind ==
+            fabric::project::VectorPathCommandKind::line &&
+        (ImGui::IsMouseDown(ImGuiMouseButton_Left) ||
+         io.MouseDelta.x != 0.0F || io.MouseDelta.y != 0.0F)) {
+        canvas.dragging = true;
+        canvas.drag_operation = CanvasUiState::DragOperation::pen_segment;
+        canvas.drag_start_mouse = io.MousePos;
+        canvas.drag_start_transform = selected_node->transform;
+        canvas.drag_start_node = *selected_node;
+    }
+    const bool pen_motion_frame = canvas.tool == CanvasUiState::Tool::pen &&
+        (io.MouseDelta.x != 0.0F || io.MouseDelta.y != 0.0F);
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left) && !pen_motion_frame) {
         canvas.dragging = false;
         canvas.drag_operation = CanvasUiState::DragOperation::none;
     }
@@ -2750,6 +2776,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
         const bool path_drag =
             canvas.drag_operation == CanvasUiState::DragOperation::path_selection ||
             canvas.drag_operation == CanvasUiState::DragOperation::path_point ||
+            canvas.drag_operation == CanvasUiState::DragOperation::pen_segment ||
             canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle1 ||
             canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle2;
         auto changed = path_drag ? canvas.drag_start_node : *selected_node;
@@ -2780,8 +2807,37 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             static_cast<void>(fabric::project::transform_path_points(
                 changed.shape, canvas.selected_path_points, delta, 0.0F,
                 {1.0F, 1.0F}));
+        } else if (canvas.drag_operation == CanvasUiState::DragOperation::pen_segment &&
+                   canvas.path_command_index < changed.shape.path.size()) {
+            auto& command = changed.shape.path[canvas.path_command_index];
+            if (command.kind == fabric::project::VectorPathCommandKind::line) {
+                fabric::core::Vec2 start_point{};
+                for (std::size_t index = canvas.path_command_index; index-- > 0U;) {
+                    const auto& candidate = changed.shape.path[index];
+                    if (candidate.kind == fabric::project::VectorPathCommandKind::move ||
+                        candidate.kind == fabric::project::VectorPathCommandKind::line ||
+                        candidate.kind == fabric::project::VectorPathCommandKind::cubic) {
+                        start_point = candidate.point;
+                        break;
+                    }
+                }
+                const auto end_point = world_to_local(current_mouse);
+                const fabric::core::Vec2 delta{
+                    end_point.x - start_point.x,
+                    end_point.y - start_point.y};
+                const fabric::core::Vec2 normal{-delta.y * 0.2F,
+                                                delta.x * 0.2F};
+                command.kind = fabric::project::VectorPathCommandKind::cubic;
+                command.point = end_point;
+                command.control1 = {
+                    start_point.x + delta.x / 3.0F + normal.x,
+                    start_point.y + delta.y / 3.0F + normal.y};
+                command.control2 = {
+                    end_point.x - delta.x / 3.0F + normal.x,
+                    end_point.y - delta.y / 3.0F + normal.y};
+            }
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::path_point &&
-            canvas.path_command_index < changed.shape.path.size()) {
+                   canvas.path_command_index < changed.shape.path.size()) {
             changed.shape.path[canvas.path_command_index].point =
                 world_to_local(current_mouse);
         } else if (canvas.drag_operation == CanvasUiState::DragOperation::bezier_handle1 &&
@@ -8755,20 +8811,22 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             canvas.tool = CanvasUiState::Tool::move;
             canvas.bezier_handle_mode = fabric::editor::BezierHandleMode::free;
         }
-        const bool pen_click = vector_canvas_e2e &&
+        const bool pen_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 2U && vector_canvas_e2e_frame < 6U;
+        const bool pen_drag = vector_canvas_e2e &&
+            vector_canvas_e2e_frame == 3U;
         const bool move_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 6U && vector_canvas_e2e_frame < 9U;
         const bool handle_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
-        if (pen_click || move_gesture || handle_gesture) {
+        if (pen_gesture || move_gesture || handle_gesture) {
             const auto frame = vector_canvas_e2e_frame;
-            const bool button_event = pen_click || frame == 6U || frame == 8U ||
+            const bool button_event = frame == 2U || frame == 3U || frame == 4U ||
+                frame == 5U || frame == 6U || frame == 8U ||
                 frame == 9U || frame == 11U;
-            const bool button_down = pen_click
-                ? frame % 2U == 0U
-                : (move_gesture ? frame == 6U : frame == 9U);
-            const bool right_click = frame == 4U || frame == 5U;
+            const bool button_down = frame == 2U || frame == 3U || frame == 5U ||
+                (move_gesture ? frame == 6U : frame == 9U);
+            const bool right_click = frame == 5U;
             const auto canvas_point = [&](const fabric::core::Vec2 point) {
                 const auto& node = session.created_vector()->native->nodes.front();
                 const auto transformed = fabric::core::Transform{
@@ -8802,9 +8860,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             const auto& test_path = test_node.shape.path;
             const auto inserted_index = !canvas.selected_path_points.empty()
                 ? canvas.selected_path_points.front() : 1U;
-            const auto test_point = pen_click && test_path.size() > 1U
-                ? (frame >= 4U && inserted_index < test_path.size()
-                       ? test_path[inserted_index].point
+            const auto test_point = pen_gesture && test_path.size() > 1U
+                ? (frame >= 3U && inserted_index < test_path.size()
+                       ? frame == 5U
+                           ? test_path[inserted_index].point
+                           : fabric::core::Vec2{
+                                 test_path[inserted_index].point.x + 0.3F,
+                                 test_path[inserted_index].point.y + 0.25F}
                        : fabric::core::Vec2{
                              (test_path[0].point.x + test_path[1].point.x) *
                                  0.5F,
@@ -8829,7 +8891,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
-            motion.motion.state = move_gesture || handle_gesture
+            motion.motion.state = pen_drag || move_gesture || handle_gesture
                 ? SDL_BUTTON_LMASK : 0U;
             motion.motion.x = mouse_x;
             motion.motion.y = mouse_y;
