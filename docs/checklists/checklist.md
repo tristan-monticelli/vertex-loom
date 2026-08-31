@@ -855,8 +855,8 @@ qui n'a pas connaissance de l'implémentation.
   sauvegarde interrompue, récupération et conservation des modifications.
   Le checker `release_data_robustness` couvre maintenant les projets invalide
   et valide ainsi qu’une ressource vectorielle manquante ; les scénarios
-  interruption/récupération restent couverts par les tests de sauvegarde mais
-  doivent encore être rejoués dans une recette release dédiée.
+  interruption/récupération sont rejoués par `release_recovery_smoke`, qui
+  accepte l’autosave dans une nouvelle session et vérifie le reload final.
 - [ ] Performance release : mesurer démarrage, FPS, mémoire et temps de chargement
   sur un petit projet et un projet représentatif de production.
   Le checker `release_performance_smoke` mesure maintenant les profils 100/10 000

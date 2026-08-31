@@ -91,6 +91,9 @@ manuelles de release.
 Le test CTest `release_data_robustness` rejette un projet invalide et un projet
 dont une ressource vectorielle référencée a été supprimée, tout en conservant
 le cas valide comme contrôle de non-régression.
+Le test `release_recovery_smoke` copie la fixture, simule une interruption après
+autosave, réouvre une nouvelle session, accepte la récupération et vérifie que
+la modification sauvegardée survit à un reload sans candidat résiduel.
 Le test CTest `release_performance_smoke` exécute les benchmarks renderer et
 runtime sur des profils de 100 puis 10 000 éléments, avec seuils FPS et rapports
 JSON séparés ; les mesures mémoire et de démarrage restent à compléter avec

@@ -570,6 +570,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_data_robustness.cmake
     )
 
+    if(FABRIC_BUILD_EDITORS)
+        add_executable(fabric_release_recovery_smoke
+            tests/cpp/release_recovery_smoke.cpp)
+        target_link_libraries(fabric_release_recovery_smoke PRIVATE fabric_editor)
+        add_test(NAME release_recovery_smoke
+            COMMAND fabric_release_recovery_smoke
+                ${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                ${CMAKE_BINARY_DIR}/release-recovery-smoke)
+    endif()
+
     if(FABRIC_BUILD_RUNTIME)
         add_test(
             NAME release_performance_smoke
