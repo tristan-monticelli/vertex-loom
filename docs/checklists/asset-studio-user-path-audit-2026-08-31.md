@@ -76,6 +76,21 @@ flowchart TD
 | U21 | Ouvrir Map Studio depuis le projet | Partiel | Le parcours Map est fonctionnel dans les tests, mais il reste séparé du parcours de création visuelle utilisateur. | P2 |
 | U22 | Créer map, scène, mécanique, trigger et publier | Partiel | Les contrats et E2E Map passent ; la découverte des concepts reste trop moteur pour un utilisateur normal. | P2 |
 
+### Vérification écran du 31 août 2026
+
+Une capture réelle du scénario `asset_studio_beam_vector_canvas_e2e` a été
+inspectée après conversion PNG. Elle montre `Beam Border` sélectionné comme un
+grand remplissage bleu dans le canvas vectoriel, tandis que la texture Thread
+n'est pas perceptible. Cette capture ne constitue donc pas une preuve de Beam
+texturé : soit la sélection masque le rendu, soit le rendu image n'est pas
+branché dans cette vue. Le statut U06/U10 reste P0 tant qu'une capture isolée,
+non sélectionnée, montre la texture originale et le shader.
+
+Le contrôle d'interface macOS n'a pas pu récupérer la fenêtre interactive
+Asset Studio : le processus est lancé, mais l'accessibilité renvoie un
+identifiant système en conflit avec Aperçu et expire. Les captures automatisées
+ne doivent pas être présentées comme une validation manuelle complète.
+
 ## Chemins d'échec à rejouer
 
 ```mermaid
