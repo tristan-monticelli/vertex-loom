@@ -88,6 +88,10 @@ manuelles de release.
 Le test CTest `release_data_robustness` rejette un projet invalide et un projet
 dont une ressource vectorielle référencée a été supprimée, tout en conservant
 le cas valide comme contrôle de non-régression.
+Le test CTest `release_performance_smoke` exécute les benchmarks renderer et
+runtime sur des profils de 100 puis 10 000 éléments, avec seuils FPS et rapports
+JSON séparés ; les mesures mémoire et de démarrage restent à compléter avec
+les outils propres à chaque OS.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un

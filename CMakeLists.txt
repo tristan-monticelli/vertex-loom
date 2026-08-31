@@ -570,6 +570,18 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_data_robustness.cmake
     )
 
+    if(FABRIC_BUILD_RUNTIME)
+        add_test(
+            NAME release_performance_smoke
+            COMMAND ${CMAKE_COMMAND}
+                "-DRENDER_BENCH=$<TARGET_FILE:fabric_render_benchmark>"
+                "-DRUNTIME_BENCH=$<TARGET_FILE:fabric_runtime_benchmark>"
+                "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-performance-smoke"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_performance_smoke.cmake
+        )
+        set_tests_properties(release_performance_smoke PROPERTIES TIMEOUT 180)
+    endif()
+
     if(FABRIC_BUILD_EDITORS)
         add_test(
             NAME asset_studio_ui_registry_e2e
