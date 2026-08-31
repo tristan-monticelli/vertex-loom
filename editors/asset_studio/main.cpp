@@ -113,6 +113,19 @@ bool is_entity_artwork_kind(const fabric::editor::StudioResourceKind kind) {
         kind == fabric::editor::StudioResourceKind::visual_component;
 }
 
+bool is_technical_visual_dependency(
+    const fabric::editor::StudioResource& resource) {
+    using Kind = fabric::editor::StudioResourceKind;
+    if (resource.kind != Kind::vector &&
+        resource.kind != Kind::textured_path &&
+        resource.kind != Kind::visual_composition) {
+        return false;
+    }
+    const auto& id = resource.id.value;
+    return id.ends_with("-border") || id.ends_with("-rail") ||
+        id.ends_with("-composition");
+}
+
 constexpr ImGuiWindowFlags fixed_panel_flags =
     ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
@@ -954,6 +967,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     }
 
     static ImGuiTextFilter filter;
+    static bool show_technical_resources = false;
     static std::optional<fabric::editor::StudioResource> delete_request;
     static std::vector<fabric::editor::StudioResource> delete_impact;
     static std::string replacement_id;
@@ -1000,6 +1014,9 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     ImGui::SetNextItemWidth(-1.0F);
     ImGui::Combo("##resource-kind-filter", &kind_filter, kind_filters,
                  static_cast<int>(std::size(kind_filters)));
+    ImGui::Checkbox("Show technical resources", &show_technical_resources);
+    ImGui::SameLine();
+    ImGui::TextDisabled("generated paths, borders and compositions");
     if (const auto* selected = session.selected_resource()) {
         if (ImGui::Button("Duplicate")) {
             const auto resource = *selected;
@@ -1041,6 +1058,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         bool any = false;
         for (const auto& resource : session.resources())
             if (resource.kind == kind &&
+                (show_technical_resources ||
+                 !is_technical_visual_dependency(resource)) &&
                 filter.PassFilter(resource.name.c_str(),
                                   resource.id.value.c_str())) any = true;
         if (!any && kind_filter == 0) return;
@@ -1052,6 +1071,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         std::optional<fabric::editor::StudioResource> context_rename_request;
         for (const auto& resource : session.resources()) {
             if (resource.kind != kind ||
+                (!show_technical_resources &&
+                 is_technical_visual_dependency(resource)) ||
                 !filter.PassFilter(resource.name.c_str(),
                                    resource.id.value.c_str())) {
                 continue;

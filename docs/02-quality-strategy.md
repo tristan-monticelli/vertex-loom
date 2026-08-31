@@ -159,6 +159,10 @@ texture ni appeler directement la factory à la place de l'action UI.
 Le test géométrique `Beam keeps repeated texture UVs continuous across
 external segments` couvre aussi une texture externe sur une ligne, une courbe
 et un segment final, avec UV d'arc-length monotones et shader holographique.
+Le rail Asset Studio masque par défaut les dépendances visuelles générées
+(`*-border`, `*-rail`, `*-composition`) afin que l'utilisateur ouvre le
+composant Beam plutôt que son vecteur interne ; la case `Show technical
+resources` conserve l'accès expert sans modifier les contrats persistés.
 Le test `asset_studio_ui_button_e2e` rend l'assistant Button avec un PNG
 original, ses couleurs et paramètres shader, injecte un clic sur le vrai bouton
 de création, capture le résultat puis recharge l'Entity et son Material v2. Il
