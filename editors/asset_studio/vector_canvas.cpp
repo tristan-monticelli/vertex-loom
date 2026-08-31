@@ -677,16 +677,42 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             !node.shape.path.empty() &&
             node.shape.path.back().kind ==
                 fabric::project::VectorPathCommandKind::close;
-        if (!node.stroke || !node.stroke->image) {
-            draw_list->AddPolyline(
-                points.data(), static_cast<int>(points.size()),
-                stroke_color,
-                node.shape.kind == fabric::project::VectorShapeKind::line ||
-                        (node.shape.kind == fabric::project::VectorShapeKind::path &&
-                         !closed_path)
-                    ? ImDrawFlags_None
-                    : ImDrawFlags_Closed,
-                stroke_width);
+        const auto stroke_flags =
+            node.shape.kind == fabric::project::VectorShapeKind::line ||
+                    (node.shape.kind == fabric::project::VectorShapeKind::path &&
+                     !closed_path)
+                ? ImDrawFlags_None
+                : ImDrawFlags_Closed;
+        if (node.stroke && node.stroke->image) {
+            // The native editor preview does not own an ImGui texture atlas.
+            // Keep image strokes visible with a deterministic woven fallback
+            // instead of dropping the stroke entirely.
+            draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
+                                   stroke_color, stroke_flags, stroke_width);
+            const ImU32 highlight = IM_COL32(255, 255, 255, 190);
+            for (std::size_t segment = 1; segment < points.size(); ++segment) {
+                const auto start = points[segment - 1];
+                const auto end = points[segment];
+                const float length = std::hypot(end.x - start.x, end.y - start.y);
+                if (length < 1.0F) continue;
+                const int dash_count = std::max(1, static_cast<int>(length / 18.0F));
+                for (int dash = 0; dash < dash_count; ++dash) {
+                    if ((dash + static_cast<int>(segment)) % 2 != 0) continue;
+                    const float begin = static_cast<float>(dash) /
+                        static_cast<float>(dash_count);
+                    const float finish = std::min(
+                        1.0F, begin + 0.42F / static_cast<float>(dash_count));
+                    draw_list->AddLine(
+                        {start.x + (end.x - start.x) * begin,
+                         start.y + (end.y - start.y) * begin},
+                        {start.x + (end.x - start.x) * finish,
+                         start.y + (end.y - start.y) * finish},
+                        highlight, std::max(1.0F, stroke_width * 0.28F));
+                }
+            }
+        } else {
+            draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
+                                   stroke_color, stroke_flags, stroke_width);
         }
     }
     if (selected_node != nullptr && !selected_node->locked) {
@@ -707,9 +733,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             draw_list->AddLine({pivot_handle.x, pivot_handle.y - 7.0F},
                                {pivot_handle.x, pivot_handle.y + 7.0F},
                                IM_COL32(180, 110, 235, 255), 2.0F);
-        } else if ((canvas.tool == CanvasUiState::Tool::move ||
-                    canvas.tool == CanvasUiState::Tool::pen) &&
-                   selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+        } else if (selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
             std::optional<std::size_t> hovered_path_point;
             float hovered_path_distance = 10.0F;
             for (std::size_t index = 0;
@@ -764,6 +788,10 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                                                IM_COL32(180, 110, 235, 255));
                 }
             }
+            draw_list->AddText(
+                {origin.x + 14.0F, origin.y + available.y - 34.0F},
+                IM_COL32(238, 238, 238, 230),
+                "Corners: amber | selected: cyan | handles: purple");
         }
     }
     draw_list->PopClipRect();

@@ -267,6 +267,10 @@ C4Component
   puis applique la mutation via `ProjectSession`. Un composant visuel portant
   des overrides est refusé par ce chemin tant que la confirmation de perte n’est
   pas explicitement réutilisée.
+- Le preview vectoriel garde les strokes image visibles même quand la texture
+  n’est pas chargée dans l’atlas ImGui : il dessine le stroke avec une trame
+  déterministe de secours. Le renderer OpenGL reste responsable du rendu texturé
+  final ; le fallback est uniquement destiné à rendre l’édition inspectable.
 - Les modes E2E SDL écrivent, en cas d’échec, un rapport de diagnostics et une
   capture PPM du framebuffer dans le projet de test pour rendre l’échec
   reproductible et inspectable. Le test de registre répète aussi le shell à la
