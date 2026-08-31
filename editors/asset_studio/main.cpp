@@ -8237,6 +8237,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                          : SDL_MOUSEBUTTONUP;
                 event.button.button = right_click
                     ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+                event.button.state = button_down ? SDL_PRESSED : SDL_RELEASED;
                 event.button.windowID = SDL_GetWindowID(window);
                 event.button.x = mouse_x;
                 event.button.y = mouse_y;
