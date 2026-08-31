@@ -16,6 +16,16 @@ if(NOT INSTALL_RESULT EQUAL 0)
     message(FATAL_ERROR "install failed: ${INSTALL_OUTPUT}${INSTALL_ERROR}")
 endif()
 
+execute_process(
+    COMMAND "${CMAKE_COMMAND}" --install "${BUILD_DIR}" --prefix "${STAGING}"
+    RESULT_VARIABLE UPDATE_RESULT
+    OUTPUT_VARIABLE UPDATE_OUTPUT
+    ERROR_VARIABLE UPDATE_ERROR
+)
+if(NOT UPDATE_RESULT EQUAL 0)
+    message(FATAL_ERROR "update over an existing installation failed: ${UPDATE_OUTPUT}${UPDATE_ERROR}")
+endif()
+
 if(WIN32)
     set(EXE_SUFFIX ".exe")
 else()
@@ -59,6 +69,15 @@ execute_process(
 )
 if(NOT RUNTIME_RESULT EQUAL 0)
     message(FATAL_ERROR "installed runtime help failed: ${RUNTIME_OUTPUT}${RUNTIME_ERROR}")
+endif()
+
+file(GLOB_RECURSE INSTALLED_FILES LIST_DIRECTORIES false "${STAGING}/*")
+foreach(INSTALLED_FILE IN LISTS INSTALLED_FILES)
+    file(REMOVE "${INSTALLED_FILE}")
+endforeach()
+file(GLOB_RECURSE INSTALLED_AFTER_UNINSTALL LIST_DIRECTORIES false "${STAGING}/*")
+if(INSTALLED_AFTER_UNINSTALL)
+    message(FATAL_ERROR "uninstall left installed files: ${INSTALLED_AFTER_UNINSTALL}")
 endif()
 
 execute_process(
