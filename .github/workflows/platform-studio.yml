@@ -61,7 +61,7 @@ jobs:
           -DFABRIC_BUILD_RUNTIME=ON
 
       - name: Build
-        run: cmake --build build --config Debug --parallel 2
+        run: cmake --build build --config Debug --parallel 4
 
       - name: Activate Windows software OpenGL
         if: runner.os == 'Windows'
