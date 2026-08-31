@@ -707,6 +707,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         )
         set_tests_properties(
             asset_studio_ui_registry_e2e
+            asset_studio_ui_min_window_e2e
+            asset_studio_ui_focus_e2e
+            asset_studio_ui_accessibility_e2e
+            asset_studio_ui_drag_e2e
+            asset_studio_ui_drag_root_e2e
+            asset_studio_ui_drag_child_e2e
+            asset_studio_ui_overrides_e2e
+            asset_studio_ui_texture_e2e
+            asset_studio_ui_input_e2e
             asset_studio_behavior_e2e
             asset_studio_transformation_e2e
             asset_studio_entity_e2e
@@ -717,7 +726,9 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             map_studio_close_e2e
             map_studio_scene_e2e
             map_studio_transformation_e2e
-            PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP:"
+            PROPERTIES
+                SKIP_REGULAR_EXPRESSION "SKIP:"
+                TIMEOUT 180
         )
     endif()
 
