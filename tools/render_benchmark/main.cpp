@@ -6,10 +6,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -72,6 +74,29 @@ bool parse_options(const int argc, char** argv, Options& options) {
     return true;
 }
 
+std::string gl_string(const GLenum name) {
+    const auto* value = glGetString(name);
+    return value == nullptr ? std::string{} : std::string{
+        reinterpret_cast<const char*>(value)};
+}
+
+bool requires_native_gpu() {
+    const char* value = std::getenv("FABRIC_REQUIRE_NATIVE_GL");
+    return value != nullptr && std::string_view{value} == "1";
+}
+
+bool is_software_renderer(const std::string& renderer) {
+    std::string lower;
+    lower.reserve(renderer.size());
+    for (const char character : renderer)
+        lower.push_back(static_cast<char>(std::tolower(
+            static_cast<unsigned char>(character))));
+    return lower.empty() || lower.find("llvmpipe") != std::string::npos ||
+        lower.find("softpipe") != std::string::npos ||
+        lower.find("software") != std::string::npos ||
+        lower.find("mesa") != std::string::npos;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -119,6 +144,19 @@ int main(int argc, char** argv) {
     if (!renderer.initialize()) {
         std::cerr << "error=renderer_initialize detail="
                   << renderer.initialization_error() << '\n';
+        SDL_GL_DeleteContext(context);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return 1;
+    }
+    const auto gl_vendor = gl_string(GL_VENDOR);
+    const auto gl_renderer = gl_string(GL_RENDERER);
+    const auto gl_version = gl_string(GL_VERSION);
+    if (requires_native_gpu() && is_software_renderer(gl_renderer)) {
+        std::cerr << "error=native_gpu_required vendor=" << gl_vendor
+                  << " renderer=" << gl_renderer
+                  << " version=" << gl_version << '\n';
+        renderer.shutdown();
         SDL_GL_DeleteContext(context);
         SDL_DestroyWindow(window);
         SDL_Quit();
@@ -209,6 +247,9 @@ int main(int argc, char** argv) {
                << "  \"frames\": " << options.frames << ",\n"
                << "  \"drawCallsTotal\": " << total_draw_calls << ",\n"
                << "  \"trianglesTotal\": " << total_triangles << ",\n"
+               << "  \"glVendor\": \"" << gl_vendor << "\",\n"
+               << "  \"glRenderer\": \"" << gl_renderer << "\",\n"
+               << "  \"glVersion\": \"" << gl_version << "\",\n"
                << "  \"elapsedMs\": " << elapsed_ms << ",\n"
                << "  \"p95FrameMs\": " << p95 << ",\n"
                << "  \"fpsP95\": " << fps << ",\n"
@@ -228,6 +269,9 @@ int main(int argc, char** argv) {
               << " frames=" << options.frames
               << " draw_calls_total=" << total_draw_calls
               << " triangles_total=" << total_triangles
+              << " gl_vendor=\"" << gl_vendor << "\""
+              << " gl_renderer=\"" << gl_renderer << "\""
+              << " gl_version=\"" << gl_version << "\""
               << " elapsed_ms=" << elapsed_ms
               << " p95_frame_ms=" << p95
               << " fps_p95=" << fps << '\n';

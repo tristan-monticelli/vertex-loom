@@ -2,6 +2,12 @@ name: platform-studio
 
 on:
   workflow_dispatch:
+    inputs:
+      native_gpu:
+        description: 'Run the Windows native GPU gate on a self-hosted GPU runner'
+        required: true
+        type: boolean
+        default: false
   push:
     paths:
       - 'CMakeLists.txt'
@@ -112,3 +118,27 @@ jobs:
             build/**/*asset-studio-ui-*.ppm
             build/**/*asset-studio-vector-canvas-*.json
             build/**/*asset-studio-vector-canvas-*.ppm
+
+  windows-native-gpu:
+    name: windows-native-gpu
+    if: ${{ inputs.native_gpu == true }}
+    runs-on: [self-hosted, windows, gpu]
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        shell: pwsh
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DFABRIC_BUILD_TESTS=ON -DFABRIC_BUILD_EDITORS=ON -DFABRIC_BUILD_RUNTIME=ON
+
+      - name: Build
+        shell: pwsh
+        run: cmake --build build --config Debug --parallel 4
+
+      - name: Run native GPU gate
+        shell: pwsh
+        env:
+          FABRIC_REQUIRE_NATIVE_GL: '1'
+        run: ctest --test-dir build -C Debug --output-on-failure

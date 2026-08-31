@@ -845,6 +845,8 @@ qui n'a pas connaissance de l'implémentation.
   fixture textile ; la recette utilisateur interactive reste à faire.
 - [ ] Rendu GPU natif : valider OpenGL sur un vrai GPU/driver Windows ; Mesa
   logiciel reste une couverture de secours et ne remplace pas cette recette.
+  Le workflow manuel `native_gpu=true` est prêt sur runner Windows
+  auto-hébergé `self-hosted/windows/gpu` ; il reste à l’exécuter.
 - [ ] Régression visuelle : comparer les screenshots de référence des écrans,
   canvas, textures, fills, strokes, clips et transformations.
   Le canvas vectoriel compare maintenant occupation et plage de canaux à une

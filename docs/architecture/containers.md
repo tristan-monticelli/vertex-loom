@@ -14,7 +14,7 @@ C4Container
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions, index unifié de ressources et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération, journal de preview borné et contraintes de poignées Bézier")
         Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
         Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
-        Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
+    Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles, p95 et identité du driver OpenGL ; FABRIC_REQUIRE_NATIVE_GL=1 refuse Mesa/llvmpipe")
     Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
     Container(package, "Release Package", "CMake install / CPack TGZ + ZIP", "Distribue les exécutables desktop et un projet exemple validé ; le smoke test vérifie l’installation, la validation des ressources et le lancement --help du runtime")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")

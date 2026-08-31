@@ -95,6 +95,13 @@ Le test CTest `release_performance_smoke` exécute les benchmarks renderer et
 runtime sur des profils de 100 puis 10 000 éléments, avec seuils FPS et rapports
 JSON séparés ; les mesures mémoire et de démarrage restent à compléter avec
 les outils propres à chaque OS.
+Les rapports renderer enregistrent maintenant vendor, renderer et version
+OpenGL. La variable `FABRIC_REQUIRE_NATIVE_GL=1` fait échouer explicitement une
+recette qui reçoit Mesa, llvmpipe, softpipe ou un renderer inconnu.
+Le workflow `platform-studio.yml` expose une exécution manuelle
+`native_gpu=true` sur un runner Windows auto-hébergé étiqueté `gpu`; cette gate
+exécute tout CTest sans la configuration Mesa et applique cette variable au
+benchmark renderer.
 Le smoke packaging réinstalle également sur le même préfixe puis vérifie que le
 staging peut être entièrement retiré ; l’intégration aux installateurs natifs
 reste une validation par plateforme.
