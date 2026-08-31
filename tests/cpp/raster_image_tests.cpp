@@ -5,6 +5,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <span>
@@ -326,6 +327,42 @@ void image_fill_mapping_distinguishes_deform_and_fit_modes() {
             "image fit policy did not change normalized UVs");
 }
 
+void native_geometry_tessellates_concave_paths_without_losing_area() {
+    auto asset = native_geometry_fixture();
+    auto& shape = asset.native->nodes.front().shape;
+    shape.bounds = {{0.0F, 0.0F}, {4.0F, 4.0F}};
+    shape.path = {
+        {.kind = fabric::project::VectorPathCommandKind::move,
+         .point = {0.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {4.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {4.0F, 1.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {1.0F, 1.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {1.0F, 4.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {0.0F, 4.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::close},
+    };
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U &&
+                result.packets.front().fill_indices.size() == 12U,
+            "concave path was not triangulated into four triangles");
+    const auto& packet = result.packets.front();
+    float area = 0.0F;
+    for (std::size_t index = 0; index < packet.fill_indices.size(); index += 3U) {
+        const auto& a = packet.fill_vertices[packet.fill_indices[index]];
+        const auto& b = packet.fill_vertices[packet.fill_indices[index + 1U]];
+        const auto& c = packet.fill_vertices[packet.fill_indices[index + 2U]];
+        area += std::abs((b.x - a.x) * (c.y - a.y) -
+                         (b.y - a.y) * (c.x - a.x)) * 0.5F;
+    }
+    require(std::abs(area - 7.0F) < 0.0001F,
+            "concave tessellation changed the silhouette area");
+}
+
 void native_geometry_builds_textured_stroke_payload() {
     auto asset = native_geometry_fixture();
     asset.native->nodes.front().stroke = fabric::project::VectorStroke{
@@ -483,6 +520,7 @@ int main() {
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
     image_fill_mapping_distinguishes_deform_and_fit_modes();
+    native_geometry_tessellates_concave_paths_without_losing_area();
     native_geometry_builds_textured_stroke_payload();
     native_geometry_applies_node_and_parent_transforms();
     opengl_vector_renderer_reports_uninitialized_use();
