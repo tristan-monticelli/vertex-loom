@@ -13,7 +13,7 @@
 
 namespace fabric::editor {
 
-enum class VisualPresetKind { eye, button, seam, zipper };
+enum class VisualPresetKind { eye, button, beam, seam, zipper };
 
 [[nodiscard]] std::string_view label(VisualPresetKind kind) noexcept;
 

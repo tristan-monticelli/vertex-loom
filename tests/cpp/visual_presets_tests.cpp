@@ -626,8 +626,7 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
 
 TEST_CASE("guided Beam is a textured path with the project default and shader") {
     auto beam_request = request(
-        fabric::editor::VisualPresetKind::seam, "guided-beam");
-    beam_request.guided_beam = true;
+        fabric::editor::VisualPresetKind::beam, "guided-beam");
     beam_request.thread_texture.reset();
     beam_request.beam_color = {0.8F, 0.1F, 0.7F, 1.0F};
     beam_request.beam_effect_color = {0.1F, 0.9F, 1.0F, 1.0F};
@@ -671,7 +670,7 @@ TEST_CASE("thread presets inherit the project default texture") {
 
 TEST_CASE("Beam texture offset uses a generic component animation property") {
     const auto beam_request = request(
-        fabric::editor::VisualPresetKind::seam, "beam");
+        fabric::editor::VisualPresetKind::beam, "beam");
     const auto bundle = fabric::editor::build_visual_preset(
         manifest(), beam_request);
     REQUIRE(bundle.ok());

@@ -55,11 +55,13 @@ Artwork and composed Entity. Internal resource types remain available through
 an explicit advanced workspace so existing project contracts stay readable and
 editable without making engine concepts part of the normal creation path.
 
-Beam is the public name for the existing persisted textured-path contract.
-Its preview and published rendering use the shared arc-length ribbon geometry
-builder; the manifest `defaultStrokeTexture` initializes newly created Beam and
-thread-based presets, while a manually selected texture remains local to the
-selected resource.
+Beam is the guided authoring type for the persisted textured-path contract.
+The internal `beam` request is distinct from the legacy `seam` preset while
+existing JSON and resource identifiers remain compatible. Its preview and
+published rendering use the shared arc-length ribbon geometry builder; the
+manifest `defaultStrokeTexture` initializes newly created Beam and thread-based
+presets, while a manually selected texture remains local to the selected
+resource.
 
 ```mermaid
 flowchart LR
@@ -70,6 +72,8 @@ flowchart LR
     Hub --> Entity[Composed Entity]
     Hub --> Advanced[Advanced]
     Advanced --> Technical[Technical resources]
+    Beam --> BeamContract[Beam request]
+    BeamContract --> Legacy[Compatible texturedPath contract]
     Beam --> Shared[Shared textured-path geometry]
     Shared --> Studio[Asset Studio preview]
     Shared --> Runtime[Preview and published runtime]

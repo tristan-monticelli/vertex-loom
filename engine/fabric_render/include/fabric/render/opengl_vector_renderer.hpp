@@ -85,6 +85,7 @@ private:
     std::int32_t shader_effect_uniform_{-1};
     std::int32_t shader_shine_uniform_{-1};
     std::int32_t shader_holography_uniform_{-1};
+    std::int32_t shader_opacity_uniform_{-1};
     std::int32_t shader_intensity_uniform_{-1};
     std::string initialization_error_;
     std::size_t vertex_buffer_capacity_{};

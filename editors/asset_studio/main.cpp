@@ -2646,7 +2646,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText("Create a visual");
             if (ImGui::MenuItem("Beam / Stroke...")) {
                 creation.visual_preset.kind =
-                    fabric::editor::VisualPresetKind::seam;
+                    fabric::editor::VisualPresetKind::beam;
                 creation.visual_preset.name = "Beam";
                 creation.visual_preset.id.value = "beam";
                 creation.visual_preset.guided_beam = true;
@@ -6776,16 +6776,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextDisabled(
             "The preset only assembles generic vectors, paths and layers.");
         const auto user_preset_label = [](const auto kind) {
-            return kind == fabric::editor::VisualPresetKind::seam
-                ? std::string_view{"Beam"}
-                : fabric::editor::label(kind);
+            return fabric::editor::label(kind);
         };
         const auto kind_label = std::string(user_preset_label(request.kind));
         ImGui::SetNextItemWidth(280.0F);
         if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
             for (const auto kind : {fabric::editor::VisualPresetKind::eye,
                                     fabric::editor::VisualPresetKind::button,
-                                    fabric::editor::VisualPresetKind::seam,
+                                    fabric::editor::VisualPresetKind::beam,
                                     fabric::editor::VisualPresetKind::zipper}) {
                 const bool selected = request.kind == kind;
                 const auto option = std::string(user_preset_label(kind));
@@ -6797,9 +6795,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::EndCombo();
         }
         draw_resource_identity_fields(request.name, request.id.value);
-        const bool uses_thread = request.kind ==
-                fabric::editor::VisualPresetKind::seam ||
-            request.kind == fabric::editor::VisualPresetKind::zipper;
+            const bool uses_thread = request.kind ==
+                fabric::editor::VisualPresetKind::beam ||
+                request.kind == fabric::editor::VisualPresetKind::seam ||
+                request.kind == fabric::editor::VisualPresetKind::zipper;
         if (uses_thread) {
             if (!request.thread_texture && session.manifest()->default_stroke_texture)
                 request.thread_texture = fabric::project::ResourceReference{
@@ -6830,7 +6829,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::EndCombo();
             }
-            if (request.kind == fabric::editor::VisualPresetKind::seam) {
+            if (request.kind == fabric::editor::VisualPresetKind::beam ||
+                request.kind == fabric::editor::VisualPresetKind::seam) {
                 ImGui::SeparatorText("Beam appearance");
                 ImGui::ColorEdit4("Beam color", &request.beam_color.red);
                 ImGui::ColorEdit4("Effect color", &request.beam_effect_color.red);

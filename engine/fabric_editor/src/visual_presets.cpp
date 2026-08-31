@@ -381,6 +381,7 @@ std::string_view label(const VisualPresetKind kind) noexcept {
     switch (kind) {
     case VisualPresetKind::eye: return "Eye";
     case VisualPresetKind::button: return "Button";
+    case VisualPresetKind::beam: return "Beam";
     case VisualPresetKind::seam: return "Seam";
     case VisualPresetKind::zipper: return "Zipper";
     }
@@ -403,14 +404,15 @@ VisualPresetResult build_visual_preset(
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "name", "preset name must not be empty");
     }
-    const bool uses_thread = effective_request.kind == VisualPresetKind::seam ||
+    const bool uses_thread = effective_request.kind == VisualPresetKind::beam ||
+        effective_request.kind == VisualPresetKind::seam ||
         effective_request.kind == VisualPresetKind::zipper;
     if (uses_thread && (!effective_request.thread_texture ||
         effective_request.thread_texture->expected_type != "texture" ||
         !core::ResourceId::is_valid(effective_request.thread_texture->id.value))) {
         add_error(result.errors, project::ErrorCode::resource_type_mismatch,
                   "threadTexture",
-                  "seam and zipper presets require a texture resource");
+                  "beam, seam and zipper presets require a texture resource");
     }
     if (effective_request.kind == VisualPresetKind::zipper &&
         (effective_request.zipper_tooth_count < 2U ||
@@ -421,9 +423,12 @@ VisualPresetResult build_visual_preset(
     if (!result.errors.empty()) return result;
 
     VisualPresetBundle bundle;
+    if (effective_request.kind == VisualPresetKind::beam)
+        effective_request.guided_beam = true;
     switch (request.kind) {
     case VisualPresetKind::eye: bundle = eye_preset(effective_request); break;
     case VisualPresetKind::button: bundle = button_preset(effective_request); break;
+    case VisualPresetKind::beam: bundle = seam_preset(effective_request); break;
     case VisualPresetKind::seam: bundle = seam_preset(effective_request); break;
     case VisualPresetKind::zipper: bundle = zipper_preset(effective_request); break;
     }

@@ -1044,6 +1044,26 @@ bool ProjectSession::create_visual_preset(
                     "a project must be open before creating a visual preset"}};
         return false;
     }
+    const bool uses_thread_texture =
+        request.kind == VisualPresetKind::beam ||
+        request.kind == VisualPresetKind::seam ||
+        request.kind == VisualPresetKind::zipper;
+    if (uses_thread_texture) {
+        const auto texture_id = request.thread_texture
+            ? request.thread_texture->id
+            : manifest_->default_stroke_texture;
+        const auto texture = texture_id
+            ? std::ranges::find_if(resources_, [&](const auto& resource) {
+                return resource.kind == StudioResourceKind::texture &&
+                    resource.id == *texture_id;
+            })
+            : resources_.end();
+        if (!texture_id || texture == resources_.end()) {
+            errors_ = {{project::ErrorCode::missing_resource, "threadTexture",
+                        "choose an existing project texture for this Beam or thread preset"}};
+            return false;
+        }
+    }
     if (!save_before_document_transition()) return false;
     auto published = publish_visual_preset(
         project_root_, *manifest_, request);

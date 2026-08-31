@@ -421,6 +421,7 @@ uniform vec4 shaderPrimary;
 uniform vec4 shaderEffect;
 uniform float shaderShine;
 uniform float shaderHolography;
+uniform float shaderOpacity;
 uniform float shaderIntensity;
 varying vec2 fragmentUv;
 void main() {
@@ -429,7 +430,8 @@ void main() {
         : color;
     if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
         shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
-        + vec3(shaderShine), base.a);
+        + vec3(shaderShine), mix(base.a * shaderPrimary.a, shaderEffect.a,
+        clamp(shaderHolography, 0.0, 1.0)) * shaderOpacity);
     gl_FragColor = base;
 }
 )GLSL"}
@@ -449,6 +451,7 @@ uniform vec4 shaderPrimary;
 uniform vec4 shaderEffect;
 uniform float shaderShine;
 uniform float shaderHolography;
+uniform float shaderOpacity;
 uniform float shaderIntensity;
 in vec2 fragmentUv;
 out vec4 fragmentColor;
@@ -458,7 +461,8 @@ void main() {
         : color;
     if (shaderEnabled == 1) base = vec4(mix(base.rgb * shaderPrimary.rgb,
         shaderEffect.rgb, clamp(shaderHolography, 0.0, 1.0)) * shaderIntensity
-        + vec3(shaderShine), base.a);
+        + vec3(shaderShine), mix(base.a * shaderPrimary.a, shaderEffect.a,
+        clamp(shaderHolography, 0.0, 1.0)) * shaderOpacity);
     fragmentColor = base;
 }
 )GLSL"};
@@ -519,6 +523,7 @@ void main() {
     shader_effect_uniform_ = functions.get_uniform_location(program_, "shaderEffect");
     shader_shine_uniform_ = functions.get_uniform_location(program_, "shaderShine");
     shader_holography_uniform_ = functions.get_uniform_location(program_, "shaderHolography");
+    shader_opacity_uniform_ = functions.get_uniform_location(program_, "shaderOpacity");
     shader_intensity_uniform_ = functions.get_uniform_location(program_, "shaderIntensity");
     if (world_to_clip_uniform_ < 0 || color_uniform_ < 0 ||
         image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
@@ -558,6 +563,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     shader_effect_uniform_ = -1;
     shader_shine_uniform_ = -1;
     shader_holography_uniform_ = -1;
+    shader_opacity_uniform_ = -1;
     shader_intensity_uniform_ = -1;
     initialization_error_.clear();
     vertex_buffer_capacity_ = 0U;
@@ -851,6 +857,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         functions.uniform_4f(shader_effect_uniform_, shader->effect_color.red, shader->effect_color.green, shader->effect_color.blue, shader->effect_color.alpha);
         functions.uniform_1f(shader_shine_uniform_, shader->shine);
         functions.uniform_1f(shader_holography_uniform_, shader->holography);
+        functions.uniform_1f(shader_opacity_uniform_, shader->opacity);
         functions.uniform_1f(shader_intensity_uniform_, shader->intensity);
     };
 

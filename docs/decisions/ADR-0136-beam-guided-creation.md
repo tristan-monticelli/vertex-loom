@@ -12,9 +12,11 @@ Le parcours Asset Studio exposait toutefois ce contrat technique sous le nom
 
 ## Décision
 
-`Beam` est le nom public de la création guidée correspondant au chemin texturé.
-Le contrat JSON, l’énumération interne et les identifiants historiques restent
-compatibles. Une création Beam reçoit la `defaultStrokeTexture` du manifeste
+`Beam` est le nom public et le type de demande guidée correspondant au chemin
+texturé. `VisualPresetKind::beam` est distinct du preset historique
+`VisualPresetKind::seam`; le contrat JSON, les identifiants de ressources et le
+format `texturedPath` restent compatibles. Une création Beam reçoit la
+`defaultStrokeTexture` du manifeste
 quand aucune variante locale n’est choisie et persiste son profil Thread,
 classification Beam, couleurs, répétition, brillance et holographie dans le
 chemin texturé produit.
@@ -27,6 +29,8 @@ sélectionnée.
 Le renderer OpenGL applique aussi le shader aux lots de remplissage et sépare
 les lots quand leurs paramètres shader diffèrent ; une composition ne perd
 donc pas son coloring en passant par le chemin batché.
+L’opacité du profil et les canaux alpha des couleurs sont appliqués au fragment
+final dans les deux variantes GLSL.
 
 Les ressources techniques restent disponibles dans un menu `Advanced` et ne
 sont pas supprimées des projets existants.
@@ -45,3 +49,6 @@ restent uniquement des outils de compatibilité/avancé.
   couverte par les tests de géométrie avant d’être exposée dans l’interface.
 - Le test isolé du Beam vérifie la texture par défaut et les paramètres shader
   avant toute vérification visuelle OpenGL.
+- La session vérifie que la texture sélectionnée, y compris la texture par
+  défaut, existe dans l’index du projet avant publication ; une référence
+  invalide est affichée comme erreur actionnable.
