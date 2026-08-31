@@ -52,15 +52,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tests runtime couvrent le fill et le transform image.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
-- [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
-  poignées liées/symétriques/libres, sélection et transform multi-points,
-  transform fill indépendante, clips imbriqués, registre animable, CommandStack,
-  géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
-  cap), stroke image avec répétition/UV, bordure vectorielle du preset
-  pédagogique `beam` livré par défaut, géométrie, E2E canvas et comparaison des
-  draw packets. Vérifié par
-  les tests géométriques, `asset_studio_vector_canvas_e2e`,
-  `fabric_render_gl_smoke`, les tests de presets et les draw packets comparés.
+- [ ] Vectoriel : le socle natif, l’édition de chemins, la tessellation, le
+  stroke et le clipping simple sont partiellement livrés. Restent à prouver dans
+  l’éditeur et le renderer : la visibilité réelle de chaque stroke, les
+  bordures du preset `beam`, la plume sur tous les coins et formes libres, les
+  poignées après reload, les clips imbriqués sur backend sans stencil et la
+  comparaison visuelle des draw packets. Les preuves actuelles sont
+  `asset_studio_vector_canvas_e2e`, `fabric_render_gl_smoke`, les tests
+  géométriques et `no_legacy_sprite_contracts`.
 - [x] Inspecteur local : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
@@ -75,12 +74,13 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `asset_studio_ui_input_e2e`; les parcours comportement monstre et path Bézier
   sont couverts par `asset_studio_behavior_e2e` et
   `asset_studio_vector_canvas_e2e`.
-- [x] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
-  Linux. Le run CI `33335758294` est vert sur les trois plateformes et les
-  parcours UI Windows passent avec le chargeur Mesa logiciel.
-- [x] Documentation et clôture : gates réconciliés et résultat confirmé sur
-  toutes les plateformes dans le run CI `33335758294`; la limite du stencil
-  imbriqué des rasterizers logiciels est documentée dans la stratégie qualité.
+- [ ] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
+  Linux avec un runner Windows natif et une preuve GPU. Le run local Linux et
+  le smoke OpenGL passent ; aucune preuve native Windows GPU n’est disponible.
+- [ ] Documentation et clôture : réconcilier toutes les gates restantes,
+  produire la comparaison visuelle complète et confirmer les plateformes
+  supportées. La limite du stencil logiciel et le fallback CPU convexe sont
+  documentés, mais cela ne clôt pas le gate visuel.
 
 ### Différences UX/logiques observées à corriger
 
@@ -123,20 +123,17 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné. Les commandes et le contrat
   v3 sont couverts par les tests de timeline et d’animation.
-- [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
-  suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
-  symétriques et libres. Le parcours `asset_studio_vector_canvas_e2e` couvre
-  aussi le cliquer-glisser, la sélection et la suppression après reload.
-- [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
-  `bevel`, `miter` et caps modifient les draw packets et le rendu ; le parcours
-  visuel capture les couples miter/butt, round/round et bevel/square.
-- [x] Ajouter le stroke image avec texture et répétition, ainsi qu'une bordure
-  vectorielle configurable ; livrer un preset `beam` préexistant et visible
-  comme exemple. Le parcours visuel du stroke texturé est prouvé par la capture
-  PPM et le probe pixel de `asset_studio_vector_canvas_e2e`.
-- [x] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
-  (offset, échelle et déformation), ainsi que chaque variante de join/cap ; les
-  captures et le reload sont contrôlés par `asset_studio_vector_canvas_e2e`.
+- [ ] Permettre l'édition Bézier directement sur le canvas sur tous les chemins :
+  la plume, l’insertion, la suppression et les poignées existent dans le
+  parcours nominal, mais les coins visibles, les formes libres et la preuve
+  après reload restent à fermer.
+- [ ] Rendre la géométrie de stroke visible dans le viewport et le runtime :
+  les draw packets existent, mais les probes visuels ne prouvent pas encore
+  largeur, joins `round`/`bevel`/`miter` et caps dans toutes les configurations.
+- [ ] Ajouter une bordure vectorielle réellement visible au preset `beam` et
+  prouver le stroke image avec texture, répétition, UV et crop dans le renderer.
+- [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
+  (offset, échelle et déformation), avec captures et reload vérifiés.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
