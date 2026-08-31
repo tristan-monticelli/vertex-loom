@@ -14,6 +14,15 @@
 #include <limits>
 #include <optional>
 #include <string_view>
+#if defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/task_info.h>
+#elif defined(__linux__)
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -78,6 +87,28 @@ bool parse_options(const int argc, char** argv, Options& options) {
         }
     }
     return true;
+}
+
+std::uint64_t peak_memory_bytes() {
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS counters{};
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &counters,
+                             sizeof(counters)) == 0) return 0U;
+    return static_cast<std::uint64_t>(counters.PeakWorkingSetSize);
+#elif defined(__APPLE__)
+    mach_task_basic_info info{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                  reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
+        return 0U;
+    return static_cast<std::uint64_t>(info.resident_size_max);
+#elif defined(__linux__)
+    struct rusage usage{};
+    if (getrusage(RUSAGE_SELF, &usage) != 0) return 0U;
+    return static_cast<std::uint64_t>(usage.ru_maxrss) * 1024U;
+#else
+    return 0U;
+#endif
 }
 
 fabric::project::ProjectManifest manifest() {
@@ -149,6 +180,7 @@ fabric::project::MapDocument map(const std::size_t instances) {
 int main(const int argc, char** argv) {
     Options options;
     if (!parse_options(argc, argv, options)) return 2;
+    const auto benchmark_start = std::chrono::steady_clock::now();
 
     const auto generated_root = std::filesystem::temp_directory_path() /
         ("vertex-loom-runtime-benchmark-" + std::to_string(
@@ -183,6 +215,7 @@ int main(const int argc, char** argv) {
     }
 
     fabric::runtime::PreviewRuntime runtime;
+    const auto load_start = std::chrono::steady_clock::now();
     if (!runtime.load({.project_root = root,
                        .package_root = package_root,
                        .map_id = {.value = external_scene
@@ -194,6 +227,8 @@ int main(const int argc, char** argv) {
             std::cerr << "detail=" << error << '\n';
         return fail("runtime_load");
     }
+    const auto load_ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - load_start).count();
     if (!runtime.run()) {
         for (const auto& error : runtime.errors()) std::cerr << "detail=" << error << '\n';
         return fail("runtime_run");
@@ -212,6 +247,11 @@ int main(const int argc, char** argv) {
                << "  \"instances\": " << options.instances << ",\n"
                << "  \"project\": \"" << options.project.generic_string() << "\",\n"
                << "  \"package\": \"" << options.package.generic_string() << "\",\n"
+               << "  \"benchmarkSetupMs\": "
+               << std::chrono::duration<double, std::milli>(
+                      load_start - benchmark_start).count() << ",\n"
+               << "  \"loadMs\": " << load_ms << ",\n"
+               << "  \"peakMemoryBytes\": " << peak_memory_bytes() << ",\n"
                << "  \"map\": \"" << options.map_id << "\",\n"
                << "  \"framesRequested\": " << options.frames << ",\n"
                << "  \"minimumFps\": " << options.minimum_fps << ",\n"
@@ -237,6 +277,8 @@ int main(const int argc, char** argv) {
               << " frames=" << stats.frames
               << " draw_calls_total=" << stats.draw_calls
               << " triangles_total=" << stats.triangles
+              << " load_ms=" << load_ms
+              << " peak_memory_bytes=" << peak_memory_bytes()
               << " elapsed_ms=" << stats.elapsed_ms
               << " p95_frame_ms=" << stats.p95_frame_ms
               << " fps_p95=" << fps << '\n';

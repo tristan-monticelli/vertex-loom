@@ -860,8 +860,8 @@ qui n'a pas connaissance de l'implémentation.
 - [ ] Performance release : mesurer démarrage, FPS, mémoire et temps de chargement
   sur un petit projet et un projet représentatif de production.
   Le checker `release_performance_smoke` mesure maintenant les profils 100/10 000
-  pour le renderer et le runtime avec seuils FPS ; mémoire, démarrage et temps
-  de chargement restent à instrumenter par plateforme.
+  pour le renderer et le runtime avec seuils FPS ; les rapports vérifient aussi
+  initialisation, chargement et pic mémoire par plateforme.
 - [ ] Packaging release : installer, lancer, mettre à jour et désinstaller le
   produit sur macOS, Windows et Linux avec ses ressources et dépendances.
   Le smoke CMake/CPack local vérifie déjà l’installation, la validation du

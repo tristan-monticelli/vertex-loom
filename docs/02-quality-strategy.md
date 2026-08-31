@@ -96,8 +96,9 @@ autosave, réouvre une nouvelle session, accepte la récupération et vérifie q
 la modification sauvegardée survit à un reload sans candidat résiduel.
 Le test CTest `release_performance_smoke` exécute les benchmarks renderer et
 runtime sur des profils de 100 puis 10 000 éléments, avec seuils FPS et rapports
-JSON séparés ; les mesures mémoire et de démarrage restent à compléter avec
-les outils propres à chaque OS.
+JSON séparés ; les rapports exposent aussi le temps d'initialisation/rendu, le
+temps de chargement runtime et le pic mémoire du processus, mesuré avec les
+APIs natives de chaque OS.
 Les rapports renderer enregistrent maintenant vendor, renderer et version
 OpenGL. La variable `FABRIC_REQUIRE_NATIVE_GL=1` fait échouer explicitement une
 recette qui reçoit Mesa, llvmpipe, softpipe ou un renderer inconnu.

@@ -18,6 +18,15 @@
 #include <span>
 #include <string_view>
 #include <vector>
+#if defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/task_info.h>
+#elif defined(__linux__)
+#include <sys/resource.h>
+#endif
 
 namespace {
 
@@ -97,11 +106,34 @@ bool is_software_renderer(const std::string& renderer) {
         lower.find("mesa") != std::string::npos;
 }
 
+std::uint64_t peak_memory_bytes() {
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS counters{};
+    if (GetProcessMemoryInfo(GetCurrentProcess(), &counters,
+                             sizeof(counters)) == 0) return 0U;
+    return static_cast<std::uint64_t>(counters.PeakWorkingSetSize);
+#elif defined(__APPLE__)
+    mach_task_basic_info info{};
+    mach_msg_type_number_t count = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO,
+                  reinterpret_cast<task_info_t>(&info), &count) != KERN_SUCCESS)
+        return 0U;
+    return static_cast<std::uint64_t>(info.resident_size_max);
+#elif defined(__linux__)
+    struct rusage usage{};
+    if (getrusage(RUSAGE_SELF, &usage) != 0) return 0U;
+    return static_cast<std::uint64_t>(usage.ru_maxrss) * 1024U;
+#else
+    return 0U;
+#endif
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
     Options options;
     if (!parse_options(argc, argv, options)) return 2;
+    const auto initialization_start = std::chrono::steady_clock::now();
 
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -162,6 +194,8 @@ int main(int argc, char** argv) {
         SDL_Quit();
         return 1;
     }
+    const auto initialization_ms = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now() - initialization_start).count();
 
     std::vector<fabric::render::VectorDrawPacket> packets;
     packets.reserve(options.packets);
@@ -250,6 +284,8 @@ int main(int argc, char** argv) {
                << "  \"glVendor\": \"" << gl_vendor << "\",\n"
                << "  \"glRenderer\": \"" << gl_renderer << "\",\n"
                << "  \"glVersion\": \"" << gl_version << "\",\n"
+               << "  \"initializationMs\": " << initialization_ms << ",\n"
+               << "  \"peakMemoryBytes\": " << peak_memory_bytes() << ",\n"
                << "  \"elapsedMs\": " << elapsed_ms << ",\n"
                << "  \"p95FrameMs\": " << p95 << ",\n"
                << "  \"fpsP95\": " << fps << ",\n"
@@ -272,6 +308,8 @@ int main(int argc, char** argv) {
               << " gl_vendor=\"" << gl_vendor << "\""
               << " gl_renderer=\"" << gl_renderer << "\""
               << " gl_version=\"" << gl_version << "\""
+              << " initialization_ms=" << initialization_ms
+              << " peak_memory_bytes=" << peak_memory_bytes()
               << " elapsed_ms=" << elapsed_ms
               << " p95_frame_ms=" << p95
               << " fps_p95=" << fps << '\n';
