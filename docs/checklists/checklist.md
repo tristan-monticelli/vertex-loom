@@ -777,9 +777,10 @@ utilisées pour tous les types de ressources.
   - [x] programmer un comportement de joueur ;
   - [x] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
-- [ ] créer et éditer un path Bézier ; l’insertion et la conversion par
-    cliquer-glisser sont maintenant couvertes par le moteur et l’E2E, mais les
-    coins, poignées et suppressions restent à fermer visuellement ;
+- [ ] créer et éditer un path Bézier ; l’insertion, la conversion par
+    cliquer-glisser, la sélection des coins/poignées et la suppression clavier
+    sont maintenant implémentées, mais leur parcours visuel automatisé reste à
+    ajouter ;
   - [ ] changer fill, texture et stroke après création avec preuve visuelle
     complète dans l’éditeur.
 - [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map

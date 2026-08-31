@@ -268,10 +268,15 @@ C4Component
   reproductible et inspectable. Le test de registre répète aussi le shell à la
   taille minimale SDL 900×600 et exige une capture de cette frame.
 - Le scénario `asset_studio_vector_canvas_e2e` configure aussi un stroke image
-  `head-thread`, capture la frame finale après le rendu OpenGL et ImGui, puis
-  écrit un probe JSON comptant les pixels non issus du fond dans la zone native
-  du canvas. La présence et la variation de pixels sont des assertions du test,
-  pas seulement des artefacts manuels.
+  `head-thread`, capture les frames Pen et poignées après le rendu OpenGL et
+  ImGui, puis écrit un probe JSON comptant les pixels non issus du fond dans la
+  zone native du canvas. La présence et la variation de pixels sont des
+  assertions du test, pas seulement des artefacts manuels.
+- En mode `Pen`, le canvas distingue désormais le clic sur un coin ou une
+  poignée existante du clic d’insertion sur un segment. Les coins sélectionnés
+  gardent leur feedback visuel, les poignées restent éditables selon le mode
+  choisi, et `Delete`/`Backspace` retire les coins sélectionnés sans supprimer
+  le point `move` initial.
   Le scénario de focus ouvre un prompt invalide et vérifie que le premier champ
   en erreur reçoit le focus clavier ainsi qu’une demande de repositionnement du
   scroll.
