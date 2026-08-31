@@ -8106,6 +8106,22 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             canvas.drag_start_node = {};
             canvas.tool = CanvasUiState::Tool::pen;
         }
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 22U &&
+            vector_canvas_e2e_freeform_seed_applied &&
+            session.created_vector()) {
+            auto freeform_node = session.created_vector()->native->nodes.front();
+            const bool inserted = fabric::project::insert_path_command(
+                freeform_node.shape, freeform_node.shape.path.size(),
+                {.kind = fabric::project::VectorPathCommandKind::line,
+                 .point = {0.2F, 0.2F}});
+            const bool applied = inserted && session.set_selected_vector_node(
+                0U, std::move(freeform_node));
+            vector_canvas_e2e_complete = vector_canvas_e2e_complete && applied;
+            if (applied) {
+                canvas.selected_path_points = {2U};
+                canvas.path_command_index = 2U;
+            }
+        }
         if (ui_texture_test && ui_texture_canvas_seen) {
             const auto push_motion = [&](const ImVec2 point, const Uint32 state) {
                 SDL_Event motion{};
@@ -8249,8 +8265,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
         const bool point_selection_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 12U && vector_canvas_e2e_frame < 16U;
-        const bool freeform_gesture = vector_canvas_e2e &&
-            vector_canvas_e2e_frame == 22U;
+        const bool freeform_gesture = false;
         const bool release_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame == 16U;
         if (point_selection_gesture)

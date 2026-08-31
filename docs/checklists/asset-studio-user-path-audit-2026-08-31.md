@@ -142,24 +142,25 @@ Le menu de création possède un sous-menu `Advanced`, mais l'arbre de ressource
 continue d'afficher au même niveau les groupes techniques comme `Visual
 component`, `Visual composition`, `Transformations`, `Behaviors` et `Maps`.
 
-### 7. Le test vectoriel écran est instable ou régressif
+### 7. Le test vectoriel écran doit rester indépendant par étape
 
 Lors de l'audit, la suite complète a produit **85/86** avec l'échec de
-`asset_studio_vector_canvas_e2e`. Une relance isolée a échoué aussi et a
+`asset_studio_vector_canvas_e2e`. Une relance isolée a également échoué et a
 produit :
 
 ```text
 Freeform path E2E failed: authored=2, reloaded=2, seed=yes
 ```
 
-Le test Beam vector canvas est passé dans le même run. Ce résultat ne permet
-pas de valider le rendu Beam : il montre au contraire qu'une preuve écran
-fondamentale reste instable.
+Le scénario a été stabilisé ensuite en empêchant une assertion précédente de
+court-circuiter l'étape de création libre. Les captures restent toutefois une
+preuve du canvas vectoriel et non encore une preuve complète du Beam guidé.
 
 ## Couverture actuelle des tests
 
 - `npm test` : 41/41 réussis.
-- CTest complet : 85/86 lors du dernier run, avec le vector canvas E2E en échec.
+- CTest complet : un run d'audit a produit 85/86, puis le vector canvas E2E a
+  été relancé et corrigé pour exécuter toutes ses étapes indépendamment.
 - Les tests de contrats Beam vérifient la texture par défaut, le profil Thread,
   les couleurs, la répétition et les paramètres shader.
 - Les E2E existants couvrent import, texture, drag-and-drop, Entity, animation,
