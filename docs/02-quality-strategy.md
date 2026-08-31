@@ -156,6 +156,9 @@ stroke par défaut, localise son bouton, injecte un clic souris en trois frames,
 capture le Beam non sélectionné puis recharge le `texturedPath`. Il vérifie la
 texture héritée, l'épaisseur, l'opacité et la répétition sans injecter la
 texture ni appeler directement la factory à la place de l'action UI.
+Le test géométrique `Beam keeps repeated texture UVs continuous across
+external segments` couvre aussi une texture externe sur une ligne, une courbe
+et un segment final, avec UV d'arc-length monotones et shader holographique.
 Le test `asset_studio_ui_button_e2e` rend l'assistant Button avec un PNG
 original, ses couleurs et paramètres shader, injecte un clic sur le vrai bouton
 de création, capture le résultat puis recharge l'Entity et son Material v2. Il

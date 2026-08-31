@@ -102,6 +102,48 @@ TEST_CASE("Bezier tessellation is bounded and deterministic") {
     CHECK(first.packets.front().fill_vertices.size() <= 8194U);
 }
 
+TEST_CASE("Beam keeps repeated texture UVs continuous across external segments") {
+    auto beam = line_path();
+    beam.document.id = {.value = "external-beam"};
+    beam.texture = {{.value = "external-thread"}, "texture"};
+    beam.uv_scale = {3.0F, 1.0F};
+    beam.shader.profile = fabric::project::SurfaceShaderProfile::thread;
+    beam.shader.classification = fabric::project::TextureClassification::beam;
+    beam.shader.primary_color = {0.15F, 0.3F, 1.0F, 1.0F};
+    beam.shader.effect_color = {1.0F, 0.1F, 0.75F, 1.0F};
+    beam.shader.holography = 0.8F;
+    beam.commands = {
+        {.kind = fabric::project::TexturedPathCommandKind::move,
+         .point = {-2.0F, 0.0F}},
+        {.kind = fabric::project::TexturedPathCommandKind::line,
+         .point = {-0.5F, 1.0F}},
+        {.kind = fabric::project::TexturedPathCommandKind::cubic,
+         .point = {1.0F, -1.0F},
+         .control1 = {0.0F, 2.0F},
+         .control2 = {0.5F, -2.0F}},
+        {.kind = fabric::project::TexturedPathCommandKind::line,
+         .point = {2.0F, 0.5F}},
+    };
+    const auto result = fabric::render::build_textured_path_draw_packets(
+        beam, 0.05F);
+    REQUIRE(result.ok());
+    REQUIRE(result.packets.size() == 1U);
+    const auto& packet = result.packets.front();
+    REQUIRE(packet.image_fill.has_value());
+    CHECK(packet.image_fill->texture == beam.texture);
+    CHECK(packet.repeat_texture_x);
+    REQUIRE(packet.shader.has_value());
+    CHECK(*packet.shader == beam.shader);
+    REQUIRE(packet.fill_uv.size() == packet.fill_vertices.size());
+    for (std::size_t index = 0; index < packet.fill_uv.size(); index += 2U) {
+        CHECK(std::isfinite(packet.fill_uv[index].x));
+        CHECK(std::isfinite(packet.fill_uv[index].y));
+        if (index > 0U)
+            CHECK(packet.fill_uv[index].x >= packet.fill_uv[index - 2U].x);
+    }
+    CHECK(packet.fill_uv.back().x > packet.fill_uv.front().x + 2.0F);
+}
+
 TEST_CASE("closed ribbon duplicates its seam with continuous UVs") {
     auto path = line_path();
     path.commands.push_back({
