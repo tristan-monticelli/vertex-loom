@@ -20,6 +20,9 @@ La mesure locale du 31 août 2026 donne, sur 600 frames et 10 000 éléments,
 établissent une baseline reproductible, mais ne ferment pas la recette release
 qui demande aussi démarrage, mémoire et temps de chargement sur deux tailles
 de projet.
+Le checker vector canvas compare aussi l’occupation et la plage de canaux de sa
+capture à la référence versionnée
+`tests/fixtures/visual-baselines/asset-studio-vector-canvas-visual.json`.
 
 ## Decision rule
 

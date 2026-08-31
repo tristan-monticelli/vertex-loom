@@ -747,6 +747,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
                 -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-vector-canvas-e2e
+                -DVISUAL_BASELINE=${CMAKE_SOURCE_DIR}/tests/fixtures/visual-baselines/asset-studio-vector-canvas-visual.json
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_vector_canvas_e2e.cmake
         )
         add_test(

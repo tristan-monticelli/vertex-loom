@@ -847,6 +847,8 @@ qui n'a pas connaissance de l'implémentation.
   logiciel reste une couverture de secours et ne remplace pas cette recette.
 - [ ] Régression visuelle : comparer les screenshots de référence des écrans,
   canvas, textures, fills, strokes, clips et transformations.
+  Le canvas vectoriel compare maintenant occupation et plage de canaux à une
+  baseline versionnée ; les références des autres écrans restent à constituer.
 - [ ] Robustesse des données : couvrir ressource manquante, fichier invalide,
   sauvegarde interrompue, récupération et conservation des modifications.
   Le checker `release_data_robustness` couvre maintenant les projets invalide
