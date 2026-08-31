@@ -10,6 +10,7 @@ C4Component
         Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
         Component(customizer, "Vector inspector", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
         Component(canvas, "Vector canvas", "C++20 + Dear ImGui + OpenGL", "Prévisualise les paths natifs, sélectionne les coins, édite les poignées Bézier et applique les outils Pen/Move/Rotate/Scale/Pivot")
+        Component(preview_canvas, "Entity preview canvas", "C++20 + Dear ImGui + OpenGL", "Affiche les draw packets d'entité et permet le déplacement du nœud sélectionné")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
@@ -23,6 +24,7 @@ C4Component
         Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer ou fermer une ou plusieurs sessions dirty")
     }
     Rel(customizer, canvas, "Délègue l’authoring direct du path")
+    Rel(shell, preview_canvas, "Affiche")
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")

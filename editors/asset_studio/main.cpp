@@ -12,6 +12,7 @@
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "import_workflow.hpp"
+#include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
 
 #include <SDL.h>
@@ -55,6 +56,7 @@ using fabric::asset_studio::draw_import_workflow;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
+using fabric::asset_studio::draw_packet_preview_canvas;
 
 fabric::editor::ProjectSession* active_picker_session = nullptr;
 std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
@@ -2418,99 +2420,6 @@ ImU32 color_to_u32(const fabric::core::Color& color) {
 }
 
 
-void draw_packet_preview_canvas(CanvasUiState& canvas,
-                                const ImVec2 available,
-                                const std::string_view label,
-                                fabric::editor::ProjectSession* editable_session = nullptr) {
-    ImGui::InvisibleButton("Entity canvas", available,
-                           ImGuiButtonFlags_MouseButtonLeft |
-                               ImGuiButtonFlags_MouseButtonMiddle);
-    const ImVec2 origin = ImGui::GetItemRectMin();
-    canvas.native_canvas = true;
-    canvas.native_origin = origin;
-    canvas.native_size = available;
-    const auto bounds = canvas.entity_world_bounds;
-    const ImVec2 center{origin.x + available.x * 0.5F,
-                        origin.y + available.y * 0.5F};
-    const float fit = std::min(
-        (available.x - 80.0F) / std::max(bounds.size.x, 1.0F),
-        (available.y - 80.0F) / std::max(bounds.size.y, 1.0F));
-    const float pixels_per_unit = std::max(0.01F, fit * canvas.zoom);
-    if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel != 0.0F) {
-        canvas.zoom = std::clamp(
-            canvas.zoom * (ImGui::GetIO().MouseWheel > 0.0F ? 1.15F : 1.0F / 1.15F),
-            0.1F, 20.0F);
-    }
-    if (ImGui::IsItemHovered() &&
-        ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
-        const auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
-        canvas.pan.x += delta.x;
-        canvas.pan.y += delta.y;
-        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
-    }
-    const auto to_screen = [&](const fabric::core::Vec2 point) {
-        return ImVec2{center.x + canvas.pan.x + point.x * pixels_per_unit,
-                      center.y + canvas.pan.y - point.y * pixels_per_unit};
-    };
-    auto* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddLine(to_screen({0.0F, bounds.origin.y}),
-                       to_screen({0.0F, bounds.origin.y + bounds.size.y}),
-                       IM_COL32(100, 110, 125, 100));
-    draw_list->AddLine(to_screen({bounds.origin.x, 0.0F}),
-                       to_screen({bounds.origin.x + bounds.size.x, 0.0F}),
-                       IM_COL32(100, 110, 125, 100));
-    const float world_half_width = available.x / (2.0F * pixels_per_unit);
-    const float world_half_height = available.y / (2.0F * pixels_per_unit);
-    canvas.native_world_bounds = {
-        .origin = {-world_half_width - canvas.pan.x / pixels_per_unit,
-                   -world_half_height + canvas.pan.y / pixels_per_unit},
-        .size = {2.0F * world_half_width, 2.0F * world_half_height}};
-    ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
-    ImGui::TextDisabled("%s · %.0f%%", std::string(label).c_str(),
-                        canvas.zoom * 100.0F);
-    if (editable_session && editable_session->selected_entity() &&
-        canvas.selected_node < editable_session->selected_entity()->nodes.size()) {
-        const auto& node = editable_session->selected_entity()->nodes[
-            canvas.selected_node];
-        const auto gizmo = to_screen(node.transform.position);
-        canvas.entity_gizmo_screen = gizmo;
-        auto* draw_list = ImGui::GetWindowDrawList();
-        draw_list->AddLine({gizmo.x - 12.0F, gizmo.y},
-                           {gizmo.x + 12.0F, gizmo.y},
-                           IM_COL32(100, 210, 255, 230), 2.0F);
-        draw_list->AddLine({gizmo.x, gizmo.y - 12.0F},
-                           {gizmo.x, gizmo.y + 12.0F},
-                           IM_COL32(100, 210, 255, 230), 2.0F);
-        draw_list->AddCircleFilled(gizmo, 5.0F, IM_COL32(100, 210, 255, 255));
-        const bool canvas_hovered = ImGui::IsMouseHoveringRect(
-            origin, {origin.x + available.x, origin.y + available.y});
-        if (canvas_hovered && !node.locked &&
-            ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-            std::hypot(ImGui::GetIO().MousePos.x - gizmo.x,
-                       ImGui::GetIO().MousePos.y - gizmo.y) <= 14.0F) {
-            canvas.entity_gizmo_dragging = true;
-            canvas.entity_gizmo_start_mouse = ImGui::GetIO().MousePos;
-            canvas.entity_gizmo_start_transform = node.transform;
-        }
-        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
-            canvas.entity_gizmo_dragging = false;
-        if (canvas.entity_gizmo_dragging && !node.locked) {
-            const ImVec2 delta{
-                ImGui::GetIO().MousePos.x - canvas.entity_gizmo_start_mouse.x,
-                ImGui::GetIO().MousePos.y - canvas.entity_gizmo_start_mouse.y};
-            const auto scale = std::max(0.01F, pixels_per_unit);
-            auto changed = node;
-            changed.transform = canvas.entity_gizmo_start_transform;
-            changed.transform.position.x += delta.x / scale;
-            changed.transform.position.y -= delta.y / scale;
-            if (editable_session->set_selected_entity_node(
-                    canvas.selected_node, std::move(changed)))
-                ImGui::SetTooltip("Move node · %.2f, %.2f",
-                                  delta.x / scale, -delta.y / scale);
-        }
-    }
-}
-
 void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
                              const AssetPreview& preview,
                              CanvasUiState& canvas, const ImVec2 available,
@@ -2841,7 +2750,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                visual_preview.errors.size());
         }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
-        draw_packet_preview_canvas(
+        fabric::asset_studio::draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
             "Visual component");
@@ -2861,7 +2770,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                entity_preview.errors.size());
         }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
-        draw_packet_preview_canvas(
+        fabric::asset_studio::draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
             "Entity preview", &session);
