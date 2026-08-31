@@ -207,3 +207,18 @@ Button en choisissant explicitement la bonne ressource, composer une Entity,
 prévisualiser le résultat, le sauvegarder, le recharger et le publier sans
 connaître `seam`, `VisualComponent`, `texturedPath`, `XPBD`, les IDs internes ou
 la structure des fichiers JSON.
+
+## Audit technique — orientation des images
+
+- [x] Vérifier les fichiers PNG originaux et leur orientation native.
+- [x] Vérifier les métadonnées `RasterView` des textures externes.
+- [x] Vérifier les conventions UV de l’aperçu ImGui et du renderer OpenGL.
+- [x] Corriger le retournement vertical du quad raster dans le builder partagé.
+- [x] Aligner les miniatures de picker sur la convention de l’aperçu principal.
+- [ ] Ajouter une capture écran dédiée d’une texture asymétrique dans Asset Studio,
+      Preview Runtime et runtime publié.
+
+Constat : les PNG fournis ne contiennent pas d’orientation EXIF et les nouvelles
+métadonnées ont une rotation à `0°`. Le retournement venait d’un mélange entre
+les coordonnées de crop haut-vers-bas et l’échantillonnage OpenGL bas-vers-haut,
+ainsi que d’une miniature qui n’inversait pas V comme les autres aperçus.

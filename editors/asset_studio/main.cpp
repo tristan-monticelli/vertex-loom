@@ -2000,7 +2000,7 @@ bool draw_project_resource_picker(
             }
             if (cached != cache.end() && cached->second.texture != 0U) {
                 ImGui::Image(static_cast<ImTextureID>(cached->second.texture),
-                             {64.0F, 64.0F});
+                             {64.0F, 64.0F}, {0.0F, 1.0F}, {1.0F, 0.0F});
             }
         }
         ImGui::TextDisabled("Type: %s",

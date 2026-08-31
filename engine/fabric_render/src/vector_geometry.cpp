@@ -423,10 +423,11 @@ VectorGeometryResult build_raster_view_draw_packets(
     }
     const auto uv_min = core::Vec2{
         crop.origin.x / static_cast<float>(input.source_width),
-        crop.origin.y / static_cast<float>(input.source_height)};
+        1.0F - (crop.origin.y + crop.size.y) /
+            static_cast<float>(input.source_height)};
     const auto uv_max = core::Vec2{
         (crop.origin.x + crop.size.x) / static_cast<float>(input.source_width),
-        (crop.origin.y + crop.size.y) / static_cast<float>(input.source_height)};
+        1.0F - crop.origin.y / static_cast<float>(input.source_height)};
 
     result.packets.push_back({
         .node_id = input.node_id,

@@ -211,7 +211,7 @@ void raster_views_produce_shared_deterministic_packets() {
     const fabric::project::ResourceReference texture{
         {.value = "woven-source"}, "texture"};
     const fabric::project::RasterView view{
-        .crop = {{2.0F, 0.0F}, {2.0F, 2.0F}},
+        .crop = {{2.0F, 1.0F}, {2.0F, 2.0F}},
         .pivot = {0.25F, 0.5F},
         .transform = {.position = {1.0F, 2.0F}, .scale = {2.0F, 1.0F}},
         .filter = fabric::project::RasterFilter::nearest,
@@ -220,7 +220,7 @@ void raster_views_produce_shared_deterministic_packets() {
         .node_id = "cropped",
         .texture = texture,
         .source_width = 4U,
-        .source_height = 2U,
+        .source_height = 4U,
         .pixels_per_unit = 2.0F,
         .view = view,
     };
@@ -234,8 +234,8 @@ void raster_views_produce_shared_deterministic_packets() {
                 {0.5F, 1.5F}, {2.5F, 1.5F},
                 {2.5F, 2.5F}, {0.5F, 2.5F}} &&
                 packet.fill_uv == std::vector<fabric::core::Vec2>{
-                    {0.5F, 0.0F}, {1.0F, 0.0F},
-                    {1.0F, 1.0F}, {0.5F, 1.0F}},
+                    {0.5F, 0.25F}, {1.0F, 0.25F},
+                    {1.0F, 0.75F}, {0.5F, 0.75F}},
             "raster crop geometry or UV coordinates changed");
 
     const auto historical = fabric::render::build_raster_view_draw_packets({
