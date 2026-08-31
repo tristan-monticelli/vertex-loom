@@ -127,9 +127,10 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   la plume, l’insertion, la suppression et les poignées existent dans le
   parcours nominal, mais les coins visibles, les formes libres et la preuve
   après reload restent à fermer.
-- [ ] Rendre la géométrie de stroke visible dans le viewport et le runtime :
-  les draw packets existent, mais les probes visuels ne prouvent pas encore
-  largeur, joins `round`/`bevel`/`miter` et caps dans toutes les configurations.
+- [x] Rendre la géométrie de stroke visible dans le viewport et le runtime :
+  le canvas consomme maintenant les triangles de `fabric_render`, avec blending
+  alpha OpenGL explicite ; le checker compare les captures `miter`, `round` et
+  `bevel` pour empêcher une régression vers une polyline unique.
 - [ ] Ajouter une bordure vectorielle réellement visible au preset `beam` et
   prouver le stroke image avec texture, répétition, UV et crop dans le renderer.
 - [ ] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image

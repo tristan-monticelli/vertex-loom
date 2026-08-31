@@ -174,9 +174,11 @@ initialise et dessine les triangles de fills couleur dans le canvas Asset
 Studio ainsi que les contours ouverts/fermés. Asset Studio résout maintenant
 les `TextureAsset` locaux à la demande et met leurs handles GPU en cache ; la
   validation visuelle complète du gate reste ouverte. La tessellation concave
-  est maintenant vérifiée par aire dans `fabric_render_tests`. Les `clipNodeId` simples
-sont maintenant appliqués par stencil dans le backend ; clips imbriqués,
-gizmos de clip et validation visuelle complète restent ouverts.
+  est maintenant vérifiée par aire dans `fabric_render_tests`. Les `clipNodeId`
+  simples sont maintenant appliqués par stencil dans le backend ; les clips
+  imbriqués disposent d’un fallback CPU convexe, et le canvas consomme les
+  triangles de stroke avec captures distinctes pour miter/round/bevel. Les
+  gizmos de clip et la validation visuelle complète du gate restent ouverts.
 
 ## Étape D — Personnalisateur intégré
 

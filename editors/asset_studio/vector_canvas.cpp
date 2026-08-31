@@ -1,6 +1,7 @@
 #include "vector_canvas.hpp"
 
 #include "fabric/editor/project_session.hpp"
+#include "fabric/render/vector_geometry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -105,6 +106,13 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             (-x * sine + y * cosine) /
                 std::max(std::abs(node.transform.scale.y), 0.0001F) +
                 node.transform.pivot.y};
+    };
+    const auto native_geometry = fabric::render::build_native_draw_packets(asset);
+    const auto packet_for = [&](const fabric::project::VectorNode& node)
+        -> const fabric::render::VectorDrawPacket* {
+        const auto packet = std::ranges::find_if(native_geometry.packets,
+            [&](const auto& candidate) { return candidate.node_id == node.id; });
+        return packet == native_geometry.packets.end() ? nullptr : &*packet;
     };
     auto* draw_list = ImGui::GetWindowDrawList();
     const float target_grid_pixels = 48.0F;
@@ -683,32 +691,23 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                      !closed_path)
                 ? ImDrawFlags_None
                 : ImDrawFlags_Closed;
-        if (node.stroke && node.stroke->image) {
-            // The native editor preview does not own an ImGui texture atlas.
-            // Keep image strokes visible with a deterministic woven fallback
-            // instead of dropping the stroke entirely.
-            draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
-                                   stroke_color, stroke_flags, stroke_width);
-            const ImU32 highlight = IM_COL32(255, 255, 255, 190);
-            for (std::size_t segment = 1; segment < points.size(); ++segment) {
-                const auto start = points[segment - 1];
-                const auto end = points[segment];
-                const float length = std::hypot(end.x - start.x, end.y - start.y);
-                if (length < 1.0F) continue;
-                const int dash_count = std::max(1, static_cast<int>(length / 18.0F));
-                for (int dash = 0; dash < dash_count; ++dash) {
-                    if ((dash + static_cast<int>(segment)) % 2 != 0) continue;
-                    const float begin = static_cast<float>(dash) /
-                        static_cast<float>(dash_count);
-                    const float finish = std::min(
-                        1.0F, begin + 0.42F / static_cast<float>(dash_count));
-                    draw_list->AddLine(
-                        {start.x + (end.x - start.x) * begin,
-                         start.y + (end.y - start.y) * begin},
-                        {start.x + (end.x - start.x) * finish,
-                         start.y + (end.y - start.y) * finish},
-                        highlight, std::max(1.0F, stroke_width * 0.28F));
-                }
+        const auto* packet = packet_for(node);
+        if (node.stroke && packet != nullptr &&
+            packet->stroke_vertices.size() >= 3U &&
+            packet->stroke_indices.size() >= 3U) {
+            for (std::size_t index = 0;
+                 index + 2U < packet->stroke_indices.size(); index += 3U) {
+                const auto first = packet->stroke_indices[index];
+                const auto second = packet->stroke_indices[index + 1U];
+                const auto third = packet->stroke_indices[index + 2U];
+                if (first >= packet->stroke_vertices.size() ||
+                    second >= packet->stroke_vertices.size() ||
+                    third >= packet->stroke_vertices.size())
+                    continue;
+                draw_list->AddTriangleFilled(
+                    to_screen(packet->stroke_vertices[first]),
+                    to_screen(packet->stroke_vertices[second]),
+                    to_screen(packet->stroke_vertices[third]), stroke_color);
             }
         } else {
             draw_list->AddPolyline(points.data(), static_cast<int>(points.size()),
