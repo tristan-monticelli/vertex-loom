@@ -148,11 +148,14 @@ if(DEFINED BUTTON_ARTIFACT)
     endforeach()
 endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
-foreach(REQUIRED_ID
+if(NOT DEFINED REGISTRY_REQUIRED_IDS)
+    set(REGISTRY_REQUIRED_IDS
         "resource-row-head-face"
         "resource-row-beam-border"
         "resource-row-textile-head-entity"
         "entity-node-root")
+endif()
+foreach(REQUIRED_ID IN LISTS REGISTRY_REQUIRED_IDS)
     string(FIND "${FIRST_REGISTRY}" "${REQUIRED_ID}" ID_POSITION)
     if(ID_POSITION LESS 0)
         message(FATAL_ERROR "UI registry is missing stable ID ${REQUIRED_ID}")
