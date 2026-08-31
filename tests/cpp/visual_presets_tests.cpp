@@ -372,8 +372,8 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
     auto source = temporary_root("fabric-studio-head-source");
     source += ".png";
     write_thread_png(source);
-    REQUIRE(studio.import_png(source, {.value = "head-face"}, "Head Face"));
     REQUIRE(studio.import_png(source, {.value = "head-thread"}, "Head Thread"));
+    REQUIRE(studio.import_png(source, {.value = "head-face"}, "Head Face"));
     std::error_code ignored;
     std::filesystem::remove(source, ignored);
 
