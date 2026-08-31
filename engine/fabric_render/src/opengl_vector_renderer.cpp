@@ -1020,6 +1020,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
 
     const auto same_fill_material = [](const VectorDrawPacket& left,
                                        const VectorDrawPacket& right) {
+        if (left.shader != right.shader) return false;
         if (left.image_fill.has_value() != right.image_fill.has_value()) return false;
         if (left.image_fill) {
             return left.image_fill->texture.id == right.image_fill->texture.id &&
@@ -1115,6 +1116,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        apply_shader(first);
         functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(index_scratch_.size()),
                                 GL_UNSIGNED_INT, nullptr);
         ++stats.draw_calls;

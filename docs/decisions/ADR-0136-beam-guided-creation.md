@@ -24,6 +24,10 @@ la géométrie de ruban par longueur d’arc. La tangente du chemin détermine
 l’orientation ; le choix de texture manuel ne modifie que la ressource
 sélectionnée.
 
+Le renderer OpenGL applique aussi le shader aux lots de remplissage et sépare
+les lots quand leurs paramètres shader diffèrent ; une composition ne perd
+donc pas son coloring en passant par le chemin batché.
+
 Les ressources techniques restent disponibles dans un menu `Advanced` et ne
 sont pas supprimées des projets existants.
 
