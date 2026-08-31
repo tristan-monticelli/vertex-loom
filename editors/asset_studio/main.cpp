@@ -2667,6 +2667,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.request_artwork = true;
             }
             if (ImGui::MenuItem("Composed Entity...")) {
+                creation.guided_button = false;
                 creation.request_entity = true;
             }
             ImGui::SeparatorText("Advanced");
@@ -6458,21 +6459,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     if (creation.request_entity && session.has_project()) {
         creation.entity.reset();
         if (creation.guided_button) {
-            creation.guided_button = false;
             creation.entity.name = "Button entity";
-            const auto button = std::ranges::find_if(
-                session.resources(), [](const auto& resource) {
-                    return resource.kind ==
-                               fabric::editor::StudioResourceKind::visual_component &&
-                        (resource.id.value.find("button") != std::string::npos ||
-                         resource.name.find("Button") != std::string::npos);
-                });
-            if (button != session.resources().end()) {
-                creation.entity.drawable =
-                    fabric::project::EntityDrawableKind::visual_component;
-                creation.entity.resource_id = button->id.value;
-                creation.entity.node_name = "Button";
-            }
+            creation.entity.drawable =
+                fabric::project::EntityDrawableKind::visual_component;
+            creation.entity.node_name = "Button";
         }
         ImGui::OpenPopup("Create entity");
         creation.request_entity = false;
@@ -7079,6 +7069,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::TextUnformatted("Create a reusable EntityDefinition v4");
         ImGui::TextDisabled(
             "The validated entity is published atomically in the open project.");
+        if (creation.guided_button) {
+            ImGui::SeparatorText("Provided Button asset");
+            ImGui::TextWrapped(
+                "Choose the existing Button visual component supplied by the project. "
+                "Asset Studio will not generate or guess a replacement.");
+        }
         const auto validation = creation.entity.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##entity-name", creation.entity.name);
@@ -7088,6 +7084,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         focus_prompt_field(validation, "node_name", "entity-create");
         const auto drawable_label = std::string(
             fabric::project::to_string(creation.entity.drawable));
+        ImGui::BeginDisabled(creation.guided_button);
         if (ImGui::BeginCombo("Drawable", drawable_label.c_str())) {
             for (const auto drawable : {
                      fabric::project::EntityDrawableKind::none,
@@ -7110,6 +7107,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             ImGui::EndCombo();
         }
+        ImGui::EndDisabled();
         if (creation.entity.drawable !=
             fabric::project::EntityDrawableKind::none) {
             const auto resource_kind = creation.entity.drawable ==
@@ -7120,8 +7118,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ? fabric::editor::StudioResourceKind::visual_component
                 : fabric::editor::StudioResourceKind::vector;
             static_cast<void>(draw_project_resource_picker(
-                "Drawable resource", session.resources(), resource_kind,
+                creation.guided_button
+                    ? "Provided Button component"
+                    : "Drawable resource",
+                session.resources(), resource_kind,
                 creation.entity.resource_id, false));
+            if (creation.guided_button && creation.entity.resource_id.empty()) {
+                ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
+                                   "Select the supplied Button component before creating.");
+            }
         } else {
             creation.entity.resource_id.clear();
             ImGui::TextDisabled(
@@ -7168,6 +7173,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (session.create_entity(creation.entity)) {
                 clear_asset_preview(preview);
                 status = "Entity created and saved.";
+                creation.guided_button = false;
                 ImGui::CloseCurrentPopup();
             } else {
                 status = "Entity creation failed; inspect diagnostics.";
@@ -7179,10 +7185,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.entity.reset();
+            creation.guided_button = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
     }
+    if (!ImGui::IsPopupOpen("Create entity") && !creation.request_entity)
+        creation.guided_button = false;
 
     if (ImGui::BeginPopupModal("Create animation", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -8437,8 +8446,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     if (ImGui::MenuItem("Vector artwork...")) {
                         creation.request_artwork = true;
                     }
-                    if (ImGui::MenuItem("Entity..."))
+                    if (ImGui::MenuItem("Entity...")) {
+                        creation.guided_button = false;
                         creation.request_entity = true;
+                    }
                     if (ImGui::BeginMenu("Advanced")) {
                         if (ImGui::MenuItem("Behavior graph..."))
                             creation.request_behavior = true;
