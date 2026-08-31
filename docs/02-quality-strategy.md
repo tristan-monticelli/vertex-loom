@@ -80,6 +80,11 @@ absente ou plate, si la sélection n'est pas faite ou si le path supprimé
 réapparaît après reload.
 `fabric_canvas_interaction_tests` vérifie aussi la suppression d’une sélection
 multiple de points, l’ordre d’effacement et la conservation de la tête `move`.
+Le test CTest `release_product_recipe` enchaîne le parcours complet sur la
+fixture textile : édition et sauvegarde dans Asset Studio, réouverture et
+validation du projet, puis lancement du Runtime sur la map publiée en mode
+smoke. Il constitue la preuve automatisée du flux produit avant les recettes
+manuelles de release.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un

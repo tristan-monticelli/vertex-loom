@@ -841,6 +841,8 @@ qui n'a pas connaissance de l'implémentation.
 
 - [ ] Recette produit complète : créer un projet, éditer une scène, sauvegarder,
   fermer, rouvrir, modifier et lancer le runtime publié sans perte de contexte.
+  Le checker `release_product_recipe` automatise maintenant ce flux sur la
+  fixture textile ; la recette utilisateur interactive reste à faire.
 - [ ] Rendu GPU natif : valider OpenGL sur un vrai GPU/driver Windows ; Mesa
   logiciel reste une couverture de secours et ne remplace pas cette recette.
 - [ ] Régression visuelle : comparer les screenshots de référence des écrans,

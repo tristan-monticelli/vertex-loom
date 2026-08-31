@@ -546,6 +546,20 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             -P ${CMAKE_SOURCE_DIR}/tests/cmake/package_install_smoke.cmake
     )
 
+    if(FABRIC_BUILD_RUNTIME)
+        add_test(
+            NAME release_product_recipe
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DPROJECT_VALIDATOR=$<TARGET_FILE:fabric_project_validate>
+                "-DGAME_RUNTIME=$<TARGET_FILE:game_runtime>"
+                "-DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head"
+                "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-product-recipe"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_product_recipe.cmake
+        )
+        set_tests_properties(release_product_recipe PROPERTIES TIMEOUT 180)
+    endif()
+
     if(FABRIC_BUILD_EDITORS)
         add_test(
             NAME asset_studio_ui_registry_e2e
