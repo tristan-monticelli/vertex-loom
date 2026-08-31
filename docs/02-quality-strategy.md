@@ -14,6 +14,13 @@
 | Security | Oui | validation locale | `ctest --test-dir build -C Debug` | Chemins et imports invalides. |
 | Mutation | Non | — | null | Trop coûteux avant stabilisation de la physique. |
 
+La mesure locale du 31 août 2026 donne, sur 600 frames et 10 000 éléments,
+`fabric_render_benchmark` à 199,8 FPS p95 (2 487 ms cumulées) et
+`fabric_runtime_benchmark` à 37,0 FPS p95 (15 743 ms cumulées). Ces chiffres
+établissent une baseline reproductible, mais ne ferment pas la recette release
+qui demande aussi démarrage, mémoire et temps de chargement sur deux tailles
+de projet.
+
 ## Decision rule
 
 Les tests unitaires et de contrat s'exécutent à chaque modification du cœur.
