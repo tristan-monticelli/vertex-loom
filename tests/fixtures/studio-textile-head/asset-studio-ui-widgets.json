@@ -14,15 +14,21 @@
       "resource_kind": "texture"
     },
     {
-      "id": "resource-row-head-button-artwork",
+      "id": "resource-row-beam-border",
       "kind": "resource",
-      "resource_id": "head-button-artwork",
+      "resource_id": "beam-border",
       "resource_kind": "vector"
     },
     {
-      "id": "resource-row-head-eye-artwork",
+      "id": "resource-row-head-seam-border",
       "kind": "resource",
-      "resource_id": "head-eye-artwork",
+      "resource_id": "head-seam-border",
+      "resource_kind": "vector"
+    },
+    {
+      "id": "resource-row-platform-strip-border",
+      "kind": "resource",
+      "resource_id": "platform-strip-border",
       "resource_kind": "vector"
     },
     {
@@ -86,18 +92,6 @@
       "resource_kind": "composition"
     },
     {
-      "id": "resource-row-head-button-composition",
-      "kind": "resource",
-      "resource_id": "head-button-composition",
-      "resource_kind": "composition"
-    },
-    {
-      "id": "resource-row-head-eye-composition",
-      "kind": "resource",
-      "resource_id": "head-eye-composition",
-      "resource_kind": "composition"
-    },
-    {
       "id": "resource-row-head-seam-composition",
       "kind": "resource",
       "resource_id": "head-seam-composition",
@@ -119,18 +113,6 @@
       "id": "resource-row-beam",
       "kind": "resource",
       "resource_id": "beam",
-      "resource_kind": "component"
-    },
-    {
-      "id": "resource-row-head-button",
-      "kind": "resource",
-      "resource_id": "head-button",
-      "resource_kind": "component"
-    },
-    {
-      "id": "resource-row-head-eye",
-      "kind": "resource",
-      "resource_id": "head-eye",
       "resource_kind": "component"
     },
     {

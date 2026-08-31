@@ -1010,14 +1010,14 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
     REQUIRE(session.create_visual_preset({
-        .kind = fabric::editor::VisualPresetKind::eye,
-        .id = {.value = "editable-eye"},
-        .name = "Editable eye",
+        .kind = fabric::editor::VisualPresetKind::seam,
+        .id = {.value = "editable-path"},
+        .name = "Editable path",
         .thread_texture = fabric::project::ResourceReference{
             {.value = "cotton-thread"}, "texture"}}));
     REQUIRE(session.select_resource(
         fabric::editor::StudioResourceKind::visual_composition,
-        {.value = "editable-eye-composition"}));
+        {.value = "editable-path-composition"}));
 
     const fabric::editor::AutosaveScheduler::Clock::time_point start{};
     auto composition = *session.selected_visual_composition();
@@ -1026,15 +1026,15 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     composition.layers.front().z_order = 3.0F;
     composition.layers.front().visible = false;
     auto duplicate = composition.layers.front();
-    duplicate.id = "eye-copy";
-    duplicate.name = "Eye copy";
+    duplicate.id = "path-copy";
+    duplicate.name = "Path copy";
     duplicate.visible = true;
     composition.layers.push_back(duplicate);
     REQUIRE(session.set_selected_visual_composition(composition, start));
     REQUIRE(session.undo(start));
-    CHECK(session.selected_visual_composition()->layers.size() == 1U);
-    REQUIRE(session.redo(start));
     CHECK(session.selected_visual_composition()->layers.size() == 2U);
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_visual_composition()->layers.size() == 3U);
     CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
           fabric::editor::AutosaveStatus::saved);
 
@@ -1042,23 +1042,22 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(recovered_composition.open(project.path()));
     REQUIRE(recovered_composition.select_resource(
         fabric::editor::StudioResourceKind::visual_composition,
-        {.value = "editable-eye-composition"}));
+        {.value = "editable-path-composition"}));
     REQUIRE(recovered_composition.has_recovery());
     REQUIRE(recovered_composition.accept_recovery(
         start + std::chrono::seconds{3}));
     CHECK(recovered_composition.selected_visual_composition()->layers.size() ==
-          2U);
+          3U);
     REQUIRE(recovered_composition.save());
 
     REQUIRE(session.undo(start + std::chrono::seconds{3}));
     REQUIRE(session.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     auto component = *session.selected_visual_component();
     component.anchors.front().position = {0.5F, -0.25F};
-    component.parameters.front().name = "Eye scale";
-    component.parameters.front().default_value =
-        fabric::core::Vec2{1.25F, 0.8F};
+    component.parameters.front().name = "Path width";
+    component.parameters.front().default_value = 1.25F;
     REQUIRE(session.set_selected_visual_component(
         component, start + std::chrono::seconds{4}));
     REQUIRE(session.undo(start + std::chrono::seconds{4}));
@@ -1072,7 +1071,7 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(recovered_component.open(project.path()));
     REQUIRE(recovered_component.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     REQUIRE(recovered_component.has_recovery());
     REQUIRE(recovered_component.accept_recovery(
         start + std::chrono::seconds{7}));
@@ -1085,9 +1084,9 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(reloaded.open(project.path()));
     REQUIRE(reloaded.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     CHECK(reloaded.selected_visual_component()->parameters.front().name ==
-          "Eye scale");
+          "Path width");
 }
 
 TEST_CASE("textured path edits undo autosave recover and reload") {

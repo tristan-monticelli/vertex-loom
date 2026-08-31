@@ -29,7 +29,7 @@ if(INVALID_RESULT EQUAL 0)
     message(FATAL_ERROR "invalid project was accepted")
 endif()
 
-file(REMOVE "${TEST_ROOT}/valid/assets/vectors/head-button-artwork.vector.json")
+file(REMOVE "${TEST_ROOT}/valid/assets/vectors/beam-border.vector.json")
 execute_process(
     COMMAND "${VALIDATOR}" --json "${TEST_ROOT}/valid"
     RESULT_VARIABLE MISSING_RESULT

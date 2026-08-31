@@ -2,12 +2,12 @@
 
 ## Statut
 
-Accepté — 2026-08-25.
+Amendé par ADR-0137 — 2026-08-31.
 
 ## Contexte
 
-L'esthétique textile demande des éléments récurrents comme les yeux, boutons,
-fermetures, coutures, fils et bordures. Les construire comme des images
+L'esthétique textile demande des éléments récurrents comme les fermetures,
+coutures, fils et bordures. Les construire comme des images
 aplaties duplique les assets et empêche leur animation ou leur adaptation à
 une forme.
 
@@ -16,7 +16,8 @@ une forme.
 `VisualComponent v1` décrit un composant paramétrique réutilisable : variante,
 drawables, points d'ancrage, propriétés typées, propriétés animables et bounds
 de preview. Une instance conserve ses paramètres, son ancrage, son transform et
-son ordre Z. Les premiers presets sont œil, bouton, fermeture éclair et couture.
+son ordre Z. Les presets conservés sont Beam, fermeture éclair et couture. Eye
+et le bouton vectoriel généré sont retirés par ADR-0137.
 Une fermeture éclair compose deux rails `TexturedPath`, une répétition de dents
 et un curseur ancré à une progression commune ; elle ne devient pas une forme
 vectorielle monolithique.
@@ -77,9 +78,8 @@ Le premier exemple est un Beam à deux attaches, courbe optionnelle, largeur,
 texture animée, couleur et opacité. Une collision peut le référencer mais n'est
 jamais créée implicitement.
 
-La bibliothèque initiale de presets est une factory d'authoring déterministe.
-Œil et bouton assemblent des formes vectorielles natives. Couture assemble un
-rail `TexturedPath`. Fermeture assemble deux rails, des calques répétés d'une
+La bibliothèque de presets est une factory d'authoring déterministe. Couture
+assemble un rail `TexturedPath`. Fermeture assemble deux rails, des calques répétés d'une
 même dent vectorielle et un curseur vectoriel. La position du curseur est un
 paramètre `Vec2` de transform ; le suivi scalaire d'un rail ne sera ajouté que
 par une contrainte de composition générique et non dans le renderer.

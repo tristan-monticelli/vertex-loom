@@ -40,7 +40,7 @@ pour commencer, terminer, annuler ou fermer un tracé, pas d'état visible
 | Créer un Beam | Contrat validé | Le preview vectoriel sélectionné masque le rendu et ne prouve pas la texture/shader. |
 | Éditer un Beam | Partiel | Le Pen du `texturedPath` et le Pen vectoriel sont deux systèmes différents sous des noms proches. |
 | Créer un Button fourni | Contrat corrigé | La sélection explicite est obligatoire, mais le parcours écran dédié n'est pas couvert. |
-| Créer un Eye/Artwork | Contrat partiel | La distinction entre ressource, composant et aperçu n'est pas assez guidée. |
+| Créer un Artwork | Contrat partiel | La distinction entre ressource, composant et aperçu n'est pas assez guidée. |
 | Composer une Entity | Contrat multi-blocs ajouté | Les blocs sont persistés, mais la prévisualisation et les déformations demandent une validation écran. |
 | Déformation locale | Non prouvée | Les libellés existent ; l'isolation d'un bloc n'est pas démontrée par E2E. |
 | Déformation globale | Non prouvée | L'ordre composition puis déformation n'est pas démontré visuellement. |

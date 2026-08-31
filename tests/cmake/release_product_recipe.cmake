@@ -42,7 +42,7 @@ if(NOT RUNTIME_RESULT EQUAL 0)
     message(FATAL_ERROR "published runtime recipe failed: ${RUNTIME_OUTPUT}${RUNTIME_ERROR}")
 endif()
 
-if(NOT EXISTS "${PROJECT}/assets/vectors/head-button-artwork.vector.json")
+if(NOT EXISTS "${PROJECT}/assets/vectors/beam-border.vector.json")
     message(FATAL_ERROR "recipe did not preserve the edited vector resource")
 endif()
 message("Release product recipe passed: create/edit/save/reopen/validate/runtime")

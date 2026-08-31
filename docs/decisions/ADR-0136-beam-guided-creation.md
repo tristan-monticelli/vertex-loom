@@ -38,8 +38,8 @@ sont pas supprimées des projets existants.
 Le parcours Button ne synthétise pas une nouvelle illustration : il référence
 une texture originale déjà fournie par le projet. Les anciens assets nommés
 `head` sont des images de boutons du jeu et sont sélectionnés comme drawable
-texture. Les motifs de bouton paramétriques historiques restent uniquement des
-outils de compatibilité/avancé et ne sont pas utilisés par ce parcours.
+texture. Les motifs de bouton paramétriques historiques sont retirés par
+ADR-0137 et ne font plus partie du produit.
 
 ## Conséquences
 

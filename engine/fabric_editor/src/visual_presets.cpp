@@ -114,92 +114,6 @@ project::VisualComponent component_for(
     };
 }
 
-VisualPresetBundle eye_preset(const VisualPresetRequest& request) {
-    const auto artwork_id = child_id(request.id, "artwork");
-    const auto composition_id = child_id(request.id, "composition");
-    auto artwork = vector_asset(
-        artwork_id, request.name + " Artwork", {2.0F, 1.5F},
-        {ellipse("sclera", "Sclera", {{-1.0F, -0.65F}, {2.0F, 1.3F}},
-                 {0.96F, 0.91F, 0.78F, 1.0F}),
-         ellipse("iris", "Iris", {{-0.48F, -0.48F}, {0.96F, 0.96F}},
-                 {0.28F, 0.55F, 0.62F, 1.0F}),
-         ellipse("pupil", "Pupil", {{-0.2F, -0.32F}, {0.4F, 0.64F}},
-                 {0.08F, 0.07F, 0.06F, 1.0F}),
-         ellipse("highlight", "Highlight", {{0.02F, -0.18F}, {0.12F, 0.18F}},
-                 {1.0F, 0.98F, 0.9F, 0.9F})});
-    project::VisualComposition composition{
-        .document = {.schema_version =
-                         project::current_visual_composition_schema_version,
-                     .type = "visualComposition",
-                     .id = composition_id,
-                     .name = request.name + " Composition"},
-        .size = {2.0F, 1.5F},
-        .layers = {layer("eye", "Eye", VisualLayerKind::vector,
-                         artwork_id, "vector")},
-    };
-    using Type = project::VisualParameterType;
-    auto component = component_for(
-        request, composition_id, {{-1.0F, -0.75F}, {2.0F, 1.5F}},
-        {{"scale", "Scale", Type::vec2, core::Vec2{1.0F, 1.0F},
-          binding("eye", "transform", "scale"), true},
-         {"rotation", "Rotation", Type::angle, 0.0F,
-          binding("eye", "transform", "rotationDegrees"), true},
-         {"opacity", "Opacity", Type::scalar, 1.0F,
-          binding("eye", "layer", "opacity"), true}},
-        {{"sleepy", "Sleepy",
-          {{"scale", core::Vec2{1.0F, 0.55F}}}},
-         {"wide", "Wide",
-          {{"scale", core::Vec2{1.2F, 1.1F}}}}});
-    return {.vectors = {std::move(artwork)},
-            .composition = std::move(composition),
-            .component = std::move(component)};
-}
-
-VisualPresetBundle button_preset(const VisualPresetRequest& request) {
-    const auto artwork_id = child_id(request.id, "artwork");
-    const auto composition_id = child_id(request.id, "composition");
-    std::vector<project::VectorNode> nodes;
-    nodes.push_back(ellipse("body", "Button body",
-                            {{-0.75F, -0.75F}, {1.5F, 1.5F}},
-                            {0.72F, 0.24F, 0.18F, 1.0F}));
-    constexpr float hole = 0.12F;
-    for (std::size_t index = 0U; index < 4U; ++index) {
-        const float x = index % 2U == 0U ? -0.27F : 0.27F;
-        const float y = index < 2U ? -0.27F : 0.27F;
-        nodes.push_back(ellipse(
-            "hole-" + std::to_string(index + 1U), "Thread hole",
-            {{x - hole, y - hole}, {hole * 2.0F, hole * 2.0F}},
-            {0.12F, 0.08F, 0.06F, 1.0F}));
-    }
-    auto artwork = vector_asset(
-        artwork_id, request.name + " Artwork", {1.5F, 1.5F},
-        std::move(nodes));
-    project::VisualComposition composition{
-        .document = {.schema_version =
-                         project::current_visual_composition_schema_version,
-                     .type = "visualComposition",
-                     .id = composition_id,
-                     .name = request.name + " Composition"},
-        .size = {1.5F, 1.5F},
-        .layers = {layer("button", "Button", VisualLayerKind::vector,
-                         artwork_id, "vector")},
-    };
-    using Type = project::VisualParameterType;
-    auto component = component_for(
-        request, composition_id, {{-0.75F, -0.75F}, {1.5F, 1.5F}},
-        {{"scale", "Scale", Type::vec2, core::Vec2{1.0F, 1.0F},
-          binding("button", "transform", "scale"), true},
-         {"rotation", "Rotation", Type::angle, 0.0F,
-          binding("button", "transform", "rotationDegrees"), true},
-         {"opacity", "Opacity", Type::scalar, 1.0F,
-          binding("button", "layer", "opacity"), true}},
-        {{"small", "Small", {{"scale", core::Vec2{0.7F, 0.7F}}}},
-         {"large", "Large", {{"scale", core::Vec2{1.4F, 1.4F}}}}});
-    return {.vectors = {std::move(artwork)},
-            .composition = std::move(composition),
-            .component = std::move(component)};
-}
-
 project::TexturedPath rail(const core::ResourceId& id, std::string name,
                            const project::ResourceReference& texture,
                            const float x) {
@@ -379,8 +293,6 @@ std::vector<std::filesystem::path> document_paths(
 
 std::string_view label(const VisualPresetKind kind) noexcept {
     switch (kind) {
-    case VisualPresetKind::eye: return "Eye";
-    case VisualPresetKind::button: return "Button";
     case VisualPresetKind::beam: return "Beam";
     case VisualPresetKind::seam: return "Seam";
     case VisualPresetKind::zipper: return "Zipper";
@@ -426,8 +338,6 @@ VisualPresetResult build_visual_preset(
     if (effective_request.kind == VisualPresetKind::beam)
         effective_request.guided_beam = true;
     switch (request.kind) {
-    case VisualPresetKind::eye: bundle = eye_preset(effective_request); break;
-    case VisualPresetKind::button: bundle = button_preset(effective_request); break;
     case VisualPresetKind::beam: bundle = seam_preset(effective_request); break;
     case VisualPresetKind::seam: bundle = seam_preset(effective_request); break;
     case VisualPresetKind::zipper: bundle = zipper_preset(effective_request); break;

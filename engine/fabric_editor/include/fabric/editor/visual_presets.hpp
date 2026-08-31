@@ -13,12 +13,12 @@
 
 namespace fabric::editor {
 
-enum class VisualPresetKind { eye, button, beam, seam, zipper };
+enum class VisualPresetKind { beam, seam, zipper };
 
 [[nodiscard]] std::string_view label(VisualPresetKind kind) noexcept;
 
 struct VisualPresetRequest {
-    VisualPresetKind kind{VisualPresetKind::eye};
+    VisualPresetKind kind{VisualPresetKind::beam};
     core::ResourceId id{.value = "visual-preset"};
     std::string name{"Visual preset"};
     std::optional<project::ResourceReference> thread_texture;

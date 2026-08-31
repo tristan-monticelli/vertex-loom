@@ -47,7 +47,7 @@ fabric::project::VisualComposition composition() {
             {.id = "eyes",
              .name = "Eyes",
              .kind = fabric::project::VisualLayerKind::component,
-             .resource = {{.value = "button-eyes"}, "visualComponent"},
+             .resource = {{.value = "sample-components"}, "visualComponent"},
              .z_order = 2.0F,
              .component_instance = fabric::project::VisualComponentInstance{}},
             {.id = "seam",

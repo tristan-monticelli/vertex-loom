@@ -141,7 +141,7 @@ TEST_CASE("entity visual component instances round-trip and expose resources") {
     auto& drawable = source.nodes.front().drawable;
     drawable.kind = fabric::project::EntityDrawableKind::visual_component;
     drawable.resource = fabric::project::ResourceReference{
-        {.value = "button-eye"}, "visualComponent"};
+        {.value = "sample-component"}, "visualComponent"};
     drawable.material.reset();
     drawable.component_instance = fabric::project::VisualComponentInstance{
         .variant_id = "stitched",
@@ -158,7 +158,7 @@ TEST_CASE("entity visual component instances round-trip and expose resources") {
 
     const auto references = fabric::project::entity_resource_references(source);
     CHECK(std::ranges::any_of(references, [](const auto& reference) {
-        return reference.id.value == "button-eye" &&
+        return reference.id.value == "sample-component" &&
             reference.expected_type == "visualComponent";
     }));
     CHECK(std::ranges::any_of(references, [](const auto& reference) {

@@ -217,7 +217,7 @@ TEST_CASE("map package planning includes native vector dependencies") {
     CHECK(std::ranges::count_if(
               planned.manifest->resources, [](const auto& resource) {
                   return resource.resource.expected_type == "vector";
-              }) == 5);
+              }) == 3);
 }
 
 TEST_CASE("map package planning rejects missing and absolute resources") {

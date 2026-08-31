@@ -23,6 +23,8 @@ de projet.
 Le checker vector canvas compare aussi l’occupation et la plage de canaux de sa
 capture à la référence versionnée
 `tests/fixtures/visual-baselines/asset-studio-vector-canvas-visual.json`.
+Cette baseline utilise désormais `beam-border`, après retrait des faux artworks
+Eye/Button, et conserve une plage qui exclut explicitement un canvas vide.
 
 ## Decision rule
 
@@ -131,7 +133,7 @@ Le test `map_studio_ui_accessibility_e2e` applique la même preuve à Map Studio
 et produit un artefact JSON ainsi qu’une capture PPM ; il est ignoré avec le
 code `77` sans écran SDL.
 Le test `asset_studio_ui_drag_e2e` capture les coordonnées des widgets source et
-cible, injecte un drag SDL de `head-button-artwork` vers le nœud `root`, puis
+cible, injecte un drag SDL de `beam-border` vers le nœud `root`, puis
 exige la mutation confirmée dans `asset-studio-ui-drag.json`.
 Les variantes `asset_studio_ui_drag_root_e2e` et
 `asset_studio_ui_drag_child_e2e` couvrent respectivement l’ajout d’un nouveau

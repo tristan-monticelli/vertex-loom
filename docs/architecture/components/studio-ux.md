@@ -50,8 +50,9 @@ doit jamais fermer le document courant. L'interface affiche la ressource, le
 champ et la cause, puis propose `Retry`, `Discard` ou `Cancel`.
 # Asset Studio guided creation workspace
 
-Asset Studio presents user-facing visual creations first: Beam, Button, Eye,
-Artwork and composed Entity. Internal resource types remain available through
+Asset Studio presents user-facing visual creations first: Beam, Button,
+Artwork and composed Entity. Button always references an imported project PNG;
+there is no generated Eye or generated Button preset. Internal resource types remain available through
 an explicit advanced workspace so existing project contracts stay readable and
 editable without making engine concepts part of the normal creation path.
 
@@ -67,7 +68,6 @@ resource.
 flowchart LR
     Hub[Guided creation hub] --> Beam[Beam]
     Hub --> Button[Button]
-    Hub --> Eye[Eye]
     Hub --> Artwork[Artwork]
     Hub --> Entity[Composed Entity]
     Hub --> Advanced[Advanced]
@@ -75,6 +75,8 @@ flowchart LR
     Beam --> BeamContract[Beam request]
     BeamContract --> Legacy[Compatible texturedPath contract]
     Beam --> Shared[Shared textured-path geometry]
+    Button --> ButtonTexture[Imported Button PNG]
+    ButtonTexture --> Entity
     Shared --> Studio[Asset Studio preview]
     Shared --> Runtime[Preview and published runtime]
     Entity --> Blocks[Explicit visual blocks]

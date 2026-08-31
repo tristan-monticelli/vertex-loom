@@ -64,7 +64,7 @@ flowchart TD
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
 | U10 | Régler color/effect/shine/holography du Beam | Partiel | Les champs sont maintenant disponibles dans l'inspecteur du chemin texturé ; la capture écran shader et le round-trip restent à prouver. | P0 |
 | U11 | Créer un Button avec l'original fourni | Partiel | Le parcours exige maintenant une texture originale sélectionnée ; l'index est rafraîchi à l'ouverture de l'assistant et signale explicitement l'absence de texture. Le round-trip écran reste à prouver. | P0 |
-| U12 | Créer un Eye | Retiré du parcours guidé | Les anciens assets identifiés comme `eye` sont des images de boutons ; ils restent lisibles comme ressources historiques, mais aucune création Eye n'est proposée. | P1 |
+| U12 | Créer un Eye | Supprimé | Le faux type Eye, sa factory et ses fixtures ont été retirés ; les originaux concernés passent par Button comme PNG. | Fermé |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
 | U14 | Créer une Entity composée de plusieurs blocs | Bloqué UX | La création démarre avec un drawable et l'ajout des autres blocs est caché dans l'inspecteur, sans assistant de composition. | P1 |
 | U15 | Déformer un bloc uniquement | Non prouvé | Les contrats de déformation existent, mais aucune preuve E2E ne démontre l'isolation visuelle du bloc sélectionné. | P1 |
@@ -195,7 +195,7 @@ preuve du canvas vectoriel et non encore une preuve complète du Beam guidé.
 3. Stabiliser le vector canvas E2E avant d'utiliser ses captures comme preuve.
 4. Construire l'assistant Entity multi-blocs avec portée de déformation
    explicite.
-5. Rejouer les parcours Eye, Artwork, animation, input, Map et publication
+5. Rejouer les parcours Artwork, animation, input, Map et publication
    comme utilisateur novice.
 6. Recalculer la note UX après les P0, sans réutiliser automatiquement les
    anciennes cases cochées.

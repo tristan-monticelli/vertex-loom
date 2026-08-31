@@ -120,7 +120,7 @@ endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 foreach(REQUIRED_ID
         "resource-row-head-face"
-        "resource-row-head-button-artwork"
+        "resource-row-beam-border"
         "resource-row-textile-head-entity"
         "entity-node-root")
     string(FIND "${FIRST_REGISTRY}" "${REQUIRED_ID}" ID_POSITION)

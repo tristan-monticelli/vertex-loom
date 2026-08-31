@@ -104,8 +104,6 @@ void create_studio_preset_fixture(const std::filesystem::path& root) {
     std::filesystem::remove(source, ignored);
 
     const std::array presets{
-        std::pair{fabric::editor::VisualPresetKind::eye, "preset-eye"},
-        std::pair{fabric::editor::VisualPresetKind::button, "preset-button"},
         std::pair{fabric::editor::VisualPresetKind::seam, "preset-seam"},
         std::pair{fabric::editor::VisualPresetKind::zipper, "preset-zipper"}};
     for (const auto [kind, id] : presets) {
@@ -135,7 +133,7 @@ void create_studio_preset_fixture(const std::filesystem::path& root) {
         .layers = {{"instances", "Instances",
                     fabric::project::MapLayerKind::instances,
                     true, false, 0.0F}}}));
-    const std::array<float, 4> positions{-6.0F, -2.0F, 2.0F, 6.0F};
+    const std::array<float, 2> positions{-2.0F, 2.0F};
     for (std::size_t index = 0; index < presets.size(); ++index) {
         const auto id = std::string{presets[index].second};
         REQUIRE(map.place_instance({
@@ -386,10 +384,6 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
             .thread_texture = fabric::project::ResourceReference{
                 {.value = "head-thread"}, "texture"}}));
     };
-    create_preset(fabric::editor::VisualPresetKind::eye,
-                  "head-eye", "Head Eye");
-    create_preset(fabric::editor::VisualPresetKind::button,
-                  "head-button", "Head Button");
     create_preset(fabric::editor::VisualPresetKind::seam,
                   "head-seam", "Head Seam");
     create_preset(fabric::editor::VisualPresetKind::seam,
@@ -413,45 +407,17 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
          .z_order = 0.0F,
          .raster_view = fabric::project::RasterView{
              .crop = {{0.0F, 0.0F}, {1.0F, 2.0F}}}},
-        {.id = "left-eye", .name = "Left eye",
-         .kind = fabric::project::VisualLayerKind::component,
-         .resource = {{.value = "head-eye"}, "visualComponent"},
-         .transform = {.position = {-1.4F, 0.6F},
-                       .scale = {0.6F, 0.6F}},
-         .z_order = 1.0F,
-         .component_instance = fabric::project::VisualComponentInstance{}},
-        {.id = "right-eye", .name = "Right eye",
-         .kind = fabric::project::VisualLayerKind::component,
-         .resource = {{.value = "head-eye"}, "visualComponent"},
-         .transform = {.position = {1.4F, 0.6F},
-                       .scale = {0.6F, 0.6F}},
-         .z_order = 2.0F,
-         .component_instance = fabric::project::VisualComponentInstance{}},
-        {.id = "left-button", .name = "Left button",
-         .kind = fabric::project::VisualLayerKind::component,
-         .resource = {{.value = "head-button"}, "visualComponent"},
-         .transform = {.position = {-1.0F, -1.0F},
-                       .scale = {0.35F, 0.35F}},
-         .z_order = 3.0F,
-         .component_instance = fabric::project::VisualComponentInstance{}},
-        {.id = "right-button", .name = "Right button",
-         .kind = fabric::project::VisualLayerKind::component,
-         .resource = {{.value = "head-button"}, "visualComponent"},
-         .transform = {.position = {1.0F, -1.0F},
-                       .scale = {0.35F, 0.35F}},
-         .z_order = 4.0F,
-         .component_instance = fabric::project::VisualComponentInstance{}},
         {.id = "mouth-seam", .name = "Mouth seam",
          .kind = fabric::project::VisualLayerKind::component,
          .resource = {{.value = "head-seam"}, "visualComponent"},
          .transform = {.position = {0.0F, -2.0F}},
-         .z_order = 5.0F,
+         .z_order = 1.0F,
          .component_instance = fabric::project::VisualComponentInstance{}},
         {.id = "beam", .name = "Animated Beam",
          .kind = fabric::project::VisualLayerKind::component,
          .resource = {{.value = "beam"}, "visualComponent"},
          .transform = {.position = {0.0F, -3.0F}, .scale = {1.25F, 1.25F}},
-         .z_order = 6.0F,
+         .z_order = 2.0F,
          .component_instance = fabric::project::VisualComponentInstance{}}};
     REQUIRE(studio.set_selected_visual_composition(std::move(composition)));
     REQUIRE(studio.save());
@@ -579,27 +545,6 @@ bool is_auxiliary_document(const std::filesystem::path& relative) {
 }
 
 } // namespace
-
-TEST_CASE("eye and button presets are native parametric components") {
-    const auto eye = fabric::editor::build_visual_preset(
-        manifest(), request(fabric::editor::VisualPresetKind::eye,
-                            "round-eye"));
-    REQUIRE(eye.ok());
-    REQUIRE(eye.bundle->vectors.size() == 1U);
-    REQUIRE(eye.bundle->vectors.front().native.has_value());
-    CHECK(eye.bundle->vectors.front().native->nodes.size() == 4U);
-    CHECK(eye.bundle->textured_paths.empty());
-    CHECK(eye.bundle->component.variants.size() == 2U);
-    CHECK(eye.bundle->composition.layers.size() == 1U);
-
-    const auto button = fabric::editor::build_visual_preset(
-        manifest(), request(fabric::editor::VisualPresetKind::button,
-                            "four-hole-button"));
-    REQUIRE(button.ok());
-    REQUIRE(button.bundle->vectors.front().native.has_value());
-    CHECK(button.bundle->vectors.front().native->nodes.size() == 5U);
-    CHECK(button.bundle->component.parameters.size() == 3U);
-}
 
 TEST_CASE("seam preset exposes a textured path without renderer specialization") {
     const auto seam_request = request(
@@ -749,8 +694,6 @@ TEST_CASE("preset publication creates a headless-valid resource graph") {
     REQUIRE(fabric::project::create_project(root, manifest()).ok());
     publish_thread_texture(root);
     for (const auto [kind, id] : {
-             std::pair{fabric::editor::VisualPresetKind::eye, "preset-eye"},
-             std::pair{fabric::editor::VisualPresetKind::button, "preset-button"},
              std::pair{fabric::editor::VisualPresetKind::seam, "preset-seam"},
              std::pair{fabric::editor::VisualPresetKind::zipper, "preset-zipper"}}) {
         const auto published = fabric::editor::publish_visual_preset(
@@ -761,7 +704,7 @@ TEST_CASE("preset publication creates a headless-valid resource graph") {
 
     const auto duplicate = fabric::editor::publish_visual_preset(
         root, manifest(),
-        request(fabric::editor::VisualPresetKind::eye, "preset-eye"));
+        request(fabric::editor::VisualPresetKind::seam, "preset-seam"));
     CHECK_FALSE(duplicate.ok());
     CHECK(std::ranges::any_of(duplicate.errors, [](const auto& error) {
         return error.code ==
@@ -794,9 +737,9 @@ TEST_CASE("versioned preset gallery is generated by Studio and loads in runtime"
     REQUIRE(runtime.load({.project_root = fixture,
                           .map_id = {.value = "preset-gallery"},
                           .mode = fabric::runtime::RuntimeMode::smoke_test}));
-    REQUIRE(runtime.map()->instances.size() == 4U);
+    REQUIRE(runtime.map()->instances.size() == 2U);
     REQUIRE(runtime.run());
-    CHECK(runtime.last_frame_packets().size() == 25U);
+    CHECK(runtime.last_frame_packets().size() == 16U);
 
     std::error_code ignored;
     std::filesystem::remove_all(regenerated, ignored);
@@ -926,7 +869,7 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     const auto resolved = fabric::render::resolve_visual_component(
         fixture, *fixture_manifest.manifest, *loaded.asset);
     REQUIRE(resolved.ok());
-    REQUIRE(resolved.packets.size() == 23U);
+    REQUIRE(resolved.packets.size() == 5U);
     const auto& face = resolved.packets.front();
     REQUIRE(face.image_fill.has_value());
     REQUIRE_FALSE(face.fill_uv.empty());

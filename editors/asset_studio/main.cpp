@@ -1054,7 +1054,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Selectable(item_label.c_str(), is_selected)) {
                 select_and_preview_resource(session, resource, preview, status);
             }
-            if (ui_drag_probe_enabled && resource.id.value == "head-button-artwork") {
+            if (ui_drag_probe_enabled && resource.id.value == "beam-border") {
                 const auto minimum = ImGui::GetItemRectMin();
                 const auto maximum = ImGui::GetItemRectMax();
                 ui_drag_source_screen = {(minimum.x + maximum.x) * 0.5F,
@@ -6854,8 +6854,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const auto kind_label = std::string(user_preset_label(request.kind));
         ImGui::SetNextItemWidth(280.0F);
         if (ImGui::BeginCombo("Preset", kind_label.c_str())) {
-            for (const auto kind : {fabric::editor::VisualPresetKind::button,
-                                    fabric::editor::VisualPresetKind::beam,
+            for (const auto kind : {fabric::editor::VisualPresetKind::beam,
                                     fabric::editor::VisualPresetKind::zipper}) {
                 const bool selected = request.kind == kind;
                 const auto option = std::string(user_preset_label(kind));
@@ -8025,7 +8024,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             child.drawable = {
                 .kind = fabric::project::EntityDrawableKind::vector,
                 .resource = fabric::project::ResourceReference{
-                    {.value = "head-button-artwork"}, "vector"}};
+                    {.value = "beam-border"}, "vector"}};
             authored = session.set_selected_entity_node(1U, child) &&
                 session.duplicate_selected_entity_node(1U);
         }
@@ -8101,8 +8100,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     bool vector_e2e_complete = false;
     if (vector_e2e && session.has_project()) {
-        const fabric::core::ResourceId vector_id{.value =
-            "head-button-artwork"};
+        const fabric::core::ResourceId vector_id{.value = "beam-border"};
         bool authored = session.select_resource(
             fabric::editor::StudioResourceKind::vector, vector_id) &&
             session.created_vector() && session.created_vector()->native &&
@@ -8166,7 +8164,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     };
     const auto vector_canvas_vector_id = find_resource_id(
         fabric::editor::StudioResourceKind::vector,
-        {"head-button-artwork", "beam-border"});
+        {"beam-border"});
     const auto vector_canvas_texture_id = find_resource_id(
         fabric::editor::StudioResourceKind::texture,
         {"head-thread", "beam-thread"});
@@ -8972,7 +8970,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         ((ui_drag_target_mode == 0 &&
                           reloaded.selected_entity()->nodes.front().drawable.resource &&
                           reloaded.selected_entity()->nodes.front().drawable.resource->id.value ==
-                              "head-button-artwork") ||
+                              "beam-border") ||
                          (ui_drag_target_mode == 1 &&
                           reloaded.selected_entity()->nodes.size() == 1U &&
                           reloaded.selected_entity()->nodes.front().parent == std::nullopt) ||

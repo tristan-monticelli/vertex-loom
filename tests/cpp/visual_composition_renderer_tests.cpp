@@ -80,10 +80,6 @@ TEST_CASE("visual preset components resolve to shared draw packets") {
     const TemporaryProject project{"fabric-composition-render"};
     publish_thread_texture(project.root());
     for (const auto [kind, id, expected_packets] : {
-             std::tuple{fabric::editor::VisualPresetKind::eye,
-                        "preview-eye", 4U},
-             std::tuple{fabric::editor::VisualPresetKind::button,
-                        "preview-button", 5U},
              std::tuple{fabric::editor::VisualPresetKind::seam,
                         "preview-seam", 2U},
              std::tuple{fabric::editor::VisualPresetKind::zipper,
