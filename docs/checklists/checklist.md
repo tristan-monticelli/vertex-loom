@@ -125,7 +125,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   v3 sont couverts par les tests de timeline et d’animation.
 - [ ] Permettre l'édition Bézier directement sur le canvas sur tous les chemins :
   la plume, l’insertion, la suppression et les poignées existent dans le
-  parcours nominal, mais les coins visibles, les formes libres et la preuve
+  parcours nominal ; les coins visibles, les formes libres et la preuve
   après reload restent à fermer.
 - [x] Rendre la géométrie de stroke visible dans le viewport et le runtime :
   le canvas consomme maintenant les triangles de `fabric_render`, avec blending

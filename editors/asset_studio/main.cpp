@@ -3970,7 +3970,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     node.shape.kind = fabric::project::VectorShapeKind::path;
                     node.shape.path = {{
                         .kind = fabric::project::VectorPathCommandKind::move,
-                        .point = node.shape.bounds.origin}};
+                        .point = node.shape.bounds.origin}, {
+                        .kind = fabric::project::VectorPathCommandKind::line,
+                        .point = {node.shape.bounds.origin.x + 1.0F,
+                                  node.shape.bounds.origin.y}}};
                     canvas.selected_path_points.clear();
                     commit_node(node);
                 }
