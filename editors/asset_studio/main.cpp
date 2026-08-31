@@ -2975,6 +2975,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             fill = {0.89F, 0.68F, 0.34F, 0.8F};
         }
         if (fill.alpha > 0.0F &&
+            node.fill.kind != fabric::project::VectorFillKind::image &&
             node.shape.kind != fabric::project::VectorShapeKind::line) {
             draw_list->AddConvexPolyFilled(points.data(),
                                            static_cast<int>(points.size()),
@@ -2994,15 +2995,17 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
             !node.shape.path.empty() &&
             node.shape.path.back().kind ==
                 fabric::project::VectorPathCommandKind::close;
-        draw_list->AddPolyline(
-            points.data(), static_cast<int>(points.size()),
-            stroke_color,
-            node.shape.kind == fabric::project::VectorShapeKind::line ||
-                    (node.shape.kind == fabric::project::VectorShapeKind::path &&
-                     !closed_path)
-                ? ImDrawFlags_None
-                : ImDrawFlags_Closed,
-            stroke_width);
+        if (!node.stroke || !node.stroke->image) {
+            draw_list->AddPolyline(
+                points.data(), static_cast<int>(points.size()),
+                stroke_color,
+                node.shape.kind == fabric::project::VectorShapeKind::line ||
+                        (node.shape.kind == fabric::project::VectorShapeKind::path &&
+                         !closed_path)
+                    ? ImDrawFlags_None
+                    : ImDrawFlags_Closed,
+                stroke_width);
+        }
     }
     if (selected_node != nullptr && !selected_node->locked) {
         if (canvas.tool == CanvasUiState::Tool::rotate) {

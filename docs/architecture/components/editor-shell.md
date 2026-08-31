@@ -414,7 +414,9 @@ C4Component
 - Le canvas natif envoie les draw packets validés au backend OpenGL 3 dans le
   viewport courant. Le resolver charge à la demande les `TextureAsset` locaux,
   les met en cache GPU pendant la session et les fournit au sampler image ; le
-  fallback ImGui reste disponible si une texture ne peut pas être résolue.
+  fallback ImGui reste disponible si une texture ne peut pas être résolue. Le
+  canvas n'écrase pas ensuite les fills ou strokes image par un overlay opaque :
+  les repères d'édition sont superposés au rendu GPU réel.
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.
