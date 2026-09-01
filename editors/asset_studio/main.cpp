@@ -9305,7 +9305,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (ui_beam_test) {
             ++ui_beam_frame;
-            if (ui_beam_frame >= 8U) {
+            if (ui_beam_frame == 8U) {
                 fabric::editor::ProjectSession reloaded;
                 ui_beam_reloaded = ui_beam_created &&
                     reloaded.open(initial_project) &&
@@ -9319,6 +9319,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.selected_textured_path()->width == 0.3F &&
                     reloaded.selected_textured_path()->opacity == 0.75F &&
                     reloaded.selected_textured_path()->uv_scale.x == 7.0F;
+                if (ui_beam_reloaded)
+                    static_cast<void>(session.select_resource(
+                        fabric::editor::StudioResourceKind::textured_path,
+                        {.value = "ui-guided-beam-rail"}));
+            }
+            if (ui_beam_frame >= 9U) {
                 write_ui_beam_probe(initial_project);
                 running = false;
             }
