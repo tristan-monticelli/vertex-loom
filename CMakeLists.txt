@@ -45,7 +45,7 @@ set(BOX2D_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     box2d
     GIT_REPOSITORY https://github.com/erincatto/box2d.git
-    GIT_TAG v3.1.1
+    GIT_TAG 8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(box2d)
@@ -54,7 +54,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     FetchContent_Declare(
         Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG v3.15.3
+        GIT_TAG 95d8a61b089317bec800c7cc4c64064cbcb3802d
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(Catch2)
@@ -135,7 +135,7 @@ set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     SDL2
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG release-2.32.10
+    GIT_TAG 5d249570393f7a37e037abf22cd6012a4cc56a71
     GIT_SHALLOW TRUE
 )
 set(SDL2IMAGE_INSTALL OFF CACHE BOOL "" FORCE)
@@ -166,7 +166,7 @@ set(SDL2IMAGE_XV OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     SDL2_image
     GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-    GIT_TAG release-2.8.12
+    GIT_TAG 12cb2e40330d256d9b1329647be8f366546d715c
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(SDL2 SDL2_image)
@@ -256,13 +256,13 @@ if(FABRIC_BUILD_EDITORS)
     FetchContent_Declare(
         native_file_dialog
         GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-        GIT_TAG v1.3.0
+        GIT_TAG 86f742bab39f1b253ad111e8ce776b46dd1ccdbe
         GIT_SHALLOW TRUE
     )
     FetchContent_Declare(
         imgui_source
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.92.9
+        GIT_TAG 01380c579715e62fb9a8d6ec0502c4ea83bfde6e
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(native_file_dialog imgui_source)
@@ -337,7 +337,9 @@ set(CPACK_PACKAGE_VENDOR "Vertex Loom")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Cross-platform 2D engine and authoring tools for textile and vector worlds")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-set(CPACK_PACKAGE_CONTACT "vertex-loom@example.invalid")
+set(VERTEX_LOOM_PACKAGE_CONTACT "" CACHE STRING
+    "Official public contact embedded in release packages")
+set(CPACK_PACKAGE_CONTACT "${VERTEX_LOOM_PACKAGE_CONTACT}")
 set(CPACK_GENERATOR "TGZ;ZIP")
 include(CPack)
 
@@ -1057,7 +1059,10 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
 
     add_executable(fabric_render_gl_smoke tests/cpp/opengl_vector_smoke.cpp)
-    target_compile_definitions(fabric_render_gl_smoke PRIVATE SDL_MAIN_HANDLED)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-artifacts")
+    target_compile_definitions(fabric_render_gl_smoke PRIVATE
+        SDL_MAIN_HANDLED
+        FABRIC_TEST_ARTIFACT_DIR="${CMAKE_BINARY_DIR}/test-artifacts")
     target_link_libraries(fabric_render_gl_smoke PRIVATE
         fabric_render
         SDL2::SDL2-static

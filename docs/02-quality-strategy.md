@@ -129,7 +129,7 @@ ne conserve aucune dominante du PNG avec une teinte blanche neutre, la couleur
 holographique reste inactive à `0`, l'holographie utilise seulement la couleur
 choisie à `1`, et `Keep image colors` restitue les canaux du PNG. Il contrôle
 aussi un gain de shine identique sur deux texels distincts et produit
-`fabric-render-shader-smoke.ppm` pour inspection isolée. La seule présence des
+`build/test-artifacts/fabric-render-shader-smoke.ppm` pour inspection isolée. La seule présence des
 paramètres dans un draw packet ou un document JSON ne constitue pas une preuve
 de coloring.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame, écrit le
@@ -520,7 +520,7 @@ interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
 La pile modulaire d'effets de surface couvre le round-trip de plus de deux
 blocs, leur ordre, leur activation, leurs couleurs et leurs bornes. Le smoke
 OpenGL compare deux ordres de pile, refuse qu'ils produisent le même pixel et
-écrit `fabric-render-effect-stack-smoke.ppm`. Les E2E Beam et Button montrent
+écrit `build/test-artifacts/fabric-render-effect-stack-smoke.ppm`. Les E2E Beam et Button montrent
 la pile directement dans l'inspecteur avec la preview texturée, puis vérifient
 sa persistance après reload. Le test de session Button ajoute un quatrième
 bloc depuis l'apparence référencée et vérifie son undo, son redo et chaque

@@ -5,12 +5,18 @@
 
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <span>
+#include <string_view>
 #include <vector>
 
 namespace {
+
+std::filesystem::path artifact_path(const std::string_view filename) {
+    return std::filesystem::path{FABRIC_TEST_ARTIFACT_DIR} / filename;
+}
 
 int skip(const char* message) {
     std::cerr << "SKIP: " << message << '\n';
@@ -324,7 +330,7 @@ int main() {
         shader_capture[index * 3U + 1U] = shader_rgba[index * 4U + 1U];
         shader_capture[index * 3U + 2U] = shader_rgba[index * 4U + 2U];
     }
-    std::ofstream shader_screen{"fabric-render-shader-smoke.ppm",
+    std::ofstream shader_screen{artifact_path("fabric-render-shader-smoke.ppm"),
                                 std::ios::binary | std::ios::trunc};
     shader_screen << "P6\n64 64\n255\n";
     shader_screen.write(
@@ -496,7 +502,7 @@ int main() {
         modular_capture[index * 3U + 1U] = modular_rgba[index * 4U + 1U];
         modular_capture[index * 3U + 2U] = modular_rgba[index * 4U + 2U];
     }
-    std::ofstream modular_screen{"fabric-render-effect-stack-smoke.ppm",
+    std::ofstream modular_screen{artifact_path("fabric-render-effect-stack-smoke.ppm"),
                                  std::ios::binary | std::ios::trunc};
     modular_screen << "P6\n64 64\n255\n";
     modular_screen.write(

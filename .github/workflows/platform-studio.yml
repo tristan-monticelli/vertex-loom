@@ -15,6 +15,17 @@ on:
       - 'editors/**'
       - 'tests/**'
       - '.github/workflows/platform-studio.yml'
+  pull_request:
+    paths:
+      - 'CMakeLists.txt'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'engine/**'
+      - 'editors/**'
+      - 'tests/**'
+      - 'docs/**'
+      - '.githooks/**'
+      - '.github/workflows/platform-studio.yml'
 
 concurrency:
   group: platform-studio-${{ github.ref }}
@@ -32,7 +43,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate Node and documentation gates
+        run: npm ci && npm run validate:config && npm run validate:ctxroute && npm run validate:architecture && npm run validate:docs -- --all && npm test
 
       - name: Install Windows software OpenGL
         if: runner.os == 'Windows'
@@ -96,18 +116,18 @@ jobs:
 
       - name: Run CTest with virtual display
         if: runner.os == 'Linux'
-        run: xvfb-run --auto-servernum ctest --test-dir build -C Debug --output-on-failure
+        run: xvfb-run --auto-servernum ctest --test-dir build -C Debug --output-on-failure --output-junit build/ctest-results.xml
 
       - name: Run CTest
         if: runner.os != 'Linux'
-        run: ctest --test-dir build -C Debug --output-on-failure
-        env:
-          GALLIUM_DRIVER: llvmpipe
-          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: ctest --test-dir build -C Debug --output-on-failure --output-junit build/ctest-results.xml
+
+      - name: Reject skipped product tests
+        run: node .github/scripts/require-no-skipped-tests.mjs build/ctest-results.xml
 
       - name: Upload Studio UI and E2E artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: studio-artifacts-${{ matrix.os }}
           if-no-files-found: ignore
@@ -120,6 +140,7 @@ jobs:
             build/**/*asset-studio-vector-canvas-*.ppm
             build/release-performance-smoke/*.json
             build/release-recovery-smoke/**/*
+            build/test-artifacts/**/*
             build/_CPack_Packages/**/*
             build/*.tar.gz
             build/*.zip
@@ -132,7 +153,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
 
       - name: Configure
         shell: pwsh
@@ -146,4 +172,8 @@ jobs:
         shell: pwsh
         env:
           FABRIC_REQUIRE_NATIVE_GL: '1'
-        run: ctest --test-dir build -C Debug --output-on-failure
+        run: ctest --test-dir build -C Debug --output-on-failure --output-junit build/ctest-results.xml
+
+      - name: Reject skipped native GPU tests
+        shell: pwsh
+        run: node .github/scripts/require-no-skipped-tests.mjs build/ctest-results.xml
