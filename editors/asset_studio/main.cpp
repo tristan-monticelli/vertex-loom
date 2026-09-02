@@ -1477,6 +1477,52 @@ void write_frame_capture(const std::filesystem::path& project_path,
     }
 }
 
+std::filesystem::path default_studio_texture_source(
+    const std::string_view filename) {
+    std::vector<std::filesystem::path> candidates;
+    if (char* base_path = SDL_GetBasePath(); base_path != nullptr) {
+        candidates.push_back(std::filesystem::path{base_path} / ".." / "share" /
+                             "vertex-loom" / "asset-studio-defaults" /
+                             std::string{filename});
+        SDL_free(base_path);
+    }
+#ifdef FABRIC_SOURCE_DIR
+    candidates.push_back(std::filesystem::path{FABRIC_SOURCE_DIR} /
+                         "editors/asset_studio/assets" /
+                         std::string{filename});
+#endif
+    for (const auto& candidate : candidates) {
+        if (std::filesystem::is_regular_file(candidate)) return candidate;
+    }
+    return {};
+}
+
+bool ensure_studio_texture(fabric::editor::ProjectSession& session,
+                           const fabric::core::ResourceId& id,
+                           const std::string_view filename,
+                           const std::string& name) {
+    const bool already_indexed = std::ranges::any_of(
+        session.resources(), [&](const auto& resource) {
+            return resource.kind == fabric::editor::StudioResourceKind::texture &&
+                resource.id == id;
+        });
+    return already_indexed ||
+        session.import_png(default_studio_texture_source(filename), id, name);
+}
+
+bool ensure_default_studio_textures(
+    fabric::editor::ProjectSession& session) {
+    if (!session.has_project() || !session.manifest()) return false;
+    const auto default_id = session.manifest()->default_stroke_texture
+        .value_or(fabric::core::ResourceId{.value = "beam-thread"});
+    return ensure_studio_texture(session, default_id, "beam-thread.png",
+                                 "Beam Thread") &&
+        ensure_studio_texture(session, {.value = "button-primary"},
+                              "button-primary.png", "Button Original 1") &&
+        ensure_studio_texture(session, {.value = "button-secondary"},
+                              "button-secondary.png", "Button Original 2");
+}
+
 void write_vector_canvas_visual_probe(const std::filesystem::path& project_path,
                                       SDL_Window* window,
                                       const ImVec2 origin,
@@ -6679,7 +6725,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     if (request_open) {
         if (choose_folder(window, path_buffer, status)) {
-            if (session.open(path_buffer.data())) {
+            if (session.open(path_buffer.data()) &&
+                ensure_default_studio_textures(session)) {
                 clear_asset_preview(preview);
                 creation.prepared_artwork.reset();
                 status = "Project opened: " + session.manifest()->name;
@@ -6750,8 +6797,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::BeginDisabled(!validation.ok());
         if (ImGui::Button("Create project", {140.0F, 0.0F})) {
             creation.project_publish_attempted = true;
-            if (session.create(creation.project.project_root(),
-                               creation.project.manifest())) {
+            const bool project_created = session.create(
+                creation.project.project_root(), creation.project.manifest());
+            const bool defaults_installed = project_created &&
+                ensure_default_studio_textures(session);
+            if (defaults_installed) {
                 clear_asset_preview(preview);
                 creation.prepared_artwork.reset();
                 status = "Project created: " + session.manifest()->name;
@@ -7904,7 +7954,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::string status{"Ready"};
     if (!initial_project.empty()) {
         copy_path_to_buffer(initial_project, path_buffer);
-        if (session.open(initial_project)) {
+        if (session.open(initial_project) &&
+            ensure_default_studio_textures(session)) {
             status = "Project opened: " + session.manifest()->name;
         } else {
             status = "Project rejected; inspect the diagnostics.";

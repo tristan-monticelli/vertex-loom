@@ -9,6 +9,7 @@ const temporary = mkdtempSync(join(tmpdir(), 'staged-validation-'));
 
 try {
   for (const [index, file] of files.entries()) {
+    if (!/\.(?:js|mjs|cjs|json)$/iu.test(file)) continue;
     const source = stagedSource(file);
     if (/\.(?:js|mjs|cjs)$/iu.test(file)) validateJavaScript(file, source, index);
     if (/\.json$/iu.test(file)) {

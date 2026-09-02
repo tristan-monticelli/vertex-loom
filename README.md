@@ -61,6 +61,12 @@ Open Asset Studio, optionally with a project directory:
 ./build/asset_studio tests/fixtures/valid-project
 ```
 
+Asset Studio installs three default PNG sources into new projects without
+altering them. Their hashes and provenance status are listed in
+[`editors/asset_studio/assets/manifest.json`](editors/asset_studio/assets/manifest.json).
+These images are not cleared for public redistribution until that manifest
+links written approval for each entry.
+
 ## Validate a project
 
 ```sh

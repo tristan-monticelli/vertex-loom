@@ -22,6 +22,8 @@ include(GNUInstallDirs)
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
 option(FABRIC_BUILD_TESTS "Build the C++ test suite" ON)
+option(FABRIC_ENABLE_SOURCE_ASSET_FALLBACK
+       "Allow Studio defaults to resolve from the source tree" ON)
 
 include(CTest)
 
@@ -288,6 +290,10 @@ if(FABRIC_BUILD_EDITORS)
         editors/asset_studio/import_workflow.cpp
     )
     target_compile_definitions(asset_studio PRIVATE SDL_MAIN_HANDLED)
+    if(FABRIC_ENABLE_SOURCE_ASSET_FALLBACK)
+        target_compile_definitions(asset_studio PRIVATE
+            FABRIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
     target_link_libraries(asset_studio PRIVATE
         fabric_editor
         fabric_imgui
@@ -310,6 +316,12 @@ install(TARGETS fabric_project_validate fabric_map_package_export fabric_asset_p
 if(FABRIC_BUILD_EDITORS)
     install(TARGETS asset_studio map_studio
             RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    install(FILES editors/asset_studio/assets/beam-thread.png
+                  editors/asset_studio/assets/button-primary.png
+                  editors/asset_studio/assets/button-secondary.png
+                  editors/asset_studio/assets/manifest.json
+                  editors/asset_studio/assets/README.md
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/asset-studio-defaults)
 endif()
 if(FABRIC_BUILD_RUNTIME)
     install(TARGETS game_runtime
@@ -317,6 +329,8 @@ if(FABRIC_BUILD_RUNTIME)
 endif()
 install(DIRECTORY tests/fixtures/studio-textile-head/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/examples/studio-textile-head)
+install(FILES LICENSE NOTICE THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/licenses)
 
 set(CPACK_PACKAGE_NAME "vertex-loom")
 set(CPACK_PACKAGE_VENDOR "Vertex Loom")

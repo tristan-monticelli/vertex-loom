@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "beam-thread",
+      "file": "beam-thread.png",
+      "sha256": "32133353656077f486cf62c4bcf6f5cf3dd51210b07023f2c4bf94b11f6bda01",
+      "width": 2048,
+      "height": 2048,
+      "format": "PNG/RGBA8",
+      "expectedOpaqueBounds": [0, 930, 2048, 728],
+      "authorOrSource": "User-provided source image; author identity pending",
+      "rightsHolder": "Pending written confirmation",
+      "license": "UNRESOLVED",
+      "attribution": "Required before public redistribution",
+      "redistribution": { "status": "pending", "evidenceFile": null }
+    },
+    {
+      "id": "button-primary",
+      "file": "button-primary.png",
+      "sha256": "fbcc1a24f9c9d2b33fe8fe6c16903c1787adcdf9bedfbaa6594e0042350a1253",
+      "width": 2048,
+      "height": 2048,
+      "format": "PNG/RGBA8",
+      "expectedOpaqueBounds": [149, 153, 1743, 1794],
+      "authorOrSource": "User-provided source image; author identity pending",
+      "rightsHolder": "Pending written confirmation",
+      "license": "UNRESOLVED",
+      "attribution": "Required before public redistribution",
+      "redistribution": { "status": "pending", "evidenceFile": null }
+    },
+    {
+      "id": "button-secondary",
+      "file": "button-secondary.png",
+      "sha256": "c266d783d715950da86818c5241e5b4ea9fb017937679a8f356aa7379dea683f",
+      "width": 2048,
+      "height": 2048,
+      "format": "PNG/RGBA8",
+      "expectedOpaqueBounds": [150, 152, 1743, 1743],
+      "authorOrSource": "User-provided source image; author identity pending",
+      "rightsHolder": "Pending written confirmation",
+      "license": "UNRESOLVED",
+      "attribution": "Required before public redistribution",
+      "redistribution": { "status": "pending", "evidenceFile": null }
+    }
+  ]
+}

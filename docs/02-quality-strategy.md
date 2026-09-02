@@ -28,6 +28,13 @@ Eye/Button, et conserve une plage qui exclut explicitement un canvas vide.
 
 ## Decision rule
 
+Le test Node `default-assets.test.mjs` décode les trois PNG distribués, exige
+RGBA8 2048×2048, vérifie alpha, zone de silhouette et SHA-256, puis contrôle
+les champs de provenance. Avec `VERTEX_LOOM_PUBLIC_RELEASE=1`, il exige en plus
+une licence résolue et une preuve écrite présente pour chaque image. Le smoke
+d’installation recalcule les mêmes empreintes depuis un préfixe isolé et exige
+le manifeste, la notice et le bundle de licences.
+
 Les tests unitaires et de contrat s'exécutent à chaque modification du cœur.
 Les intégrations précèdent chaque étape fonctionnelle. Le benchmark
 `./build/fabric_render_benchmark --packets 10000 --frames 600` est requis avant

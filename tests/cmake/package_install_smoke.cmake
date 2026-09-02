@@ -51,6 +51,33 @@ if(NOT EXISTS "${EXAMPLE_PROJECT}")
     message(FATAL_ERROR "installed example project is missing: ${EXAMPLE_PROJECT}")
 endif()
 
+set(DEFAULT_ASSET_ROOT "${STAGING}/share/vertex-loom/asset-studio-defaults")
+if(NOT EXISTS "${DEFAULT_ASSET_ROOT}/manifest.json" OR
+   NOT EXISTS "${DEFAULT_ASSET_ROOT}/README.md")
+    message(FATAL_ERROR "installed default asset manifest or notice is missing")
+endif()
+function(verify_default_asset DEFAULT_ASSET_FILE DEFAULT_ASSET_SHA256)
+    set(DEFAULT_ASSET_PATH "${DEFAULT_ASSET_ROOT}/${DEFAULT_ASSET_FILE}")
+    if(NOT EXISTS "${DEFAULT_ASSET_PATH}")
+        message(FATAL_ERROR "installed default asset is missing: ${DEFAULT_ASSET_FILE}")
+    endif()
+    file(SHA256 "${DEFAULT_ASSET_PATH}" INSTALLED_SHA256)
+    if(NOT INSTALLED_SHA256 STREQUAL DEFAULT_ASSET_SHA256)
+        message(FATAL_ERROR "installed default asset checksum mismatch: ${DEFAULT_ASSET_FILE}")
+    endif()
+endfunction()
+verify_default_asset("beam-thread.png"
+    "32133353656077f486cf62c4bcf6f5cf3dd51210b07023f2c4bf94b11f6bda01")
+verify_default_asset("button-primary.png"
+    "fbcc1a24f9c9d2b33fe8fe6c16903c1787adcdf9bedfbaa6594e0042350a1253")
+verify_default_asset("button-secondary.png"
+    "c266d783d715950da86818c5241e5b4ea9fb017937679a8f356aa7379dea683f")
+foreach(LICENSE_FILE IN ITEMS LICENSE NOTICE THIRD_PARTY_NOTICES.md)
+    if(NOT EXISTS "${STAGING}/share/vertex-loom/licenses/${LICENSE_FILE}")
+        message(FATAL_ERROR "installed license file is missing: ${LICENSE_FILE}")
+    endif()
+endforeach()
+
 execute_process(
     COMMAND "${STAGING}/bin/fabric_project_validate${EXE_SUFFIX}" "${STAGING}/share/vertex-loom/examples/studio-textile-head"
     RESULT_VARIABLE VALIDATE_RESULT
