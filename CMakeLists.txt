@@ -755,13 +755,25 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(
+            NAME asset_studio_ui_beam_holography_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-beam-holography-e2e
+                -DUI_ARGUMENT=--ui-beam-holography-test
+                -DBEAM_ARTIFACT=asset-studio-ui-beam.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-beam-thread;resource-row-beam-border;resource-row-beam-entity;entity-node-root"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
             NAME asset_studio_ui_button_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
-                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-button-e2e
                 -DUI_ARGUMENT=--ui-button-test
                 -DBUTTON_ARTIFACT=asset-studio-ui-button.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-button-primary;resource-row-button-secondary"
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(

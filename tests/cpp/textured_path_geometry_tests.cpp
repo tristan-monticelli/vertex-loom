@@ -42,6 +42,8 @@ TEST_CASE("open textured path emits an exact continuous ribbon") {
     CHECK(packet.fill_color == path.color);
     REQUIRE(packet.image_fill.has_value());
     CHECK(packet.image_fill->texture == path.texture);
+    CHECK(packet.image_fill->fit ==
+          fabric::project::VectorImageFit::stretch);
     CHECK(packet.image_fill->opacity == path.opacity);
     CHECK(packet.repeat_texture_x);
     CHECK(packet.fill_vertices == std::vector<fabric::core::Vec2>{
@@ -53,8 +55,21 @@ TEST_CASE("open textured path emits an exact continuous ribbon") {
     check_close(packet.fill_uv[0].x, 0.25F);
     check_close(packet.fill_uv[0].y, 0.1F);
     check_close(packet.fill_uv[1].y, 0.6F);
-    check_close(packet.fill_uv[2].x, 4.25F);
+    check_close(packet.fill_uv[2].x, 2.25F);
     CHECK_FALSE(packet.closed_outline);
+}
+
+TEST_CASE("mirror mapping repeats only along the path axis") {
+    auto path = line_path();
+    path.uv_mode = fabric::project::TexturedPathUvMode::mirror;
+    const auto result = fabric::render::build_textured_path_draw_packets(path);
+    REQUIRE(result.ok());
+    REQUIRE(result.packets.size() == 1U);
+    const auto& packet = result.packets.front();
+    CHECK(packet.repeat_texture_x);
+    CHECK(packet.mirror_texture_x);
+    CHECK(packet.fill_uv[0].y == packet.fill_uv[2].y);
+    CHECK(packet.fill_uv[1].y == packet.fill_uv[3].y);
 }
 
 TEST_CASE("textured path draw packet carries its custom shader settings") {
@@ -69,6 +84,21 @@ TEST_CASE("textured path draw packet carries its custom shader settings") {
     CHECK(*result.packets.front().shader == path.shader);
 }
 
+TEST_CASE("texture metrics keep left-right edges and thickness non-repeating") {
+    auto path = line_path();
+    path.texture_metrics = {
+        .origin = {0.1F, 0.2F}, .size = {0.7F, 0.6F}};
+    const auto result = fabric::render::build_textured_path_draw_packets(path);
+    REQUIRE(result.ok());
+    const auto& packet = result.packets.front();
+    check_close(packet.fill_uv[0].x, 0.1F + 0.25F);
+    check_close(packet.fill_uv[2].x, 0.1F + 0.25F + 2.0F * 0.7F);
+    check_close(packet.fill_uv[0].y, 0.2F + 0.1F);
+    check_close(packet.fill_uv[1].y, 0.2F + 0.1F + 0.6F * 0.5F);
+    CHECK(packet.fill_uv[0].y != packet.fill_uv[1].y);
+    CHECK(packet.fill_uv[0].x != packet.fill_uv[2].x);
+}
+
 TEST_CASE("stretch UVs and width profiles follow normalized path distance") {
     auto path = line_path();
     path.uv_mode = fabric::project::TexturedPathUvMode::stretch;
@@ -81,6 +111,25 @@ TEST_CASE("stretch UVs and width profiles follow normalized path distance") {
     check_close(packet.fill_vertices[0].y, 0.25F);
     check_close(packet.fill_vertices[2].y, 1.0F);
     check_close(packet.fill_uv[2].x, 2.25F);
+}
+
+TEST_CASE("one Beam repetition maps exactly once regardless of path length") {
+    auto short_beam = line_path();
+    short_beam.uv_scale = {1.0F, 1.0F};
+    auto long_beam = short_beam;
+    long_beam.commands.back().point = {20.0F, 0.0F};
+
+    const auto short_result =
+        fabric::render::build_textured_path_draw_packets(short_beam);
+    const auto long_result =
+        fabric::render::build_textured_path_draw_packets(long_beam);
+    REQUIRE(short_result.ok());
+    REQUIRE(long_result.ok());
+    const auto& short_uv = short_result.packets.front().fill_uv;
+    const auto& long_uv = long_result.packets.front().fill_uv;
+    check_close(short_uv.front().x, long_uv.front().x);
+    check_close(short_uv[short_uv.size() - 2U].x, 1.25F);
+    check_close(long_uv[long_uv.size() - 2U].x, 1.25F);
 }
 
 TEST_CASE("Bezier tessellation is bounded and deterministic") {
@@ -215,6 +264,7 @@ TEST_CASE("textured path geometry rejects invalid tolerance and reversals") {
 
     auto overflowing_uv = line_path();
     overflowing_uv.uv_scale.x = std::numeric_limits<float>::max();
+    overflowing_uv.uv_offset.x = std::numeric_limits<float>::max();
     CHECK_FALSE(fabric::render::build_textured_path_draw_packets(
                     overflowing_uv).ok());
 }

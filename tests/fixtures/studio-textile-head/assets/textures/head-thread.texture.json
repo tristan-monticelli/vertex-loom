@@ -1,10 +1,10 @@
 {
-  "height": 2,
+  "height": 2048,
   "id": "head-thread",
   "name": "Head Thread",
   "pixelFormat": "rgba8",
   "schemaVersion": 1,
   "source": "assets/textures/head-thread.png",
   "type": "texture",
-  "width": 2
+  "width": 2048
 }

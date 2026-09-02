@@ -143,6 +143,9 @@ public:
         project::MaterialDefinition material,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_referenced_material(
+        const core::ResourceId& material_id,
+        project::MaterialDefinition material);
     [[nodiscard]] bool set_selected_vector_node(
         std::size_t node_index, project::VectorNode node,
         AutosaveScheduler::Clock::time_point now =

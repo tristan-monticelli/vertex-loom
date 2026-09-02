@@ -27,13 +27,46 @@
   "name": "Beam",
   "parameters": [
     {
+      "animatable": false,
+      "default": {
+        "type": "resource",
+        "value": {
+          "expectedType": "texture",
+          "id": "beam-thread"
+        }
+      },
+      "id": "texture",
+      "name": "Texture",
+      "target": {
+        "componentId": "texturedPath",
+        "nodeId": "beam",
+        "propertyId": "texture"
+      },
+      "type": "resource"
+    },
+    {
+      "animatable": false,
+      "default": {
+        "type": "text",
+        "value": "recolor"
+      },
+      "id": "color-mode",
+      "name": "Color handling",
+      "target": {
+        "componentId": "shader",
+        "nodeId": "beam",
+        "propertyId": "colorMode"
+      },
+      "type": "text"
+    },
+    {
       "animatable": true,
       "default": {
         "type": "scalar",
-        "value": 0.11999999731779099
+        "value": 0.5
       },
       "id": "width",
-      "name": "Width",
+      "name": "Thickness",
       "target": {
         "componentId": "texturedPath",
         "nodeId": "beam",
@@ -45,10 +78,10 @@
       "animatable": true,
       "default": {
         "type": "scalar",
-        "value": 5.0
+        "value": 1.0
       },
       "id": "repeat",
-      "name": "Repeat",
+      "name": "Repetition",
       "target": {
         "componentId": "texturedPath",
         "nodeId": "beam",
@@ -59,17 +92,22 @@
     {
       "animatable": true,
       "default": {
-        "type": "scalar",
-        "value": 0.0
+        "type": "color",
+        "value": {
+          "alpha": 1.0,
+          "blue": 1.0,
+          "green": 1.0,
+          "red": 1.0
+        }
       },
-      "id": "offset",
-      "name": "Texture offset",
+      "id": "color",
+      "name": "Base tint",
       "target": {
-        "componentId": "texturedPath",
+        "componentId": "shader",
         "nodeId": "beam",
-        "propertyId": "uvOffsetX"
+        "propertyId": "primaryColor"
       },
-      "type": "scalar"
+      "type": "color"
     },
     {
       "animatable": true,
@@ -78,18 +116,48 @@
         "value": {
           "alpha": 1.0,
           "blue": 1.0,
-          "green": 0.3499999940395355,
-          "red": 0.20000000298023224
+          "green": 1.0,
+          "red": 1.0
         }
       },
-      "id": "color",
-      "name": "Color",
+      "id": "effect-color",
+      "name": "Holo color",
       "target": {
-        "componentId": "texturedPath",
+        "componentId": "shader",
         "nodeId": "beam",
-        "propertyId": "color"
+        "propertyId": "effectColor"
       },
       "type": "color"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "scalar",
+        "value": 0.0
+      },
+      "id": "shine",
+      "name": "Shine",
+      "target": {
+        "componentId": "shader",
+        "nodeId": "beam",
+        "propertyId": "shine"
+      },
+      "type": "scalar"
+    },
+    {
+      "animatable": true,
+      "default": {
+        "type": "scalar",
+        "value": 0.0
+      },
+      "id": "holography",
+      "name": "Holography",
+      "target": {
+        "componentId": "shader",
+        "nodeId": "beam",
+        "propertyId": "holography"
+      },
+      "type": "scalar"
     },
     {
       "animatable": true,

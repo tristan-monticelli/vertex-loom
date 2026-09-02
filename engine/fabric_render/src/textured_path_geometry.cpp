@@ -207,9 +207,16 @@ bool append_join_sections(std::vector<RibbonSection>& sections,
 
 float texture_u(const project::TexturedPath& path, const float distance,
                 const float total_distance) {
-    const float base = path.uv_mode == project::TexturedPathUvMode::repeat
-        ? distance : distance / total_distance;
-    return path.uv_offset.x + base * path.uv_scale.x;
+    // Repetition is expressed per complete path: 1 maps the source once from
+    // the deterministic start to the end, independently of world-unit length.
+    const float base = distance / total_distance;
+    return path.texture_metrics.origin.x + path.uv_offset.x +
+        base * path.uv_scale.x * path.texture_metrics.size.x;
+}
+
+float texture_v(const project::TexturedPath& path, const float across) {
+    return path.texture_metrics.origin.y + path.uv_offset.y +
+        across * path.uv_scale.y * path.texture_metrics.size.y;
 }
 
 void append_round_cap(VectorDrawPacket& packet,
@@ -223,7 +230,7 @@ void append_round_cap(VectorDrawPacket& packet,
     packet.fill_vertices.push_back(center);
     packet.fill_uv.push_back(
         {texture_u(path, distance, total_distance),
-         path.uv_offset.y + path.uv_scale.y * 0.5F});
+         texture_v(path, 0.5F)});
     for (std::size_t step = 0U; step <= round_cap_segments; ++step) {
         const float angle = pi * static_cast<float>(step) /
             static_cast<float>(round_cap_segments);
@@ -237,8 +244,7 @@ void append_round_cap(VectorDrawPacket& packet,
         const float transverse = dot(offset, section_normal);
         packet.fill_uv.push_back(
             {texture_u(path, distance, total_distance),
-             path.uv_offset.y +
-                 (1.0F - transverse) * 0.5F * path.uv_scale.y});
+             texture_v(path, (1.0F - transverse) * 0.5F)});
         if (step > 0U) {
             const auto current = static_cast<std::uint32_t>(
                 packet.fill_vertices.size() - 1U);
@@ -340,9 +346,12 @@ VectorGeometryResult build_textured_path_draw_packets(
         .fill_color = path.color,
         .image_fill = project::VectorImageFill{
             .texture = path.texture,
+            .fit = project::VectorImageFit::stretch,
             .opacity = path.opacity},
         .repeat_texture_x =
-            path.uv_mode == project::TexturedPathUvMode::repeat,
+            path.uv_mode != project::TexturedPathUvMode::stretch,
+        .mirror_texture_x =
+            path.uv_mode == project::TexturedPathUvMode::mirror,
         .outline = points,
         .closed_outline = path.closed,
     };
@@ -353,9 +362,9 @@ VectorGeometryResult build_textured_path_draw_packets(
         packet.fill_vertices.push_back(section.left);
         packet.fill_vertices.push_back(section.right);
         const float u = texture_u(path, section.distance, total_distance);
-        packet.fill_uv.push_back({u, path.uv_offset.y});
+        packet.fill_uv.push_back({u, texture_v(path, 0.0F)});
         packet.fill_uv.push_back(
-            {u, path.uv_offset.y + path.uv_scale.y});
+            {u, texture_v(path, 1.0F)});
     }
     for (std::size_t index = 0U; index + 1U < sections.size(); ++index) {
         const auto base = static_cast<std::uint32_t>(index * 2U);

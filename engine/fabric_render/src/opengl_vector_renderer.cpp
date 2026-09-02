@@ -424,6 +424,9 @@ uniform float shaderShine;
 uniform float shaderHolography;
 uniform float shaderOpacity;
 uniform float shaderIntensity;
+uniform sampler2D shaderEffects;
+uniform int shaderEffectCount;
+uniform float shaderEffectTextureWidth;
 varying vec2 fragmentUv;
 void main() {
     vec4 base = textured == 1
@@ -433,24 +436,78 @@ void main() {
         float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
         float holo = clamp(shaderHolography, 0.0, 1.0);
         float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
-        float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
-        vec3 monochrome = shaderPrimary.rgb * luma;
-        vec3 threadBase = base.rgb *
-            mix(vec3(1.0), shaderPrimary.rgb, 0.55);
-        vec3 threadColor = threadBase * (0.65 + 0.35 * luma) +
-            shaderEffect.rgb * holo * (0.25 + 0.75 * band);
-        vec3 plasticColor = base.rgb * shaderPrimary.rgb +
-            shaderEffect.rgb * shaderShine * highlight;
+        float effectMix = holo * (0.15 + 0.35 * band);
+        float threadDetail = 0.55 + 0.45 * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb * threadDetail,
+            shaderEffect.rgb * threadDetail, effectMix);
+        vec3 plasticColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+        vec3 monochrome = mix(shaderPrimary.rgb * luma,
+            shaderEffect.rgb * luma, effectMix);
         vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
-            shaderEffect.rgb * (0.4 + 0.6 * luma), holo * band);
+            shaderEffect.rgb * (0.4 + 0.6 * luma), effectMix);
         vec3 surface = shaderProfile == 0 ? threadColor :
             shaderProfile == 1 ? plasticColor :
             shaderProfile == 2 ? monochrome : customColor;
-        if (shaderProfile != 1)
-            surface += vec3(shaderShine * highlight * (0.25 + 0.75 * luma));
-        base = vec4(surface * shaderIntensity,
-            base.a * mix(shaderPrimary.a, shaderEffect.a, holo * band) *
-                shaderOpacity);
+        float surfaceAlpha = base.a * mix(shaderPrimary.a, shaderEffect.a,
+            effectMix) * shaderOpacity;
+        if (shaderEffectCount > 0) {
+            // Thread is a reference image: keep its luminance/detail, then
+            // let the selected effect color define the visible palette.
+            surface = shaderProfile == 0 ? vec3(luma) : base.rgb;
+            surfaceAlpha = base.a * shaderOpacity;
+            for (int effectIndex = 0; effectIndex < shaderEffectCount;
+                 ++effectIndex) {
+                float firstX = (float(effectIndex * 2) + 0.5) /
+                    shaderEffectTextureWidth;
+                float secondX = (float(effectIndex * 2 + 1) + 0.5) /
+                    shaderEffectTextureWidth;
+                vec4 effectColor = texture2D(shaderEffects, vec2(firstX, 0.5));
+                vec4 settings = texture2D(shaderEffects, vec2(secondX, 0.5));
+                if (settings.a > 0.5) {
+                    float amount = clamp(settings.g, 0.0, 1.0);
+                    if (settings.r < 0.25) {
+                        // Tint recolors the reference luminance while keeping
+                        // the fiber contrast and alpha intact.
+                        vec3 tinted = vec3(luma) * effectColor.rgb;
+                        surface = mix(surface, tinted, amount);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amount);
+                    } else if (settings.r < 0.75) {
+                        float effectBand = 0.5 + 0.5 * sin(
+                            (fragmentUv.x * 1.35 + fragmentUv.y * 0.65) *
+                            6.2831853 * max(settings.b * 6.0, 0.05));
+                        float glint = pow(0.5 + 0.5 * effectBand, 8.0);
+                        float sweep = smoothstep(0.42, 0.92, effectBand);
+                        float amountBand = amount * (0.20 + 0.65 * sweep);
+                        vec3 holographic = surface *
+                            (0.84 + 0.16 * effectColor.rgb) +
+                            effectColor.rgb *
+                                (0.10 + 0.42 * sweep) *
+                                (0.45 + 0.55 * luma) +
+                            effectColor.rgb * glint * (0.12 + 0.28 * luma);
+                        surface = mix(surface, holographic, amountBand);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amountBand);
+                    } else {
+                        // Shine is a stable material lift, not an edge-only
+                        // highlight that disappears at tile boundaries.
+                        surface += effectColor.rgb * amount * 0.16;
+                    }
+                }
+            }
+        } else {
+            // Legacy Thread assets must follow the same rule as the modular
+            // path: the reference PNG contributes detail, while the selected
+            // primary color controls the visible palette.
+            if (shaderProfile == 0) {
+                surface = vec3(luma) * shaderPrimary.rgb;
+                if (holo > 0.0) {
+                    surface = mix(surface,
+                        shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+                }
+            }
+            surface += shaderEffect.rgb * clamp(shaderShine, 0.0, 1.0) * 0.16;
+        }
+        base = vec4(surface * shaderIntensity, surfaceAlpha);
     }
     gl_FragColor = base;
 }
@@ -474,6 +531,9 @@ uniform float shaderShine;
 uniform float shaderHolography;
 uniform float shaderOpacity;
 uniform float shaderIntensity;
+uniform sampler2D shaderEffects;
+uniform int shaderEffectCount;
+uniform float shaderEffectTextureWidth;
 in vec2 fragmentUv;
 out vec4 fragmentColor;
 void main() {
@@ -484,24 +544,78 @@ void main() {
         float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
         float holo = clamp(shaderHolography, 0.0, 1.0);
         float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
-        float highlight = pow(max(0.0, 1.0 - abs(fract(fragmentUv.x) - 0.5) * 2.0), 12.0);
-        vec3 monochrome = shaderPrimary.rgb * luma;
-        vec3 threadBase = base.rgb *
-            mix(vec3(1.0), shaderPrimary.rgb, 0.55);
-        vec3 threadColor = threadBase * (0.65 + 0.35 * luma) +
-            shaderEffect.rgb * holo * (0.25 + 0.75 * band);
-        vec3 plasticColor = base.rgb * shaderPrimary.rgb +
-            shaderEffect.rgb * shaderShine * highlight;
+        float effectMix = holo * (0.15 + 0.35 * band);
+        float threadDetail = 0.55 + 0.45 * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb * threadDetail,
+            shaderEffect.rgb * threadDetail, effectMix);
+        vec3 plasticColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+        vec3 monochrome = mix(shaderPrimary.rgb * luma,
+            shaderEffect.rgb * luma, effectMix);
         vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
-            shaderEffect.rgb * (0.4 + 0.6 * luma), holo * band);
+            shaderEffect.rgb * (0.4 + 0.6 * luma), effectMix);
         vec3 surface = shaderProfile == 0 ? threadColor :
             shaderProfile == 1 ? plasticColor :
             shaderProfile == 2 ? monochrome : customColor;
-        if (shaderProfile != 1)
-            surface += vec3(shaderShine * highlight * (0.25 + 0.75 * luma));
-        base = vec4(surface * shaderIntensity,
-            base.a * mix(shaderPrimary.a, shaderEffect.a, holo * band) *
-                shaderOpacity);
+        float surfaceAlpha = base.a * mix(shaderPrimary.a, shaderEffect.a,
+            effectMix) * shaderOpacity;
+        if (shaderEffectCount > 0) {
+            // Thread is a reference image: keep its luminance/detail, then
+            // let the selected effect color define the visible palette.
+            surface = shaderProfile == 0 ? vec3(luma) : base.rgb;
+            surfaceAlpha = base.a * shaderOpacity;
+            for (int effectIndex = 0; effectIndex < shaderEffectCount;
+                 ++effectIndex) {
+                float firstX = (float(effectIndex * 2) + 0.5) /
+                    shaderEffectTextureWidth;
+                float secondX = (float(effectIndex * 2 + 1) + 0.5) /
+                    shaderEffectTextureWidth;
+                vec4 effectColor = texture(shaderEffects, vec2(firstX, 0.5));
+                vec4 settings = texture(shaderEffects, vec2(secondX, 0.5));
+                if (settings.a > 0.5) {
+                    float amount = clamp(settings.g, 0.0, 1.0);
+                    if (settings.r < 0.25) {
+                        // Tint recolors the reference luminance while keeping
+                        // the fiber contrast and alpha intact.
+                        vec3 tinted = vec3(luma) * effectColor.rgb;
+                        surface = mix(surface, tinted, amount);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amount);
+                    } else if (settings.r < 0.75) {
+                        float effectBand = 0.5 + 0.5 * sin(
+                            (fragmentUv.x * 1.35 + fragmentUv.y * 0.65) *
+                            6.2831853 * max(settings.b * 6.0, 0.05));
+                        float glint = pow(0.5 + 0.5 * effectBand, 8.0);
+                        float sweep = smoothstep(0.42, 0.92, effectBand);
+                        float amountBand = amount * (0.20 + 0.65 * sweep);
+                        vec3 holographic = surface *
+                            (0.84 + 0.16 * effectColor.rgb) +
+                            effectColor.rgb *
+                                (0.10 + 0.42 * sweep) *
+                                (0.45 + 0.55 * luma) +
+                            effectColor.rgb * glint * (0.12 + 0.28 * luma);
+                        surface = mix(surface, holographic, amountBand);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amountBand);
+                    } else {
+                        // Shine is a stable material lift, not an edge-only
+                        // highlight that disappears at tile boundaries.
+                        surface += effectColor.rgb * amount * 0.16;
+                    }
+                }
+            }
+        } else {
+            // Legacy Thread assets must follow the same rule as the modular
+            // path: the reference PNG contributes detail, while the selected
+            // primary color controls the visible palette.
+            if (shaderProfile == 0) {
+                surface = vec3(luma) * shaderPrimary.rgb;
+                if (holo > 0.0) {
+                    surface = mix(surface,
+                        shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+                }
+            }
+            surface += shaderEffect.rgb * clamp(shaderShine, 0.0, 1.0) * 0.16;
+        }
+        base = vec4(surface * shaderIntensity, surfaceAlpha);
     }
     fragmentColor = base;
 }
@@ -566,6 +680,10 @@ void main() {
     shader_holography_uniform_ = functions.get_uniform_location(program_, "shaderHolography");
     shader_opacity_uniform_ = functions.get_uniform_location(program_, "shaderOpacity");
     shader_intensity_uniform_ = functions.get_uniform_location(program_, "shaderIntensity");
+    shader_effects_uniform_ = functions.get_uniform_location(program_, "shaderEffects");
+    shader_effect_count_uniform_ = functions.get_uniform_location(program_, "shaderEffectCount");
+    shader_effect_texture_width_uniform_ = functions.get_uniform_location(
+        program_, "shaderEffectTextureWidth");
     if (world_to_clip_uniform_ < 0 || color_uniform_ < 0 ||
         image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
         functions.delete_buffers(1, &vertex_buffer_);
@@ -576,6 +694,15 @@ void main() {
         program_ = 0U;
         return false;
     }
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum_effect_texture_width_);
+    glGenTextures(1, &shader_effect_texture_);
+    functions.active_texture(GL_TEXTURE1);
+    functions.bind_texture(GL_TEXTURE_2D, shader_effect_texture_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    functions.active_texture(GL_TEXTURE0);
     return true;
 }
 
@@ -588,6 +715,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
         if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
         functions.delete_program(program_);
     }
+    if (shader_effect_texture_ != 0U) glDeleteTextures(1, &shader_effect_texture_);
     program_ = 0U;
     legacy_fixed_function_ = false;
     vertex_array_ = 0U;
@@ -607,6 +735,11 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     shader_holography_uniform_ = -1;
     shader_opacity_uniform_ = -1;
     shader_intensity_uniform_ = -1;
+    shader_effects_uniform_ = -1;
+    shader_effect_count_uniform_ = -1;
+    shader_effect_texture_width_uniform_ = -1;
+    shader_effect_texture_ = 0U;
+    maximum_effect_texture_width_ = 0;
     initialization_error_.clear();
     vertex_buffer_capacity_ = 0U;
     index_buffer_capacity_ = 0U;
@@ -662,6 +795,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                     left.image_fill->opacity == right.image_fill->opacity &&
                     left.raster_filter == right.raster_filter &&
                     left.repeat_texture_x == right.repeat_texture_x &&
+                    left.mirror_texture_x == right.mirror_texture_x &&
                     same_texture_tint(left, right);
             }
             if (!left.fill_color || !right.fill_color) return false;
@@ -745,7 +879,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 glBindTexture(GL_TEXTURE_2D, texture->handle);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                                 packet.repeat_texture_x
-                                    ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                    ? (packet.mirror_texture_x
+                                        ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                    : GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                                 GL_CLAMP_TO_EDGE);
                 if (packet.raster_filter) {
@@ -894,7 +1030,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     const auto apply_shader = [&](const VectorDrawPacket& packet) {
         const auto& shader = packet.shader;
         functions.uniform_1i(shader_enabled_uniform_, shader ? 1 : 0);
-        if (!shader) return;
+        functions.uniform_1i(shader_effect_count_uniform_, 0);
+        if (!shader) return true;
         functions.uniform_1i(shader_profile_uniform_,
                              static_cast<int>(shader->profile));
         functions.uniform_4f(shader_primary_uniform_, shader->primary_color.red, shader->primary_color.green, shader->primary_color.blue, shader->primary_color.alpha);
@@ -903,6 +1040,48 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         functions.uniform_1f(shader_holography_uniform_, shader->holography);
         functions.uniform_1f(shader_opacity_uniform_, shader->opacity);
         functions.uniform_1f(shader_intensity_uniform_, shader->intensity);
+        if (shader->effects.empty()) return true;
+        if (maximum_effect_texture_width_ <= 0 ||
+            shader->effects.size() >
+                static_cast<std::size_t>(maximum_effect_texture_width_ / 2)) {
+            stats.errors.push_back(
+                "OpenGL surface effect stack exceeds the GPU texture capacity");
+            functions.uniform_1i(shader_enabled_uniform_, 0);
+            return false;
+        }
+        const auto byte = [](const float value) {
+            return static_cast<std::uint8_t>(std::lround(
+                std::clamp(value, 0.0F, 1.0F) * 255.0F));
+        };
+        const auto texture_width = shader->effects.size() * 2U;
+        effect_texture_scratch_.assign(texture_width * 4U, 0U);
+        for (std::size_t index = 0; index < shader->effects.size(); ++index) {
+            const auto& effect = shader->effects[index];
+            const auto color_offset = index * 8U;
+            effect_texture_scratch_[color_offset] = byte(effect.color.red);
+            effect_texture_scratch_[color_offset + 1U] = byte(effect.color.green);
+            effect_texture_scratch_[color_offset + 2U] = byte(effect.color.blue);
+            effect_texture_scratch_[color_offset + 3U] = byte(effect.color.alpha);
+            effect_texture_scratch_[color_offset + 4U] =
+                effect.kind == project::SurfaceEffectKind::tint ? 0U :
+                effect.kind == project::SurfaceEffectKind::holography ? 127U :
+                255U;
+            effect_texture_scratch_[color_offset + 5U] = byte(effect.amount);
+            effect_texture_scratch_[color_offset + 6U] = byte(effect.scale / 8.0F);
+            effect_texture_scratch_[color_offset + 7U] = effect.enabled ? 255U : 0U;
+        }
+        functions.active_texture(GL_TEXTURE1);
+        functions.bind_texture(GL_TEXTURE_2D, shader_effect_texture_);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     static_cast<GLsizei>(texture_width), 1, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, effect_texture_scratch_.data());
+        functions.uniform_1i(shader_effects_uniform_, 1);
+        functions.uniform_1i(shader_effect_count_uniform_,
+                             static_cast<GLint>(shader->effects.size()));
+        functions.uniform_1f(shader_effect_texture_width_uniform_,
+                             static_cast<float>(texture_width));
+        functions.active_texture(GL_TEXTURE0);
+        return true;
     };
 
     const auto draw_fill = [&](const VectorDrawPacket& packet,
@@ -983,7 +1162,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                             packet.repeat_texture_x
-                                ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                ? (packet.mirror_texture_x
+                                    ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                : GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                             GL_CLAMP_TO_EDGE);
             if (packet.raster_filter) {
@@ -1002,7 +1183,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
-        apply_shader(packet);
+        if (!apply_shader(packet)) return false;
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.fill_indices.size()),
             GL_UNSIGNED_INT, nullptr);
@@ -1059,7 +1240,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
-        apply_shader(packet);
+        if (!apply_shader(packet)) return false;
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.stroke_indices.size()),
             GL_UNSIGNED_INT, nullptr);
@@ -1078,6 +1259,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 left.image_fill->opacity == right.image_fill->opacity &&
                 left.raster_filter == right.raster_filter &&
                 left.repeat_texture_x == right.repeat_texture_x &&
+                left.mirror_texture_x == right.mirror_texture_x &&
                 same_texture_tint(left, right);
         }
         if (left.fill_color.has_value() != right.fill_color.has_value()) return false;
@@ -1151,7 +1333,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                             first.repeat_texture_x
-                                ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                ? (first.mirror_texture_x
+                                    ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                : GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                             GL_CLAMP_TO_EDGE);
             if (first.raster_filter) {
@@ -1167,7 +1351,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
-        apply_shader(first);
+        if (!apply_shader(first)) return false;
         functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(index_scratch_.size()),
                                 GL_UNSIGNED_INT, nullptr);
         ++stats.draw_calls;

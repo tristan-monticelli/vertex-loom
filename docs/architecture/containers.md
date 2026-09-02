@@ -12,7 +12,7 @@ C4Container
         Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources, version générée par CMake et journaux structurés locaux")
         Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont profils shader textiles/plastiques, texture de stroke par défaut du manifeste, classification de textures, collisions configurables, BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions, index unifié de ressources et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération, journal de preview borné et contraintes de poignées Bézier")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés, profils shader et batching stable")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés avec métriques de bande U/V et raccords sans bouclage dans l'épaisseur, profils shader avec pile d'effets ordonnée sans plafond produit et batching stable")
         Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
     Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : initialisation, packets, draw calls, triangles, p95, pic mémoire et identité du driver OpenGL ; FABRIC_REQUIRE_NATIVE_GL=1 refuse Mesa/llvmpipe")
     Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, mesure la préparation et le chargement d’une map dense, puis mesure culling, draw calls, p95 et pic mémoire du runtime")
@@ -76,6 +76,13 @@ même instant sans introduire un format de preview distinct.
 Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
+
+Les apparences de surface peuvent porter une pile ordonnée d'effets (teinte,
+holographie et brillance). `fabric_project` persiste cette liste sans plafond
+fonctionnel et `fabric_render` la parcourt dans le fragment shader au moyen
+d'une texture de paramètres dimensionnée à l'exécution. La seule borne est la
+capacité de texture annoncée par le GPU ; elle produit une erreur de rendu
+explicite au lieu de tronquer silencieusement la pile.
 
 Les triggers ne sont plus liés au personnage CLI : Preview Runtime construit
 une liste d'acteurs à bounds monde pour chaque instance et pour le personnage,

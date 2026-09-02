@@ -23,4 +23,13 @@ std::string_view to_string(const SurfaceShaderProfile value) noexcept {
     return "Monochrome";
 }
 
+std::string_view to_string(const SurfaceEffectKind value) noexcept {
+    switch (value) {
+    case SurfaceEffectKind::tint: return "Tint";
+    case SurfaceEffectKind::holography: return "Holography";
+    case SurfaceEffectKind::shine: return "Shine";
+    }
+    return "Tint";
+}
+
 } // namespace fabric::project

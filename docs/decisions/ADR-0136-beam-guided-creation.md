@@ -21,6 +21,11 @@ quand aucune variante locale n’est choisie et persiste son profil Thread,
 classification Beam, couleurs, répétition, brillance et holographie dans le
 chemin texturé produit.
 
+Un projet créé depuis Asset Studio installe immédiatement la ressource PNG
+`beam-thread` dans son dossier `assets/textures` et la définit comme
+`defaultStrokeTexture`. Le bouton Beam ne peut donc pas ouvrir un projet neuf
+avec une référence de texture absente.
+
 Les nouvelles compositions Beam utilisent aussi l'identifiant de calque
 `beam` pour leurs bindings publics. `seam` reste accepté uniquement dans les
 ressources historiques ; il ne doit plus apparaître dans l'inspecteur d'un
@@ -30,6 +35,41 @@ Le rendu reste partagé par Asset Studio, Preview Runtime et runtime publié via
 la géométrie de ruban par longueur d’arc. La tangente du chemin détermine
 l’orientation ; le choix de texture manuel ne modifie que la ressource
 sélectionnée.
+
+Les `textureMetrics` persistées décrivent la bande source : U couvre les bords
+gauche/droit de la frise et V couvre uniquement son épaisseur. U avance par
+longueur d’arc ; V ne se répète jamais. Les caps et raccords réutilisent ces
+mêmes bornes afin de ne pas inverser, recouper ou boucler la texture dans un
+autre axe. Le PNG original reste stocké dans sa résolution complète ; ces
+métriques remplacent tout recadrage destructif du fichier importé. Le draw
+packet du chemin marque son image en `stretch` technique afin que le renderer
+ne réapplique pas ensuite un second cadrage `cover` sur les UV déjà calculés.
+
+La texture Beam fournie par défaut peut déjà contenir une frise complète. Le
+preset guidé commence donc avec une répétition de `1` afin de préserver cette
+frise ; la répétition reste un paramètre local et avancé pour les textures qui
+contiennent un motif unique. Cette valeur est normalisée sur la longueur totale
+du chemin : `1` couvre une fois le trajet du début à la fin, indépendamment de
+sa longueur en unités monde.
+
+Pour une frise complète dont les bords gauche et droit ne sont pas conçus pour
+un raccord direct, le mapping avancé `Mirror tile` répète uniquement l'axe U
+du chemin en miroir. L'axe V reste toujours clampé sur l'épaisseur ; le chemin
+et sa tangente ne sont jamais inversés.
+
+Après création, l'inspecteur Beam reprend dans un seul groupe la texture, le
+profil, les deux couleurs, l'épaisseur, la répétition, la brillance,
+l'holographie et l'opacité. Les réglages de contrat UV restent repliés dans la
+section avancée. La couleur du ruban demeure blanche : la coloration Beam est
+appliquée une seule fois par le profil Thread afin de conserver les détails du
+PNG source. Les terminaisons d'un Beam guidé restent droites et l'offset U
+n'est pas exposé : les bords gauche et droit du PNG ne sont ni arrondis, ni
+décalés, ni recadrés par l'outil.
+
+Le réglage utilisateur `Color handling` distingue `Recolor from detail`, qui
+utilise la luminance et l'alpha du PNG avec la teinte de base, de `Keep image
+colors`, qui conserve les couleurs du PNG. Ce choix est persisté comme
+paramètre du composant et résolu par le même renderer dans Studio et runtime.
 
 Le renderer OpenGL applique aussi le shader aux lots de remplissage et sépare
 les lots quand leurs paramètres shader diffèrent ; une composition ne perd

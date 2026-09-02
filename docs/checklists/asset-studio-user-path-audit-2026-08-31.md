@@ -62,8 +62,8 @@ flowchart TD
 | U07 | Créer plusieurs Beams | Partiel | Le premier Beam prouve `defaultStrokeTexture`; un scénario multi-Beam avec variante locale reste à ajouter. | P1 |
 | U08 | Changer la variante texture d'un Beam | Partiel | Le combo existe et la référence est locale, mais aucune preuve écran ne confirme la continuité et le rechargement. | P1 |
 | U09 | Régler répétition/orientation sur ligne, courbe et segments | Contrat géométrique couvert | L'arc-length geometry est testée ; le parcours guidé complet et les captures comparables restent absents. | P1 |
-| U10 | Régler color/effect/shine/holography du Beam | Partiel corrigé | Le shader Thread conserve le motif à holographie maximale ; l'assistant et le reload Studio sont prouvés. La comparaison Preview Runtime/publication reste ouverte. | P1 |
-| U11 | Créer un Button avec l'original fourni | Conforme sur le parcours isolé | Le parcours conserve le PNG choisi, lui attache un Material v2, expose couleur, effet, brillance, holographie et opacité, puis prouve clic réel, capture et reload. | Fermé |
+| U10 | Régler color/effect/shine/holography du Beam | Partiel corrigé | L'inspecteur expose une pile sans plafond produit avec ajout, duplication, ordre et suppression. Quatre blocs et leur ordre sont testés dans le renderer ; la comparaison Preview Runtime/publication reste ouverte. | P1 |
+| U11 | Créer un Button avec l'original fourni | Conforme sur le parcours isolé | Le parcours conserve le PNG choisi, attache un Material v2 et affiche immédiatement la pile modulaire sous le bloc Button avec la preview complète ; clic réel, capture et reload sont prouvés. | Fermé |
 | U12 | Créer un Eye | Supprimé | Le faux type Eye, sa factory et ses fixtures ont été retirés ; les originaux concernés passent par Button comme PNG. | Fermé |
 | U13 | Créer un Artwork | Partiel | Le prompt et la publication existent ; la personnalisation complète et le rendu final restent incomplets. | P1 |
 | U14 | Créer une Entity composée de plusieurs blocs | Bloqué UX | La création démarre avec un drawable et l'ajout des autres blocs est caché dans l'inspecteur, sans assistant de composition. | P1 |

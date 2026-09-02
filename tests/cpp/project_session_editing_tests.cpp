@@ -401,6 +401,13 @@ TEST_CASE("guided Button entity preserves its PNG and reloads shader appearance"
         .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
         .shine = 0.4F,
         .holography = 0.3F,
+        .effects = {
+            {.kind = fabric::project::SurfaceEffectKind::tint,
+             .color = {0.2F, 0.7F, 1.0F, 1.0F}},
+            {.kind = fabric::project::SurfaceEffectKind::holography,
+             .color = {1.0F, 0.2F, 0.8F, 1.0F}, .amount = 0.3F},
+            {.kind = fabric::project::SurfaceEffectKind::shine,
+             .amount = 0.4F}},
     };
     REQUIRE(session.create_entity(button));
     REQUIRE(session.selected_entity());
@@ -417,6 +424,34 @@ TEST_CASE("guided Button entity preserves its PNG and reloads shader appearance"
     REQUIRE(loaded.ok());
     REQUIRE(loaded.asset->shader);
     CHECK(*loaded.asset->shader == *button.appearance_shader);
+    auto edited = *loaded.asset;
+    edited.shader->effects.push_back({
+        .kind = fabric::project::SurfaceEffectKind::shine,
+        .color = {0.2F, 1.0F, 0.4F, 1.0F}, .amount = 0.2F});
+    REQUIRE(session.set_referenced_material(drawable.material->id, edited));
+    const auto edited_reload = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(edited_reload.ok());
+    REQUIRE(edited_reload.asset->shader);
+    CHECK(edited_reload.asset->shader->effects.size() == 4U);
+    REQUIRE(session.undo());
+    const auto undone = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(undone.ok());
+    REQUIRE(undone.asset->shader);
+    CHECK(undone.asset->shader->effects.size() == 3U);
+    REQUIRE(session.redo());
+    const auto redone = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(redone.ok());
+    REQUIRE(redone.asset->shader);
+    CHECK(redone.asset->shader->effects.size() == 4U);
     CHECK(std::filesystem::is_regular_file(
         project.path() / "assets/textures/original-button.png"));
 }

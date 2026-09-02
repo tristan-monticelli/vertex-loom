@@ -90,6 +90,7 @@ bool ui_beam_probe_enabled = false;
 bool ui_beam_create_seen = false;
 bool ui_beam_created = false;
 bool ui_beam_reloaded = false;
+bool ui_beam_holography_variant = false;
 ImVec2 ui_beam_create_screen{};
 bool ui_button_probe_enabled = false;
 bool ui_button_create_seen = false;
@@ -163,6 +164,126 @@ void draw_resource_identity_fields(std::string& name, std::string& id) {
 
 void draw_technical_tooltip(const std::string_view text) {
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", std::string(text).c_str());
+}
+
+bool draw_surface_effect_stack(
+    fabric::project::ShaderSurfaceSettings& shader,
+    const char* identifier,
+    const bool expand_blocks = true) {
+    using Effect = fabric::project::SurfaceEffect;
+    using Kind = fabric::project::SurfaceEffectKind;
+    bool changed = false;
+    ImGui::PushID(identifier);
+    ImGui::SeparatorText("Effect stack");
+    ImGui::TextDisabled("%zu block%s · evaluated from top to bottom",
+                        shader.effects.size(), shader.effects.size() == 1U ? "" : "s");
+    if (shader.effects.empty()) {
+        ImGui::TextWrapped(
+            "This asset still uses the compatible two-color shader.");
+        if (ImGui::Button("Convert to modular effects")) {
+            shader.effects = {
+                Effect{.kind = Kind::tint,
+                       .color = shader.primary_color,
+                       .amount = 1.0F},
+                Effect{.kind = Kind::holography,
+                       .color = shader.effect_color,
+                       .amount = shader.holography},
+                Effect{.kind = Kind::shine,
+                       .color = {1.0F, 1.0F, 1.0F, 1.0F},
+                       .amount = shader.shine},
+            };
+            changed = true;
+        }
+    }
+    if (ImGui::BeginCombo("Add effect", "Choose a block…")) {
+        for (const auto kind : {Kind::tint, Kind::holography, Kind::shine}) {
+            const auto label = std::string(fabric::project::to_string(kind));
+            if (ImGui::Selectable(label.c_str())) {
+                shader.effects.push_back(Effect{.kind = kind});
+                changed = true;
+            }
+        }
+        ImGui::EndCombo();
+    }
+
+    enum class Action { none, duplicate, move_up, move_down, remove };
+    Action action = Action::none;
+    std::size_t action_index = 0U;
+    for (std::size_t index = 0; index < shader.effects.size(); ++index) {
+        auto& effect = shader.effects[index];
+        ImGui::PushID(static_cast<int>(index));
+        const auto title = std::to_string(index + 1U) + ". " +
+            std::string(fabric::project::to_string(effect.kind));
+        const bool open = ImGui::CollapsingHeader(
+            title.c_str(), expand_blocks ? ImGuiTreeNodeFlags_DefaultOpen : 0);
+        if (open) {
+            changed |= ImGui::Checkbox("Enabled", &effect.enabled);
+            const auto current_kind = std::string(
+                fabric::project::to_string(effect.kind));
+            if (ImGui::BeginCombo("Mode", current_kind.c_str())) {
+                for (const auto kind : {Kind::tint, Kind::holography,
+                                        Kind::shine}) {
+                    const auto label = std::string(
+                        fabric::project::to_string(kind));
+                    if (ImGui::Selectable(label.c_str(), effect.kind == kind)) {
+                        effect.kind = kind;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            changed |= ImGui::ColorEdit4("Color", &effect.color.red);
+            changed |= ImGui::SliderFloat(
+                "Amount", &effect.amount, 0.0F, 1.0F, "%.2f");
+            if (effect.kind == Kind::holography) {
+                changed |= ImGui::SliderFloat(
+                    "Pattern scale", &effect.scale, 0.05F, 8.0F, "%.2f");
+            }
+            if (ImGui::SmallButton("Duplicate")) {
+                action = Action::duplicate;
+                action_index = index;
+            }
+            ImGui::SameLine();
+            ImGui::BeginDisabled(index == 0U);
+            if (ImGui::SmallButton("Up")) {
+                action = Action::move_up;
+                action_index = index;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::BeginDisabled(index + 1U == shader.effects.size());
+            if (ImGui::SmallButton("Down")) {
+                action = Action::move_down;
+                action_index = index;
+            }
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Remove")) {
+                action = Action::remove;
+                action_index = index;
+            }
+        }
+        ImGui::PopID();
+        if (action != Action::none) break;
+    }
+    if (action == Action::duplicate) {
+        shader.effects.insert(shader.effects.begin() +
+            static_cast<std::ptrdiff_t>(action_index + 1U),
+            shader.effects[action_index]);
+        changed = true;
+    } else if (action == Action::move_up) {
+        std::swap(shader.effects[action_index], shader.effects[action_index - 1U]);
+        changed = true;
+    } else if (action == Action::move_down) {
+        std::swap(shader.effects[action_index], shader.effects[action_index + 1U]);
+        changed = true;
+    } else if (action == Action::remove) {
+        shader.effects.erase(shader.effects.begin() +
+            static_cast<std::ptrdiff_t>(action_index));
+        changed = true;
+    }
+    ImGui::PopID();
+    return changed;
 }
 
 struct CreationUiState {
@@ -3048,21 +3169,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 material.shader = shader_enabled
                     ? std::optional<fabric::project::ShaderSurfaceSettings>{
                         fabric::project::ShaderSurfaceSettings{
-                            .profile = fabric::project::SurfaceShaderProfile::custom}}
+                            .profile = fabric::project::SurfaceShaderProfile::custom,
+                            .effects = {{
+                                .kind = fabric::project::SurfaceEffectKind::tint}}}}
                     : std::optional<fabric::project::ShaderSurfaceSettings>{};
                 commit_material(std::move(material));
             }
             if (current.shader) {
                 auto appearance = *current.shader;
                 bool changed = false;
-                changed |= ImGui::ColorEdit4(
-                    "Primary color", &appearance.primary_color.red);
-                changed |= ImGui::ColorEdit4(
-                    "Effect color", &appearance.effect_color.red);
-                changed |= ImGui::SliderFloat(
-                    "Shine", &appearance.shine, 0.0F, 1.0F);
-                changed |= ImGui::SliderFloat(
-                    "Holography", &appearance.holography, 0.0F, 1.0F);
+                changed |= draw_surface_effect_stack(
+                    appearance, "material-effects");
                 changed |= ImGui::SliderFloat(
                     "Effect opacity", &appearance.opacity, 0.0F, 1.0F);
                 changed |= ImGui::SliderFloat(
@@ -3252,101 +3369,204 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
                 auto style = *session.selected_textured_path();
                 bool style_changed = false;
-                ImGui::SeparatorText("Ribbon and texture");
-                style_changed |= ImGui::Checkbox("Closed", &style.closed);
-                style_changed |= ImGui::DragFloat(
-                    "Width (world units)", &style.width, 0.01F, 0.001F, 1000.0F);
-                draw_technical_tooltip("Ribbon width rendered along the textured path.");
-                style_changed |= ImGui::DragFloat2(
-                    "Texture repeat (factor)", &style.uv_scale.x, 0.05F,
-                    0.001F, 1000.0F);
-                draw_technical_tooltip("Texture repetition multiplier along the path.");
-                style_changed |= ImGui::DragFloat2(
-                    "Texture offset (normalized)", &style.uv_offset.x, 0.01F);
-                draw_technical_tooltip("Normalized offset applied to the path texture.");
-                style_changed |= ImGui::ColorEdit4(
-                    "Color", &style.color.red);
-                style_changed |= ImGui::SliderFloat(
-                    "Opacity (0–1)", &style.opacity, 0.0F, 1.0F);
-                draw_technical_tooltip("Opacity applied to the textured path.");
-                int uv_mode = style.uv_mode ==
-                        fabric::project::TexturedPathUvMode::repeat ? 0 : 1;
-                if (ImGui::Combo("UV mode", &uv_mode,
-                                 "Repeat\0Stretch\0")) {
-                    style.uv_mode = uv_mode == 0
-                        ? fabric::project::TexturedPathUvMode::repeat
-                        : fabric::project::TexturedPathUvMode::stretch;
-                    style_changed = true;
+                const bool is_beam = style.shader.classification ==
+                    fabric::project::TextureClassification::beam;
+                ImGui::SeparatorText(is_beam ? "Beam" : "Ribbon and texture");
+                if (is_beam) {
+                    std::string texture_id = style.texture.id.value;
+                    if (draw_project_resource_picker(
+                            "Texture", session.resources(),
+                            fabric::editor::StudioResourceKind::texture,
+                            texture_id, false)) {
+                        style.texture = {{.value = std::move(texture_id)},
+                                         "texture"};
+                        style_changed = true;
+                    }
+                    const auto beam_profile_label = [](const auto profile) {
+                        using Profile =
+                            fabric::project::SurfaceShaderProfile;
+                        switch (profile) {
+                        case Profile::thread: return "Recolor from detail";
+                        case Profile::plastic: return "Keep image colors";
+                        case Profile::monochrome: return "Monochrome";
+                        case Profile::custom: return "Custom";
+                        }
+                        return "Custom";
+                    };
+                    const auto profile_label =
+                        beam_profile_label(style.shader.profile);
+                    if (ImGui::BeginCombo("Profile", profile_label)) {
+                        for (const auto profile : {
+                                 fabric::project::SurfaceShaderProfile::thread,
+                                 fabric::project::SurfaceShaderProfile::plastic,
+                                 fabric::project::SurfaceShaderProfile::monochrome,
+                                 fabric::project::SurfaceShaderProfile::custom}) {
+                            const bool selected = style.shader.profile == profile;
+                            const auto label = beam_profile_label(profile);
+                            if (ImGui::Selectable(label, selected)) {
+                                style.shader.profile = profile;
+                                style_changed = true;
+                            }
+                            if (selected) ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::TextDisabled(style.shader.profile ==
+                            fabric::project::SurfaceShaderProfile::plastic
+                        ? "White preserves the PNG colors."
+                        : "White produces a neutral Beam from the PNG detail.");
+                    style_changed |= draw_surface_effect_stack(
+                        style.shader, "beam-effects");
+                    style_changed |= ImGui::DragFloat(
+                        "Thickness", &style.width, 0.01F, 0.001F, 1000.0F,
+                        "%.3f");
+                    style_changed |= ImGui::DragFloat(
+                        "Repetition", &style.uv_scale.x, 0.05F, 0.01F,
+                        1000.0F);
+                    style_changed |= ImGui::SliderFloat(
+                        "Opacity", &style.opacity, 0.0F, 1.0F);
+                    ImGui::TextDisabled(
+                        "Orientation follows the path from start to end.");
+
+                    if (ImGui::CollapsingHeader("Advanced Beam settings")) {
+                        style_changed |= ImGui::Checkbox("Closed path", &style.closed);
+                        int uv_mode = style.uv_mode ==
+                                fabric::project::TexturedPathUvMode::repeat ? 0 :
+                            style.uv_mode == fabric::project::TexturedPathUvMode::mirror
+                                ? 1 : 2;
+                        if (ImGui::Combo("Mapping", &uv_mode,
+                                         "Tile\0Mirror tile\0Stretch\0")) {
+                            style.uv_mode = uv_mode == 0
+                                ? fabric::project::TexturedPathUvMode::repeat
+                                : uv_mode == 1
+                                    ? fabric::project::TexturedPathUvMode::mirror
+                                    : fabric::project::TexturedPathUvMode::stretch;
+                            style_changed = true;
+                        }
+                        float band_top = style.texture_metrics.origin.y;
+                        float band_height = style.texture_metrics.size.y;
+                        bool band_changed = ImGui::DragFloat(
+                            "Texture band top", &band_top, 0.005F, 0.0F, 0.999F);
+                        band_changed |= ImGui::DragFloat(
+                            "Texture band thickness", &band_height, 0.005F,
+                            0.001F, 1.0F);
+                        if (band_changed) {
+                            band_top = std::clamp(band_top, 0.0F, 0.999F);
+                            band_height = std::clamp(
+                                band_height, 0.001F, 1.0F - band_top);
+                            style.texture_metrics.origin = {0.0F, band_top};
+                            style.texture_metrics.size = {1.0F, band_height};
+                            style_changed = true;
+                        }
+                        ImGui::TextDisabled(
+                            "Left and right source edges are locked.");
+                        style_changed |= ImGui::SliderFloat(
+                            "Shader opacity", &style.shader.opacity, 0.0F, 1.0F);
+                        style_changed |= ImGui::SliderFloat(
+                            "Shader intensity", &style.shader.intensity,
+                            0.0F, 4.0F);
+                    }
+                    // Beam thickness never tiles and its source left/right
+                    // bounds are immutable.
+                    style.uv_scale.y = 1.0F;
+                    style.uv_offset = {};
+                    style.texture_metrics.origin.x = 0.0F;
+                    style.texture_metrics.size.x = 1.0F;
+                    style.color = {1.0F, 1.0F, 1.0F, 1.0F};
+                } else {
+                    style_changed |= ImGui::Checkbox("Closed", &style.closed);
+                    style_changed |= ImGui::DragFloat(
+                        "Width (world units)", &style.width, 0.01F, 0.001F,
+                        1000.0F);
+                    style_changed |= ImGui::DragFloat2(
+                        "Texture repeat (factor)", &style.uv_scale.x, 0.05F,
+                        0.001F, 1000.0F);
+                    style_changed |= ImGui::DragFloat2(
+                        "Texture offset (normalized)", &style.uv_offset.x,
+                        0.01F);
+                    style_changed |= ImGui::ColorEdit4(
+                        "Color", &style.color.red);
+                    style_changed |= ImGui::SliderFloat(
+                        "Opacity (0–1)", &style.opacity, 0.0F, 1.0F);
+                    int uv_mode = style.uv_mode ==
+                            fabric::project::TexturedPathUvMode::repeat ? 0 :
+                        style.uv_mode == fabric::project::TexturedPathUvMode::mirror
+                            ? 1 : 2;
+                    if (ImGui::Combo("UV mode", &uv_mode,
+                                     "Repeat\0Mirror repeat\0Stretch\0")) {
+                        style.uv_mode = uv_mode == 0
+                            ? fabric::project::TexturedPathUvMode::repeat
+                            : uv_mode == 1
+                                ? fabric::project::TexturedPathUvMode::mirror
+                                : fabric::project::TexturedPathUvMode::stretch;
+                        style_changed = true;
+                    }
+                    ImGui::SeparatorText("Surface color and shader");
+                    const auto shader_profile_label = std::string(
+                        fabric::project::to_string(style.shader.profile));
+                    if (ImGui::BeginCombo("Shader profile",
+                                          shader_profile_label.c_str())) {
+                        for (const auto profile : {
+                                 fabric::project::SurfaceShaderProfile::thread,
+                                 fabric::project::SurfaceShaderProfile::plastic,
+                                 fabric::project::SurfaceShaderProfile::monochrome,
+                                 fabric::project::SurfaceShaderProfile::custom}) {
+                            const bool selected_profile =
+                                style.shader.profile == profile;
+                            const auto label = std::string(
+                                fabric::project::to_string(profile));
+                            if (ImGui::Selectable(label.c_str(), selected_profile)) {
+                                style.shader.profile = profile;
+                                style_changed = true;
+                            }
+                            if (selected_profile) ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    const auto shader_classification_label = std::string(
+                        fabric::project::to_string(style.shader.classification));
+                    if (ImGui::BeginCombo(
+                            "Texture role", shader_classification_label.c_str())) {
+                        for (const auto classification : {
+                                 fabric::project::TextureClassification::floor,
+                                 fabric::project::TextureClassification::rope,
+                                 fabric::project::TextureClassification::beam,
+                                 fabric::project::TextureClassification::button_eye,
+                                 fabric::project::TextureClassification::collision_marker}) {
+                            const bool selected_classification =
+                                style.shader.classification == classification;
+                            const auto label = std::string(
+                                fabric::project::to_string(classification));
+                            if (ImGui::Selectable(
+                                    label.c_str(), selected_classification)) {
+                                style.shader.classification = classification;
+                                style_changed = true;
+                            }
+                            if (selected_classification)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    style_changed |= draw_surface_effect_stack(
+                        style.shader, "path-effects");
+                    style_changed |= ImGui::SliderFloat(
+                        "Shader opacity", &style.shader.opacity, 0.0F, 1.0F);
+                    style_changed |= ImGui::SliderFloat(
+                        "Shader intensity", &style.shader.intensity, 0.0F, 4.0F);
                 }
                 if (style_changed)
                     (void)session.set_selected_textured_path(std::move(style));
-                auto shader_style = *session.selected_textured_path();
-                bool shader_changed = false;
-                ImGui::SeparatorText("Surface color and shader");
-                const auto shader_profile_label = std::string(
-                    fabric::project::to_string(shader_style.shader.profile));
-                if (ImGui::BeginCombo("Shader profile",
-                                      shader_profile_label.c_str())) {
-                    for (const auto profile : {
-                             fabric::project::SurfaceShaderProfile::thread,
-                             fabric::project::SurfaceShaderProfile::plastic,
-                             fabric::project::SurfaceShaderProfile::monochrome,
-                             fabric::project::SurfaceShaderProfile::custom}) {
-                        const bool selected_profile =
-                            shader_style.shader.profile == profile;
-                        const auto label = std::string(
-                            fabric::project::to_string(profile));
-                        if (ImGui::Selectable(label.c_str(), selected_profile)) {
-                            shader_style.shader.profile = profile;
-                            shader_changed = true;
-                        }
-                        if (selected_profile) ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
+                if (!is_beam) {
+                    ImGui::SeparatorText("Texture animation preview");
+                    ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
+                    ImGui::DragFloat(
+                        "Scroll speed (factor/s)", &path_ui.scroll_speed,
+                        0.05F, -100.0F, 100.0F);
+                    draw_technical_tooltip(
+                        "Texture offset speed used by the preview animation.");
+                    if (ImGui::Button("Reset preview offset"))
+                        path_ui.preview_offset = 0.0F;
                 }
-                const auto shader_classification_label = std::string(
-                    fabric::project::to_string(shader_style.shader.classification));
-                if (ImGui::BeginCombo("Texture role",
-                                      shader_classification_label.c_str())) {
-                    for (const auto classification : {
-                             fabric::project::TextureClassification::floor,
-                             fabric::project::TextureClassification::rope,
-                             fabric::project::TextureClassification::beam,
-                             fabric::project::TextureClassification::button_eye,
-                             fabric::project::TextureClassification::collision_marker}) {
-                        const bool selected_classification =
-                            shader_style.shader.classification == classification;
-                        const auto label = std::string(
-                            fabric::project::to_string(classification));
-                        if (ImGui::Selectable(label.c_str(), selected_classification)) {
-                            shader_style.shader.classification = classification;
-                            shader_changed = true;
-                        }
-                        if (selected_classification) ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                shader_changed |= ImGui::ColorEdit4(
-                    "Primary color", &shader_style.shader.primary_color.red);
-                shader_changed |= ImGui::ColorEdit4(
-                    "Effect color", &shader_style.shader.effect_color.red);
-                shader_changed |= ImGui::SliderFloat(
-                    "Shine", &shader_style.shader.shine, 0.0F, 1.0F);
-                shader_changed |= ImGui::SliderFloat(
-                    "Holography", &shader_style.shader.holography, 0.0F, 1.0F);
-                shader_changed |= ImGui::SliderFloat(
-                    "Shader opacity", &shader_style.shader.opacity, 0.0F, 1.0F);
-                shader_changed |= ImGui::SliderFloat(
-                    "Shader intensity", &shader_style.shader.intensity, 0.0F, 4.0F);
-                if (shader_changed)
-                    (void)session.set_selected_textured_path(std::move(shader_style));
-                ImGui::SeparatorText("Texture animation preview");
-                ImGui::Checkbox("Scroll texture", &path_ui.animate_texture);
-                ImGui::DragFloat("Scroll speed (factor/s)", &path_ui.scroll_speed,
-                                 0.05F, -100.0F, 100.0F);
-                draw_technical_tooltip("Texture offset speed used by the preview animation.");
-                if (ImGui::Button("Reset preview offset"))
-                    path_ui.preview_offset = 0.0F;
             } else if (session.selected_visual_composition()) {
                 const auto& composition =
                     *session.selected_visual_composition();
@@ -3611,7 +3831,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     selected_anchor = 0U;
                     selected_parameter = 0U;
                 }
-                ImGui::SeparatorText("Anchors");
+                const bool is_beam_component = std::ranges::any_of(
+                    component.parameters, [](const auto& parameter) {
+                        return parameter.target.node_id == "beam" &&
+                            parameter.target.component_id == "shader";
+                    });
+                if (!is_beam_component ||
+                    ImGui::CollapsingHeader("Advanced component structure")) {
+                    ImGui::SeparatorText("Anchors");
                 for (std::size_t index = 0; index < component.anchors.size();
                      ++index) {
                     const auto& anchor = component.anchors[index];
@@ -3654,21 +3881,95 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::SetItemTooltip("Position of the visual component anchor in project world units.");
                 }
-
-                const auto& current_component =
-                    *session.selected_visual_component();
-                ImGui::SeparatorText("Parameters");
-                for (std::size_t index = 0;
-                     index < current_component.parameters.size(); ++index) {
-                    const auto& parameter = current_component.parameters[index];
-                    if (ImGui::Selectable(parameter.name.c_str(),
-                                          selected_parameter == index))
-                        selected_parameter = index;
                 }
-                if (!current_component.parameters.empty() &&
-                    selected_parameter < current_component.parameters.size()) {
-                    auto parameter =
-                        current_component.parameters[selected_parameter];
+
+                const auto current_component =
+                    *session.selected_visual_component();
+                ImGui::SeparatorText(
+                    is_beam_component ? "Beam appearance" : "Parameters");
+                if (is_beam_component) {
+                    for (std::size_t index = 0;
+                         index < current_component.parameters.size(); ++index) {
+                        auto parameter = current_component.parameters[index];
+                        bool changed = false;
+                        ImGui::PushID(static_cast<int>(index));
+                        if (auto* reference = std::get_if<
+                                fabric::project::ResourceReference>(
+                                &parameter.default_value)) {
+                            std::string texture_id = reference->id.value;
+                            if (draw_project_resource_picker(
+                                    parameter.name.c_str(), session.resources(),
+                                    fabric::editor::StudioResourceKind::texture,
+                                    texture_id, false)) {
+                                *reference = {{.value = std::move(texture_id)},
+                                              "texture"};
+                                changed = true;
+                            }
+                        } else if (auto* color = std::get_if<fabric::core::Color>(
+                                       &parameter.default_value)) {
+                            changed = ImGui::ColorEdit4(
+                                parameter.name.c_str(), &color->red);
+                        } else if (auto* value = std::get_if<std::string>(
+                                       &parameter.default_value)) {
+                            if (parameter.id == "color-mode") {
+                                const char* label = *value == "preserve"
+                                    ? "Keep image colors"
+                                    : "Recolor from detail";
+                                if (ImGui::BeginCombo(parameter.name.c_str(),
+                                                      label)) {
+                                    if (ImGui::Selectable(
+                                            "Recolor from detail",
+                                            *value == "recolor")) {
+                                        *value = "recolor";
+                                        changed = true;
+                                    }
+                                    if (ImGui::Selectable(
+                                            "Keep image colors",
+                                            *value == "preserve")) {
+                                        *value = "preserve";
+                                        changed = true;
+                                    }
+                                    ImGui::EndCombo();
+                                }
+                            }
+                        } else if (auto* value = std::get_if<float>(
+                                       &parameter.default_value)) {
+                            if (parameter.id == "shine" ||
+                                parameter.id == "holography" ||
+                                parameter.id == "opacity") {
+                                changed = ImGui::SliderFloat(
+                                    parameter.name.c_str(), value, 0.0F, 1.0F);
+                            } else {
+                                changed = ImGui::DragFloat(
+                                    parameter.name.c_str(), value, 0.01F,
+                                    parameter.id == "repeat" ? 0.01F : 0.001F,
+                                    1000.0F);
+                            }
+                        }
+                        if (changed) {
+                            auto candidate =
+                                *session.selected_visual_component();
+                            candidate.parameters[index] = std::move(parameter);
+                            (void)session.set_selected_visual_component(
+                                std::move(candidate));
+                        }
+                        ImGui::PopID();
+                    }
+                    ImGui::TextDisabled(
+                        "Orientation follows the path from start to end.");
+                } else {
+                    for (std::size_t index = 0;
+                         index < current_component.parameters.size(); ++index) {
+                        const auto& parameter =
+                            current_component.parameters[index];
+                        if (ImGui::Selectable(parameter.name.c_str(),
+                                              selected_parameter == index))
+                            selected_parameter = index;
+                    }
+                    if (!current_component.parameters.empty() &&
+                        selected_parameter < current_component.parameters.size()) {
+                        auto parameter =
+                            current_component.parameters[selected_parameter];
                     bool changed = ImGui::Checkbox(
                         "Animatable", &parameter.animatable);
                     ImGui::TextDisabled("Target %s.%s.%s",
@@ -3712,6 +4013,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             std::move(parameter);
                         (void)session.set_selected_visual_component(
                             std::move(candidate));
+                    }
                     }
                 }
                 ImGui::TextDisabled("%zu variant(s)",
@@ -4617,6 +4919,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     else
                         status = "Advanced entity section saved.";
                 };
+            if (ImGui::CollapsingHeader("Advanced Entity systems")) {
             if (ImGui::CollapsingHeader("Constraints", ImGuiTreeNodeFlags_DefaultOpen)) {
                 for (std::size_t index = 0; index < entity.constraints.size(); ++index) {
                     auto constraint = entity.constraints[index];
@@ -4803,6 +5106,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         fabric::project::AnimationStateMachine{};
                     commit_advanced_entity(std::move(next));
                 }
+            }
             }
         }
         if (selected != nullptr &&
@@ -5094,6 +5398,29 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 };
             ImGui::SeparatorText("Entity node properties");
+            if (node.drawable.material) {
+                const auto loaded = fabric::project::load_material(
+                    session.project_root(), *session.manifest(),
+                    fabric::project::material_document_path(
+                        *session.manifest(), node.drawable.material->id));
+                if (loaded.ok() && loaded.asset->shader) {
+                    auto appearance = *loaded.asset;
+                    bool appearance_changed = draw_surface_effect_stack(
+                        *appearance.shader, "entity-material-effects");
+                    appearance_changed |= ImGui::SliderFloat(
+                        "Appearance opacity", &appearance.shader->opacity,
+                        0.0F, 1.0F);
+                    appearance_changed |= ImGui::SliderFloat(
+                        "Appearance intensity", &appearance.shader->intensity,
+                        0.0F, 4.0F);
+                    if (appearance_changed &&
+                        !session.set_referenced_material(
+                            node.drawable.material->id,
+                            std::move(appearance))) {
+                        status = "Appearance change rejected; inspect diagnostics.";
+                    }
+                }
+            }
             bool locked = node.locked;
             if (ImGui::Checkbox("Locked", &locked)) {
                 node.locked = locked;
@@ -6670,6 +6997,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             creation.entity.drawable =
                 fabric::project::EntityDrawableKind::texture;
             creation.entity.node_name = "Button";
+            creation.entity.resource_id = "button-primary";
             creation.entity.appearance_shader =
                 fabric::project::ShaderSurfaceSettings{
                     .profile = fabric::project::SurfaceShaderProfile::custom,
@@ -6679,6 +7007,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     .effect_color = {0.2F, 0.8F, 1.0F, 1.0F},
                     .shine = 0.2F,
                     .holography = 0.0F,
+                    .effects = {
+                        {.kind = fabric::project::SurfaceEffectKind::tint,
+                         .color = {1.0F, 1.0F, 1.0F, 1.0F}},
+                        {.kind = fabric::project::SurfaceEffectKind::holography,
+                         .color = {0.2F, 0.8F, 1.0F, 1.0F},
+                         .amount = 0.0F},
+                        {.kind = fabric::project::SurfaceEffectKind::shine,
+                         .color = {1.0F, 1.0F, 1.0F, 1.0F},
+                         .amount = 0.2F}},
                 };
         }
         ImGui::OpenPopup("Create entity");
@@ -7064,8 +7401,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (request.kind == fabric::editor::VisualPresetKind::beam ||
                 request.kind == fabric::editor::VisualPresetKind::seam) {
                 ImGui::SeparatorText("Beam appearance");
-                ImGui::ColorEdit4("Beam color", &request.beam_color.red);
-                ImGui::ColorEdit4("Effect color", &request.beam_effect_color.red);
+                ImGui::ColorEdit4("Base tint", &request.beam_color.red);
+                ImGui::TextDisabled("White keeps the Beam neutral; the PNG supplies shape and detail.");
+                ImGui::ColorEdit4("Holo color",
+                                  &request.beam_effect_color.red);
                 ImGui::SliderFloat("Shine", &request.beam_shine, 0.0F, 1.0F);
                 ImGui::SliderFloat("Holography", &request.beam_holography, 0.0F, 1.0F);
                 ImGui::DragFloat("Thickness", &request.beam_width,
@@ -7388,11 +7727,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SeparatorText("Button appearance");
             ImGui::TextDisabled(
                 "These settings recolor the selected PNG; the source image is never modified.");
-            ImGui::ColorEdit4("Color", &appearance.primary_color.red);
-            ImGui::ColorEdit4("Effect color", &appearance.effect_color.red);
-            ImGui::SliderFloat("Shine", &appearance.shine, 0.0F, 1.0F);
-            ImGui::SliderFloat("Holography", &appearance.holography,
-                               0.0F, 1.0F);
+            static_cast<void>(draw_surface_effect_stack(
+                appearance, "button-create-effects", false));
             ImGui::SliderFloat("Opacity", &appearance.opacity,
                                0.0F, 1.0F);
         } else if (creation.entity.drawable !=
@@ -8029,13 +8365,21 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         creation.visual_preset.name = "UI Guided Beam";
         creation.visual_preset.guided_beam = true;
         creation.visual_preset.thread_texture.reset();
-        creation.visual_preset.beam_color = {0.2F, 0.35F, 1.0F, 1.0F};
-        creation.visual_preset.beam_effect_color = {1.0F, 0.1F, 0.8F, 1.0F};
-        creation.visual_preset.beam_shine = 0.3F;
-        creation.visual_preset.beam_holography = 0.8F;
-        creation.visual_preset.beam_repetition = 7.0F;
-        creation.visual_preset.beam_width = 0.3F;
-        creation.visual_preset.beam_opacity = 0.75F;
+        creation.visual_preset.beam_color = {1.0F, 1.0F, 1.0F, 1.0F};
+        creation.visual_preset.beam_effect_color = {1.0F, 1.0F, 1.0F, 1.0F};
+        creation.visual_preset.beam_shine = 0.0F;
+        creation.visual_preset.beam_holography = 0.0F;
+        creation.visual_preset.beam_repetition = 1.0F;
+        creation.visual_preset.beam_width = 0.5F;
+        creation.visual_preset.beam_opacity = 1.0F;
+        if (ui_beam_holography_variant) {
+            creation.visual_preset.beam_color =
+                {0.15F, 0.75F, 1.0F, 1.0F};
+            creation.visual_preset.beam_effect_color =
+                {0.75F, 1.0F, 0.95F, 1.0F};
+            creation.visual_preset.beam_shine = 0.6F;
+            creation.visual_preset.beam_holography = 1.0F;
+        }
         creation.request_visual_preset = true;
     }
     if (ui_button_test && session.has_project()) {
@@ -8230,9 +8574,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         node.transform.position = {0.0F, 0.0F};
         node.transform.scale = {50.0F, 50.0F};
         node.drawable = {
-            .kind = fabric::project::EntityDrawableKind::texture,
+            .kind = fabric::project::EntityDrawableKind::visual_component,
             .resource = fabric::project::ResourceReference{
-                {.value = "beam-thread"}, "texture"}};
+                {.value = "beam"}, "visualComponent"},
+            .component_instance = fabric::project::VisualComponentInstance{}};
         bool authored = selected && session.set_selected_entity_node(0U, node) &&
             session.add_selected_entity_node({
                 .id = "studio-child", .name = "Studio Child",
@@ -8278,7 +8623,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             reloaded.selected_entity()->nodes.front().transform.scale ==
                 fabric::core::Vec2{50.0F, 50.0F} &&
             reloaded.selected_entity()->nodes.front().drawable.kind ==
-                fabric::project::EntityDrawableKind::texture &&
+                fabric::project::EntityDrawableKind::visual_component &&
             reloaded.selected_entity()->nodes[1].drawable.kind ==
                 fabric::project::EntityDrawableKind::visual_component &&
             reloaded.selected_entity()->nodes[2].drawable.kind ==
@@ -8679,12 +9024,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (vector_canvas_e2e_frame == 17U) {
                 node.stroke->join = fabric::project::VectorStrokeJoin::miter;
                 node.stroke->cap = fabric::project::VectorStrokeCap::butt;
+                node.stroke->image.reset();
             } else if (vector_canvas_e2e_frame == 18U) {
                 node.stroke->join = fabric::project::VectorStrokeJoin::round;
                 node.stroke->cap = fabric::project::VectorStrokeCap::round;
+                node.stroke->image.reset();
             } else if (vector_canvas_e2e_frame == 19U) {
                 node.stroke->join = fabric::project::VectorStrokeJoin::bevel;
                 node.stroke->cap = fabric::project::VectorStrokeCap::square;
+                node.stroke->image.reset();
             } else if (node.stroke->image) {
                 node.stroke->image->transform.position = {0.35F, -0.15F};
                 node.stroke->image->transform.scale = {1.8F, 0.7F};
@@ -9234,6 +9582,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
+        if (ui_button_test && ui_button_frame == 2U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-button-create.ppm");
+        if (ui_beam_test && ui_beam_frame == 2U)
+            write_frame_capture(initial_project, window,
+                                "asset-studio-beam-create.ppm");
         SDL_GL_SwapWindow(window);
         if ((ui_test_mode || ui_min_window_test) && ++ui_test_frame >= 1U)
             running = false;
@@ -9367,9 +9721,33 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.manifest()->default_stroke_texture &&
                     reloaded.selected_textured_path()->texture.id ==
                         *reloaded.manifest()->default_stroke_texture &&
-                    reloaded.selected_textured_path()->width == 0.3F &&
-                    reloaded.selected_textured_path()->opacity == 0.75F &&
-                    reloaded.selected_textured_path()->uv_scale.x == 7.0F;
+                    reloaded.selected_textured_path()->width ==
+                        creation.visual_preset.beam_width &&
+                    reloaded.selected_textured_path()->opacity ==
+                        creation.visual_preset.beam_opacity &&
+                    reloaded.selected_textured_path()->uv_scale.x ==
+                        creation.visual_preset.beam_repetition &&
+                    reloaded.selected_textured_path()->cap ==
+                        fabric::project::TexturedPathCap::butt &&
+                    reloaded.selected_textured_path()->color ==
+                        fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F} &&
+                    reloaded.selected_textured_path()->shader.profile ==
+                        fabric::project::SurfaceShaderProfile::thread &&
+                    reloaded.selected_textured_path()->shader.classification ==
+                        fabric::project::TextureClassification::beam &&
+                    reloaded.selected_textured_path()->shader.primary_color ==
+                        creation.visual_preset.beam_color &&
+                    reloaded.selected_textured_path()->shader.effect_color ==
+                        creation.visual_preset.beam_effect_color &&
+                    reloaded.selected_textured_path()->shader.shine ==
+                        creation.visual_preset.beam_shine &&
+                    reloaded.selected_textured_path()->shader.holography ==
+                        creation.visual_preset.beam_holography &&
+                    reloaded.selected_textured_path()->shader.effects.size() == 3U &&
+                    reloaded.selected_textured_path()->shader.effects[0].color ==
+                        creation.visual_preset.beam_color &&
+                    reloaded.selected_textured_path()->shader.effects[1].color ==
+                        creation.visual_preset.beam_effect_color;
                 if (ui_beam_reloaded)
                     static_cast<void>(session.select_resource(
                         fabric::editor::StudioResourceKind::textured_path,
@@ -9384,21 +9762,39 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             ++ui_button_frame;
             if (ui_button_frame == 1U) {
                 creation.entity.name = "UI Guided Button";
-                creation.entity.resource_id = "head-face";
+                creation.entity.resource_id = "button-primary";
                 creation.entity.transform.scale = {50.0F, 50.0F};
                 if (creation.entity.appearance_shader) {
                     creation.entity.appearance_shader->primary_color =
                         {0.2F, 0.7F, 1.0F, 1.0F};
                     creation.entity.appearance_shader->effect_color =
-                        {1.0F, 0.2F, 0.8F, 1.0F};
+                        {1.0F, 0.8F, 0.1F, 1.0F};
                     creation.entity.appearance_shader->shine = 0.4F;
                     creation.entity.appearance_shader->holography = 0.3F;
+                    auto& effects =
+                        creation.entity.appearance_shader->effects;
+                    effects[0].color = {0.2F, 0.7F, 1.0F, 1.0F};
+                    effects[1].color = {1.0F, 0.8F, 0.1F, 1.0F};
+                    effects[1].amount = 0.3F;
+                    effects[2].amount = 0.4F;
                 }
             }
             if (ui_button_frame >= 12U) {
                 fabric::editor::ProjectSession reloaded;
+                const bool project_loaded = reloaded.open(initial_project);
+                const auto has_texture = [&](const std::string_view id) {
+                    return std::ranges::any_of(
+                        reloaded.resources(), [&](const auto& resource) {
+                            return resource.kind ==
+                                    fabric::editor::StudioResourceKind::texture &&
+                                resource.id.value == id;
+                        });
+                };
+                const bool defaults_loaded = project_loaded &&
+                    has_texture("button-primary") &&
+                    has_texture("button-secondary");
                 const bool entity_loaded = ui_button_created &&
-                    reloaded.open(initial_project) &&
+                    defaults_loaded &&
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::entity,
                         {.value = "ui-guided-button"}) &&
@@ -9413,10 +9809,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             fabric::project::material_document_path(
                                 *reloaded.manifest(), drawable.material->id));
                         ui_button_reloaded =
-                            drawable.resource->id.value == "head-face" &&
+                            drawable.resource->id.value == "button-primary" &&
                             material.ok() && material.asset->shader &&
                             material.asset->shader->classification ==
-                                fabric::project::TextureClassification::button_eye;
+                                fabric::project::TextureClassification::button_eye &&
+                            material.asset->shader->effects.size() == 3U;
                     }
                 }
                 write_ui_button_probe(initial_project);
@@ -9628,8 +10025,11 @@ int main(const int argument_count, char** arguments) {
         std::string_view{arguments[1]} == "--ui-texture-test";
     const bool ui_input_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-input-test";
+    ui_beam_holography_variant = argument_count == 3 &&
+        std::string_view{arguments[1]} == "--ui-beam-holography-test";
     const bool ui_beam_test = argument_count == 3 &&
-        std::string_view{arguments[1]} == "--ui-beam-test";
+        (std::string_view{arguments[1]} == "--ui-beam-test" ||
+         ui_beam_holography_variant);
     const bool ui_button_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-button-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
@@ -9657,6 +10057,7 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-texture-test project-directory\n"
                      "       asset_studio --ui-input-test project-directory\n"
                      "       asset_studio --ui-beam-test project-directory\n"
+                     "       asset_studio --ui-beam-holography-test project-directory\n"
                      "       asset_studio --ui-button-test project-directory\n";
         return 64;
     }

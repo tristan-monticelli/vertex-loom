@@ -51,8 +51,13 @@ bool color_read(const Json& o, const char* key, core::Color& out, std::vector<Er
     return number(*i, "red", out.red, e) && number(*i, "green", out.green, e) &&
            number(*i, "blue", out.blue, e) && number(*i, "alpha", out.alpha, e);
 }
+Json effect(const SurfaceEffect& value) {
+    return {{"kind", std::string(to_string(value.kind))},
+            {"enabled", value.enabled}, {"color", color(value.color)},
+            {"amount", value.amount}, {"scale", value.scale}};
+}
 Json shader(const ShaderSurfaceSettings& value) {
-    return {{"profile", std::string(to_string(value.profile))},
+    Json result = {{"profile", std::string(to_string(value.profile))},
             {"classification", std::string(to_string(value.classification))},
             {"primaryColor", color(value.primary_color)},
             {"effectColor", color(value.effect_color)},
@@ -60,6 +65,12 @@ Json shader(const ShaderSurfaceSettings& value) {
             {"opacity", value.opacity}, {"intensity", value.intensity},
             {"repetition", vec(value.repetition)},
             {"deformation", vec(value.deformation)}};
+    if (!value.effects.empty()) {
+        result["effects"] = Json::array();
+        for (const auto& item : value.effects)
+            result["effects"].push_back(effect(item));
+    }
+    return result;
 }
 bool shader_read(const Json& o, std::optional<ShaderSurfaceSettings>& out,
                  std::vector<Error>& e) {
@@ -93,6 +104,39 @@ bool shader_read(const Json& o, std::optional<ShaderSurfaceSettings>& out,
     number(*i, "intensity", value.intensity, e);
     vec_read(*i, "repetition", value.repetition, e);
     vec_read(*i, "deformation", value.deformation, e);
+    if (const auto effects = i->find("effects"); effects != i->end()) {
+        if (!effects->is_array()) {
+            error(e, ErrorCode::invalid_asset, "shader.effects",
+                  "expected an array");
+        } else {
+            for (std::size_t index = 0; index < effects->size(); ++index) {
+                const auto& item = (*effects)[index];
+                const auto field = "shader.effects[" + std::to_string(index) + "]";
+                if (!item.is_object()) {
+                    error(e, ErrorCode::invalid_asset, field,
+                          "expected an object");
+                    continue;
+                }
+                SurfaceEffect parsed;
+                std::string kind;
+                text(item, "kind", kind, e);
+                if (kind == "Tint") parsed.kind = SurfaceEffectKind::tint;
+                else if (kind == "Holography") parsed.kind = SurfaceEffectKind::holography;
+                else if (kind == "Shine") parsed.kind = SurfaceEffectKind::shine;
+                else error(e, ErrorCode::invalid_asset, field + ".kind",
+                           "unsupported surface effect");
+                const auto enabled = item.find("enabled");
+                if (enabled == item.end() || !enabled->is_boolean())
+                    error(e, ErrorCode::invalid_asset, field + ".enabled",
+                          "expected a boolean");
+                else parsed.enabled = enabled->get<bool>();
+                color_read(item, "color", parsed.color, e);
+                number(item, "amount", parsed.amount, e);
+                number(item, "scale", parsed.scale, e);
+                value.effects.push_back(parsed);
+            }
+        }
+    }
     if (e.empty()) out = value;
     return e.empty();
 }
@@ -145,6 +189,23 @@ ValidationReport validate_material(const ProjectManifest&, const MaterialDefinit
             !std::isfinite(a.shader->deformation.y))
             error(r.errors, ErrorCode::invalid_asset, "shader.deformation",
                   "must be finite");
+        for (std::size_t index = 0; index < a.shader->effects.size(); ++index) {
+            const auto& effect = a.shader->effects[index];
+            const auto field = "shader.effects[" + std::to_string(index) + "]";
+            for (const auto channel : {effect.color.red, effect.color.green,
+                                      effect.color.blue, effect.color.alpha})
+                if (!std::isfinite(channel) || channel < 0.0F || channel > 1.0F)
+                    error(r.errors, ErrorCode::invalid_asset, field + ".color",
+                          "channels must be finite in [0,1]");
+            if (!std::isfinite(effect.amount) || effect.amount < 0.0F ||
+                effect.amount > 1.0F)
+                error(r.errors, ErrorCode::invalid_asset, field + ".amount",
+                      "must be finite in [0,1]");
+            if (!std::isfinite(effect.scale) || effect.scale <= 0.0F ||
+                effect.scale > 8.0F)
+                error(r.errors, ErrorCode::invalid_asset, field + ".scale",
+                      "must be finite in (0,8]");
+        }
     }
     const auto valid_ref = [&](const auto& ref, const char* field, const char* type) { if (!ref) return; if (!core::ResourceId::is_valid(ref->id.value) || ref->expected_type != type) error(r.errors, ErrorCode::resource_type_mismatch, field, "reference has an invalid id or expected type"); };
     valid_ref(a.texture, "texture", "texture"); valid_ref(a.vector_pattern, "vector", "vector");

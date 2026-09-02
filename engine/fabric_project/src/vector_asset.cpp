@@ -433,6 +433,42 @@ std::optional<VectorStroke> read_stroke(const Json& object,
         read_float(*shader, "intensity", stroke.shader.intensity, errors, field + ".shader.intensity");
         read_vec2(*shader, "repetition", stroke.shader.repetition, errors, field + ".shader.repetition");
         read_vec2(*shader, "deformation", stroke.shader.deformation, errors, field + ".shader.deformation");
+        if (const auto effects = shader->find("effects"); effects != shader->end()) {
+            if (!effects->is_array()) {
+                add_error(errors, ErrorCode::invalid_asset,
+                          field + ".shader.effects", "expected an array");
+            } else {
+                for (std::size_t index = 0; index < effects->size(); ++index) {
+                    const auto& effect = (*effects)[index];
+                    const auto effect_field = field + ".shader.effects[" +
+                        std::to_string(index) + "]";
+                    if (!effect.is_object()) {
+                        add_error(errors, ErrorCode::invalid_asset, effect_field,
+                                  "expected an object");
+                        continue;
+                    }
+                    SurfaceEffect parsed;
+                    std::string kind;
+                    read_string(effect, "kind", kind, errors);
+                    if (kind == "Tint") parsed.kind = SurfaceEffectKind::tint;
+                    else if (kind == "Holography") parsed.kind = SurfaceEffectKind::holography;
+                    else if (kind == "Shine") parsed.kind = SurfaceEffectKind::shine;
+                    else add_error(errors, ErrorCode::invalid_asset,
+                                   effect_field + ".kind",
+                                   "unsupported surface effect");
+                    read_bool(effect, "enabled", parsed.enabled, errors,
+                              effect_field + ".enabled");
+                    if (effect.contains("color"))
+                        read_color(effect["color"], parsed.color, errors,
+                                   effect_field + ".color");
+                    read_float(effect, "amount", parsed.amount, errors,
+                               effect_field + ".amount");
+                    read_float(effect, "scale", parsed.scale, errors,
+                               effect_field + ".scale");
+                    stroke.shader.effects.push_back(parsed);
+                }
+            }
+        }
     }
     return stroke;
 }
@@ -1360,6 +1396,20 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"effectColor", {{"red", stroke.shader.effect_color.red}, {"green", stroke.shader.effect_color.green}, {"blue", stroke.shader.effect_color.blue}, {"alpha", stroke.shader.effect_color.alpha}}},
                     {"shine", stroke.shader.shine}, {"holography", stroke.shader.holography}, {"opacity", stroke.shader.opacity}, {"intensity", stroke.shader.intensity},
                     {"repetition", serialize_vec2(stroke.shader.repetition)}, {"deformation", serialize_vec2(stroke.shader.deformation)}};
+                if (!stroke.shader.effects.empty()) {
+                    auto& effects = node_json["stroke"]["shader"]["effects"];
+                    effects = Json::array();
+                    for (const auto& effect : stroke.shader.effects) {
+                        effects.push_back({
+                            {"kind", std::string(to_string(effect.kind))},
+                            {"enabled", effect.enabled},
+                            {"color", {{"red", effect.color.red},
+                                       {"green", effect.color.green},
+                                       {"blue", effect.color.blue},
+                                       {"alpha", effect.color.alpha}}},
+                            {"amount", effect.amount}, {"scale", effect.scale}});
+                    }
+                }
                 if (stroke.image) {
                     const auto& image = *stroke.image;
                     node_json["stroke"]["image"] = {

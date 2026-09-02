@@ -157,6 +157,49 @@ TEST_CASE("component parameters transform their generic target layer") {
     }));
 }
 
+TEST_CASE("Beam inspector effect color reaches the resolved shader") {
+    const TemporaryProject project{"fabric-beam-effect-color-render"};
+    publish_thread_texture(project.root());
+    auto beam_request = request(fabric::editor::VisualPresetKind::beam,
+                                "inspected-beam");
+    beam_request.guided_beam = true;
+    beam_request.beam_holography = 0.0F;
+    REQUIRE(fabric::editor::publish_visual_preset(
+        project.root(), TemporaryProject::manifest(), beam_request).ok());
+
+    auto component = load_component(project, "inspected-beam");
+    const auto effect = std::ranges::find_if(
+        component.parameters, [](const auto& parameter) {
+            return parameter.id == "effect-color";
+        });
+    REQUIRE(effect != component.parameters.end());
+    effect->default_value = fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F};
+    const auto color_mode = std::ranges::find_if(
+        component.parameters, [](const auto& parameter) {
+            return parameter.id == "color-mode";
+        });
+    REQUIRE(color_mode != component.parameters.end());
+    color_mode->default_value = std::string{"preserve"};
+
+    const auto resolved = fabric::render::resolve_visual_component(
+        project.root(), TemporaryProject::manifest(), component);
+    REQUIRE(resolved.ok());
+    REQUIRE(resolved.packets.size() == 1U);
+    REQUIRE(resolved.packets.front().shader.has_value());
+    CHECK(resolved.packets.front().shader->effect_color ==
+          fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F});
+    const auto holography = std::ranges::find(
+        resolved.packets.front().shader->effects,
+        fabric::project::SurfaceEffectKind::holography,
+        &fabric::project::SurfaceEffect::kind);
+    REQUIRE(holography != resolved.packets.front().shader->effects.end());
+    CHECK(holography->color ==
+          fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F});
+    CHECK(resolved.packets.front().shader->profile ==
+          fabric::project::SurfaceShaderProfile::plastic);
+    CHECK(resolved.packets.front().shader->holography == Catch::Approx(0.0F));
+}
+
 TEST_CASE("textured layer opacity is applied exactly once") {
     const TemporaryProject project{"fabric-composition-opacity"};
     publish_thread_texture(project.root());

@@ -1129,6 +1129,10 @@ bool ProjectSession::create_visual_preset(
         return false;
     }
     if (!refresh_resources()) return false;
+    if (request.kind == VisualPresetKind::beam) {
+        return select_resource(StudioResourceKind::textured_path,
+                               {.value = request.id.value + "-rail"});
+    }
     return select_resource(StudioResourceKind::visual_component, request.id);
 }
 
@@ -2620,6 +2624,55 @@ bool ProjectSession::set_selected_material(
     return true;
 }
 
+bool ProjectSession::set_referenced_material(
+    const core::ResourceId& material_id,
+    project::MaterialDefinition material) {
+    if (!selected_entity_ || !manifest_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an Entity before editing its appearance"}};
+        return false;
+    }
+    const bool referenced = std::ranges::any_of(
+        selected_entity_->nodes, [&](const auto& node) {
+            return node.drawable.material &&
+                node.drawable.material->id == material_id;
+        });
+    if (!referenced) {
+        errors_ = {{project::ErrorCode::invalid_asset, "material",
+                    "the material is not referenced by the selected Entity"}};
+        return false;
+    }
+    if (dirty_document_ != DirtyDocument::none &&
+        dirty_document_ != DirtyDocument::material) {
+        errors_ = {{project::ErrorCode::invalid_asset, "material",
+                    "save or undo the current document before editing the Button appearance"}};
+        return false;
+    }
+    if (!selected_material_ || selected_material_->document.id != material_id) {
+        const auto loaded = project::load_material(
+            project_root_, *manifest_,
+            project::material_document_path(*manifest_, material_id));
+        if (!loaded.ok()) {
+            errors_ = loaded.errors;
+            return false;
+        }
+        selected_material_ = *loaded.asset;
+        selected_material_document_path_ =
+            project::material_document_path(*manifest_, material_id);
+        commands_.clear();
+        commands_.mark_clean();
+    }
+    if (!set_selected_material(std::move(material))) return false;
+    const auto published = project::publish_material(
+        project_root_, *manifest_, *selected_material_);
+    if (!published.ok()) {
+        errors_ = published.errors;
+        return false;
+    }
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_vector_node(
     const std::size_t node_index, project::VectorNode node,
     const AutosaveScheduler::Clock::time_point now) {
@@ -3485,6 +3538,15 @@ bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     }
     if (dirty_document_ == DirtyDocument::animation &&
         !sync_animation_preview_entity()) return false;
+    if (dirty_document_ == DirtyDocument::material && selected_entity_ &&
+        selected_material_) {
+        const auto published = project::publish_material(
+            project_root_, *manifest_, *selected_material_);
+        if (!published.ok()) {
+            errors_ = published.errors;
+            return false;
+        }
+    }
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -3496,6 +3558,15 @@ bool ProjectSession::redo(const AutosaveScheduler::Clock::time_point now) {
     }
     if (dirty_document_ == DirtyDocument::animation &&
         !sync_animation_preview_entity()) return false;
+    if (dirty_document_ == DirtyDocument::material && selected_entity_ &&
+        selected_material_) {
+        const auto published = project::publish_material(
+            project_root_, *manifest_, *selected_material_);
+        if (!published.ok()) {
+            errors_ = published.errors;
+            return false;
+        }
+    }
     autosave_.mark_changed(now);
     errors_.clear();
     return true;

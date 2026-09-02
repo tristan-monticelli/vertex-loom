@@ -22,10 +22,12 @@ struct LayerOverrides {
     std::optional<float> path_width;
     std::optional<float> path_repeat;
     std::optional<float> path_offset;
+    std::optional<project::ResourceReference> path_texture;
     std::optional<core::Color> path_color;
     std::optional<float> path_opacity;
     std::optional<core::Color> shader_primary;
     std::optional<core::Color> shader_effect;
+    std::optional<project::SurfaceShaderProfile> shader_profile;
     std::optional<float> shader_shine;
     std::optional<float> shader_holography;
     std::optional<float> shader_intensity;
@@ -124,10 +126,27 @@ bool apply_parameter(OverrideMap& overrides,
             layer.path_opacity = *value;
             return true;
         }
+    } else if (component == "texturedPath" && property == "texture") {
+        if (const auto* value =
+                std::get_if<project::ResourceReference>(&parameter.value)) {
+            layer.path_texture = *value;
+            return true;
+        }
     } else if (component == "shader" && property == "primaryColor") {
         if (const auto* value = std::get_if<core::Color>(&parameter.value)) { layer.shader_primary = *value; return true; }
     } else if (component == "shader" && property == "effectColor") {
         if (const auto* value = std::get_if<core::Color>(&parameter.value)) { layer.shader_effect = *value; return true; }
+    } else if (component == "shader" && property == "colorMode") {
+        if (const auto* value = std::get_if<std::string>(&parameter.value)) {
+            if (*value == "recolor") {
+                layer.shader_profile = project::SurfaceShaderProfile::thread;
+                return true;
+            }
+            if (*value == "preserve") {
+                layer.shader_profile = project::SurfaceShaderProfile::plastic;
+                return true;
+            }
+        }
     } else if (component == "shader" && property == "shine") {
         if (const auto* value = std::get_if<float>(&parameter.value)) { layer.shader_shine = *value; return true; }
     } else if (component == "shader" && property == "holography") {
@@ -154,15 +173,38 @@ void translate_packets(std::vector<VectorDrawPacket>& packets,
 
 void apply_path_overrides(project::TexturedPath& path,
                           const LayerOverrides& overrides) {
+    const auto effect_of_kind = [&](const project::SurfaceEffectKind kind) {
+        return std::ranges::find(path.shader.effects, kind,
+                                 &project::SurfaceEffect::kind);
+    };
     if (overrides.path_width) path.width = *overrides.path_width;
     if (overrides.path_repeat) path.uv_scale.x = *overrides.path_repeat;
     if (overrides.path_offset) path.uv_offset.x = *overrides.path_offset;
+    if (overrides.path_texture) path.texture = *overrides.path_texture;
     if (overrides.path_color) path.color = *overrides.path_color;
     if (overrides.path_opacity) path.opacity = *overrides.path_opacity;
-    if (overrides.shader_primary) path.shader.primary_color = *overrides.shader_primary;
-    if (overrides.shader_effect) path.shader.effect_color = *overrides.shader_effect;
-    if (overrides.shader_shine) path.shader.shine = *overrides.shader_shine;
-    if (overrides.shader_holography) path.shader.holography = *overrides.shader_holography;
+    if (overrides.shader_primary) {
+        path.shader.primary_color = *overrides.shader_primary;
+        const auto effect = effect_of_kind(project::SurfaceEffectKind::tint);
+        if (effect != path.shader.effects.end()) effect->color = *overrides.shader_primary;
+    }
+    if (overrides.shader_effect) {
+        path.shader.effect_color = *overrides.shader_effect;
+        const auto effect = effect_of_kind(project::SurfaceEffectKind::holography);
+        if (effect != path.shader.effects.end()) effect->color = *overrides.shader_effect;
+    }
+    if (overrides.shader_profile) path.shader.profile = *overrides.shader_profile;
+    if (overrides.shader_shine) {
+        path.shader.shine = *overrides.shader_shine;
+        const auto effect = effect_of_kind(project::SurfaceEffectKind::shine);
+        if (effect != path.shader.effects.end()) effect->amount = *overrides.shader_shine;
+    }
+    if (overrides.shader_holography) {
+        path.shader.holography = *overrides.shader_holography;
+        const auto effect = effect_of_kind(project::SurfaceEffectKind::holography);
+        if (effect != path.shader.effects.end())
+            effect->amount = *overrides.shader_holography;
+    }
     if (overrides.shader_intensity) path.shader.intensity = *overrides.shader_intensity;
 }
 

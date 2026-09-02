@@ -152,7 +152,15 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         path.width = request.beam_width;
         path.opacity = request.beam_opacity;
         path.uv_scale.x = request.beam_repetition;
-        path.color = request.beam_color;
+        path.cap = project::TexturedPathCap::butt;
+        // The provided Beam PNG remains intact. The 192 px alpha bounds keep
+        // 35 px of vertical safety margin; U keeps the full 2048 px width.
+        path.texture_metrics = {
+            .origin = {0.0F, 0.4375F},
+            .size = {1.0F, 0.12890625F}};
+        // Beam coloring belongs to the Thread shader. Tinting the raster fill
+        // too would multiply the same color twice and erase source details.
+        path.color = {1.0F, 1.0F, 1.0F, 1.0F};
         path.shader.profile = project::SurfaceShaderProfile::thread;
         path.shader.classification = project::TextureClassification::beam;
         path.shader.primary_color = request.beam_color;
@@ -160,6 +168,16 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         path.shader.shine = request.beam_shine;
         path.shader.holography = request.beam_holography;
         path.shader.repetition = {request.beam_repetition, 1.0F};
+        path.shader.effects = {
+            {.kind = project::SurfaceEffectKind::tint,
+             .color = request.beam_color},
+            {.kind = project::SurfaceEffectKind::holography,
+             .color = request.beam_effect_color,
+             .amount = request.beam_holography},
+            {.kind = project::SurfaceEffectKind::shine,
+             .color = {1.0F, 1.0F, 1.0F, 1.0F},
+             .amount = request.beam_shine},
+        };
     }
     auto border = vector_asset(
         border_id, request.name + " Border", {4.0F, 0.8F},
@@ -184,18 +202,46 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
             border_id, "vector", {}, 1.0F));
     }
     using Type = project::VisualParameterType;
+    std::vector<project::VisualComponentParameter> parameters;
+    if (request.guided_beam) {
+        parameters = {
+            {"texture", "Texture", Type::resource, path.texture,
+             binding(layer_id, "texturedPath", "texture"), false},
+            {"color-mode", "Color handling", Type::text,
+             std::string{"recolor"},
+             binding(layer_id, "shader", "colorMode"), false},
+            {"width", "Thickness", Type::scalar, path.width,
+             binding(layer_id, "texturedPath", "width"), true},
+            {"repeat", "Repetition", Type::scalar, path.uv_scale.x,
+             binding(layer_id, "texturedPath", "uvScaleX"), true},
+            {"color", "Base tint", Type::color, path.shader.primary_color,
+             binding(layer_id, "shader", "primaryColor"), true},
+            {"effect-color", "Holo color", Type::color,
+             path.shader.effect_color,
+             binding(layer_id, "shader", "effectColor"), true},
+            {"shine", "Shine", Type::scalar, path.shader.shine,
+             binding(layer_id, "shader", "shine"), true},
+            {"holography", "Holography", Type::scalar,
+             path.shader.holography,
+             binding(layer_id, "shader", "holography"), true},
+            {"opacity", "Opacity", Type::scalar, path.opacity,
+             binding(layer_id, "texturedPath", "opacity"), true}};
+    } else {
+        parameters = {
+            {"width", "Width", Type::scalar, path.width,
+             binding(layer_id, "texturedPath", "width"), true},
+            {"repeat", "Repeat", Type::scalar, path.uv_scale.x,
+             binding(layer_id, "texturedPath", "uvScaleX"), true},
+            {"offset", "Texture offset", Type::scalar, 0.0F,
+             binding(layer_id, "texturedPath", "uvOffsetX"), true},
+            {"color", "Color", Type::color, path.color,
+             binding(layer_id, "texturedPath", "color"), true},
+            {"opacity", "Opacity", Type::scalar, path.opacity,
+             binding(layer_id, "texturedPath", "opacity"), true}};
+    }
     auto component = component_for(
         request, composition_id, {{-2.0F, -0.4F}, {4.0F, 0.8F}},
-        {{"width", "Width", Type::scalar, path.width,
-          binding(layer_id, "texturedPath", "width"), true},
-         {"repeat", "Repeat", Type::scalar, path.uv_scale.x,
-          binding(layer_id, "texturedPath", "uvScaleX"), true},
-         {"offset", "Texture offset", Type::scalar, 0.0F,
-          binding(layer_id, "texturedPath", "uvOffsetX"), true},
-         {"color", "Color", Type::color, path.color,
-          binding(layer_id, "texturedPath", "color"), true},
-         {"opacity", "Opacity", Type::scalar, path.opacity,
-          binding(layer_id, "texturedPath", "opacity"), true}});
+        std::move(parameters));
     return {.vectors = request.guided_beam
             ? std::vector<project::VectorAsset>{}
             : std::vector<project::VectorAsset>{std::move(border)},

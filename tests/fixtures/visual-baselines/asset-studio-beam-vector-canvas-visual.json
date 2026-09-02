@@ -1,6 +1,6 @@
 {
   "schema": "asset-studio-vector-canvas-visual-baseline-v1",
-  "minimum_non_background_pixels": 500000,
+  "minimum_non_background_pixels": 400000,
   "maximum_non_background_pixels": 1000000,
   "minimum_channel": 0,
   "maximum_channel": 255

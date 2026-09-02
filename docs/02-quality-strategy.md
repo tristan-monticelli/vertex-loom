@@ -124,11 +124,14 @@ explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
 échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
 graphique et ne ferme aucune case de couverture visuelle.
 
-Le smoke OpenGL des profils shader vérifie que le profil Thread conserve les
-variations de la texture quand l'holographie vaut `1`, contrôle les canaux de
-deux pixels distincts et produit `fabric-render-shader-smoke.ppm` pour
-inspection isolée. La seule présence des paramètres dans un draw packet ou un
-document JSON ne constitue pas une preuve de coloring.
+Le smoke OpenGL des profils shader vérifie quatre invariants pixels : `Thread`
+ne conserve aucune dominante du PNG avec une teinte blanche neutre, la couleur
+holographique reste inactive à `0`, l'holographie utilise seulement la couleur
+choisie à `1`, et `Keep image colors` restitue les canaux du PNG. Il contrôle
+aussi un gain de shine identique sur deux texels distincts et produit
+`fabric-render-shader-smoke.ppm` pour inspection isolée. La seule présence des
+paramètres dans un draw packet ou un document JSON ne constitue pas une preuve
+de coloring.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame, écrit le
 registre JSON des IDs stables et capture `asset_studio-ui-test.ppm` dans le
 projet de test ; il est destiné aux contrôleurs UX et ne modifie pas le
@@ -161,13 +164,14 @@ actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
 relecture avec un binding clavier et un binding gamepad.
 Le test `asset_studio_ui_beam_e2e` rend l'assistant Beam sur le fixture projet
 réel `studio-beam`, dont `defaultStrokeTexture` pointe vers `beam-thread`,
-localise son bouton, injecte un clic souris en trois frames,
-capture le Beam non sélectionné puis recharge le `texturedPath`. Il vérifie la
-texture héritée, l'épaisseur, l'opacité et la répétition sans injecter la
-texture ni appeler directement la factory à la place de l'action UI.
-Le smoke OpenGL vérifie aussi que le profil Thread conserve la variation de
-couleur de l'image tout en produisant un mélange visible entre couleur primaire
-et couleur d'effet ; une sortie presque noire ou uniforme échoue.
+localise son bouton, injecte un clic souris en trois frames, capture le
+formulaire dans `asset-studio-beam-create.ppm`, puis capture un Beam blanc
+neutre et recharge le `texturedPath`. Il vérifie la texture héritée,
+l'épaisseur, l'opacité et la répétition sans injecter la texture ni appeler
+directement la factory à la place de l'action UI. Le test séparé
+`asset_studio_ui_beam_holography_e2e` rejoue le même parcours avec une teinte
+bleue, une couleur holographique or et de la brillance ; sa capture doit rester
+exempte de rose implicite.
 Le test géométrique `Beam keeps repeated texture UVs continuous across
 external segments` couvre aussi une texture externe sur une ligne, une courbe
 et un segment final, avec UV d'arc-length monotones et shader holographique.
@@ -513,6 +517,14 @@ parcours map → entité → composant jusqu'aux draw packets transformés.
 Le contrat `AnimationClip v3` couvre parseur strict, round-trip, publication
 atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
 interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
+La pile modulaire d'effets de surface couvre le round-trip de plus de deux
+blocs, leur ordre, leur activation, leurs couleurs et leurs bornes. Le smoke
+OpenGL compare deux ordres de pile, refuse qu'ils produisent le même pixel et
+écrit `fabric-render-effect-stack-smoke.ppm`. Les E2E Beam et Button montrent
+la pile directement dans l'inspecteur avec la preview texturée, puis vérifient
+sa persistance après reload. Le test de session Button ajoute un quatrième
+bloc depuis l'apparence référencée et vérifie son undo, son redo et chaque
+rechargement disque intermédiaire.
 Le registre de descripteurs couvre résolution par binding, propriétés
 animables/inscriptibles, doublons, identifiants manquants et bornes inversées.
 La timeline couvre insertion, tri, déplacement, suppression protégée de la

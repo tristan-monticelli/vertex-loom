@@ -154,24 +154,22 @@ void create_studio_beam_fixture(const std::filesystem::path& root) {
         .id = {.value = "studio-beam"},
         .name = "Studio Beam"}));
 
-    auto source = temporary_root("fabric-studio-beam-thread");
-    source += ".png";
-    write_thread_png(source);
-    REQUIRE(studio.import_png(source, {.value = "beam-thread"}, "Beam Thread"));
-    std::error_code ignored;
-    std::filesystem::remove(source, ignored);
+    const auto fixture_texture = std::filesystem::path{FABRIC_SOURCE_DIR} /
+        "tests/fixtures/studio-beam/assets/textures/beam-thread.png";
+    REQUIRE(studio.import_png(
+        fixture_texture, {.value = "beam-thread"}, "Beam Thread"));
     REQUIRE(studio.create_visual_preset({
         .kind = fabric::editor::VisualPresetKind::beam,
         .id = {.value = "beam"},
         .name = "Beam",
         .thread_texture = fabric::project::ResourceReference{
             {.value = "beam-thread"}, "texture"},
-        .beam_color = {0.2F, 0.35F, 1.0F, 1.0F},
-        .beam_effect_color = {1.0F, 0.1F, 0.8F, 1.0F},
-        .beam_shine = 0.3F,
-        .beam_holography = 0.8F,
-        .beam_repetition = 5.0F,
-        .beam_width = 0.12F,
+        .beam_color = {1.0F, 1.0F, 1.0F, 1.0F},
+        .beam_effect_color = {1.0F, 1.0F, 1.0F, 1.0F},
+        .beam_shine = 0.0F,
+        .beam_holography = 0.0F,
+        .beam_repetition = 1.0F,
+        .beam_width = 0.5F,
         .beam_opacity = 1.0F,
         .guided_beam = true}));
 
@@ -188,13 +186,13 @@ void create_studio_beam_fixture(const std::filesystem::path& root) {
     animation.duration = 1.0;
     animation.loop = true;
     REQUIRE(studio.create_animation(animation));
-    const fabric::project::PropertyBinding offset{
-        "root", "beam", "offset"};
+    const fabric::project::PropertyBinding repetition{
+        "root", "beam", "repeat"};
     REQUIRE(studio.insert_selected_animation_key(
-        offset, 0.0F, 0.0F,
+        repetition, 0.0F, 1.0F,
         fabric::project::AnimationInterpolation::linear));
     REQUIRE(studio.insert_selected_animation_key(
-        offset, 1.0F, 4.0F,
+        repetition, 1.0F, 2.0F,
         fabric::project::AnimationInterpolation::linear));
     REQUIRE(studio.save());
 
@@ -376,13 +374,14 @@ void create_textile_head_fixture(const std::filesystem::path& root) {
         .id = {.value = "studio-textile-head"},
         .name = "Studio Textile Head"}));
 
-    auto source = temporary_root("fabric-studio-head-source");
-    source += ".png";
-    write_thread_png(source);
-    REQUIRE(studio.import_png(source, {.value = "head-thread"}, "Head Thread"));
-    REQUIRE(studio.import_png(source, {.value = "head-face"}, "Head Face"));
-    std::error_code ignored;
-    std::filesystem::remove(source, ignored);
+    const auto fixture_textures = std::filesystem::path{FABRIC_SOURCE_DIR} /
+        "tests/fixtures/studio-textile-head/assets/textures";
+    REQUIRE(studio.import_png(
+        fixture_textures / "head-thread.png", {.value = "head-thread"},
+        "Head Thread"));
+    REQUIRE(studio.import_png(
+        fixture_textures / "head-face.png", {.value = "head-face"},
+        "Head Face"));
 
     const auto create_preset = [&](const auto kind, const char* id,
                                    const char* name) {
@@ -454,6 +453,7 @@ std::vector<std::filesystem::path> fixture_files(
             filename != "asset-studio-ui-widgets.json" &&
             filename != "asset_studio-e2e-failure.txt" &&
             filename != "asset_studio-e2e-failure.ppm" &&
+            filename != "beam-original.png" &&
             relative != "assets/vectors/beam-border.vector.json")
             result.push_back(relative);
     }
@@ -582,6 +582,8 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
 }
 
 TEST_CASE("guided Beam is a textured path with the project default and shader") {
+    CHECK(fabric::editor::VisualPresetRequest{}.beam_repetition ==
+          Catch::Approx(1.0F));
     auto beam_request = request(
         fabric::editor::VisualPresetKind::beam, "guided-beam");
     beam_request.thread_texture.reset();
@@ -608,12 +610,42 @@ TEST_CASE("guided Beam is a textured path with the project default and shader") 
           fabric::project::TextureClassification::beam);
     CHECK(beam.shader.primary_color == beam_request.beam_color);
     CHECK(beam.shader.effect_color == beam_request.beam_effect_color);
+    REQUIRE(beam.shader.effects.size() == 3U);
+    CHECK(beam.shader.effects[0].kind ==
+          fabric::project::SurfaceEffectKind::tint);
+    CHECK(beam.shader.effects[0].color == beam_request.beam_color);
+    CHECK(beam.shader.effects[1].kind ==
+          fabric::project::SurfaceEffectKind::holography);
+    CHECK(beam.shader.effects[1].color == beam_request.beam_effect_color);
+    CHECK(beam.shader.effects[1].amount == Catch::Approx(0.6F));
+    CHECK(beam.shader.effects[2].kind ==
+          fabric::project::SurfaceEffectKind::shine);
+    CHECK(beam.shader.effects[2].amount == Catch::Approx(0.4F));
     CHECK(beam.shader.repetition.x == 7.0F);
     CHECK(beam.uv_scale.x == 7.0F);
     CHECK(beam.width == 0.35F);
     CHECK(beam.opacity == 0.75F);
+    CHECK(beam.cap == fabric::project::TexturedPathCap::butt);
+    CHECK(beam.texture_metrics.origin.x == 0.0F);
+    CHECK(beam.texture_metrics.size.x == 1.0F);
+    CHECK(beam.texture_metrics.origin.y == Catch::Approx(896.0F / 2048.0F));
+    CHECK(beam.texture_metrics.size.y == Catch::Approx(264.0F / 2048.0F));
+    CHECK(beam.color == fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
     REQUIRE(built.bundle->composition.layers.size() == 1U);
     CHECK(built.bundle->composition.layers.front().id == "beam");
+    REQUIRE(built.bundle->component.parameters.size() == 9U);
+    CHECK(built.bundle->component.parameters[0].id == "texture");
+    CHECK(built.bundle->component.parameters[1].id == "color-mode");
+    CHECK(built.bundle->component.parameters[1].default_value ==
+          fabric::project::VisualParameterValue{std::string{"recolor"}});
+    CHECK(std::ranges::any_of(
+        built.bundle->component.parameters, [](const auto& parameter) {
+            return parameter.target.property_id == "effectColor";
+        }));
+    CHECK(std::ranges::any_of(
+        built.bundle->component.parameters, [](const auto& parameter) {
+            return parameter.target.property_id == "holography";
+        }));
     for (const auto& parameter : built.bundle->component.parameters)
         CHECK(parameter.target.node_id == "beam");
 }
@@ -646,7 +678,7 @@ TEST_CASE("thread presets inherit the project default texture") {
           "base-thread");
 }
 
-TEST_CASE("Beam texture offset uses a generic component animation property") {
+TEST_CASE("Beam repetition uses a generic component animation property") {
     const auto beam_request = request(
         fabric::editor::VisualPresetKind::beam, "beam");
     const auto bundle = fabric::editor::build_visual_preset(
@@ -659,10 +691,10 @@ TEST_CASE("Beam texture offset uses a generic component animation property") {
         REQUIRE(registry.register_descriptor(std::move(descriptor)).ok());
     const auto bindings = fabric::editor::AnimationTimeline::animatable_bindings(
         "beam-node", registry);
-    const auto offset_binding = std::ranges::find(
+    const auto repetition_binding = std::ranges::find(
         bindings, fabric::project::PropertyBinding{
-            "beam-node", "beam", "offset"});
-    REQUIRE(offset_binding != bindings.end());
+            "beam-node", "beam", "repeat"});
+    REQUIRE(repetition_binding != bindings.end());
 
     fabric::project::AnimationClip clip{
         .document = {.schema_version =
@@ -674,16 +706,16 @@ TEST_CASE("Beam texture offset uses a generic component animation property") {
         .loop = true};
     fabric::editor::CommandStack commands;
     fabric::editor::AnimationTimeline timeline(clip, commands);
-    REQUIRE(timeline.insert_key(*offset_binding, 0.0F, 0.0F,
+    REQUIRE(timeline.insert_key(*repetition_binding, 0.0F, 1.0F,
                                 fabric::project::AnimationInterpolation::linear));
-    REQUIRE(timeline.insert_key(*offset_binding, 1.0F, 4.0F,
+    REQUIRE(timeline.insert_key(*repetition_binding, 1.0F, 2.0F,
                                 fabric::project::AnimationInterpolation::linear));
     const auto evaluated = fabric::project::evaluate_animation(clip, 0.5F);
     REQUIRE(evaluated.ok());
     REQUIRE(evaluated.properties.size() == 1U);
-    CHECK(evaluated.properties.front().binding == *offset_binding);
+    CHECK(evaluated.properties.front().binding == *repetition_binding);
     CHECK(std::get<float>(evaluated.properties.front().value) ==
-          Catch::Approx(2.0F));
+          Catch::Approx(1.5F));
 }
 
 TEST_CASE("zipper composes two rails repeated teeth and one slider") {
@@ -791,8 +823,10 @@ TEST_CASE("one animated Beam matches Asset Studio Map Studio and runtime") {
     create_studio_beam_fixture(regenerated);
     const auto expected_files = fixture_files(fixture);
     REQUIRE(fixture_files(regenerated) == expected_files);
-    for (const auto& relative : expected_files)
+    for (const auto& relative : expected_files) {
+        INFO("beam fixture mismatch: " << relative.generic_string());
         CHECK(files_equal(regenerated / relative, fixture / relative));
+    }
     REQUIRE(fabric::project::validate_project(fixture).ok());
 
     const auto loaded_manifest = fabric::project::load_manifest(fixture);
@@ -908,7 +942,7 @@ TEST_CASE("textile head fixture is composed and cropped through Studio") {
     REQUIRE_FALSE(face.fill_uv.empty());
     const auto maximum_u = std::ranges::max_element(
         face.fill_uv, {}, &fabric::core::Vec2::x)->x;
-    CHECK(maximum_u == Catch::Approx(0.5F));
+    CHECK(maximum_u == Catch::Approx(1.0F / 2048.0F));
 
     fabric::runtime::PreviewRuntime runtime;
     REQUIRE(runtime.load({

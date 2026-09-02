@@ -37,6 +37,15 @@ fabric::project::MaterialDefinition material() {
             .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
             .shine = 0.4F,
             .holography = 0.3F,
+            .effects = {
+                {.kind = fabric::project::SurfaceEffectKind::tint,
+                 .color = {0.2F, 0.7F, 1.0F, 1.0F}},
+                {.kind = fabric::project::SurfaceEffectKind::holography,
+                 .color = {1.0F, 0.2F, 0.8F, 1.0F}, .amount = 0.3F},
+                {.kind = fabric::project::SurfaceEffectKind::shine,
+                 .amount = 0.4F},
+                {.kind = fabric::project::SurfaceEffectKind::shine,
+                 .enabled = false, .amount = 0.1F}},
         },
         .uv_transform = {.position = {0.1F, -0.2F},
                          .rotation_degrees = 15.0F,
@@ -78,6 +87,8 @@ TEST_CASE("material definition round trips and publishes atomically") {
         manifest(), fabric::project::serialize_material(source));
     REQUIRE(parsed.ok());
     REQUIRE(*parsed.asset == source);
+    REQUIRE(parsed.asset->shader);
+    CHECK(parsed.asset->shader->effects.size() == 4U);
 
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-material-" + std::to_string(

@@ -27,7 +27,7 @@ struct VisualPresetRequest {
     core::Color beam_effect_color{1.0F, 1.0F, 1.0F, 1.0F};
     float beam_shine{};
     float beam_holography{};
-    float beam_repetition{5.0F};
+    float beam_repetition{1.0F};
     float beam_width{0.12F};
     float beam_opacity{1.0F};
     bool guided_beam{};
