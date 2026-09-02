@@ -143,8 +143,9 @@ attend l’application du focus ImGui sur le premier champ, puis vérifie l’ar
 Le test `asset_studio_ui_accessibility_e2e` vérifie l’activation de la navigation
 clavier ImGui et un ratio de contraste texte/fond d’au moins 4,5:1.
 Le test `map_studio_ui_accessibility_e2e` applique la même preuve à Map Studio
-et produit un artefact JSON ainsi qu’une capture PPM ; il est ignoré avec le
-code `77` sans écran SDL.
+et produit avant le swap un artefact JSON ainsi qu’une capture PPM ; la preuve
+échoue sous 960×640 ou si tous les canaux sont identiques. Il est ignoré avec
+le code `77` sans écran SDL.
 Le test `asset_studio_ui_drag_e2e` capture les coordonnées des widgets source et
 cible, injecte un drag SDL de `beam-border` vers le nœud `root`, puis
 exige la mutation confirmée dans `asset-studio-ui-drag.json`.

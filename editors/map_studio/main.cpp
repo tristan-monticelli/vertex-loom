@@ -172,6 +172,7 @@ void write_e2e_failure_artifacts(
     std::vector<unsigned char> pixels(
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_FRONT);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
     std::ofstream image(project_path / "map_studio-e2e-failure.ppm",
                         std::ios::binary);
@@ -204,15 +205,6 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
     const float text = relative_luminance(colors[ImGuiCol_Text]);
     const float contrast = (std::max(background, text) + 0.05F) /
         (std::min(background, text) + 0.05F);
-    std::ofstream output(project_path / "map-studio-ui-accessibility.json");
-    if (output) {
-        output << "{\n  \"schema\": \"map-studio-ui-accessibility-test-v1\",\n"
-               << "  \"keyboard_navigation_enabled\": "
-               << (keyboard_navigation_enabled ? "true" : "false") << ",\n"
-               << "  \"text_window_contrast\": " << contrast << ",\n"
-               << "  \"text_window_contrast_ok\": "
-               << (contrast >= 4.5F ? "true" : "false") << "\n}\n";
-    }
     int width = 0;
     int height = 0;
     SDL_GL_GetDrawableSize(window, &width, &height);
@@ -220,7 +212,25 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
     std::vector<unsigned char> pixels(
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    const auto [minimum, maximum] = std::minmax_element(pixels.begin(), pixels.end());
+    const bool visual_valid = width >= 960 && height >= 640 &&
+        minimum != pixels.end() && maximum != pixels.end() &&
+        *minimum != *maximum;
+    std::ofstream output(project_path / "map-studio-ui-accessibility.json");
+    if (output) {
+        output << "{\n  \"schema\": \"map-studio-ui-accessibility-test-v1\",\n"
+               << "  \"keyboard_navigation_enabled\": "
+               << (keyboard_navigation_enabled ? "true" : "false") << ",\n"
+               << "  \"text_window_contrast\": " << contrast << ",\n"
+               << "  \"text_window_contrast_ok\": "
+               << (contrast >= 4.5F ? "true" : "false") << ",\n"
+               << "  \"capture_width\": " << width << ",\n"
+               << "  \"capture_height\": " << height << ",\n"
+               << "  \"visual_valid\": "
+               << (visual_valid ? "true" : "false") << "\n}\n";
+    }
     std::ofstream image(project_path / "map_studio-ui-accessibility.ppm",
                         std::ios::binary);
     if (!image) return;
@@ -1629,20 +1639,28 @@ struct MapTexture {
     std::uint32_t height{};
 };
 
-struct MapPreviewRenderState {
+struct MapPreviewRenderer {
     fabric::render::OpenGLVectorRenderer* renderer{};
     const fabric::render::MapPreviewResult* preview{};
     const std::filesystem::path* project_root{};
     const fabric::project::ProjectManifest* manifest{};
     std::unordered_map<std::string, MapTexture>* textures{};
     fabric::render::OpenGLVectorViewport viewport{};
+    std::vector<std::string> errors;
 };
 
 void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
-    auto* state = static_cast<MapPreviewRenderState*>(command->UserCallbackData);
+    auto* state = static_cast<MapPreviewRenderer*>(command->UserCallbackData);
     if (state == nullptr || state->renderer == nullptr || state->preview == nullptr ||
         state->project_root == nullptr || state->manifest == nullptr ||
-        state->textures == nullptr || state->preview->packets.empty()) return;
+        state->textures == nullptr) return;
+    state->errors = state->preview->errors;
+    if (!state->renderer->ready()) {
+        state->errors.push_back("OpenGL initialization failed: " +
+                                state->renderer->initialization_error());
+        return;
+    }
+    if (state->preview->packets.empty()) return;
     const fabric::render::OpenGLTextureResolver resolver =
         [state](const fabric::core::ResourceId& id)
         -> std::optional<fabric::render::OpenGLTextureHandle> {
@@ -1654,10 +1672,18 @@ void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
         const auto loaded = fabric::project::load_texture_asset(
             *state->project_root, *state->manifest,
             fabric::project::texture_document_path(*state->manifest, id));
-        if (!loaded.ok()) return std::nullopt;
+        if (!loaded.ok()) {
+            state->errors.push_back("Texture document '" + id.value +
+                                    "' is missing or invalid");
+            return std::nullopt;
+        }
         const auto decoded = fabric::render::load_png(
             *state->project_root / loaded.asset->source);
-        if (!decoded.ok()) return std::nullopt;
+        if (!decoded.ok()) {
+            state->errors.push_back("Texture PNG '" + id.value +
+                                    "' could not be decoded");
+            return std::nullopt;
+        }
         MapTexture texture{.width = decoded.image->width,
                            .height = decoded.image->height};
         glGenTextures(1, &texture.handle);
@@ -1667,17 +1693,28 @@ void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        while (glGetError() != GL_NO_ERROR) {}
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      static_cast<GLsizei>(texture.width),
                      static_cast<GLsizei>(texture.height), 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, decoded.image->rgba8.data());
+        const auto upload_error = glGetError();
         glBindTexture(GL_TEXTURE_2D, 0);
+        if (upload_error != GL_NO_ERROR) {
+            glDeleteTextures(1, &texture.handle);
+            state->errors.push_back("GPU rejected texture upload for '" +
+                                    id.value + "' (OpenGL error " +
+                                    std::to_string(upload_error) + ")");
+            return std::nullopt;
+        }
         const auto [inserted, _] = state->textures->emplace(id.value, texture);
         return fabric::render::OpenGLTextureHandle{
             inserted->second.handle, inserted->second.width, inserted->second.height};
     };
-    static_cast<void>(state->renderer->draw(
-        state->preview->packets, state->viewport, resolver));
+    const auto stats = state->renderer->draw(
+        state->preview->packets, state->viewport, resolver);
+    state->errors.insert(state->errors.end(), stats.errors.begin(),
+                         stats.errors.end());
 }
 
 void draw_transform_editor(fabric::editor::MapSession& session,
@@ -1743,7 +1780,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      std::string& placement_resource_id,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
-                     MapPreviewRenderState& preview_render_state,
+                     MapPreviewRenderer& preview_render_state,
                      const fabric::physics::MechanicSimulation& mechanic_preview,
                      std::string& status) {
     if (!session.map()) return;
@@ -2682,7 +2719,7 @@ int run(const std::filesystem::path& project_root,
     bool preview_playing = true;
     float layers_pane_width = 360.0F;
     fabric::render::MapPreviewResult map_preview;
-    MapPreviewRenderState preview_render_state{
+    MapPreviewRenderer preview_render_state{
         .renderer = &map_renderer,
         .textures = &map_textures,
     };
@@ -2860,11 +2897,21 @@ int run(const std::filesystem::path& project_root,
                                session.dirty() ? "dirty" : "saved");
             if (ImGui::Button("Save")) status = session.save() ? "Map saved" : "Save failed";
             ImGui::SameLine();
+            const bool renderer_blocked = !map_renderer.ready() ||
+                !preview_render_state.errors.empty();
+            const std::string renderer_block_reason = !map_renderer.ready()
+                ? "Preview renderer unavailable: " + map_renderer.initialization_error()
+                : (!preview_render_state.errors.empty()
+                    ? "Resolve render diagnostics before preview or publication."
+                    : std::string{});
+            ImGui::BeginDisabled(renderer_blocked);
             if (ImGui::Button("Preview")) {
                 preview_time = 0.0F;
                 preview_playing = true;
                 status = "Map preview restarted";
             }
+            ImGui::EndDisabled();
+            draw_disabled_reason(renderer_blocked, renderer_block_reason);
             ImGui::SameLine();
             if (ImGui::Button("Validate")) {
                 if (prepare_package()) {
@@ -2876,6 +2923,7 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::SameLine();
+            ImGui::BeginDisabled(renderer_blocked);
             if (ImGui::Button("Publish")) {
                 if (prepare_package()) {
                     const auto parent = choose_folder(window, status);
@@ -2891,6 +2939,8 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
             }
+            ImGui::EndDisabled();
+            draw_disabled_reason(renderer_blocked, renderer_block_reason);
             ImGui::SameLine();
             ImGui::BeginDisabled(!session.can_undo());
             if (ImGui::Button("Undo")) static_cast<void>(session.undo());
@@ -3071,6 +3121,8 @@ int run(const std::filesystem::path& project_root,
                             canvas_snapping, preview_render_state,
                             mechanic_session.simulation(), status);
             for (const auto& error : map_preview.errors)
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
+            for (const auto& error : preview_render_state.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             draw_transform_editor(session, selected_instances, transform_editor, status);
             ImGui::Text("Collisions: %zu", map.collisions.size());
@@ -4107,7 +4159,6 @@ int run(const std::filesystem::path& project_root,
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
         if (scene_e2e || transformation_e2e) running = false;
         if (ui_accessibility_test) {
             write_ui_accessibility_probe(
@@ -4115,6 +4166,7 @@ int run(const std::filesystem::path& project_root,
                 (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
             running = false;
         }
+        SDL_GL_SwapWindow(window);
     }
 
     const bool e2e_incomplete = e2e_failed ||
