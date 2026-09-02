@@ -118,6 +118,16 @@ test('documentation rejects guides after initialization', () => {
   assert.match(result.stderr, /guide or placeholder/u);
 });
 
+test('documentation rejects duplicate ADR identifiers', () => {
+  const cwd = initializedWorkspace();
+  mkdirSync(join(cwd, 'docs/decisions'), { recursive: true });
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0042-first.md'), '# ADR-0042 — First\n');
+  writeFileSync(join(cwd, 'docs/decisions/ADR-0042-second.md'), '# ADR-0042 — Second\n');
+  const result = spawnSync('node', [join(root, '.githooks/validate-docs.mjs'), '--all'], { cwd, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /ADR-0042: duplicate decision identifiers/u);
+});
+
 test('invalid Mermaid is rejected', () => {
   const cwd = starterWorkspace();
   writeFileSync(join(cwd, 'docs/bad.md'), '# Diagram\n\n```mermaid\nflowchart TD\n  A -->\n```\n');

@@ -1,4 +1,4 @@
-# ADR-0135 — Profils shader textiles et marqueurs de collision
+# ADR-0142 — Profils shader textiles et marqueurs de collision
 
 - Status: accepted
 - Date: 2026-08-31
@@ -19,13 +19,19 @@ répétition et déformation ; les valeurs restent des propriétés ordinaires a
 que les tracks d'animation existants puissent les cibler.
 
 Le renderer doit interpréter le profil, pas seulement le sérialiser. `Thread`
-recolore selon la luminance tout en conservant les détails de l'image et ajoute
-une bande iridescente dépendante des UV. `Plastic` conserve la couleur source
-avec un reflet concentré, `Monochrome` applique la couleur principale à la
-luminance et `Custom` mélange les deux couleurs selon les UV et la luminance.
-La brillance est un reflet localisé ; elle ne peut pas être une addition blanche
-uniforme. Une holographie à `1` ne doit jamais remplacer toute la texture par
-une couleur constante.
+utilise la luminance et l'alpha du PNG comme détail, puis applique la teinte de
+base choisie sans conserver une dominante accidentelle de l'image source.
+`Plastic` conserve les couleurs du PNG et applique la teinte de base comme un
+multiplicateur ; dans l'interface Beam, ce choix est présenté comme « Keep
+image colors ». `Monochrome` applique les couleurs à la luminance et `Custom`
+mélange les deux couleurs selon les UV et la luminance.
+
+La couleur holographique n'intervient que lorsque l'holographie est supérieure
+à zéro. Elle est entièrement choisie par l'auteur : le shader n'injecte aucune
+couleur rose, cyan ou arc-en-ciel implicite. La brillance ajoute un apport
+constant à chaque pixel de matière, tout en respectant son alpha ; elle ne
+dépend ni de la luminance ni des bords U de chaque tuile. Une holographie à `1`
+ne doit jamais remplacer toute la texture par une couleur constante.
 
 Le manifeste du projet porte aussi une référence optionnelle
 `defaultStrokeTexture`. La première texture importée initialise cette valeur
