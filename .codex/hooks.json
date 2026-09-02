@@ -35,6 +35,17 @@
             "statusMessage": "Checking architecture policy"
           }
         ]
+      },
+      {
+        "matcher": "mcp__node_repl__js",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./.codex/hooks/screen-scope-guard.mjs",
+            "additionalContextLimit": 300,
+            "statusMessage": "Enforcing app-only screen scope"
+          }
+        ]
       }
     ],
     "PostToolUse": [
