@@ -1,0 +1,154 @@
+name: Public release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  legal-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Require clean declared checkout
+        run: git status --porcelain --untracked-files=all | tee /tmp/status && test ! -s /tmp/status
+      - name: Require asset redistribution evidence
+        env:
+          VERTEX_LOOM_PUBLIC_RELEASE: '1'
+        run: node --test tests/default-assets.test.mjs
+      - name: Require public contact and matching tag
+        env:
+          VERTEX_LOOM_PACKAGE_CONTACT: ${{ secrets.VERTEX_LOOM_PACKAGE_CONTACT }}
+        run: node .github/scripts/release-preflight.mjs
+
+  build:
+    needs: legal-gate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos
+            runner: '["macos-latest"]'
+            generator: TGZ
+          - platform: windows
+            runner: '["self-hosted","windows","gpu"]'
+            generator: ZIP
+          - platform: linux
+            runner: '["ubuntu-latest"]'
+            generator: TGZ
+    runs-on: ${{ fromJSON(matrix.runner) }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Linux graphics dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libglu1-mesa-dev libgtk-3-dev libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libwayland-dev libdecor-0-dev xvfb
+      - name: Require platform signing configuration
+        env:
+          VERTEX_LOOM_PACKAGE_CONTACT: ${{ secrets.VERTEX_LOOM_PACKAGE_CONTACT }}
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: node .github/scripts/release-preflight.mjs
+      - name: Configure release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_ENABLE_SOURCE_ASSET_FALLBACK=OFF -DVERTEX_LOOM_PACKAGE_CONTACT=${{ secrets.VERTEX_LOOM_PACKAGE_CONTACT }}
+      - name: Build release
+        run: cmake --build build --config Release --parallel 4
+      - name: Test release on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a ctest --test-dir build -C Release --output-on-failure --output-junit build/ctest-results.xml
+      - name: Test release on native GPU
+        if: runner.os != 'Linux'
+        env:
+          FABRIC_REQUIRE_NATIVE_GL: '1'
+        run: ctest --test-dir build -C Release --output-on-failure --output-junit build/ctest-results.xml
+      - name: Reject skipped release tests
+        run: node .github/scripts/require-no-skipped-tests.mjs build/ctest-results.xml
+      - name: Sign macOS executables
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+        run: |
+          node -e "require('fs').writeFileSync(process.env.RUNNER_TEMP + '/vertex-loom.p12', Buffer.from(process.env.MACOS_CERTIFICATE_BASE64, 'base64'))"
+          security create-keychain -p temporary "$RUNNER_TEMP/vertex-loom.keychain-db"
+          security import "$RUNNER_TEMP/vertex-loom.p12" -k "$RUNNER_TEMP/vertex-loom.keychain-db" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temporary "$RUNNER_TEMP/vertex-loom.keychain-db"
+          security list-keychains -d user -s "$RUNNER_TEMP/vertex-loom.keychain-db"
+          find build -maxdepth 2 -type f -perm +111 -exec codesign --force --options runtime --timestamp --sign "$MACOS_SIGNING_IDENTITY" {} \;
+      - name: Sign Windows executables
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\vertex-loom.pfx", [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          Get-ChildItem build -Recurse -Filter *.exe | ForEach-Object { signtool sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f "$env:RUNNER_TEMP\vertex-loom.pfx" /p $env:WINDOWS_CERTIFICATE_PASSWORD $_.FullName }
+      - name: Package
+        run: cpack --config build/CPackConfig.cmake -G ${{ matrix.generator }} -B build/release-artifacts
+      - name: Notarize macOS archive
+        if: runner.os == 'macOS'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: xcrun notarytool submit build/release-artifacts/*.tar.gz --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+      - name: Generate checksums and SBOM
+        run: node .github/scripts/generate-release-metadata.mjs build/release-artifacts
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: vertex-loom-${{ matrix.platform }}-${{ github.ref_name }}
+          path: build/release-artifacts/*
+          if-no-files-found: error
+
+  linux-native-gpu:
+    needs: legal-gate
+    runs-on: [self-hosted, linux, gpu]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Configure hardware smoke
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DFABRIC_BUILD_EDITORS=OFF -DFABRIC_BUILD_TESTS=OFF
+      - name: Build hardware smoke
+        run: cmake --build build --target fabric_render_benchmark fabric_runtime_benchmark --parallel 4
+      - name: Require native Linux OpenGL and 60 FPS
+        env:
+          FABRIC_REQUIRE_NATIVE_GL: '1'
+        run: |
+          ./build/fabric_render_benchmark --packets 10000 --frames 600 --report render-native-linux.json
+          ./build/fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60 --report runtime-native-linux.json
+
+  publish:
+    needs: [build, linux-native-gpu]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          pattern: vertex-loom-*-${{ github.ref_name }}
+          path: release-artifacts
+          merge-multiple: true
+      - name: Publish candidate, beta, or public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          args=(--generate-notes)
+          if [[ "$GITHUB_REF_NAME" == *-rc.* || "$GITHUB_REF_NAME" == *-beta.* ]]; then args+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" release-artifacts/* "${args[@]}"

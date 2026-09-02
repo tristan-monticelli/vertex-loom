@@ -331,6 +331,8 @@ install(DIRECTORY tests/fixtures/studio-textile-head/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/examples/studio-textile-head)
 install(FILES LICENSE NOTICE THIRD_PARTY_NOTICES.md
         DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/licenses)
+install(FILES docs/release/README.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom)
 
 set(CPACK_PACKAGE_NAME "vertex-loom")
 set(CPACK_PACKAGE_VENDOR "Vertex Loom")
