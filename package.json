@@ -1,6 +1,6 @@
 {
   "name": "vertex-loom",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Cross-platform C++20 2D engine and authoring tools for textile and vector worlds.",
   "private": true,
   "license": "Apache-2.0",

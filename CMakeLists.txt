@@ -2,6 +2,21 @@ cmake_minimum_required(VERSION 3.24)
 
 project(VertexLoom VERSION 0.1.0 LANGUAGES C CXX)
 
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/package.json" VERTEX_LOOM_PACKAGE_JSON)
+string(JSON VERTEX_LOOM_NPM_VERSION GET "${VERTEX_LOOM_PACKAGE_JSON}" version)
+if(NOT VERTEX_LOOM_NPM_VERSION STREQUAL PROJECT_VERSION)
+    message(FATAL_ERROR
+        "Version mismatch: CMake=${PROJECT_VERSION}, npm=${VERTEX_LOOM_NPM_VERSION}")
+endif()
+
+set(VERTEX_LOOM_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
+file(MAKE_DIRECTORY "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}/fabric/core")
+configure_file(
+    engine/fabric_core/include/fabric/core/version_config.hpp.in
+    "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}/fabric/core/version_config.hpp"
+    @ONLY
+)
+
 include(GNUInstallDirs)
 
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
@@ -48,7 +63,10 @@ add_library(fabric_core STATIC
     engine/fabric_core/src/resource_id.cpp
     engine/fabric_core/src/version.cpp
 )
-target_include_directories(fabric_core PUBLIC engine/fabric_core/include)
+target_include_directories(fabric_core PUBLIC
+    engine/fabric_core/include
+    "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}"
+)
 target_compile_features(fabric_core PUBLIC cxx_std_20)
 
 add_library(fabric_project STATIC
