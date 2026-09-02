@@ -300,9 +300,25 @@ if(FABRIC_BUILD_EDITORS)
         fabric_render
         nfd
     )
+    if(APPLE)
+        set_target_properties(asset_studio PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.vertexloom.assetstudio"
+            MACOSX_BUNDLE_BUNDLE_NAME "Vertex Loom Asset Studio"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+    endif()
     add_executable(map_studio editors/map_studio/main.cpp)
     target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(map_studio PRIVATE fabric_editor fabric_imgui nfd)
+    if(APPLE)
+        set_target_properties(map_studio PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.vertexloom.mapstudio"
+            MACOSX_BUNDLE_BUNDLE_NAME "Vertex Loom Map Studio"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+    endif()
 endif()
 
 if(FABRIC_BUILD_RUNTIME)
@@ -314,8 +330,14 @@ endif()
 install(TARGETS fabric_project_validate fabric_map_package_export fabric_asset_preview
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 if(FABRIC_BUILD_EDITORS)
-    install(TARGETS asset_studio map_studio
-            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if(APPLE)
+        install(TARGETS asset_studio map_studio
+                BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    else()
+        install(TARGETS asset_studio map_studio
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
     install(FILES editors/asset_studio/assets/beam-thread.png
                   editors/asset_studio/assets/button-primary.png
                   editors/asset_studio/assets/button-secondary.png
