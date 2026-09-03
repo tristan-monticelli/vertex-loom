@@ -169,12 +169,126 @@ void draw_technical_tooltip(const std::string_view text) {
 bool draw_surface_effect_stack(
     fabric::project::ShaderSurfaceSettings& shader,
     const char* identifier,
-    const bool expand_blocks = true) {
+    const bool expand_blocks = false) {
     using Effect = fabric::project::SurfaceEffect;
     using Kind = fabric::project::SurfaceEffectKind;
     bool changed = false;
     ImGui::PushID(identifier);
-    ImGui::SeparatorText("Effect stack");
+    const bool guided_surface =
+        shader.classification == fabric::project::TextureClassification::beam ||
+        shader.classification ==
+            fabric::project::TextureClassification::button_eye;
+    const bool is_beam =
+        shader.classification == fabric::project::TextureClassification::beam;
+    const auto effect_of_kind = [&](const Kind kind) {
+        return std::ranges::find(shader.effects, kind, &Effect::kind);
+    };
+    const auto set_effect = [&](const Kind kind, const fabric::core::Color color,
+                                const float amount) {
+        auto effect = effect_of_kind(kind);
+        if (effect == shader.effects.end()) {
+            shader.effects.push_back(
+                Effect{.kind = kind, .color = color, .amount = amount});
+        } else {
+            effect->enabled = true;
+            effect->color = color;
+            effect->amount = amount;
+        }
+    };
+    const auto sync_legacy_settings = [&]() {
+        if (const auto tint = effect_of_kind(Kind::tint);
+            tint != shader.effects.end())
+            shader.primary_color = tint->color;
+        if (const auto holography = effect_of_kind(Kind::holography);
+            holography != shader.effects.end()) {
+            shader.effect_color = holography->color;
+            shader.holography = holography->amount;
+        }
+        if (const auto shine = effect_of_kind(Kind::shine);
+            shine != shader.effects.end())
+            shader.shine = shine->amount;
+    };
+    if (guided_surface && !shader.effects.empty()) {
+        ImGui::SeparatorText("Quick look");
+        ImGui::TextDisabled(is_beam
+            ? "Start with a readable Beam, then fine-tune only what matters."
+            : "Keep the original image readable or apply a restrained finish.");
+        const auto apply_look = [&](const int look) {
+            shader.profile = is_beam
+                ? fabric::project::SurfaceShaderProfile::thread
+                : fabric::project::SurfaceShaderProfile::custom;
+            if (look == 0) {
+                set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F},
+                           is_beam ? 0.92F : 0.0F);
+                set_effect(Kind::holography,
+                           {0.65F, 0.92F, 1.0F, 1.0F}, 0.0F);
+                set_effect(Kind::shine,
+                           {1.0F, 1.0F, 1.0F, 1.0F}, 0.08F);
+            } else if (look == 1) {
+                set_effect(Kind::tint, {0.18F, 0.70F, 1.0F, 1.0F},
+                           is_beam ? 0.88F : 0.32F);
+                set_effect(Kind::holography,
+                           {0.55F, 0.96F, 1.0F, 1.0F}, 0.18F);
+                set_effect(Kind::shine,
+                           {0.82F, 0.94F, 1.0F, 1.0F}, 0.14F);
+            } else {
+                set_effect(Kind::tint, {1.0F, 0.58F, 0.24F, 1.0F},
+                           is_beam ? 0.82F : 0.28F);
+                set_effect(Kind::holography,
+                           {1.0F, 0.82F, 0.42F, 1.0F}, 0.12F);
+                set_effect(Kind::shine,
+                           {1.0F, 0.94F, 0.78F, 1.0F}, 0.16F);
+            }
+            sync_legacy_settings();
+            changed = true;
+        };
+        if (ImGui::Button(is_beam ? "Neutral thread" : "Original image"))
+            apply_look(0);
+        ImGui::SameLine();
+        if (ImGui::Button("Cool glow")) apply_look(1);
+        ImGui::SameLine();
+        if (ImGui::Button("Warm glow")) apply_look(2);
+
+        if (auto tint = effect_of_kind(Kind::tint);
+            tint != shader.effects.end()) {
+            bool quick_changed = ImGui::ColorEdit4(
+                "Base color##quick", &tint->color.red);
+            quick_changed |= ImGui::SliderFloat(
+                "Recolor strength##quick", &tint->amount, 0.0F, 1.0F,
+                "%.2f");
+            if (quick_changed) {
+                tint->enabled = true;
+                changed = true;
+            }
+        }
+        if (auto holography = effect_of_kind(Kind::holography);
+            holography != shader.effects.end()) {
+            bool quick_changed = ImGui::ColorEdit4(
+                "Glow color##quick", &holography->color.red);
+            quick_changed |= ImGui::SliderFloat(
+                "Glow strength##quick", &holography->amount, 0.0F, 1.0F,
+                "%.2f");
+            if (quick_changed) {
+                holography->enabled = true;
+                changed = true;
+            }
+        }
+        if (auto shine = effect_of_kind(Kind::shine);
+            shine != shader.effects.end()) {
+            const bool quick_changed = ImGui::SliderFloat(
+                "Highlight##quick", &shine->amount, 0.0F, 1.0F, "%.2f");
+            if (quick_changed) {
+                shine->enabled = true;
+                changed = true;
+            }
+        }
+        if (changed) sync_legacy_settings();
+    }
+
+    const bool show_advanced = !guided_surface ||
+        ImGui::CollapsingHeader("Advanced effect stack");
+    if (show_advanced) {
+        if (!guided_surface) ImGui::SeparatorText("Effect stack");
     ImGui::TextDisabled("%zu block%s · evaluated from top to bottom",
                         shader.effects.size(), shader.effects.size() == 1U ? "" : "s");
     if (shader.effects.empty()) {
@@ -282,6 +396,8 @@ bool draw_surface_effect_stack(
             static_cast<std::ptrdiff_t>(action_index));
         changed = true;
     }
+    }
+    if (changed) sync_legacy_settings();
     ImGui::PopID();
     return changed;
 }
@@ -7005,17 +7121,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         fabric::project::TextureClassification::button_eye,
                     .primary_color = {1.0F, 1.0F, 1.0F, 1.0F},
                     .effect_color = {0.2F, 0.8F, 1.0F, 1.0F},
-                    .shine = 0.2F,
+                    .shine = 0.08F,
                     .holography = 0.0F,
                     .effects = {
                         {.kind = fabric::project::SurfaceEffectKind::tint,
-                         .color = {1.0F, 1.0F, 1.0F, 1.0F}},
+                         .color = {1.0F, 1.0F, 1.0F, 1.0F},
+                         .amount = 0.0F},
                         {.kind = fabric::project::SurfaceEffectKind::holography,
                          .color = {0.2F, 0.8F, 1.0F, 1.0F},
                          .amount = 0.0F},
                         {.kind = fabric::project::SurfaceEffectKind::shine,
                          .color = {1.0F, 1.0F, 1.0F, 1.0F},
-                         .amount = 0.2F}},
+                         .amount = 0.08F}},
                 };
         }
         ImGui::OpenPopup("Create entity");
@@ -8365,10 +8482,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         creation.visual_preset.name = "UI Guided Beam";
         creation.visual_preset.guided_beam = true;
         creation.visual_preset.thread_texture.reset();
-        creation.visual_preset.beam_color = {1.0F, 1.0F, 1.0F, 1.0F};
-        creation.visual_preset.beam_effect_color = {1.0F, 1.0F, 1.0F, 1.0F};
-        creation.visual_preset.beam_shine = 0.0F;
-        creation.visual_preset.beam_holography = 0.0F;
         creation.visual_preset.beam_repetition = 1.0F;
         creation.visual_preset.beam_width = 0.5F;
         creation.visual_preset.beam_opacity = 1.0F;
@@ -9766,17 +9879,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 creation.entity.transform.scale = {50.0F, 50.0F};
                 if (creation.entity.appearance_shader) {
                     creation.entity.appearance_shader->primary_color =
-                        {0.2F, 0.7F, 1.0F, 1.0F};
+                        {0.18F, 0.70F, 1.0F, 1.0F};
                     creation.entity.appearance_shader->effect_color =
-                        {1.0F, 0.8F, 0.1F, 1.0F};
-                    creation.entity.appearance_shader->shine = 0.4F;
-                    creation.entity.appearance_shader->holography = 0.3F;
+                        {0.55F, 0.96F, 1.0F, 1.0F};
+                    creation.entity.appearance_shader->shine = 0.14F;
+                    creation.entity.appearance_shader->holography = 0.18F;
                     auto& effects =
                         creation.entity.appearance_shader->effects;
-                    effects[0].color = {0.2F, 0.7F, 1.0F, 1.0F};
-                    effects[1].color = {1.0F, 0.8F, 0.1F, 1.0F};
-                    effects[1].amount = 0.3F;
-                    effects[2].amount = 0.4F;
+                    effects[0].color = {0.18F, 0.70F, 1.0F, 1.0F};
+                    effects[0].amount = 0.32F;
+                    effects[1].color = {0.55F, 0.96F, 1.0F, 1.0F};
+                    effects[1].amount = 0.18F;
+                    effects[2].amount = 0.14F;
                 }
             }
             if (ui_button_frame >= 12U) {

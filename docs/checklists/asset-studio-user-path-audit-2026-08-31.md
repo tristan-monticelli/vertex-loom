@@ -218,6 +218,34 @@ prévisualiser le résultat, le sauvegarder, le recharger et le publier sans
 connaître `seam`, `VisualComponent`, `texturedPath`, `XPBD`, les IDs internes ou
 la structure des fichiers JSON.
 
+## Réaudit visuel du 3 septembre 2026 — Beam, Thread et Button
+
+Les E2E Beam, Beam holographique et Button ont été rejoués avec un affichage
+macOS réel puis leurs captures PPM ont été inspectées. Les tests passaient
+auparavant en environnement sans écran grâce à une sortie `77`, sans constituer
+une preuve visuelle.
+
+- Le Beam neutre apparaissait presque gris malgré une texture source rose et
+  blanche ; les valeurs blanches par défaut ne démontraient aucune action des
+  couleurs.
+- Le Button de test utilisait une recoloration cyan à force maximale, ce qui
+  supprimait la hiérarchie colorée de l'original et produisait un aplat peu
+  esthétique.
+- Les réglages utiles étaient noyés dans trois blocs techniques ; l'ajout naïf
+  de contrôles a d'abord repoussé `Create Button` sous le viewport et a été
+  rejeté par le vrai E2E.
+
+Corrections vérifiées : palette Beam bleu textile perceptible, Button initial
+sans recoloration destructive, trois looks rapides, cinq contrôles essentiels
+visibles, pile avancée repliée et synchronisation des champs historiques. Les
+captures `asset_studio-ui-test.ppm` montrent désormais le détail de la fibre du
+Beam et les couleurs rose, verte et cyan du Button sous la finition choisie.
+
+Reste ouvert : comparer automatiquement des pixels avant/après pour chaque
+contrôle et entre Asset Studio, Preview Runtime et paquet publié. Les captures
+actuelles sont inspectables, mais le script E2E valide encore principalement le
+clic, la sauvegarde et le rechargement.
+
 ## Audit technique — orientation des images
 
 - [x] Vérifier les fichiers PNG originaux et leur orientation native.

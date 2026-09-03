@@ -66,6 +66,12 @@ PNG source. Les terminaisons d'un Beam guidé restent droites et l'offset U
 n'est pas exposé : les bords gauche et droit du PNG ne sont ni arrondis, ni
 décalés, ni recadrés par l'outil.
 
+Le Beam guidé commence avec une palette bleu textile perceptible, une
+holographie légère et une brillance contenue. L'inspecteur expose trois looks
+rapides (`Neutral thread`, `Cool glow`, `Warm glow`) puis les couleurs et
+intensités principales sans ouvrir la pile technique. La pile ordonnée reste
+disponible dans `Advanced effect stack`.
+
 Le réglage utilisateur `Color handling` distingue `Recolor from detail`, qui
 utilise la luminance et l'alpha du PNG avec la teinte de base, de `Keep image
 colors`, qui conserve les couleurs du PNG. Ce choix est persisté comme

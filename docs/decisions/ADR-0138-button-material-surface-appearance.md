@@ -24,6 +24,13 @@ attache ce matériau à l'Entity Button. Il expose couleur principale, couleur
 d'effet, brillance, holographie et opacité. Il ne crée, ne remplace et ne
 transforme aucune texture source.
 
+Le look initial conserve les couleurs de l'image originale : la force de
+recoloration et l'holographie commencent à zéro, avec seulement un reflet
+léger. `Original image`, `Cool glow` et `Warm glow` fournissent des points de
+départ sobres ; couleur, force de recoloration, couleur et force de lueur et
+reflet restent directement éditables. La pile modulaire complète est repliée
+par défaut afin que l'action de création reste visible dans la fenêtre.
+
 ## Conséquences
 
 - Les deux PNG originaux restent les seules sources visuelles des Buttons.

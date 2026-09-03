@@ -582,8 +582,14 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
 }
 
 TEST_CASE("guided Beam is a textured path with the project default and shader") {
-    CHECK(fabric::editor::VisualPresetRequest{}.beam_repetition ==
-          Catch::Approx(1.0F));
+    const fabric::editor::VisualPresetRequest defaults;
+    CHECK(defaults.beam_repetition == Catch::Approx(1.0F));
+    CHECK(defaults.beam_color ==
+          fabric::core::Color{0.18F, 0.70F, 1.0F, 1.0F});
+    CHECK(defaults.beam_effect_color ==
+          fabric::core::Color{0.55F, 0.96F, 1.0F, 1.0F});
+    CHECK(defaults.beam_shine == Catch::Approx(0.14F));
+    CHECK(defaults.beam_holography == Catch::Approx(0.18F));
     auto beam_request = request(
         fabric::editor::VisualPresetKind::beam, "guided-beam");
     beam_request.thread_texture.reset();
