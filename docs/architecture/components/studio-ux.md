@@ -43,6 +43,23 @@ C4Component
 6. Composer la map/scène avec les références existantes et publier après validation.
 7. Lancer Preview Runtime ; toute divergence renvoie à la ressource et au paramètre concernés.
 
+## Workspaces orientés tâche
+
+Le triptyque explorateur/canvas/inspecteur reste stable ; un dock inférieur
+change selon la tâche. La création ne doit pas ouvrir un formulaire contenant
+la totalité du futur document.
+
+| Workspace | Sélection conservée | Canvas | Inspecteur | Dock inférieur |
+| --- | --- | --- | --- | --- |
+| Entity | ressource et nœud | composition, sélection directe et gizmos | propriétés du nœud ; commandes de clé | diagnostics/dépendances |
+| Animation | Entity, nœud, clip et playhead | pose évaluée et gizmos auto-key | propriété ou clé sélectionnée | transport, pistes, clés, marqueurs et courbes |
+
+Le Resource Explorer fournit `Créer une Entity depuis la sélection`. Le
+workspace Entity fournit `Animer…`. Une propriété animable fournit une icône de
+clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
+tangentes, composition additive et segment A→B sont avancés, jamais requis pour
+la première animation. Voir ADR-0147.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

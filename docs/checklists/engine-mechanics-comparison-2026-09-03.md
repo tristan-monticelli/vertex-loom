@@ -18,6 +18,47 @@ Les cinq concepts suivants ne sont pas interchangeables :
 - contrainte physique : relation résolue entre corps par la simulation ;
 - animation guidée par chemin : animation d'une transform ou de bones sur une courbe.
 
+### Méthode UX ajoutée après revue
+
+La présence d'un champ ou d'une commande ne suffit pas à déclarer une capacité
+utilisable. L'audit mesure aussi le parcours de production : point d'entrée,
+conservation de la sélection, nombre de décisions avant le premier résultat,
+édition directe sur canvas, visibilité de la hiérarchie et du temps, feedback,
+undo et retour au document. Un parcours est `implémenté` seulement si son
+workspace permet de créer, observer et corriger le résultat sans reconstruire
+manuellement des identifiants ou changer de contexte sans indication.
+
+Le code actuel révèle deux parcours distincts mais mal raccordés : la création
+d'Entity est un long formulaire modal, puis l'édition réelle se fait ailleurs ;
+la création d'Animation ne produit qu'un conteneur, puis expose dans un même
+inspecteur vertical la cible, les marqueurs, les clés, les segments A→B et les
+pistes. Cette densité rend des contrats puissants difficiles à découvrir.
+
+| Tâche observée | Parcours Vertex Loom au 2026-09-03 | Coût/rupture | Référence UX convergente | État UX | Cible vérifiable | Priorité |
+| --- | --- | --- | --- | --- | --- | --- |
+| Créer une Entity depuis un visuel | `+ Add resource` → `Composed Entity` → nom/root/drawable/material → ajouter chaque block → choisir type puis ressource → saisir les transforms → créer | La sélection initiale n'est pas l'entrée ; composition et réglages avancés précèdent le premier résultat | Godot/Unity/Construct créent ou composent depuis hiérarchie, projet ou canvas ; GameMaker accepte le drag d'asset | partiel | Sélectionner un ou plusieurs visuels → `Créer une Entity` → Entity ouverte avec nœuds déjà créés | P1 |
+| Construire la hiérarchie | Boutons `Add child` et cibles de drop étroites dans l'inspecteur ; transform visuel séparé sur le canvas | La structure n'est pas manipulée dans un vrai panneau d'arbre et la destination du drop est peu visible | Scene/Hierarchy/Outliner/Project bars rendent parent, sélection et drop persistants | partiel | Arbre Entity dédié ; drop sur un nœud ou entre deux nœuds ; sélection synchronisée canvas/arbre/inspecteur | P1 |
+| Créer une animation d'Entity | Depuis l'Entity, `Add animation clip...` conserve la cible ; depuis le menu technique, la cible dépend de la sélection courante | Bon raccourci contextuel, mais la création termine dans un inspecteur générique sans mise en scène du prochain geste | Godot ouvre l'Animation Panel depuis l'AnimationPlayer ; Rive/Spine passent en mode Animate ; Unity ouvre Animation sur l'objet sélectionné | partiel | `Animer…` depuis l'Entity crée/ouvre le clip et place immédiatement le focus dans le workspace Animation | P1 |
+| Poser la première clé | Choisir nœud → propriété → preset de binding parfois redondant → temps/type/valeur → `Set key` | L'utilisateur traduit son intention en binding technique avant de voir une piste | Godot/Unreal ajoutent piste et clé depuis l'icône de la propriété ; Unity/GameMaker enregistrent les changements au playhead | partiel | Icône clé sur chaque propriété animable ; la piste est créée automatiquement au playhead, avec valeur courante | P0 |
+| Créer un mouvement A→B | Formulaire séparé avec temps A/B, valeurs A/B, interpolation, easing et composition | La pose n'est pas manipulée sur le canvas ; doublon conceptuel avec les clés ordinaires | Les éditeurs de référence font avancer le playhead, modifier l'objet, enregistrer la nouvelle pose | partiel | Clé initiale depuis l'état courant → déplacer le playhead → gizmo/propriété → auto-key ; formulaire A→B relégué en avancé | P1 |
+| Lire et corriger une animation | Slider de scrub, texte des propriétés évaluées, liste verticale des pistes et cases de sélection | Absence de dope sheet spatial : durée, densité, alignement et sélection temporelle sont difficiles à lire | Tous les outils d'animation comparés exposent pistes + playhead + clés dans une timeline dédiée | partiel | Dock Timeline redimensionnable avec lignes par nœud/propriété, clés positionnées, sélection rectangle, drag, zoom et lecture | P0 |
+| Éditer la machine à états | Section repliée dans `Advanced Entity systems` | Mélange définition d'Entity, rig, physique et orchestration d'animations | Godot, Unreal et Rive séparent graph/state machine de la timeline | partiel | Onglet `Animation Graph` relié aux clips, transitions inspectables et preview d'état active | P1 |
+
+### Architecture de panneaux cible
+
+| Zone persistante | Entity workspace | Animation workspace |
+| --- | --- | --- |
+| Explorateur gauche | Assets filtrables et drag source | Clips de l'Entity et ressources compatibles |
+| Arbre gauche/centre | Nœuds, parenté, ordre, visibilité, lock | Même arbre en lecture/sélection ; pistes sous chaque nœud |
+| Canvas central | Sélection directe, déplacement, rotation, scale, drop | Preview au playhead, gizmos enregistrables, onion skin optionnel |
+| Inspecteur droit | Propriétés du nœud sélectionné ; clé à côté des propriétés animables | Valeur de la clé/piste sélectionnée, interpolation et easing |
+| Dock bas | Diagnostics et dépendances sur demande | Transport, playhead, dope sheet, marqueurs et courbes |
+
+Les modales ne doivent plus porter la composition. Elles restent limitées au nom,
+au choix d'un template ou à une confirmation destructive. Les réglages de
+binding brut, tangentes, composition additive et création A→B restent
+disponibles dans un volet `Avancé`, sans bloquer le parcours direct.
+
 ## Tableau maître
 
 | Domaine | Capacité | Preuve Vertex Loom | Studio | Preview | Runtime publié | État | Godot | Unity | Unreal | GameMaker | Construct | Spine | Rive | Écart/impact | Priorité | Recommandation | Sources officielles |
@@ -36,10 +77,12 @@ Les cinq concepts suivants ne sont pas interchangeables :
 | Déplacement | A12 — rail de déplacement d'instance | Aucun contrat de rail cinématique ; ne pas confondre avec A09/A10 | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Impossible d'authorer une plateforme ou caméra sur rail | P1 | Ajouter un composant générique PathFollower séparé du rendu | G2, U2, E2, C2, S2 |
 | Animation | A13 — animation guidée par chemin | Aucun binding distance/tangente sur spline | non | non | non | absent | ✓ | ✓ | ✓ | partiel | partiel | ✓ | partiel | Courbes visuelles inutilisables comme trajectoires animées | P1 | ADR dédiée, binding `progress`, orientation optionnelle | G2, U2, E2, S2 |
 | Composition | A14 — compositions, composants, paramètres, variantes, ancres | `visual_composition.hpp`, `visual_component.hpp`, ADR-0104/0105 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | Pas de bibliothèque de variantes visuelle avancée | P2 | Conserver le résolveur commun et améliorer seulement l'UX | G1, U1, E1, R1 |
-| Entités | A15 — entité/prefab, arbre et overrides d'instance | `entity.hpp`, `map.hpp`, ADR-0071/0075/0089 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Overrides incompatibles diagnostiqués mais peu guidés | P2 | Ajouter réparation assistée par type | G1, U1, E1 |
+| Entités | A15 — entité/prefab, arbre et overrides d'instance | `entity.hpp`, `map.hpp`, ADR-0071/0075/0089 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Contrat/runtime complets, mais composition et hiérarchie restent trop enfouies dans formulaire et inspecteur | P1 | Fermer le parcours A39 puis ajouter réparation assistée par type | G1, U1, E1, G8, U8, C6 |
 | Entités | A16 — transformation atomique A→B avec transfert d'état | `entity_transformation.hpp`, ADR-0115, tests runtime | oui | oui | oui | implémenté | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Capacité spécialisée différenciante | P2 | Garder politiques versionnées et replay déterministe | G1, U1, E1 |
-| Animation | A17 — clips, clés, interpolation, easing, segments, événements | `animation.hpp`, timeline, ADR-0039..0043/0125/0126 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Audio sur timeline non prouvé | P2 | Relier événements animation aux événements audio typés | G3, U3, E3, GM1, S1, R1 |
+| Animation | A17 — clips, clés, interpolation, easing, segments, événements | `animation.hpp`, timeline, ADR-0039..0043/0125/0126 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Contrat/runtime complets, mais timeline textuelle et binding manuel rendent l'authoring insuffisant ; audio non prouvé | P0 | Fermer A40, puis relier les événements animation aux événements audio typés | G3, U3, E3, GM1, S1, R1, G8, U8, E8, GM4, S4, R4 |
 | Animation | A18 — machine à états d'animation | `animation_state_machine.hpp`, ADR-0042/0045 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | partiel | ✓ | Authoring Studio incomplet/non prouvé | P1 | Ajouter édition de transitions et E2E reload | G3, U3, E3, R1 |
+| UX Entity | A39 — composition contextuelle, arbre et édition directe | Modale `Create entity`, puis boutons/drop dans l'inspecteur et gizmo translation ; ADR-0130/0147 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | partiel | partiel | Le contrat est complet mais le premier résultat exige trop de décisions et change de surface | P1 | Créer depuis la sélection et ouvrir un workspace Entity avec arbre synchronisé | G8, U8, E8, GM4, C6, S4, R4 |
+| UX Animation | A40 — workspace timeline, création de piste et keying contextuel | `Add animation clip...`, formulaire `Set key`, liste de tracks ; ADR-0147 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | Pas de dope sheet visuelle ni de clé depuis la propriété ; binding technique exposé trop tôt | P0 | Dock Timeline et key icon/auto-track depuis la propriété courante | G8, U8, E8, GM4, C6, S4, R4 |
 | Rig | A19 — bones, skinning pondéré et déformation mesh | `entity.hpp`, ADR-0046/0097, tests déformation | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Outils de peinture de poids moins complets | P1 | Ajouter métriques et édition visuelle des poids | G4, U3, E3, S1, R1 |
 | Rig | A20 — IK FABRIK et ordre des contraintes | ADR-0043/0044/0096, tests contraintes | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Bibliothèque de contraintes réduite | P2 | Étendre seulement sur cas utilisateur mesuré | G4, U3, E3, S2, R1 |
 | Physique | A21 — XPBD et substeps/interpolation | ADR-0098/0100/0139, `entity_simulation` tests | partiel | oui | oui | partiel | partiel | partiel | partiel | — | — | partiel | partiel | Authoring/diagnostics moins complets | P1 | Visualiser particules, contraintes et énergie | G5, U4, E4, S1, R1 |
@@ -71,8 +114,8 @@ Les cinq concepts suivants ne sont pas interchangeables :
 | texture | A03, A07, A10 |
 | vector | A04, A08 |
 | material | A05, A06, A07 |
-| entity | A15, A16, A19, A21 |
-| animation | A17, A18 |
+| entity | A15, A16, A19, A21, A39 |
+| animation | A17, A18, A40 |
 | input | A22 |
 | behavior | A23 |
 | transformation | A16 |
@@ -122,7 +165,7 @@ projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
 | Map, runtime, input, replay, audio, caméra, perf | 0047–0085 | A22, A24–A34 |
 | Prompts, entités, preview, simulation | 0086–0103 | A14–A21, A24–A28 |
 | Composition, chemins, comportements, publication | 0104–0135 | A09–A16, A22–A23, A29, A31, A36 |
-| Beam/Button/surfaces/release | 0136–0146 | A06–A07, A10–A11, A21, A34, A36–A38 |
+| Beam/Button/surfaces/release/UX | 0136–0147 | A06–A07, A10–A11, A21, A34, A36–A40 |
 
 ## Registre affirmation → source officielle
 
@@ -167,12 +210,21 @@ de qualité ou de format.
 | R1 | Rive fournit artboards, bones, contraintes, clés et machines à états. | [Rive — Keys](https://rive.app/docs/editor/keys), [State machines](https://rive.app/docs/runtimes/state-machines) |
 | R2 | Les runtimes Rive avancent les machines et exposent événements/data binding. | [Rive — State machine playback](https://rive.app/docs/runtimes/state-machines), [Events](https://rive.app/docs/runtimes/rive-events) |
 | R3 | `.riv` est le format exporté consommé par les runtimes. | [Rive — Exporting](https://rive.app/docs/editor/exporting) |
+| G8 | Le Scene dock conserve l'arbre et l'Inspector édite la sélection ; l'Animation Panel affiche pistes, playhead et clés, et une propriété peut créer sa piste et sa clé. | [Godot — Nodes and Scenes](https://docs.godotengine.org/en/stable/getting_started/step_by_step/nodes_and_scenes.html), [Godot — Animation features](https://docs.godotengine.org/en/stable/tutorials/animation/introduction.html) |
+| U8 | Un Prefab se crée depuis la hiérarchie vers le Project ; l'Animation window enregistre les propriétés de l'objet sélectionné au playhead. | [Unity 6 — Creating Prefabs](https://docs.unity3d.com/6000.0/Documentation/Manual/CreatingPrefabs.html), [Unity 6 — Animating a GameObject](https://docs.unity3d.com/6000.0/Documentation/Manual/animeditor-AnimatingAGameObject.html) |
+| E8 | Sequencer accepte un Actor sélectionné ou glissé, crée des pistes filtrées et peut ajouter piste et clé depuis une propriété ou un raccourci. | [Unreal — Sequencer Track List](https://dev.epicgames.com/documentation/en-us/unreal-engine/sequencer-track-list-in-unreal-engine), [Unreal — Keyframing](https://dev.epicgames.com/documentation/en-us/unreal-engine/creating-animation-keyframes-in-unreal-engine) |
+| GM4 | Le Sequence Editor réunit Canvas, Track Panel et Dope Sheet ; un asset glissé crée sa piste et l'enregistrement ajoute les paramètres modifiés. | [GameMaker — Sequence Editor](https://manual.gamemaker.io/monthly/en/The_Asset_Editors/Sequences.htm), [Track Panel](https://manual.gamemaker.io/lts/en/The_Asset_Editors/Sequence_Properties/The_Track_Panel.htm) |
+| C6 | Le Layout View autorise sélection, hiérarchie, drop et édition synchronisée dans la Properties Bar ; ses capacités d'animation restent plus spécialisées. | [Construct 3 — Layout View](https://www.construct.net/en/make-games/manuals/construct-3/interface/layout-view), [Interface](https://www.construct.net/en/make-games/manuals/construct-3/overview/the-interface) |
+| S4 | Spine garde l'animation active, la hiérarchie et les clés visibles dans Tree, Graph ou Dopesheet en mode Animate. | [Spine — Keys and timeline](https://esotericsoftware.com/spine-keys) |
+| R4 | Rive réserve en mode Animate une timeline avec liste des animations, playhead, durée, snap, pistes filtrables et contrôles de lecture. | [Rive — Timeline](https://rive.app/docs/editor/animate-mode/timeline) |
 
 ## Conclusion et ordre de correction
 
 La régression A07 a été corrigée et vérifiée sur affichage réel : les nouveaux
 Beam et Button préservent la source sans effet ; la recoloration reste
-explicite. Les autres P0 sont des gates de release externes et restent
-explicitement ouverts. Les P1 structurants (rail cinématique, animation par
-chemin, tilemap) nécessitent des ADR séparées ; cet audit ne les implémente pas
-implicitement.
+explicite. La revue UX ajoute un P0 produit : A40. La timeline actuelle prouve
+le contrat et les commandes, pas un parcours d'animation satisfaisant. A39 et
+A40 doivent être corrigés avant de qualifier Entity/Animation d'ergonomiques.
+Les autres P0 sont des gates de release externes et restent explicitement
+ouverts. Les P1 structurants (rail cinématique, animation par chemin, tilemap)
+nécessitent des ADR séparées ; cet audit ne les implémente pas implicitement.
