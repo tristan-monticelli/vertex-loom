@@ -28,7 +28,7 @@ Les cinq concepts suivants ne sont pas interchangeables :
 | Import | A04 — SVG lié puis conversion vectorielle native | `svg_vector.cpp`, ADR-0016/0036, tests SVG | oui | oui | oui | implémenté | ✓ | partiel | partiel | partiel | ✓ | ✓ | ✓ | Pas de réimport différentiel documenté | P2 | Ajouter un diff de réimport lié | G1, U1, E1 |
 | Surfaces | A05 — Material v2, blend, texture/vector pattern, UV | `material.hpp`, `material_entity_tests`, ADR-0038/0138 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Bibliothèque de matériaux limitée | P2 | Ajouter duplication et aperçu comparatif | G1, U1, E1 |
 | Surfaces | A06 — pile Tint/Holography/Shine ordonnée | `shader_profile.hpp`, `opengl_vector_smoke`, ADR-0143 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | N/A | partiel | Effets limités à trois familles | P2 | N'ajouter un effet qu'avec contrat, UI et test pixel | G1, U1, E1, R2 |
-| Surfaces | A07 — source intacte par défaut, recoloration explicite | Défaut Beam/Button antérieur bleu/reflet ; ADR-0136/0138 corrigés par cet audit | oui | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | ✓ | Défaut produit confirmé avant correction | P0 | `preserve_source` par défaut ; zéro tint/glow/shine | G1, U1, E1, R2 |
+| Surfaces | A07 — source intacte par défaut, recoloration explicite | `BeamColorMode`, tests presets, E2E Beam/Button et smoke GL réels ; ADR-0136/0138 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | ✓ | Défaut bleu/reflet corrigé ; anciens JSON inchangés | P0 | Maintenir fixture asymétrique et gate sans `SKIP` | G1, U1, E1, R2 |
 | Vecteur | A08 — formes, fills, strokes, clips, hiérarchie et Bézier | `vector_asset.hpp`, ADR-0022..0035/0128, canvas E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | ✓ | Opérations booléennes non prouvées | P2 | Documenter ou ajouter les booléens si requis par un projet | G1, U1, E1, S1, R1 |
 | Chemins | A09 — spline géométrique ligne/cubique, ouverte/fermée | `TexturedPathCommandKind`, `textured_path_geometry_tests` | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | Pas de subdivision utilisateur | P2 | Exposer la tolérance uniquement avec budget perf | G2, U2, E2, S2 |
 | Chemins | A10 — chemin visuel texturé repeat/mirror/stretch | `TexturedPathUvMode`, tests UV et OpenGL | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | N/A | N/A | Couverture graphique de toutes variantes à consolider | P1 | Matrice pixel repeat/mirror/stretch dans la recette GL | G2, U2 |
@@ -170,8 +170,9 @@ de qualité ou de format.
 
 ## Conclusion et ordre de correction
 
-La seule régression P0 corrigeable localement sans nouvelle architecture est
-A07 : les nouveaux Beam et Button doivent préserver la source sans effet.
-Les autres P0 sont des gates de release externes et restent explicitement
-ouverts. Les P1 structurants (rail cinématique, animation par chemin, tilemap)
-nécessitent des ADR séparées ; cet audit ne les implémente pas implicitement.
+La régression A07 a été corrigée et vérifiée sur affichage réel : les nouveaux
+Beam et Button préservent la source sans effet ; la recoloration reste
+explicite. Les autres P0 sont des gates de release externes et restent
+explicitement ouverts. Les P1 structurants (rail cinématique, animation par
+chemin, tilemap) nécessitent des ADR séparées ; cet audit ne les implémente pas
+implicitement.

@@ -14,6 +14,7 @@
 namespace fabric::editor {
 
 enum class VisualPresetKind { beam, seam, zipper };
+enum class BeamColorMode { preserve_source, recolor_from_detail };
 
 [[nodiscard]] std::string_view label(VisualPresetKind kind) noexcept;
 
@@ -23,10 +24,11 @@ struct VisualPresetRequest {
     std::string name{"Visual preset"};
     std::optional<project::ResourceReference> thread_texture;
     std::size_t zipper_tooth_count{12U};
-    core::Color beam_color{0.18F, 0.70F, 1.0F, 1.0F};
-    core::Color beam_effect_color{0.55F, 0.96F, 1.0F, 1.0F};
-    float beam_shine{0.14F};
-    float beam_holography{0.18F};
+    BeamColorMode beam_color_mode{BeamColorMode::preserve_source};
+    core::Color beam_color{1.0F, 1.0F, 1.0F, 1.0F};
+    core::Color beam_effect_color{1.0F, 1.0F, 1.0F, 1.0F};
+    float beam_shine{};
+    float beam_holography{};
     float beam_repetition{1.0F};
     float beam_width{0.12F};
     float beam_opacity{1.0F};

@@ -423,6 +423,23 @@ int main() {
         preserve_right[0] < 40U && preserve_right[1] > 200U &&
         preserve_right[2] < 40U;
 
+    auto zero_effects = preserve;
+    zero_effects.effects = {
+        {.kind = fabric::project::SurfaceEffectKind::tint,
+         .color = {1.0F, 1.0F, 1.0F, 1.0F}, .amount = 0.0F},
+        {.kind = fabric::project::SurfaceEffectKind::holography,
+         .color = {1.0F, 1.0F, 1.0F, 1.0F}, .amount = 0.0F},
+        {.kind = fabric::project::SurfaceEffectKind::shine,
+         .color = {1.0F, 1.0F, 1.0F, 1.0F}, .amount = 0.0F},
+    };
+    const auto [zero_left_stats, zero_left] =
+        render_shader_pixel(zero_effects, 16);
+    const auto [zero_right_stats, zero_right] =
+        render_shader_pixel(zero_effects, 48);
+    const bool zero_effects_preserve_every_channel = zero_left_stats.ok() &&
+        zero_right_stats.ok() && zero_left == preserve_left &&
+        zero_right == preserve_right;
+
     auto stacked_source = neutral;
     stacked_source.effects = {
         {.kind = fabric::project::SurfaceEffectKind::tint,
@@ -521,7 +538,9 @@ int main() {
         !holography_uses_selected_color ||
         !holography_preserves_detail ||
         !neutral_thread_has_no_source_hue ||
-        !image_color_mode_preserves_png || !effect_stack_preserves_png_detail ||
+        !image_color_mode_preserves_png ||
+        !zero_effects_preserve_every_channel ||
+        !effect_stack_preserves_png_detail ||
         !effect_stack_uses_selected_color || !shine_is_uniform ||
         !modular_stack_is_ordered) {
         std::cerr << "OpenGL smoke pixel or draw stats were invalid: "

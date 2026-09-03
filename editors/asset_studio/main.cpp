@@ -210,46 +210,44 @@ bool draw_surface_effect_stack(
     };
     if (guided_surface && !shader.effects.empty()) {
         ImGui::SeparatorText("Quick look");
-        ImGui::TextDisabled(is_beam
-            ? "Start with a readable Beam, then fine-tune only what matters."
-            : "Keep the original image readable or apply a restrained finish.");
-        const auto apply_look = [&](const int look) {
-            shader.profile = is_beam
-                ? fabric::project::SurfaceShaderProfile::thread
-                : fabric::project::SurfaceShaderProfile::custom;
-            if (look == 0) {
-                set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F},
-                           is_beam ? 0.92F : 0.0F);
-                set_effect(Kind::holography,
-                           {0.65F, 0.92F, 1.0F, 1.0F}, 0.0F);
-                set_effect(Kind::shine,
-                           {1.0F, 1.0F, 1.0F, 1.0F}, 0.08F);
-            } else if (look == 1) {
-                set_effect(Kind::tint, {0.18F, 0.70F, 1.0F, 1.0F},
-                           is_beam ? 0.88F : 0.32F);
-                set_effect(Kind::holography,
-                           {0.55F, 0.96F, 1.0F, 1.0F}, 0.18F);
-                set_effect(Kind::shine,
-                           {0.82F, 0.94F, 1.0F, 1.0F}, 0.14F);
-            } else {
-                set_effect(Kind::tint, {1.0F, 0.58F, 0.24F, 1.0F},
-                           is_beam ? 0.82F : 0.28F);
-                set_effect(Kind::holography,
-                           {1.0F, 0.82F, 0.42F, 1.0F}, 0.12F);
-                set_effect(Kind::shine,
-                           {1.0F, 0.94F, 0.78F, 1.0F}, 0.16F);
+        ImGui::TextDisabled(
+            "Preserve the source or recolor it with your selected color.");
+        auto tint = effect_of_kind(Kind::tint);
+        const bool source_mode = is_beam
+            ? shader.profile != fabric::project::SurfaceShaderProfile::thread
+            : tint == shader.effects.end() || tint->amount <= 0.0F;
+        if (ImGui::BeginCombo("Traitement des couleurs",
+                              source_mode ? "Source intacte" : "Recoloration")) {
+            if (ImGui::Selectable("Source intacte", source_mode)) {
+                set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
+                shader.profile = fabric::project::SurfaceShaderProfile::plastic;
+                changed = true;
             }
+            if (ImGui::Selectable("Recoloration", !source_mode)) {
+                const auto selected_color = tint == shader.effects.end()
+                    ? fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F}
+                    : tint->color;
+                set_effect(Kind::tint, selected_color, 1.0F);
+                shader.profile = is_beam
+                    ? fabric::project::SurfaceShaderProfile::thread
+                    : fabric::project::SurfaceShaderProfile::custom;
+                changed = true;
+            }
+            ImGui::EndCombo();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Réinitialiser depuis la source")) {
+            shader.profile = fabric::project::SurfaceShaderProfile::plastic;
+            set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
+            set_effect(Kind::holography,
+                       {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
+            set_effect(Kind::shine,
+                       {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
             sync_legacy_settings();
             changed = true;
-        };
-        if (ImGui::Button(is_beam ? "Neutral thread" : "Original image"))
-            apply_look(0);
-        ImGui::SameLine();
-        if (ImGui::Button("Cool glow")) apply_look(1);
-        ImGui::SameLine();
-        if (ImGui::Button("Warm glow")) apply_look(2);
+        }
 
-        if (auto tint = effect_of_kind(Kind::tint);
+        if (tint = effect_of_kind(Kind::tint);
             tint != shader.effects.end()) {
             bool quick_changed = ImGui::ColorEdit4(
                 "Base color##quick", &tint->color.red);
@@ -258,6 +256,11 @@ bool draw_surface_effect_stack(
                 "%.2f");
             if (quick_changed) {
                 tint->enabled = true;
+                shader.profile = tint->amount <= 0.0F
+                    ? fabric::project::SurfaceShaderProfile::plastic
+                    : is_beam
+                    ? fabric::project::SurfaceShaderProfile::thread
+                    : fabric::project::SurfaceShaderProfile::custom;
                 changed = true;
             }
         }
@@ -3502,8 +3505,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         using Profile =
                             fabric::project::SurfaceShaderProfile;
                         switch (profile) {
-                        case Profile::thread: return "Recolor from detail";
-                        case Profile::plastic: return "Keep image colors";
+                        case Profile::thread: return "Recoloration";
+                        case Profile::plastic: return "Source intacte";
                         case Profile::monochrome: return "Monochrome";
                         case Profile::custom: return "Custom";
                         }
@@ -4029,18 +4032,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                        &parameter.default_value)) {
                             if (parameter.id == "color-mode") {
                                 const char* label = *value == "preserve"
-                                    ? "Keep image colors"
-                                    : "Recolor from detail";
-                                if (ImGui::BeginCombo(parameter.name.c_str(),
-                                                      label)) {
+                                    ? "Source intacte"
+                                    : "Recoloration";
+                                if (ImGui::BeginCombo(
+                                        "Traitement des couleurs", label)) {
                                     if (ImGui::Selectable(
-                                            "Recolor from detail",
+                                            "Recoloration",
                                             *value == "recolor")) {
                                         *value = "recolor";
                                         changed = true;
                                     }
                                     if (ImGui::Selectable(
-                                            "Keep image colors",
+                                            "Source intacte",
                                             *value == "preserve")) {
                                         *value = "preserve";
                                         changed = true;
@@ -7120,19 +7123,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     .classification =
                         fabric::project::TextureClassification::button_eye,
                     .primary_color = {1.0F, 1.0F, 1.0F, 1.0F},
-                    .effect_color = {0.2F, 0.8F, 1.0F, 1.0F},
-                    .shine = 0.08F,
+                    .effect_color = {1.0F, 1.0F, 1.0F, 1.0F},
+                    .shine = 0.0F,
                     .holography = 0.0F,
                     .effects = {
                         {.kind = fabric::project::SurfaceEffectKind::tint,
                          .color = {1.0F, 1.0F, 1.0F, 1.0F},
                          .amount = 0.0F},
                         {.kind = fabric::project::SurfaceEffectKind::holography,
-                         .color = {0.2F, 0.8F, 1.0F, 1.0F},
+                         .color = {1.0F, 1.0F, 1.0F, 1.0F},
                          .amount = 0.0F},
                         {.kind = fabric::project::SurfaceEffectKind::shine,
                          .color = {1.0F, 1.0F, 1.0F, 1.0F},
-                         .amount = 0.08F}},
+                         .amount = 0.0F}},
                 };
         }
         ImGui::OpenPopup("Create entity");
@@ -7518,8 +7521,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (request.kind == fabric::editor::VisualPresetKind::beam ||
                 request.kind == fabric::editor::VisualPresetKind::seam) {
                 ImGui::SeparatorText("Beam appearance");
+                int color_mode = request.beam_color_mode ==
+                        fabric::editor::BeamColorMode::preserve_source
+                    ? 0 : 1;
+                if (ImGui::Combo("Traitement des couleurs", &color_mode,
+                                 "Source intacte\0Recoloration\0")) {
+                    request.beam_color_mode = color_mode == 0
+                        ? fabric::editor::BeamColorMode::preserve_source
+                        : fabric::editor::BeamColorMode::recolor_from_detail;
+                }
                 ImGui::ColorEdit4("Base tint", &request.beam_color.red);
-                ImGui::TextDisabled("White keeps the Beam neutral; the PNG supplies shape and detail.");
+                ImGui::TextDisabled(
+                    "The selected color is used only in Recoloration mode.");
                 ImGui::ColorEdit4("Holo color",
                                   &request.beam_effect_color.red);
                 ImGui::SliderFloat("Shine", &request.beam_shine, 0.0F, 1.0F);
@@ -8486,6 +8499,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         creation.visual_preset.beam_width = 0.5F;
         creation.visual_preset.beam_opacity = 1.0F;
         if (ui_beam_holography_variant) {
+            creation.visual_preset.beam_color_mode =
+                fabric::editor::BeamColorMode::recolor_from_detail;
             creation.visual_preset.beam_color =
                 {0.15F, 0.75F, 1.0F, 1.0F};
             creation.visual_preset.beam_effect_color =
@@ -9845,7 +9860,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.selected_textured_path()->color ==
                         fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F} &&
                     reloaded.selected_textured_path()->shader.profile ==
-                        fabric::project::SurfaceShaderProfile::thread &&
+                        (creation.visual_preset.beam_color_mode ==
+                                 fabric::editor::BeamColorMode::preserve_source
+                             ? fabric::project::SurfaceShaderProfile::plastic
+                             : fabric::project::SurfaceShaderProfile::thread) &&
                     reloaded.selected_textured_path()->shader.classification ==
                         fabric::project::TextureClassification::beam &&
                     reloaded.selected_textured_path()->shader.primary_color ==
@@ -9877,21 +9895,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 creation.entity.name = "UI Guided Button";
                 creation.entity.resource_id = "button-primary";
                 creation.entity.transform.scale = {50.0F, 50.0F};
-                if (creation.entity.appearance_shader) {
-                    creation.entity.appearance_shader->primary_color =
-                        {0.18F, 0.70F, 1.0F, 1.0F};
-                    creation.entity.appearance_shader->effect_color =
-                        {0.55F, 0.96F, 1.0F, 1.0F};
-                    creation.entity.appearance_shader->shine = 0.14F;
-                    creation.entity.appearance_shader->holography = 0.18F;
-                    auto& effects =
-                        creation.entity.appearance_shader->effects;
-                    effects[0].color = {0.18F, 0.70F, 1.0F, 1.0F};
-                    effects[0].amount = 0.32F;
-                    effects[1].color = {0.55F, 0.96F, 1.0F, 1.0F};
-                    effects[1].amount = 0.18F;
-                    effects[2].amount = 0.14F;
-                }
             }
             if (ui_button_frame >= 12U) {
                 fabric::editor::ProjectSession reloaded;
@@ -9927,7 +9930,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             material.ok() && material.asset->shader &&
                             material.asset->shader->classification ==
                                 fabric::project::TextureClassification::button_eye &&
-                            material.asset->shader->effects.size() == 3U;
+                            material.asset->shader->primary_color ==
+                                fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F} &&
+                            material.asset->shader->effect_color ==
+                                fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F} &&
+                            material.asset->shader->shine == 0.0F &&
+                            material.asset->shader->holography == 0.0F &&
+                            material.asset->shader->effects.size() == 3U &&
+                            std::ranges::all_of(
+                                material.asset->shader->effects,
+                                [](const auto& effect) {
+                                    return effect.amount == 0.0F;
+                                });
                     }
                 }
                 write_ui_button_probe(initial_project);

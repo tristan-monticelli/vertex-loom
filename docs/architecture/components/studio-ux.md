@@ -72,13 +72,13 @@ flowchart LR
     Hub --> Entity[Composed Entity]
     Hub --> Advanced[Advanced]
     Advanced --> Technical[Technical resources]
-    Beam --> BeamContract[Beam request]
+    Beam --> BeamContract[Beam request<br/>preserve_source par défaut<br/>ou recolor_from_detail]
     BeamContract --> Legacy[Compatible texturedPath contract]
     Beam --> Shared[Shared textured-path geometry]
     Beam --> BeamE2E[UI click, screenshot and reload proof]
     BeamE2E --> Shared
     Button --> ButtonTexture[Imported Button PNG]
-    ButtonTexture --> ButtonMaterial[Material v2 appearance<br/>color, effect, shine, holography, opacity]
+    ButtonTexture --> ButtonMaterial[Material v2 appearance<br/>source intacte par défaut<br/>ou recoloration explicite]
     ButtonMaterial --> Entity
     ButtonMaterial --> Shared
     Button --> ButtonE2E[UI click, screenshot and reload proof]

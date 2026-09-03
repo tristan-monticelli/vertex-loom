@@ -164,6 +164,8 @@ void create_studio_beam_fixture(const std::filesystem::path& root) {
         .name = "Beam",
         .thread_texture = fabric::project::ResourceReference{
             {.value = "beam-thread"}, "texture"},
+        .beam_color_mode =
+            fabric::editor::BeamColorMode::recolor_from_detail,
         .beam_color = {1.0F, 1.0F, 1.0F, 1.0F},
         .beam_effect_color = {1.0F, 1.0F, 1.0F, 1.0F},
         .beam_shine = 0.0F,
@@ -584,15 +586,19 @@ TEST_CASE("seam preset exposes a textured path without renderer specialization")
 TEST_CASE("guided Beam is a textured path with the project default and shader") {
     const fabric::editor::VisualPresetRequest defaults;
     CHECK(defaults.beam_repetition == Catch::Approx(1.0F));
+    CHECK(defaults.beam_color_mode ==
+          fabric::editor::BeamColorMode::preserve_source);
     CHECK(defaults.beam_color ==
-          fabric::core::Color{0.18F, 0.70F, 1.0F, 1.0F});
+          fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
     CHECK(defaults.beam_effect_color ==
-          fabric::core::Color{0.55F, 0.96F, 1.0F, 1.0F});
-    CHECK(defaults.beam_shine == Catch::Approx(0.14F));
-    CHECK(defaults.beam_holography == Catch::Approx(0.18F));
+          fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
+    CHECK(defaults.beam_shine == Catch::Approx(0.0F));
+    CHECK(defaults.beam_holography == Catch::Approx(0.0F));
     auto beam_request = request(
         fabric::editor::VisualPresetKind::beam, "guided-beam");
     beam_request.thread_texture.reset();
+    beam_request.beam_color_mode =
+        fabric::editor::BeamColorMode::recolor_from_detail;
     beam_request.beam_color = {0.8F, 0.1F, 0.7F, 1.0F};
     beam_request.beam_effect_color = {0.1F, 0.9F, 1.0F, 1.0F};
     beam_request.beam_shine = 0.4F;
@@ -666,6 +672,31 @@ TEST_CASE("guided Beam rejects invalid visible appearance values") {
         manifest(), beam_request);
     CHECK_FALSE(built.ok());
     CHECK(built.errors.size() == 3U);
+}
+
+TEST_CASE("new guided Beam preserves source colors without implicit effects") {
+    auto beam_request = request(
+        fabric::editor::VisualPresetKind::beam, "neutral-guided-beam");
+    beam_request.guided_beam = true;
+    const auto built = fabric::editor::build_visual_preset(
+        manifest(), beam_request);
+    REQUIRE(built.ok());
+    const auto& beam = built.bundle->textured_paths.front();
+    CHECK(beam.shader.profile ==
+          fabric::project::SurfaceShaderProfile::plastic);
+    CHECK(beam.shader.primary_color ==
+          fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
+    CHECK(beam.shader.effect_color ==
+          fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F});
+    CHECK(beam.shader.shine == Catch::Approx(0.0F));
+    CHECK(beam.shader.holography == Catch::Approx(0.0F));
+    REQUIRE(beam.shader.effects.size() == 3U);
+    CHECK(std::ranges::all_of(beam.shader.effects, [](const auto& effect) {
+        return effect.amount == 0.0F;
+    }));
+    REQUIRE(built.bundle->component.parameters.size() == 9U);
+    CHECK(built.bundle->component.parameters[1].default_value ==
+          fabric::project::VisualParameterValue{std::string{"preserve"}});
 }
 
 TEST_CASE("thread presets inherit the project default texture") {

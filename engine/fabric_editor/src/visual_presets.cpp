@@ -161,7 +161,11 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         // Beam coloring belongs to the Thread shader. Tinting the raster fill
         // too would multiply the same color twice and erase source details.
         path.color = {1.0F, 1.0F, 1.0F, 1.0F};
-        path.shader.profile = project::SurfaceShaderProfile::thread;
+        const bool preserve_source = request.beam_color_mode ==
+            BeamColorMode::preserve_source;
+        path.shader.profile = preserve_source
+            ? project::SurfaceShaderProfile::plastic
+            : project::SurfaceShaderProfile::thread;
         path.shader.classification = project::TextureClassification::beam;
         path.shader.primary_color = request.beam_color;
         path.shader.effect_color = request.beam_effect_color;
@@ -170,7 +174,8 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
         path.shader.repetition = {request.beam_repetition, 1.0F};
         path.shader.effects = {
             {.kind = project::SurfaceEffectKind::tint,
-             .color = request.beam_color},
+             .color = request.beam_color,
+             .amount = preserve_source ? 0.0F : 1.0F},
             {.kind = project::SurfaceEffectKind::holography,
              .color = request.beam_effect_color,
              .amount = request.beam_holography},
@@ -208,7 +213,9 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
             {"texture", "Texture", Type::resource, path.texture,
              binding(layer_id, "texturedPath", "texture"), false},
             {"color-mode", "Color handling", Type::text,
-             std::string{"recolor"},
+             std::string{request.beam_color_mode ==
+                     BeamColorMode::preserve_source
+                 ? "preserve" : "recolor"},
              binding(layer_id, "shader", "colorMode"), false},
             {"width", "Thickness", Type::scalar, path.width,
              binding(layer_id, "texturedPath", "width"), true},
