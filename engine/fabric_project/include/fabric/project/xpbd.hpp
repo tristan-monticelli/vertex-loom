@@ -77,10 +77,21 @@ struct XpbdResult {
     [[nodiscard]] bool ok() const noexcept { return errors.empty(); }
 };
 
+struct XpbdDiagnostics {
+    std::size_t particle_count{};
+    std::size_t dynamic_particle_count{};
+    std::size_t constraint_count{};
+    float maximum_constraint_error{};
+    float rms_constraint_error{};
+    float compliant_energy{};
+    friend bool operator==(const XpbdDiagnostics&, const XpbdDiagnostics&) = default;
+};
+
 [[nodiscard]] ValidationReport validate_xpbd_system(const XpbdSystem&, float dt,
                                                     std::size_t iterations);
 [[nodiscard]] XpbdResult solve_xpbd_substep(XpbdSystem&, float dt,
                                              std::size_t iterations,
                                              float quantization = 4096.0F);
+[[nodiscard]] XpbdDiagnostics measure_xpbd_system(const XpbdSystem&);
 
 } // namespace fabric::project

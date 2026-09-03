@@ -14,3 +14,11 @@ positions à `1/4096` unité par défaut après chaque itération.
 
 Les indices, masses inverses, compliances, lambdas et positions sont validés
 avant exécution. Un système invalide ne modifie pas son état.
+
+Le diagnostic commun mesure, sans modifier l'état, le nombre de particules
+dynamiques, le nombre de contraintes, l'erreur maximale et RMS des cinq
+familles. Il expose aussi l'énergie élastique estimée `0.5 * erreur² /
+compliance` pour les contraintes dont la compliance est strictement positive ;
+les contraintes dures sont incluses dans les erreurs mais exclues de cette
+énergie afin d'éviter une valeur infinie. Ces mesures sont des aides d'auteur,
+pas un nouvel état persistant ni une entrée du solveur.

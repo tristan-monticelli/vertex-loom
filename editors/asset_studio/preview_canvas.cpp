@@ -45,6 +45,78 @@ void draw_packet_preview_canvas(
     draw_list->AddLine(to_screen({bounds.origin.x, 0.0F}),
                        to_screen({bounds.origin.x + bounds.size.x, 0.0F}),
                        IM_COL32(100, 110, 125, 100));
+    if (editable_session && editable_session->selected_entity() &&
+        editable_session->selected_entity()->xpbd) {
+        canvas.xpbd_overlay_visible = true;
+        const auto& xpbd = *editable_session->selected_entity()->xpbd;
+        const auto particle_position = [&](const std::size_t index)
+            -> std::optional<ImVec2> {
+            if (index >= xpbd.particles.size()) return std::nullopt;
+            return to_screen(xpbd.particles[index].position);
+        };
+        for (const auto& constraint : xpbd.distance_constraints) {
+            const auto first = particle_position(constraint.first);
+            const auto second = particle_position(constraint.second);
+            if (first && second)
+                draw_list->AddLine(*first, *second,
+                                   IM_COL32(64, 205, 230, 220), 2.0F);
+        }
+        for (const auto& constraint : xpbd.bending_constraints) {
+            const auto first = particle_position(constraint.first);
+            const auto middle = particle_position(constraint.middle);
+            const auto third = particle_position(constraint.third);
+            if (first && middle)
+                draw_list->AddLine(*first, *middle,
+                                   IM_COL32(190, 120, 240, 190), 2.0F);
+            if (middle && third)
+                draw_list->AddLine(*middle, *third,
+                                   IM_COL32(190, 120, 240, 190), 2.0F);
+        }
+        for (const auto& constraint : xpbd.area_constraints) {
+            const auto first = particle_position(constraint.first);
+            const auto second = particle_position(constraint.second);
+            const auto third = particle_position(constraint.third);
+            if (first && second && third) {
+                const ImVec2 points[]{*first, *second, *third};
+                draw_list->AddPolyline(points, 3, IM_COL32(245, 180, 70, 190),
+                                       ImDrawFlags_Closed, 2.0F);
+            }
+        }
+        for (const auto& constraint : xpbd.pin_constraints) {
+            const auto particle = particle_position(constraint.particle);
+            const auto target = to_screen(constraint.target);
+            if (particle)
+                draw_list->AddLine(*particle, target,
+                                   IM_COL32(245, 95, 135, 210), 2.0F);
+            draw_list->AddRect({target.x - 4.0F, target.y - 4.0F},
+                               {target.x + 4.0F, target.y + 4.0F},
+                               IM_COL32(245, 95, 135, 255), 0.0F, 0, 2.0F);
+        }
+        for (const auto& constraint : xpbd.collision_constraints) {
+            const auto particle = particle_position(constraint.particle);
+            const float normal_length = std::hypot(constraint.normal.x,
+                                                   constraint.normal.y);
+            if (particle && normal_length > 0.0001F) {
+                const auto position = xpbd.particles[constraint.particle].position;
+                const fabric::core::Vec2 tip{
+                    position.x + constraint.normal.x / normal_length * 0.5F,
+                    position.y + constraint.normal.y / normal_length * 0.5F};
+                draw_list->AddLine(*particle, to_screen(tip),
+                                   IM_COL32(250, 90, 70, 230), 2.0F);
+            }
+        }
+        for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
+            const auto point = to_screen(xpbd.particles[index].position);
+            const bool fixed = xpbd.particles[index].inverse_mass == 0.0F;
+            draw_list->AddCircleFilled(
+                point, fixed ? 6.0F : 5.0F,
+                fixed ? IM_COL32(245, 95, 135, 255)
+                      : IM_COL32(80, 220, 165, 255));
+            draw_list->AddText({point.x + 7.0F, point.y - 8.0F},
+                               IM_COL32(225, 230, 238, 230),
+                               std::to_string(index).c_str());
+        }
+    }
     const float world_half_width = available.x / (2.0F * pixels_per_unit);
     const float world_half_height = available.y / (2.0F * pixels_per_unit);
     canvas.native_world_bounds = {

@@ -80,6 +80,11 @@ du parcours : il pouvait tenter de sauvegarder un état sans clip valide.
 L'E2E du panneau et celui du gizmo Entity s'exécutent successivement afin qu'une
 fenêtre au premier plan ne masque pas artificiellement l'interaction canvas.
 
+Le volet `Entity simulation` résume le système XPBD avec les erreurs max/RMS et
+l'énergie compliante définies par ADR-0139. Le canvas superpose particules et
+liaisons sans les confondre avec les contraintes d'animation de nœuds ; ces
+diagnostics ne sont jamais sauvegardés dans l'Entity.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

@@ -51,6 +51,7 @@ struct CanvasUiState {
     bool entity_gizmo_dragging{};
     ImVec2 entity_gizmo_start_mouse{};
     ImVec2 entity_gizmo_screen{};
+    bool xpbd_overlay_visible{};
     fabric::core::Transform entity_gizmo_start_transform;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;

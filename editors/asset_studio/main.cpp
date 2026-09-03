@@ -5760,7 +5760,27 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::CollapsingHeader("Whole Entity simulation (advanced)")) {
                 if (entity.xpbd) {
                     auto xpbd = *entity.xpbd;
-                    ImGui::Text("%zu particles", xpbd.particles.size());
+                    const auto diagnostics =
+                        fabric::project::measure_xpbd_system(xpbd);
+                    ImGui::Text("%zu particles (%zu dynamic) · %zu constraints",
+                                diagnostics.particle_count,
+                                diagnostics.dynamic_particle_count,
+                                diagnostics.constraint_count);
+                    ImGui::Text("Constraint error max %.4f · RMS %.4f",
+                                diagnostics.maximum_constraint_error,
+                                diagnostics.rms_constraint_error);
+                    ImGui::Text("Compliant energy %.4f",
+                                diagnostics.compliant_energy);
+                    ImGui::TextDisabled(
+                        "Canvas: dynamic green · fixed/pin pink · distance cyan · "
+                        "bend violet · area amber · collision red");
+                    ImGui::TextDisabled(
+                        "distance %zu · pin %zu · bend %zu · area %zu · collision %zu",
+                        xpbd.distance_constraints.size(),
+                        xpbd.pin_constraints.size(),
+                        xpbd.bending_constraints.size(),
+                        xpbd.area_constraints.size(),
+                        xpbd.collision_constraints.size());
                     for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
                         ImGui::PushID(static_cast<int>(index));
                         ImGui::InputFloat2("Position (world units)", &xpbd.particles[index].position.x);
@@ -5780,6 +5800,34 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         next.xpbd = std::move(xpbd);
                         commit_advanced_entity(std::move(next));
                     }
+                    ImGui::SameLine();
+                    if (ImGui::Button("Reset as 4-point cloth")) {
+                        fabric::project::XpbdSystem cloth{
+                            .particles = {
+                                {{-1.0F, 1.0F}, 0.0F}, {{1.0F, 1.0F}, 0.0F},
+                                {{-1.0F, -1.0F}, 1.0F}, {{1.0F, -1.0F}, 1.0F}},
+                            .distance_constraints = {
+                                {0, 1, 2.0F, 0.0F, 0.0F},
+                                {0, 2, 2.0F, 0.001F, 0.0F},
+                                {1, 3, 2.0F, 0.001F, 0.0F},
+                                {2, 3, 2.0F, 0.001F, 0.0F}},
+                            .pin_constraints = {
+                                {0, {-1.0F, 1.0F}, 0.0F, {}},
+                                {1, {1.0F, 1.0F}, 0.0F, {}}},
+                            .bending_constraints = {
+                                {0, 2, 3, 2.828427F, 0.01F, 0.0F}},
+                            .area_constraints = {
+                                {0, 2, 1, 2.0F, 0.001F, 0.0F},
+                                {1, 2, 3, 2.0F, 0.001F, 0.0F}},
+                            .collision_constraints = {
+                                {2, {0.0F, 1.0F}, -2.0F, 0.0F, 0.0F},
+                                {3, {0.0F, 1.0F}, -2.0F, 0.0F, 0.0F}}};
+                        auto next = entity;
+                        next.xpbd = std::move(cloth);
+                        commit_advanced_entity(std::move(next));
+                    }
+                    ImGui::SetItemTooltip(
+                        "Create a valid example containing all five constraint families.");
                     if (ImGui::Button("Remove XPBD system")) {
                         auto next = entity;
                         next.xpbd.reset();
@@ -5787,7 +5835,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 } else if (ImGui::Button("Create XPBD system")) {
                     auto next = entity;
-                    next.xpbd = fabric::project::XpbdSystem{};
+                    next.xpbd = fabric::project::XpbdSystem{
+                        .particles = {
+                            {{-1.0F, 0.0F}, 0.0F}, {{0.0F, 0.0F}, 1.0F},
+                            {{1.0F, 0.0F}, 1.0F}},
+                        .distance_constraints = {
+                            {0, 1, 1.0F, 0.001F, 0.0F},
+                            {1, 2, 1.0F, 0.001F, 0.0F}},
+                        .pin_constraints = {
+                            {0, {-1.0F, 0.0F}, 0.0F, {}}}};
                     commit_advanced_entity(std::move(next));
                 }
             }
@@ -5867,6 +5923,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     return added_ok;
                 };
             ImGui::SeparatorText("Entity behavior");
+            if (entity.xpbd) {
+                const auto diagnostics =
+                    fabric::project::measure_xpbd_system(*entity.xpbd);
+                ImGui::Text("XPBD · %zu particles · %zu constraints",
+                            diagnostics.particle_count,
+                            diagnostics.constraint_count);
+                ImGui::TextDisabled("error %.4f max / %.4f RMS · energy %.4f",
+                                    diagnostics.maximum_constraint_error,
+                                    diagnostics.rms_constraint_error,
+                                    diagnostics.compliant_energy);
+            }
             if (ImGui::Button("Open Animation Graph")) {
                 animation_graph_ui.open = true;
                 if (entity.animation_state_machine)
@@ -9411,6 +9478,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             fabric::project::AnimationConditionOperator::equal,
                             true}},
                         .priority = 1}}};
+            with_graph.xpbd = fabric::project::XpbdSystem{
+                .particles = {
+                    {{-5.0F, -2.0F}, 0.0F}, {{0.0F, 2.0F}, 1.0F},
+                    {{5.0F, -2.0F}, 1.0F}},
+                .distance_constraints = {
+                    {0, 1, 6.403124F, 0.001F, 0.0F},
+                    {1, 2, 6.403124F, 0.001F, 0.0F}},
+                .pin_constraints = {{0, {-5.0F, -2.0F}, 0.0F, {}}}};
             authored = session.set_selected_entity_definition(
                 std::move(with_graph)) && session.save();
             animation_graph_ui.open = authored;
@@ -10385,7 +10460,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (entity_e2e && entity_e2e_complete &&
-            !entity_e2e_capture_written) {
+            entity_gizmo_e2e_frame >= 2U && !entity_e2e_capture_written) {
             write_frame_capture(initial_project, window,
                                 "asset-studio-entity-e2e.ppm");
             entity_e2e_capture_written = true;
@@ -10786,6 +10861,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         {.value = "beam-entity"});
                 entity_e2e_complete = entity_e2e_complete && reopened &&
                     ui_animation_graph_seen &&
+                    canvas.xpbd_overlay_visible &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=
                         entity_gizmo_e2e_initial_position.x;
