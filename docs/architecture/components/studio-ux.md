@@ -85,6 +85,11 @@ l'énergie compliante définies par ADR-0139. Le canvas superpose particules et
 liaisons sans les confondre avec les contraintes d'animation de nœuds ; ces
 diagnostics ne sont jamais sauvegardés dans l'Entity.
 
+Le panneau d'une ressource Audio maintient un brouillon stable du document :
+bus nommés, volume, boucle et spatialisation sont édités ensemble puis validés
+atomiquement. Le choix `master` reste toujours disponible et un bus supprimé
+réaffecte ses événements à `master`, ce qui évite les références cassées.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

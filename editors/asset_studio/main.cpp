@@ -6632,9 +6632,47 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                                        error.field.c_str(), error.message.c_str());
             } else {
-                for (std::size_t event_index = 0; event_index < loaded.audio->events.size(); ++event_index) {
-                    auto event = loaded.audio->events[event_index];
+                static std::string audio_draft_id;
+                static fabric::project::AudioDocument audio_draft;
+                if (audio_draft_id != loaded.audio->document.id.value) {
+                    audio_draft_id = loaded.audio->document.id.value;
+                    audio_draft = *loaded.audio;
+                }
+                ImGui::TextDisabled("master · 100%%");
+                for (std::size_t bus_index = 0;
+                     bus_index < audio_draft.buses.size(); ++bus_index) {
+                    auto& bus = audio_draft.buses[bus_index];
+                    ImGui::PushID(static_cast<int>(bus_index));
+                    ImGui::Text("%s", bus.id.c_str());
+                    draw_technical_tooltip(
+                        "Bus ids remain stable so event routing cannot break while editing.");
+                    ImGui::SliderFloat("Bus volume", &bus.volume, 0.0F, 1.0F);
+                    if (ImGui::SmallButton("Remove bus")) {
+                        const auto removed_id = bus.id;
+                        audio_draft.buses.erase(audio_draft.buses.begin() +
+                            static_cast<std::ptrdiff_t>(bus_index));
+                        for (auto& event : audio_draft.events)
+                            if (event.bus == removed_id) event.bus = "master";
+                        ImGui::PopID();
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+                if (ImGui::Button("Add bus")) {
+                    std::string id = "bus-" +
+                        std::to_string(audio_draft.buses.size() + 1U);
+                    while (std::ranges::any_of(audio_draft.buses,
+                                               [&](const auto& bus) {
+                        return bus.id == id;
+                    })) id += "-copy";
+                    audio_draft.buses.push_back({id, 1.0F});
+                }
+                for (std::size_t event_index = 0;
+                     event_index < audio_draft.events.size(); ++event_index) {
+                    auto& event = audio_draft.events[event_index];
                     ImGui::PushID(static_cast<int>(event_index));
+                    ImGui::SeparatorText(
+                        ("Event " + std::to_string(event_index + 1U)).c_str());
                     ImGui::InputText("Event id", &event.id);
                     ImGui::InputText("Source", &event.source);
                     ImGui::SliderFloat("Volume (0–1)", &event.volume, 0.0F, 1.0F);
@@ -6643,13 +6681,56 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     ImGui::Checkbox("Loop", &event.loop);
                     draw_technical_tooltip(
                         "Restart this event automatically when playback reaches its end.");
-                    if (ImGui::Button("Save event") &&
-                        !session.set_selected_audio_event(event_index, std::move(event)))
-                        status = "Audio event rejected; inspect diagnostics.";
+                    if (ImGui::BeginCombo("Bus", event.bus.c_str())) {
+                        if (ImGui::Selectable("master", event.bus == "master"))
+                            event.bus = "master";
+                        for (const auto& bus : audio_draft.buses)
+                            if (ImGui::Selectable(bus.id.c_str(), event.bus == bus.id))
+                                event.bus = bus.id;
+                        ImGui::EndCombo();
+                    }
+                    bool spatial = event.spatial.has_value();
+                    if (ImGui::Checkbox("Spatial 2D", &spatial))
+                        event.spatial = spatial
+                            ? std::optional<fabric::project::AudioSpatialSettings>{
+                                fabric::project::AudioSpatialSettings{}}
+                            : std::nullopt;
+                    if (event.spatial) {
+                        ImGui::InputFloat2("Source position", &event.spatial->position.x);
+                        ImGui::InputFloat("Minimum distance",
+                                          &event.spatial->minimum_distance);
+                        ImGui::InputFloat("Maximum distance",
+                                          &event.spatial->maximum_distance);
+                    }
+                    if (ImGui::SmallButton("Remove event")) {
+                        audio_draft.events.erase(audio_draft.events.begin() +
+                            static_cast<std::ptrdiff_t>(event_index));
+                        ImGui::PopID();
+                        break;
+                    }
                     ImGui::PopID();
                 }
-                if (loaded.audio->events.empty())
+                if (audio_draft.events.empty())
                     ImGui::TextDisabled("No audio events defined.");
+                if (ImGui::Button("Add event")) {
+                    std::string id = "event-" +
+                        std::to_string(audio_draft.events.size() + 1U);
+                    while (std::ranges::any_of(audio_draft.events,
+                                               [&](const auto& event) {
+                        return event.id == id;
+                    })) id += "-copy";
+                    audio_draft.events.push_back({.id = std::move(id)});
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Save Audio setup")) {
+                    if (session.set_selected_audio_document(audio_draft))
+                        status = "Audio buses and events saved.";
+                    else
+                        status = "Audio setup rejected; inspect diagnostics.";
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Revert Audio changes"))
+                    audio_draft = *loaded.audio;
             }
         }
         if (selected != nullptr &&

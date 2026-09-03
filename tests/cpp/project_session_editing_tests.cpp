@@ -557,6 +557,61 @@ TEST_CASE("runtime settings are editable and survive save and reload") {
     CHECK(*reloaded.manifest()->runtime == settings);
 }
 
+TEST_CASE("audio buses and spatial events survive Studio editing") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    REQUIRE(fabric::project::publish_audio(
+        project.path(), manifest,
+        {.document = {.schema_version = 1,
+                      .type = "audio",
+                      .id = {.value = "studio-audio"},
+                      .name = "Studio Audio"},
+         .events = {{.id = "impact",
+                     .source = "assets/audio/impact.wav"}}}).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::audio,
+        fabric::core::ResourceId{.value = "studio-audio"}));
+
+    const fabric::project::AudioDocument edited{
+        .document = {.schema_version = fabric::project::current_audio_schema_version,
+                     .type = "audio",
+                     .id = {.value = "studio-audio"},
+                     .name = "Studio Audio"},
+        .buses = {{.id = "effects", .volume = 0.6F}},
+        .events = {{.id = "impact",
+                    .source = "assets/audio/impact.wav",
+                    .volume = 0.75F,
+                    .loop = true,
+                    .bus = "effects",
+                    .spatial = fabric::project::AudioSpatialSettings{
+                        .position = {6.0F, -2.0F},
+                        .minimum_distance = 2.0F,
+                        .maximum_distance = 14.0F}}},
+    };
+    REQUIRE(session.set_selected_audio_document(edited));
+
+    const auto reloaded = fabric::project::load_audio(
+        project.path(), *session.manifest(),
+        fabric::project::audio_document_path(
+            *session.manifest(), {.value = "studio-audio"}));
+    REQUIRE(reloaded.ok());
+    CHECK(*reloaded.audio == edited);
+
+    auto invalid = edited;
+    invalid.events.front().bus = "missing";
+    CHECK_FALSE(session.set_selected_audio_document(std::move(invalid)));
+    const auto unchanged = fabric::project::load_audio(
+        project.path(), *session.manifest(),
+        fabric::project::audio_document_path(
+            *session.manifest(), {.value = "studio-audio"}));
+    REQUIRE(unchanged.ok());
+    CHECK(*unchanged.audio == edited);
+}
+
 TEST_CASE("resource index administers every directly creatable resource") {
     const TemporaryDirectory project;
     write_project(project.path());

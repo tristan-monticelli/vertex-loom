@@ -110,6 +110,7 @@ public:
     [[nodiscard]] bool create_input(const CreateInputPrompt& prompt);
     [[nodiscard]] bool set_selected_audio_event(
         std::size_t event_index, project::AudioEvent event);
+    [[nodiscard]] bool set_selected_audio_document(project::AudioDocument audio);
     [[nodiscard]] bool create_visual_preset(
         const VisualPresetRequest& request);
     [[nodiscard]] bool create_visual_composition(

@@ -35,20 +35,56 @@ AudioResult load_pcm_wav(const std::filesystem::path& path) {
     return result;
 }
 
+SpatialAudioMix resolve_spatial_audio(
+    const float source_x, const float source_y,
+    const float minimum_distance, const float maximum_distance,
+    const float listener_x, const float listener_y) noexcept {
+    if (!std::isfinite(source_x) || !std::isfinite(source_y) ||
+        !std::isfinite(listener_x) || !std::isfinite(listener_y) ||
+        !std::isfinite(minimum_distance) || !std::isfinite(maximum_distance) ||
+        minimum_distance < 0.0F || maximum_distance <= minimum_distance)
+        return {};
+    const float relative_x = source_x - listener_x;
+    const float relative_y = source_y - listener_y;
+    const float distance = std::hypot(relative_x, relative_y);
+    const float attenuation = distance <= minimum_distance
+        ? 1.0F
+        : std::clamp(1.0F - (distance - minimum_distance) /
+            (maximum_distance - minimum_distance), 0.0F, 1.0F);
+    return {.attenuation = attenuation,
+            .pan = std::clamp(relative_x / maximum_distance, -1.0F, 1.0F)};
+}
+
 bool PcmAudioMixer::configure(const std::uint32_t sample_rate,
                               const std::uint16_t channels) noexcept {
     if (sample_rate == 0U || (channels != 1 && channels != 2)) return false;
     sample_rate_ = sample_rate;
     channels_ = channels;
     voices_.clear();
+    bus_gains_ = {{"master", 1.0F}};
     return true;
 }
 
 bool PcmAudioMixer::play(const PcmWavClip& clip, const float gain) noexcept {
+    return play(clip, "master", gain, 0.0F);
+}
+
+bool PcmAudioMixer::set_bus_gain(std::string bus, const float gain) {
+    if (bus.empty() || !std::isfinite(gain) || gain < 0.0F) return false;
+    bus_gains_.insert_or_assign(std::move(bus), gain);
+    return true;
+}
+
+bool PcmAudioMixer::play(const PcmWavClip& clip, const std::string_view bus,
+                         const float gain, const float pan,
+                         const bool loop) noexcept {
     if (sample_rate_ == 0U || channels_ == 0U || clip.sample_rate != sample_rate_ ||
         (clip.channels != 1 && clip.channels != 2) || clip.samples.empty() ||
-        !std::isfinite(gain) || gain < 0.0F) return false;
-    voices_.push_back({.clip = &clip, .frame = 0, .gain = gain});
+        !std::isfinite(gain) || gain < 0.0F || !std::isfinite(pan) ||
+        pan < -1.0F || pan > 1.0F || !bus_gains_.contains(std::string{bus}))
+        return false;
+    voices_.push_back({.clip = &clip, .frame = 0, .gain = gain,
+                       .pan = pan, .bus = std::string{bus}, .loop = loop});
     return true;
 }
 
@@ -57,12 +93,22 @@ std::vector<std::int16_t> PcmAudioMixer::mix(const std::size_t frames) noexcept 
     for (auto& voice : voices_) {
         const auto& clip = *voice.clip;
         const auto clip_frames = clip.samples.size() / clip.channels;
-        const auto remaining = clip_frames - voice.frame;
-        const auto count = std::min(frames, remaining);
-        for (std::size_t frame = 0; frame < count; ++frame) {
-            const auto source = (voice.frame + frame) * clip.channels;
-            const auto left = static_cast<float>(clip.samples[source]) * voice.gain;
-            const auto right = static_cast<float>(clip.samples[source + (clip.channels == 2 ? 1 : 0)]) * voice.gain;
+        const float bus_gain = bus_gains_.contains(voice.bus)
+            ? bus_gains_.at(voice.bus) : 0.0F;
+        const float effective_gain = voice.gain * bus_gain;
+        const float left_pan = voice.pan > 0.0F ? 1.0F - voice.pan : 1.0F;
+        const float right_pan = voice.pan < 0.0F ? 1.0F + voice.pan : 1.0F;
+        for (std::size_t frame = 0; frame < frames; ++frame) {
+            if (voice.frame >= clip_frames) {
+                if (voice.loop) voice.frame = 0U;
+                else break;
+            }
+            const auto source = voice.frame * clip.channels;
+            const auto left = static_cast<float>(clip.samples[source]) *
+                effective_gain * left_pan;
+            const auto right = static_cast<float>(
+                clip.samples[source + (clip.channels == 2 ? 1 : 0)]) *
+                effective_gain * right_pan;
             if (channels_ == 1) {
                 const auto mixed = clip.channels == 2 ? (left + right) * 0.5F : left;
                 const auto target = static_cast<float>(output[frame]) + mixed;
@@ -79,11 +125,12 @@ std::vector<std::int16_t> PcmAudioMixer::mix(const std::size_t frames) noexcept 
                     right_target, static_cast<float>(std::numeric_limits<std::int16_t>::min()),
                     static_cast<float>(std::numeric_limits<std::int16_t>::max())));
             }
+            ++voice.frame;
         }
-        voice.frame += count;
     }
     voices_.erase(std::remove_if(voices_.begin(), voices_.end(), [](const auto& voice) {
-        return voice.frame >= voice.clip->samples.size() / voice.clip->channels;
+        return !voice.loop &&
+            voice.frame >= voice.clip->samples.size() / voice.clip->channels;
     }), voices_.end());
     return output;
 }

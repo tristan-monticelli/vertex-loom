@@ -102,6 +102,11 @@ struct PreviewRuntime::Impl {
     PcmAudioMixer audio_mixer;
     PcmAudioDevice audio_device;
     std::optional<PcmWavClip> audio_clip;
+    std::string audio_bus{"master"};
+    float audio_bus_gain{1.0F};
+    float audio_gain{1.0F};
+    float audio_pan{};
+    bool audio_loop{};
     SDL_GameController* controller{};
     Camera2D camera;
     std::vector<render::VectorDrawPacket> packets;
@@ -1035,6 +1040,11 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
+    impl_->audio_bus = "master";
+    impl_->audio_bus_gain = 1.0F;
+    impl_->audio_gain = 1.0F;
+    impl_->audio_pan = 0.0F;
+    impl_->audio_loop = false;
 
     const bool valid_map_id = core::ResourceId::is_valid(options_.map_id.value);
     const bool valid_scene_id = options_.scene_id.has_value() &&
@@ -1185,8 +1195,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 errors_.push_back("runtime.audio: document has no events");
                 return false;
             }
+            const auto& event = audio.audio->events.front();
             options_.audio_wav = options_.project_root /
-                audio.audio->events.front().source;
+                event.source;
+            impl_->audio_bus = event.bus;
+            impl_->audio_gain = event.volume;
+            impl_->audio_loop = event.loop;
+            const auto bus = std::ranges::find(
+                audio.audio->buses, event.bus, &project::AudioBus::id);
+            impl_->audio_bus_gain = bus == audio.audio->buses.end()
+                ? 1.0F : bus->volume;
+            if (event.spatial) {
+                const auto spatial = resolve_spatial_audio(
+                    event.spatial->position.x, event.spatial->position.y,
+                    event.spatial->minimum_distance,
+                    event.spatial->maximum_distance);
+                impl_->audio_gain *= spatial.attenuation;
+                impl_->audio_pan = spatial.pan;
+            }
         }
     }
     std::optional<project::SceneDocument> loaded_scene;
@@ -1892,11 +1918,14 @@ bool PreviewRuntime::run() {
     impl_->camera.set_viewport(options_.width, options_.height);
     impl_->camera.set_limits(options_.camera_limits);
     if (!headless && impl_->audio_clip) {
-        if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
-                                          impl_->audio_clip->channels) ||
+        if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate, 2U) ||
+            !impl_->audio_mixer.set_bus_gain(impl_->audio_bus,
+                                             impl_->audio_bus_gain) ||
             !impl_->audio_device.open(impl_->audio_clip->sample_rate,
-                                      impl_->audio_clip->channels) ||
-            !impl_->audio_mixer.play(*impl_->audio_clip)) {
+                                      2U) ||
+            !impl_->audio_mixer.play(*impl_->audio_clip, impl_->audio_bus,
+                                     impl_->audio_gain, impl_->audio_pan,
+                                     impl_->audio_loop)) {
             errors_.push_back("audio: " + (impl_->audio_device.error().empty()
                 ? std::string("could not start PCM playback")
                 : impl_->audio_device.error()));

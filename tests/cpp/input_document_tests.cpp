@@ -116,9 +116,41 @@ TEST_CASE("audio document round-trips events") {
     fabric::project::AudioDocument audio;
     audio.document.id = {.value = "music"};
     audio.document.name = "Music";
-    audio.events = {{"theme", "audio/theme.wav", 0.8F, true}};
+    audio.buses = {{"music", 0.6F}};
+    audio.events = {{.id = "theme", .source = "audio/theme.wav",
+                     .volume = 0.8F, .loop = true, .bus = "music",
+                     .spatial = fabric::project::AudioSpatialSettings{
+                         .position = {4.0F, 3.0F}, .minimum_distance = 2.0F,
+                         .maximum_distance = 12.0F}}};
     const auto parsed = fabric::project::parse_audio(
         fabric::project::serialize_audio(audio));
     REQUIRE(parsed.ok());
     CHECK(*parsed.audio == audio);
+}
+
+TEST_CASE("audio v1 migrates to master bus without spatialization") {
+    const auto parsed = fabric::project::parse_audio(
+        R"({"schemaVersion":1,"type":"audio","id":"legacy-audio","name":"Legacy","events":[{"id":"theme","source":"audio/theme.wav","volume":0.8,"loop":true}]})");
+    REQUIRE(parsed.ok());
+    CHECK(parsed.audio->document.schema_version ==
+          fabric::project::current_audio_schema_version);
+    REQUIRE(parsed.audio->events.size() == 1U);
+    CHECK(parsed.audio->events.front().bus == "master");
+    CHECK_FALSE(parsed.audio->events.front().spatial.has_value());
+}
+
+TEST_CASE("audio rejects traversal and missing buses") {
+    fabric::project::AudioDocument audio;
+    audio.document.id = {.value = "unsafe-audio"};
+    audio.document.name = "Unsafe";
+    audio.events = {{.id = "escape", .source = "../outside.wav",
+                     .bus = "missing"}};
+    const auto report = fabric::project::validate_audio(manifest(), audio);
+    CHECK_FALSE(report.ok());
+    CHECK(std::ranges::any_of(report.errors, [](const auto& error) {
+        return error.field == "events[0].source";
+    }));
+    CHECK(std::ranges::any_of(report.errors, [](const auto& error) {
+        return error.field == "events[0].bus";
+    }));
 }

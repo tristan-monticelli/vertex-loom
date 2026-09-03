@@ -1085,6 +1085,13 @@ bool ProjectSession::set_selected_audio_event(const std::size_t event_index,
     }
     auto candidate = *loaded.audio;
     candidate.events[event_index] = std::move(event);
+    return set_selected_audio_document(std::move(candidate));
+}
+
+bool ProjectSession::set_selected_audio_document(project::AudioDocument candidate) {
+    const auto* selected = selected_resource();
+    if (selected == nullptr || selected->kind != StudioResourceKind::audio ||
+        selected->id != candidate.document.id) return false;
     const auto validation = project::validate_audio(*manifest_, candidate);
     if (!validation.ok()) { errors_ = validation.errors; return false; }
     const auto published = project::publish_audio(project_root_, *manifest_, candidate);
