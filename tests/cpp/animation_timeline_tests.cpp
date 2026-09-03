@@ -131,4 +131,54 @@ TEST_CASE("animation timeline creates an undoable A to B segment") {
         fabric::project::AnimationInterpolation::linear));
 }
 
+TEST_CASE("animation timeline curve settings are immediate and undoable") {
+    auto source = clip();
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(source, commands);
+    const fabric::project::PropertyBinding binding{
+        "root", "transform", "position"};
+
+    REQUIRE(timeline.set_key(
+        binding, 0.0F, fabric::core::Vec2{},
+        fabric::project::AnimationInterpolation::linear));
+    REQUIRE(timeline.set_track_curve(
+        binding, fabric::project::AnimationInterpolation::cubic,
+        fabric::project::AnimationEasing::ease_in_out));
+    CHECK(source.tracks.front().interpolation ==
+          fabric::project::AnimationInterpolation::cubic);
+    CHECK(source.tracks.front().easing ==
+          fabric::project::AnimationEasing::ease_in_out);
+    REQUIRE(commands.undo());
+    CHECK(source.tracks.front().interpolation ==
+          fabric::project::AnimationInterpolation::linear);
+    CHECK(source.tracks.front().easing ==
+          fabric::project::AnimationEasing::linear);
+}
+
+TEST_CASE("animation canvas auto-key updates merge into one undo step") {
+    auto source = clip();
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(source, commands);
+    const fabric::project::PropertyBinding binding{
+        "root", "transform", "position"};
+
+    REQUIRE(timeline.set_key(
+        binding, 0.5F, fabric::core::Vec2{1.0F, 2.0F},
+        fabric::project::AnimationInterpolation::linear,
+        fabric::project::AnimationComposition::replace,
+        fabric::project::AnimationEasing::linear, {}, {}, true));
+    const auto history = commands.size();
+    REQUIRE(timeline.set_key(
+        binding, 0.5F, fabric::core::Vec2{4.0F, 6.0F},
+        fabric::project::AnimationInterpolation::linear,
+        fabric::project::AnimationComposition::replace,
+        fabric::project::AnimationEasing::linear, {}, {}, true));
+    CHECK(commands.size() == history);
+    CHECK(std::get<fabric::core::Vec2>(
+              source.tracks.front().keys.front().value) ==
+          fabric::core::Vec2{4.0F, 6.0F});
+    REQUIRE(commands.undo());
+    CHECK(source.tracks.empty());
+}
+
 } // namespace

@@ -3452,12 +3452,14 @@ bool ProjectSession::set_selected_animation_key(
     const project::AnimationComposition composition,
     const project::AnimationEasing easing,
     std::optional<project::AnimationValue> in_tangent,
-    std::optional<project::AnimationValue> out_tangent) {
+    std::optional<project::AnimationValue> out_tangent,
+    const bool mergeable) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.set_key(std::move(binding), time, std::move(value),
                           interpolation, composition, easing,
-                          std::move(in_tangent), std::move(out_tangent))) {
+                          std::move(in_tangent), std::move(out_tangent),
+                          mergeable)) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;
@@ -3549,12 +3551,38 @@ bool ProjectSession::move_selected_animation_key(
     return true;
 }
 
-bool ProjectSession::insert_selected_animation_marker(
-    std::string id, const float time,
+bool ProjectSession::set_selected_animation_track_curve(
+    project::PropertyBinding binding,
+    const project::AnimationInterpolation interpolation,
+    const project::AnimationEasing easing,
     const AutosaveScheduler::Clock::time_point now) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
-    if (!timeline.insert_marker(std::move(id), time)) {
+    if (!timeline.set_track_curve(binding, interpolation, easing)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks",
+                    "select an existing animation track before editing its curve"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::insert_selected_animation_marker(
+    std::string id, const float time,
+    const AutosaveScheduler::Clock::time_point now) {
+    return insert_selected_animation_marker(
+        std::move(id), time, std::nullopt, now);
+}
+
+bool ProjectSession::insert_selected_animation_marker(
+    std::string id, const float time,
+    std::optional<project::AnimationAudioCue> audio,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.insert_marker(std::move(id), time, std::move(audio))) {
         errors_ = {{project::ErrorCode::invalid_asset, "markers",
                     "the marker id or time is invalid or already exists"}};
         return false;

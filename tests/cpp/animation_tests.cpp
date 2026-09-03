@@ -200,4 +200,49 @@ TEST_CASE("animation marker hits are ordered across loop boundaries") {
     CHECK(clamped.back().id == "turn");
 }
 
+TEST_CASE("animation v4 marker audio cues round-trip and remain typed at runtime") {
+    auto source = clip();
+    source.markers = {{
+        .id = "foot",
+        .time = 0.25F,
+        .audio = fabric::project::AnimationAudioCue{
+            .audio = {{.value = "character-audio"}, "audio"},
+            .event_id = "footstep"}}};
+
+    const auto parsed = fabric::project::parse_animation(
+        manifest(), fabric::project::serialize_animation(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(parsed.asset->markers.front().audio.has_value());
+    CHECK(parsed.asset->markers.front().audio->event_id == "footstep");
+
+    const auto references =
+        fabric::project::animation_resource_references(*parsed.asset);
+    REQUIRE(references.size() == 2U);
+    CHECK(references.front() == fabric::project::ResourceReference{
+        {.value = "character-audio"}, "audio"});
+
+    const auto hits = fabric::project::animation_markers_between(
+        *parsed.asset, 0.0F, 0.5F);
+    REQUIRE(hits.size() == 1U);
+    REQUIRE(hits.front().audio.has_value());
+    CHECK(hits.front().audio->audio.id.value == "character-audio");
+    CHECK(hits.front().audio->event_id == "footstep");
+}
+
+TEST_CASE("animation v3 markers migrate without implicit audio cues") {
+    auto serialized = fabric::project::serialize_animation(clip());
+    const auto version = serialized.find("\"schemaVersion\": 4");
+    REQUIRE(version != std::string::npos);
+    serialized.replace(version, std::string{"\"schemaVersion\": 4"}.size(),
+                       "\"schemaVersion\": 3");
+
+    const auto parsed = fabric::project::parse_animation(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->document.schema_version ==
+          fabric::project::current_animation_schema_version);
+    CHECK(std::ranges::none_of(parsed.asset->markers, [](const auto& marker) {
+        return marker.audio.has_value();
+    }));
+}
+
 } // namespace

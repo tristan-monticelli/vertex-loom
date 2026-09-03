@@ -1,5 +1,6 @@
 #include "fabric/project/animation.hpp"
 
+#include "fabric/project/audio.hpp"
 #include "fabric/project/document_storage.hpp"
 
 #include <nlohmann/json.hpp>
@@ -41,7 +42,7 @@ ValidationReport validate_animation(const ProjectManifest&, const AnimationClip&
     ValidationReport report;
     if (a.document.schema_version != current_animation_schema_version)
         error(report.errors, ErrorCode::unsupported_schema_version,
-              "schemaVersion", "only animation schema version 3 is supported");
+              "schemaVersion", "only animation schema version 4 is supported");
     if (a.document.type != "animation")
         error(report.errors, ErrorCode::invalid_asset, "type", "must be animation");
     if (!core::ResourceId::is_valid(a.document.id.value))
@@ -67,6 +68,13 @@ ValidationReport validate_animation(const ProjectManifest&, const AnimationClip&
             marker.time > a.duration)
             error(report.errors, ErrorCode::invalid_asset, "markers.time",
                   "must be within duration");
+        if (marker.audio &&
+            (!core::ResourceId::is_valid(marker.audio->audio.id.value) ||
+             marker.audio->audio.expected_type != "audio" ||
+             !core::ResourceId::is_valid(marker.audio->event_id)))
+            error(report.errors, ErrorCode::resource_type_mismatch,
+                  "markers.audio",
+                  "must reference an audio document and a valid event id");
     }
 
     std::set<std::string> bindings;
@@ -119,7 +127,7 @@ ValidationReport validate_animation(const ProjectManifest&, const AnimationClip&
     }
     return report;
 }
-std::vector<ResourceReference> animation_resource_references(const AnimationClip& a){std::vector<ResourceReference> r;for(const auto& t:a.tracks)for(const auto& k:t.keys)if(const auto* ref=std::get_if<ResourceReference>(&k.value))r.push_back(*ref);return r;}
+std::vector<ResourceReference> animation_resource_references(const AnimationClip& a){std::vector<ResourceReference> r;for(const auto& marker:a.markers)if(marker.audio)r.push_back(marker.audio->audio);for(const auto& t:a.tracks)for(const auto& k:t.keys)if(const auto* ref=std::get_if<ResourceReference>(&k.value))r.push_back(*ref);return r;}
 std::string serialize_animation(const AnimationClip& animation) {
     Json document = {
         {"schemaVersion", animation.document.schema_version},
@@ -132,8 +140,14 @@ std::string serialize_animation(const AnimationClip& animation) {
         {"loop", animation.loop},
         {"markers", Json::array()},
         {"tracks", Json::array()}};
-    for (const auto& marker : animation.markers)
-        document["markers"].push_back({{"id", marker.id}, {"time", marker.time}});
+    for (const auto& marker : animation.markers) {
+        Json serialized_marker = {{"id", marker.id}, {"time", marker.time}};
+        if (marker.audio)
+            serialized_marker["audio"] = {
+                {"document", ref(marker.audio->audio)},
+                {"eventId", marker.audio->event_id}};
+        document["markers"].push_back(std::move(serialized_marker));
+    }
     for (const auto& track : animation.tracks) {
         Json serialized_track = {
             {"binding", {{"node", track.binding.node_id},
@@ -214,6 +228,24 @@ AnimationResult parse_animation(const ProjectManifest& manifest, std::string_vie
             AnimationMarker marker;
             text(serialized, "id", marker.id, result.errors);
             number(serialized, "time", marker.time, result.errors);
+            const auto audio = serialized.find("audio");
+            if (audio != serialized.end() && !audio->is_null()) {
+                if (!audio->is_object()) {
+                    error(result.errors, ErrorCode::invalid_asset,
+                          "markers.audio", "expected an audio cue or null");
+                } else {
+                    AnimationAudioCue cue;
+                    const auto document = audio->find("document");
+                    if (document == audio->end() || !document->is_object())
+                        error(result.errors, ErrorCode::invalid_asset,
+                              "markers.audio.document",
+                              "expected a resource reference");
+                    else
+                        ref_read(*document, cue.audio, result.errors);
+                    text(*audio, "eventId", cue.event_id, result.errors);
+                    marker.audio = std::move(cue);
+                }
+            }
             animation.markers.push_back(std::move(marker));
         }
     } else {
@@ -332,7 +364,7 @@ AnimationResult parse_animation(const ProjectManifest& manifest, std::string_vie
     result.asset = std::move(animation);
     return result;
 }
-AnimationResult load_animation(const std::filesystem::path& root,const ProjectManifest& m,const std::filesystem::path& path){auto s=load_document(root,path,[&](std::string_view v){return parse_validation(m,v);});AnimationResult r;r.errors=std::move(s.errors);if(s.contents)r=parse_animation(m,*s.contents);if(r.ok()&&path!=animation_document_path(m,r.asset->document.id)){r.asset.reset();error(r.errors,ErrorCode::invalid_path,"document","document filename does not match its id");}return r;}
+AnimationResult load_animation(const std::filesystem::path& root,const ProjectManifest& m,const std::filesystem::path& path){auto s=load_document(root,path,[&](std::string_view v){return parse_validation(m,v);});AnimationResult r;r.errors=std::move(s.errors);if(s.contents)r=parse_animation(m,*s.contents);if(r.ok()&&path!=animation_document_path(m,r.asset->document.id)){r.asset.reset();error(r.errors,ErrorCode::invalid_path,"document","document filename does not match its id");}if(r.ok()){for(const auto& marker:r.asset->markers){if(!marker.audio)continue;const auto loaded=load_audio(root,m,audio_document_path(m,marker.audio->audio.id));if(!loaded.ok()){r.asset.reset();error(r.errors,ErrorCode::missing_resource,"markers.audio.document","referenced audio document could not be loaded");break;}if(std::ranges::none_of(loaded.audio->events,[&](const auto& event){return event.id==marker.audio->event_id;})){r.asset.reset();error(r.errors,ErrorCode::missing_resource,"markers.audio.eventId","referenced audio event does not exist");break;}}}return r;}
 AnimationResult publish_animation(const std::filesystem::path& root,
                                    const ProjectManifest& manifest,
                                    const AnimationClip& animation) {
@@ -440,7 +472,8 @@ std::vector<AnimationMarkerHit> animation_markers_between(
         if (!(end > begin)) return hits;
         for (const auto& marker : clip.markers) {
             if (marker.time > begin && marker.time <= end)
-                hits.push_back({marker.id, marker.time, marker.time, 0});
+                hits.push_back({marker.id, marker.time, marker.time, 0,
+                                marker.audio});
         }
         std::stable_sort(hits.begin(), hits.end(),
                          [](const auto& left, const auto& right) {
@@ -458,7 +491,8 @@ std::vector<AnimationMarkerHit> animation_markers_between(
         for (const auto& marker : clip.markers) {
             const auto absolute_time = loop_start + marker.time;
             if (absolute_time > from_time && absolute_time <= to_time)
-                hits.push_back({marker.id, absolute_time, marker.time, loop_index});
+                hits.push_back({marker.id, absolute_time, marker.time, loop_index,
+                                marker.audio});
         }
     }
     std::stable_sort(hits.begin(), hits.end(),

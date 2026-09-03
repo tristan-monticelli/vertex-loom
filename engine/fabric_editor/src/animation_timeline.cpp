@@ -117,7 +117,8 @@ bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
                                 const project::AnimationComposition composition,
                                 const project::AnimationEasing easing,
                                 std::optional<project::AnimationValue> in_tangent,
-                                std::optional<project::AnimationValue> out_tangent) {
+                                std::optional<project::AnimationValue> out_tangent,
+                                const bool mergeable) {
     auto next = clip_;
     auto* track = find_track(next, binding);
     if (!track) {
@@ -148,7 +149,7 @@ bool AnimationTimeline::set_key(const project::PropertyBinding& binding,
                          });
     }
     auto before = clip_;
-    return commit(commands_, clip_, std::move(before), std::move(next));
+    return commit(commands_, clip_, std::move(before), std::move(next), mergeable);
 }
 
 bool AnimationTimeline::set_segment(
@@ -208,6 +209,19 @@ bool AnimationTimeline::move_key(const project::PropertyBinding& binding,
     return commit(commands_, clip_, std::move(before), std::move(next), true);
 }
 
+bool AnimationTimeline::set_track_curve(
+    const project::PropertyBinding& binding,
+    const project::AnimationInterpolation interpolation,
+    const project::AnimationEasing easing) {
+    auto next = clip_;
+    auto* track = find_track(next, binding);
+    if (!track) return false;
+    track->interpolation = interpolation;
+    track->easing = easing;
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
 bool AnimationTimeline::remove_key(const project::PropertyBinding& binding,
                                    std::size_t key_index) {
     auto next = clip_;
@@ -219,12 +233,14 @@ bool AnimationTimeline::remove_key(const project::PropertyBinding& binding,
     return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
-bool AnimationTimeline::insert_marker(std::string id, const float time) {
+bool AnimationTimeline::insert_marker(
+    std::string id, const float time,
+    std::optional<project::AnimationAudioCue> audio) {
     auto next = clip_;
     if (std::ranges::any_of(next.markers,
                             [&](const auto& marker) { return marker.id == id; }))
         return false;
-    next.markers.push_back({std::move(id), time});
+    next.markers.push_back({std::move(id), time, std::move(audio)});
     std::stable_sort(next.markers.begin(), next.markers.end(),
                      [](const auto& left, const auto& right) {
                          return left.time < right.time;

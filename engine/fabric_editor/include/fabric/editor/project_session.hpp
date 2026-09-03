@@ -242,7 +242,8 @@ public:
             project::AnimationComposition::replace,
         project::AnimationEasing easing = project::AnimationEasing::linear,
         std::optional<project::AnimationValue> in_tangent = {},
-        std::optional<project::AnimationValue> out_tangent = {});
+        std::optional<project::AnimationValue> out_tangent = {},
+        bool mergeable = false);
     [[nodiscard]] bool set_selected_animation_segment(
         project::PropertyBinding binding, float start_time,
         project::AnimationValue start_value, float end_time,
@@ -264,8 +265,19 @@ public:
         project::PropertyBinding binding, std::size_t key_index, float time,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_animation_track_curve(
+        project::PropertyBinding binding,
+        project::AnimationInterpolation interpolation,
+        project::AnimationEasing easing,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool insert_selected_animation_marker(
         std::string id, float time,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool insert_selected_animation_marker(
+        std::string id, float time,
+        std::optional<project::AnimationAudioCue> audio,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool remove_selected_animation_marker(

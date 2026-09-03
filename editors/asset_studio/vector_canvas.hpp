@@ -41,6 +41,7 @@ struct CanvasUiState {
     std::size_t selected_node{};
     std::string selected_entity_id;
     std::vector<std::size_t> selected_entity_nodes;
+    std::vector<fabric::core::Transform> entity_display_transforms;
     bool native_canvas{};
     Tool tool{Tool::move};
     fabric::editor::BezierHandleMode bezier_handle_mode{

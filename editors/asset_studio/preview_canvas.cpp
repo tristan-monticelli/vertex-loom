@@ -8,7 +8,8 @@ namespace fabric::asset_studio {
 
 void draw_packet_preview_canvas(
     CanvasUiState& canvas, const ImVec2 available, const std::string_view label,
-    fabric::editor::ProjectSession* editable_session) {
+    fabric::editor::ProjectSession* editable_session,
+    EntityTransformCommit transform_commit) {
     ImGui::InvisibleButton("Entity canvas", available,
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
@@ -130,6 +131,12 @@ void draw_packet_preview_canvas(
     if (editable_session && editable_session->selected_entity() &&
         canvas.selected_node < editable_session->selected_entity()->nodes.size()) {
         const auto& entity = *editable_session->selected_entity();
+        const auto display_transform = [&](const std::size_t index)
+            -> const fabric::core::Transform& {
+            return canvas.entity_display_transforms.size() == entity.nodes.size()
+                ? canvas.entity_display_transforms[index]
+                : entity.nodes[index].transform;
+        };
         if (canvas.selected_entity_id != entity.document.id.value) {
             canvas.selected_entity_id = entity.document.id.value;
             canvas.selected_node = 0U;
@@ -149,7 +156,7 @@ void draw_packet_preview_canvas(
             origin, {origin.x + available.x, origin.y + available.y});
         if (canvas_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             const auto primary = to_screen(
-                entity.nodes[canvas.selected_node].transform.position);
+                display_transform(canvas.selected_node).position);
             if (std::hypot(ImGui::GetIO().MousePos.x - primary.x,
                            ImGui::GetIO().MousePos.y - primary.y) <= 14.0F) {
                 clicked_node = canvas.selected_node;
@@ -157,8 +164,7 @@ void draw_packet_preview_canvas(
             }
         }
         for (std::size_t index = 0; index < entity.nodes.size(); ++index) {
-            const auto& candidate = entity.nodes[index];
-            const auto gizmo = to_screen(candidate.transform.position);
+            const auto gizmo = to_screen(display_transform(index).position);
             const bool selected = std::ranges::find(
                 canvas.selected_entity_nodes, index) !=
                 canvas.selected_entity_nodes.end();
@@ -209,12 +215,13 @@ void draw_packet_preview_canvas(
             if (!node.locked) {
                 canvas.entity_gizmo_dragging = true;
                 canvas.entity_gizmo_start_mouse = ImGui::GetIO().MousePos;
-                canvas.entity_gizmo_start_transform = node.transform;
+                canvas.entity_gizmo_start_transform =
+                    display_transform(canvas.selected_node);
                 canvas.entity_gizmo_start_transforms.clear();
                 for (const auto index : canvas.selected_entity_nodes)
                     if (!entity.nodes[index].locked)
                         canvas.entity_gizmo_start_transforms.push_back(
-                            {index, entity.nodes[index].transform});
+                            {index, display_transform(index)});
             }
         }
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -225,19 +232,19 @@ void draw_packet_preview_canvas(
                 ImGui::GetIO().MousePos.x - canvas.entity_gizmo_start_mouse.x,
                 ImGui::GetIO().MousePos.y - canvas.entity_gizmo_start_mouse.y};
             const auto scale = std::max(0.01F, pixels_per_unit);
-            std::vector<std::pair<std::size_t, fabric::project::EntityNode>>
-                changed_nodes;
-            changed_nodes.reserve(canvas.entity_gizmo_start_transforms.size());
+            std::vector<std::pair<std::size_t, fabric::core::Transform>>
+                changed_transforms;
+            changed_transforms.reserve(
+                canvas.entity_gizmo_start_transforms.size());
             for (const auto& [index, transform] :
                  canvas.entity_gizmo_start_transforms) {
-                auto changed = entity.nodes[index];
-                changed.transform = transform;
-                changed.transform.position.x += delta.x / scale;
-                changed.transform.position.y -= delta.y / scale;
-                changed_nodes.emplace_back(index, std::move(changed));
+                auto changed = transform;
+                changed.position.x += delta.x / scale;
+                changed.position.y -= delta.y / scale;
+                changed_transforms.emplace_back(index, changed);
             }
-            if (editable_session->set_selected_entity_nodes(
-                    std::move(changed_nodes)))
+            if (transform_commit &&
+                transform_commit(std::move(changed_transforms)))
                 ImGui::SetTooltip("Move node · %.2f, %.2f",
                                   delta.x / scale, -delta.y / scale);
         }

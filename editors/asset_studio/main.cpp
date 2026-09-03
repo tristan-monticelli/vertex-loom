@@ -539,6 +539,9 @@ struct AnimationUiState {
     int binding_preset{};
     std::string visual_component_id;
     std::string marker_id{"marker"};
+    bool marker_audio_enabled{};
+    std::string marker_audio_id;
+    std::string marker_audio_event_id;
     float scrub_time{};
     float key_time{};
     float marker_time{};
@@ -583,6 +586,11 @@ struct AnimationUiState {
     float dragging_key_original_time{};
     std::vector<KeySelection> selected_keys;
     std::vector<ClipboardEntry> key_clipboard;
+    bool box_selecting{};
+    bool box_select_additive{};
+    ImVec2 box_select_start{};
+    ImVec2 box_select_current{};
+    bool curve_view{};
 };
 
 struct AnimationGraphUiState {
@@ -630,6 +638,60 @@ void draw_animation_timeline_dock(
     ImGui::SameLine();
     ImGui::SetNextItemWidth(120.0F);
     ImGui::SliderFloat("Zoom", &ui.timeline_zoom, 0.5F, 4.0F, "%.1fx");
+    ImGui::SameLine();
+    ImGui::Checkbox("Curves", &ui.curve_view);
+    if (ui.curve_view && !ui.selected_keys.empty()) {
+        const auto binding = ui.selected_keys.front().binding;
+        const auto selected_track = std::ranges::find(
+            clip.tracks, binding, &fabric::project::AnimationTrack::binding);
+        if (selected_track != clip.tracks.end()) {
+            auto interpolation = selected_track->interpolation;
+            auto easing = selected_track->easing;
+            bool changed = false;
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(105.0F);
+            if (ImGui::BeginCombo(
+                    "##curve-interpolation",
+                    fabric::project::to_string(interpolation).data())) {
+                for (const auto option : {
+                         fabric::project::AnimationInterpolation::step,
+                         fabric::project::AnimationInterpolation::linear,
+                         fabric::project::AnimationInterpolation::cubic}) {
+                    if (ImGui::Selectable(
+                            fabric::project::to_string(option).data(),
+                            interpolation == option)) {
+                        interpolation = option;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(105.0F);
+            if (ImGui::BeginCombo("##curve-easing",
+                                  fabric::project::to_string(easing).data())) {
+                for (const auto option : {
+                         fabric::project::AnimationEasing::linear,
+                         fabric::project::AnimationEasing::ease_in,
+                         fabric::project::AnimationEasing::ease_out,
+                         fabric::project::AnimationEasing::ease_in_out}) {
+                    if (ImGui::Selectable(
+                            fabric::project::to_string(option).data(),
+                            easing == option)) {
+                        easing = option;
+                        changed = true;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            if (changed) {
+                status = session.set_selected_animation_track_curve(
+                    binding, interpolation, easing)
+                    ? "Animation curve changed."
+                    : "Curve change rejected; inspect diagnostics.";
+            }
+        }
+    }
 
     if (!ImGui::BeginChild("Animation timeline scroll", {0.0F, 0.0F}, true,
                            ImGuiWindowFlags_HorizontalScrollbar)) {
@@ -696,6 +758,52 @@ void draw_animation_timeline_dock(
             track.binding.component_id + "/" + track.binding.property_id;
         draw->AddText({origin.x + 8.0F, top + 7.0F},
                       IM_COL32(216, 221, 230, 255), track_label.c_str());
+        if (ui.curve_view && track.keys.size() > 1U) {
+            const auto scalar_value = [](const fabric::project::AnimationValue& value)
+                -> std::optional<float> {
+                if (const auto* scalar = std::get_if<float>(&value)) return *scalar;
+                if (const auto* point = std::get_if<fabric::core::Vec2>(&value))
+                    return point->x;
+                if (const auto* color = std::get_if<fabric::core::Color>(&value))
+                    return color->red;
+                if (const auto* boolean = std::get_if<bool>(&value))
+                    return *boolean ? 1.0F : 0.0F;
+                return std::nullopt;
+            };
+            std::vector<float> values;
+            for (const auto& key : track.keys)
+                if (const auto value = scalar_value(key.value))
+                    values.push_back(*value);
+            if (!values.empty()) {
+                const auto [minimum, maximum] = std::minmax_element(
+                    values.begin(), values.end());
+                const float range = std::max(0.0001F, *maximum - *minimum);
+                std::vector<ImVec2> curve;
+                constexpr std::size_t samples = 48U;
+                curve.reserve(samples + 1U);
+                for (std::size_t sample = 0; sample <= samples; ++sample) {
+                    const float time = clip.duration *
+                        static_cast<float>(sample) / static_cast<float>(samples);
+                    const auto evaluated = fabric::project::evaluate_animation(
+                        clip, time);
+                    const auto property = std::ranges::find(
+                        evaluated.properties, track.binding,
+                        &fabric::project::EvaluatedProperty::binding);
+                    if (property == evaluated.properties.end()) continue;
+                    const auto value = scalar_value(property->value);
+                    if (!value) continue;
+                    const float normalized = (*value - *minimum) / range;
+                    curve.push_back({x_for_time(time),
+                                     top + row_height - 4.0F -
+                                         normalized * (row_height - 8.0F)});
+                }
+                if (curve.size() > 1U)
+                    draw->AddPolyline(curve.data(),
+                                      static_cast<int>(curve.size()),
+                                      IM_COL32(115, 225, 155, 210),
+                                      ImDrawFlags_None, 1.5F);
+            }
+        }
         for (std::size_t key_index = 0; key_index < track.keys.size(); ++key_index) {
             const AnimationUiState::KeySelection candidate{track.binding, key_index};
             const bool dragging = ui.dragging_key &&
@@ -757,8 +865,55 @@ void draw_animation_timeline_dock(
                 ui.dragging_key_original_time = ui.scrub_time;
             }
         } else if (mouse.x >= time_start) {
-            ui.selected_keys.clear();
             ui.scrub_time = time_for_x(mouse.x);
+            if (mouse.y >= origin.y + header_height) {
+                ui.box_selecting = true;
+                ui.box_select_additive = ImGui::GetIO().KeyCtrl ||
+                    ImGui::GetIO().KeySuper;
+                ui.box_select_start = mouse;
+                ui.box_select_current = mouse;
+                if (!ui.box_select_additive) ui.selected_keys.clear();
+            } else {
+                ui.selected_keys.clear();
+            }
+        }
+    }
+    if (ui.box_selecting && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        ui.box_select_current = mouse;
+    if (ui.box_selecting) {
+        const ImVec2 minimum{std::min(ui.box_select_start.x,
+                                     ui.box_select_current.x),
+                             std::min(ui.box_select_start.y,
+                                     ui.box_select_current.y)};
+        const ImVec2 maximum{std::max(ui.box_select_start.x,
+                                     ui.box_select_current.x),
+                             std::max(ui.box_select_start.y,
+                                     ui.box_select_current.y)};
+        draw->AddRectFilled(minimum, maximum, IM_COL32(80, 155, 235, 40));
+        draw->AddRect(minimum, maximum, IM_COL32(100, 190, 255, 230));
+        if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+            for (std::size_t track_index = 0;
+                 track_index < clip.tracks.size(); ++track_index) {
+                const auto& track = clip.tracks[track_index];
+                const float center = origin.y + header_height + row_height *
+                    (static_cast<float>(track_index) + 0.5F);
+                for (std::size_t key_index = 0;
+                     key_index < track.keys.size(); ++key_index) {
+                    const float x = x_for_time(track.keys[key_index].time);
+                    if (x < minimum.x || x > maximum.x ||
+                        center < minimum.y || center > maximum.y) continue;
+                    const AnimationUiState::KeySelection selected{
+                        track.binding, key_index};
+                    if (std::ranges::none_of(
+                            ui.selected_keys, [&](const auto& candidate) {
+                                return same_animation_key(candidate, selected);
+                            }))
+                        ui.selected_keys.push_back(selected);
+                }
+            }
+            status = std::to_string(ui.selected_keys.size()) +
+                " animation key(s) selected.";
+            ui.box_selecting = false;
         }
     }
     if (ui.dragging_key && ImGui::IsMouseDown(ImGuiMouseButton_Left))
@@ -3817,10 +3972,66 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                entity_preview.errors.size());
         }
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
+        fabric::asset_studio::EntityTransformCommit transform_commit;
+        if (entity_selected) {
+            transform_commit = [&](auto transforms) {
+                std::vector<std::pair<std::size_t,
+                                      fabric::project::EntityNode>> nodes;
+                nodes.reserve(transforms.size());
+                for (const auto& [index, transform] : transforms) {
+                    if (index >= session.selected_entity()->nodes.size())
+                        return false;
+                    auto node = session.selected_entity()->nodes[index];
+                    node.transform = transform;
+                    nodes.emplace_back(index, std::move(node));
+                }
+                return session.set_selected_entity_nodes(std::move(nodes));
+            };
+        } else if (animation_ui.auto_key && session.selected_animation()) {
+            transform_commit = [&](auto transforms) {
+                bool changed = false;
+                for (const auto& [index, transform] : transforms) {
+                    if (index >= session.selected_entity()->nodes.size())
+                        return false;
+                    const auto binding = fabric::project::PropertyBinding{
+                        .node_id = session.selected_entity()->nodes[index].id,
+                        .component_id = "transform",
+                        .property_id = "position"};
+                    const auto track = std::ranges::find(
+                        session.selected_animation()->tracks, binding,
+                        &fabric::project::AnimationTrack::binding);
+                    const auto interpolation =
+                        track == session.selected_animation()->tracks.end()
+                        ? animation_ui.interpolation : track->interpolation;
+                    const auto composition =
+                        track == session.selected_animation()->tracks.end()
+                        ? animation_ui.composition : track->composition;
+                    const auto easing =
+                        track == session.selected_animation()->tracks.end()
+                        ? animation_ui.easing : track->easing;
+                    changed = session.set_selected_animation_key(
+                        binding, animation_ui.scrub_time, transform.position,
+                        interpolation,
+                        fabric::editor::AutosaveScheduler::Clock::now(),
+                        composition, easing, {}, {}, true) || changed;
+                    animation_ui.node_id = binding.node_id;
+                    animation_ui.component_id = "transform";
+                    animation_ui.property_id = "position";
+                }
+                if (changed)
+                    status = "Position keyed from the canvas at the playhead.";
+                return changed;
+            };
+        }
         fabric::asset_studio::draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
-            "Entity preview", &session);
+            entity_selected
+                ? "Entity preview"
+                : animation_ui.auto_key
+                ? "Animated entity · auto-key"
+                : "Animated entity · enable auto-key to edit",
+            &session, std::move(transform_commit));
     } else if (preview.texture != 0U && session.imported_texture() &&
                session.selected_resource() != nullptr &&
                session.selected_resource()->kind ==
@@ -7181,10 +7392,48 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SliderFloat("Marker time (seconds)", &animation_ui.marker_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             draw_technical_tooltip("Timeline position at which the marker is stored.");
-            ImGui::BeginDisabled(animation_ui.marker_id.empty());
+            ImGui::Checkbox("Trigger audio event", &animation_ui.marker_audio_enabled);
+            if (animation_ui.marker_audio_enabled) {
+                draw_project_resource_picker(
+                    "Audio document##animation-marker", session.resources(),
+                    fabric::editor::StudioResourceKind::audio,
+                    animation_ui.marker_audio_id, false);
+                std::optional<fabric::project::AudioDocument> marker_audio;
+                if (!animation_ui.marker_audio_id.empty()) {
+                    const auto loaded = fabric::project::load_audio(
+                        session.project_root(), *session.manifest(),
+                        fabric::project::audio_document_path(
+                            *session.manifest(),
+                            {.value = animation_ui.marker_audio_id}));
+                    if (loaded.ok()) marker_audio = *loaded.audio;
+                }
+                const char* event_preview = animation_ui.marker_audio_event_id.empty()
+                    ? "Choose an event..."
+                    : animation_ui.marker_audio_event_id.c_str();
+                if (ImGui::BeginCombo("Audio event", event_preview)) {
+                    if (marker_audio)
+                        for (const auto& event : marker_audio->events)
+                            if (ImGui::Selectable(
+                                    event.id.c_str(),
+                                    event.id == animation_ui.marker_audio_event_id))
+                                animation_ui.marker_audio_event_id = event.id;
+                    ImGui::EndCombo();
+                }
+            }
+            const bool marker_audio_valid = !animation_ui.marker_audio_enabled ||
+                (!animation_ui.marker_audio_id.empty() &&
+                 !animation_ui.marker_audio_event_id.empty());
+            ImGui::BeginDisabled(animation_ui.marker_id.empty() ||
+                                 !marker_audio_valid);
             if (ImGui::Button("Add marker")) {
+                std::optional<fabric::project::AnimationAudioCue> audio;
+                if (animation_ui.marker_audio_enabled)
+                    audio = fabric::project::AnimationAudioCue{
+                        .audio = {{.value = animation_ui.marker_audio_id}, "audio"},
+                        .event_id = animation_ui.marker_audio_event_id};
                 if (session.insert_selected_animation_marker(
-                        animation_ui.marker_id, animation_ui.marker_time)) {
+                        animation_ui.marker_id, animation_ui.marker_time,
+                        std::move(audio))) {
                     status = "Animation marker added.";
                 } else {
                     status = "Animation marker rejected; inspect diagnostics.";
@@ -7193,9 +7442,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::EndDisabled();
             draw_disabled_reason(animation_ui.marker_id.empty(),
                                  "Enter a marker id before adding a marker.");
+            draw_disabled_reason(!marker_audio_valid,
+                                 "Choose an audio document and one of its events.");
             bool marker_removed = false;
             for (const auto& marker : clip.markers) {
-                ImGui::BulletText("%s · %.2f s", marker.id.c_str(), marker.time);
+                if (marker.audio)
+                    ImGui::BulletText("%s · %.2f s · %s/%s", marker.id.c_str(),
+                                      marker.time,
+                                      marker.audio->audio.id.value.c_str(),
+                                      marker.audio->event_id.c_str());
+                else
+                    ImGui::BulletText("%s · %.2f s", marker.id.c_str(), marker.time);
                 ImGui::SameLine();
                 const auto marker_button = "Remove##animation-marker-" + marker.id;
                 if (ImGui::SmallButton(marker_button.c_str())) {
@@ -9789,6 +10046,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
 
     bool animation_e2e_complete = false;
+    bool animation_gizmo_e2e_active = false;
     if (animation_e2e && session.has_project()) {
         ui_animation_probe_enabled = true;
         ui_animation_timeline_seen = false;
@@ -9805,6 +10063,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 2.0F, fabric::core::Vec2{0.8F, 0.0F},
                 fabric::project::AnimationInterpolation::linear) &&
             session.save();
+        if (authored) {
+            animation_ui.auto_key = true;
+            animation_ui.curve_view = true;
+            animation_ui.scrub_time = 0.75F;
+            animation_ui.selected_keys = {{
+                {"root", "transform", "position"}, 0U}};
+            canvas.selected_node = 0U;
+            canvas.selected_entity_nodes = {0U};
+            canvas.selected_entity_id = "beam-entity";
+            animation_gizmo_e2e_active = true;
+        }
         fabric::editor::ProjectSession reloaded;
         const bool reopened = authored && reloaded.open(initial_project) &&
             reloaded.select_resource(
@@ -10359,6 +10628,30 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 static_cast<void>(SDL_PushEvent(&button));
             }
         }
+        if (animation_gizmo_e2e_active && animation_ui_e2e_frame >= 2U &&
+            animation_ui_e2e_frame < 5U) {
+            const auto start = canvas.entity_gizmo_screen;
+            const bool moved = animation_ui_e2e_frame >= 3U;
+            const auto mouse_x = static_cast<int>(std::lround(
+                start.x + (moved ? 42.0F : 0.0F)));
+            const auto mouse_y = static_cast<int>(std::lround(start.y));
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = mouse_x;
+            motion.motion.y = mouse_y;
+            static_cast<void>(SDL_PushEvent(&motion));
+            if (animation_ui_e2e_frame != 3U) {
+                SDL_Event button{};
+                button.type = animation_ui_e2e_frame == 4U
+                    ? SDL_MOUSEBUTTONUP : SDL_MOUSEBUTTONDOWN;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = mouse_x;
+                button.button.y = mouse_y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
             if (creation.input_capture) {
@@ -10559,9 +10852,43 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     session.selected_animation()
                 ? &*session.selected_animation()
                 : nullptr;
+            canvas.entity_display_transforms.clear();
+            canvas.entity_display_transforms.reserve(
+                session.selected_entity()->nodes.size());
+            for (const auto& node : session.selected_entity()->nodes)
+                canvas.entity_display_transforms.push_back(node.transform);
+            if (animation != nullptr) {
+                const auto evaluated = fabric::project::evaluate_animation(
+                    *animation, animation_ui.scrub_time);
+                for (const auto& property : evaluated.properties) {
+                    if (property.binding.component_id != "transform" ||
+                        property.binding.property_id != "position") continue;
+                    const auto node = std::ranges::find(
+                        session.selected_entity()->nodes,
+                        property.binding.node_id,
+                        &fabric::project::EntityNode::id);
+                    const auto* position =
+                        std::get_if<fabric::core::Vec2>(&property.value);
+                    if (node == session.selected_entity()->nodes.end() ||
+                        position == nullptr) continue;
+                    const auto index = static_cast<std::size_t>(std::distance(
+                        session.selected_entity()->nodes.begin(), node));
+                    if (property.composition ==
+                        fabric::project::AnimationComposition::additive) {
+                        canvas.entity_display_transforms[index].position.x +=
+                            position->x;
+                        canvas.entity_display_transforms[index].position.y +=
+                            position->y;
+                    } else {
+                        canvas.entity_display_transforms[index].position = *position;
+                    }
+                }
+            }
             entity_preview = build_entity_preview(
                 session, animation, animation_ui.scrub_time);
             canvas.entity_world_bounds = entity_preview.bounds;
+        } else {
+            canvas.entity_display_transforms.clear();
         }
         if (textured_path_ui.animate_texture &&
             session.selected_textured_path()) {
@@ -11134,7 +11461,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 running = false;
             }
         }
-        if (animation_e2e && ++animation_ui_e2e_frame >= 4U) {
+        if (animation_e2e && ++animation_ui_e2e_frame >= 7U) {
             const bool saved = session.save();
             fabric::editor::ProjectSession reloaded;
             const bool reopened = saved && reloaded.open(initial_project) &&
@@ -11150,9 +11477,20 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             track.binding.property_id == "rotationDegrees" &&
                             !track.keys.empty();
                     });
+            const bool canvas_auto_key = reopened &&
+                std::ranges::any_of(
+                    reloaded.selected_animation()->tracks,
+                    [](const auto& track) {
+                        return track.binding.node_id == "root" &&
+                            track.binding.component_id == "transform" &&
+                            track.binding.property_id == "position" &&
+                            std::ranges::any_of(track.keys, [](const auto& key) {
+                                return key.time == 0.75F;
+                            });
+                    });
             animation_e2e_complete = animation_e2e_complete &&
                 ui_animation_timeline_seen && ui_animation_quick_key_seen &&
-                rotation_track;
+                rotation_track && canvas_auto_key && animation_ui.curve_view;
             if (!animation_e2e_complete)
                 std::cerr << "Asset Studio Animation workspace E2E failed\n";
             running = false;
