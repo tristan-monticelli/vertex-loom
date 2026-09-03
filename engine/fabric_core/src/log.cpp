@@ -1,7 +1,11 @@
 #include "fabric/core/log.hpp"
 
 #include <chrono>
+#include <atomic>
+#include <cstdint>
 #include <ostream>
+#include <sstream>
+#include <utility>
 
 namespace fabric::core {
 namespace {
@@ -43,7 +47,19 @@ std::string_view to_string(const LogLevel level) noexcept {
     return "unknown";
 }
 
-JsonLineLogger::JsonLineLogger(std::ostream& output) noexcept : output_(output) {}
+std::string make_trace_session_id(const std::string_view prefix) {
+    static std::atomic<std::uint64_t> sequence{};
+    const auto timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()).count();
+    std::ostringstream value;
+    value << (prefix.empty() ? "session" : prefix) << '-' << std::hex
+          << timestamp << '-' << sequence.fetch_add(1, std::memory_order_relaxed);
+    return value.str();
+}
+
+JsonLineLogger::JsonLineLogger(std::ostream& output,
+                               TraceContext context) noexcept
+    : output_(output), context_(std::move(context)) {}
 
 void JsonLineLogger::write(const LogLevel level, const std::string_view category,
                            const std::string_view message,
@@ -58,6 +74,21 @@ void JsonLineLogger::write(const LogLevel level, const std::string_view category
     write_escaped(output_, category);
     output_ << ",\"message\":";
     write_escaped(output_, message);
+    if (!context_.session_id.empty() || !context_.resource_id.empty()) {
+        output_ << ",\"context\":{";
+        bool first_context = true;
+        if (!context_.session_id.empty()) {
+            output_ << "\"sessionId\":";
+            write_escaped(output_, context_.session_id);
+            first_context = false;
+        }
+        if (!context_.resource_id.empty()) {
+            if (!first_context) output_.put(',');
+            output_ << "\"resourceId\":";
+            write_escaped(output_, context_.resource_id);
+        }
+        output_.put('}');
+    }
     output_ << ",\"fields\":{";
 
     bool first = true;

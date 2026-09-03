@@ -8,7 +8,7 @@
     "expectedType": "entity",
     "id": "beam-entity"
   },
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "tracks": [
     {
       "binding": {

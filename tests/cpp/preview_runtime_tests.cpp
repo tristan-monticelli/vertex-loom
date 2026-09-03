@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -27,6 +28,29 @@
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
+
+TEST_CASE("preview runtime diagnostics preserve Studio trace context") {
+    std::ostringstream log;
+    fabric::runtime::PreviewRuntime runtime;
+    CHECK_FALSE(runtime.load({
+        .project_root = std::filesystem::temp_directory_path() /
+            "missing-vertex-loom-trace-project",
+        .map_id = {.value = "trace-map"},
+        .mode = fabric::runtime::RuntimeMode::smoke_test,
+        .trace = {.session_id = "studio-session-42",
+                  .resource_id = "trace-map"},
+        .log_output = &log}));
+    CHECK(runtime.trace_context().session_id == "studio-session-42");
+    CHECK(runtime.trace_context().resource_id == "trace-map");
+    CHECK(log.str().find("\"sessionId\":\"studio-session-42\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"resourceId\":\"trace-map\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"category\":\"runtime.load\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"message\":\"failed\"") !=
+          std::string::npos);
+}
 
 fabric::project::ProjectManifest manifest() {
     return {.schema_version = fabric::project::current_schema_version,

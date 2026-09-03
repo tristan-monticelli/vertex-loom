@@ -2417,6 +2417,8 @@ int run(const std::filesystem::path& project_root,
         const bool scene_e2e = false,
         const bool transformation_e2e = false,
         const bool ui_accessibility_test = false) {
+    const auto trace_session_id =
+        fabric::core::make_trace_session_id("map-studio");
     const int graphical_failure =
         (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test)
             ? 77 : 1;
@@ -2607,7 +2609,10 @@ int run(const std::filesystem::path& project_root,
             const bool loaded = authored && preview_runtime.load({
                 .project_root = project_root,
                 .map_id = map_id,
-                .mode = fabric::runtime::RuntimeMode::smoke_test});
+                .mode = fabric::runtime::RuntimeMode::smoke_test,
+                .trace = {.session_id = trace_session_id,
+                          .resource_id = map_id.value},
+                .log_output = &std::clog});
             const bool transformed = loaded && preview_runtime.transform_instance(
                 "rotating-platform-instance", transformation.document.id);
             const auto destination = transformed
@@ -3750,7 +3755,10 @@ int run(const std::filesystem::path& project_root,
                     const bool loaded = preview_runtime.load({
                         .project_root = session.project_root(),
                         .map_id = map.document.id,
-                        .mode = fabric::runtime::RuntimeMode::smoke_test});
+                        .mode = fabric::runtime::RuntimeMode::smoke_test,
+                        .trace = {.session_id = trace_session_id,
+                                  .resource_id = map.document.id.value},
+                        .log_output = &std::clog});
                     const bool transformed = loaded &&
                         preview_runtime.transform_instance(
                             selected_id.value,

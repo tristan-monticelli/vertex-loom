@@ -39,6 +39,23 @@ struct RuntimePacketBounds {
     core::Vec2 maximum;
 };
 
+struct RuntimeTraceCompletion {
+    core::JsonLineLogger* logger{};
+    std::string_view category;
+    const std::vector<std::string>* errors{};
+    const PreviewRuntimeStats* stats{};
+    bool success{};
+
+    ~RuntimeTraceCompletion() {
+        if (!logger) return;
+        const auto error_count = std::to_string(errors ? errors->size() : 0U);
+        const auto frames = std::to_string(stats ? stats->frames : 0U);
+        logger->write(success ? core::LogLevel::info : core::LogLevel::error,
+                      category, success ? "completed" : "failed",
+                      {{"errorCount", error_count}, {"frames", frames}});
+    }
+};
+
 struct PreviewRuntime::Impl {
     struct TextureSource {
         std::filesystem::path path;
@@ -147,6 +164,7 @@ struct PreviewRuntime::Impl {
     std::filesystem::path project_root;
     const project::ProjectManifest* manifest{};
     std::vector<std::string>* errors{};
+    std::unique_ptr<core::JsonLineLogger> logger;
 
     [[nodiscard]] bool transform_entity_instance(
         const std::string& instance_id,
@@ -1002,6 +1020,20 @@ PreviewRuntime::~PreviewRuntime() {
 
 bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     options_ = options;
+    if (options_.trace.session_id.empty())
+        options_.trace.session_id = core::make_trace_session_id("runtime");
+    if (options_.trace.resource_id.empty())
+        options_.trace.resource_id = options_.scene_id
+            ? options_.scene_id->value : options_.map_id.value;
+    impl_->logger.reset();
+    if (options_.log_output)
+        impl_->logger = std::make_unique<core::JsonLineLogger>(
+            *options_.log_output, options_.trace);
+    RuntimeTraceCompletion trace{
+        .logger = impl_->logger.get(), .category = "runtime.load",
+        .errors = &errors_, .stats = &stats_};
+    if (impl_->logger)
+        impl_->logger->write(core::LogLevel::info, "runtime.load", "started");
     manifest_.reset();
     scene_.reset();
     map_.reset();
@@ -1836,10 +1868,16 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                  instance.transform.position.y - 0.5F},
                 {1.0F, 1.0F}}));
     }
+    trace.success = true;
     return true;
 }
 
 bool PreviewRuntime::run() {
+    RuntimeTraceCompletion trace{
+        .logger = impl_->logger.get(), .category = "runtime.run",
+        .errors = &errors_, .stats = &stats_};
+    if (impl_->logger)
+        impl_->logger->write(core::LogLevel::info, "runtime.run", "started");
     if (!loaded()) return false;
     SDL_SetMainReady();
     const auto sdl_flags = SDL_INIT_VIDEO |
@@ -2536,6 +2574,7 @@ bool PreviewRuntime::run() {
                 static_cast<double>(frame_times_ms.size()) * 0.95)) - 1U);
         stats_.p95_frame_ms = frame_times_ms[index];
     }
+    trace.success = true;
     return true;
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fabric/core/log.hpp"
 #include "fabric/core/resource_id.hpp"
 #include "fabric/physics/physics_world.hpp"
 #include "fabric/physics/mechanic_simulation.hpp"
@@ -63,6 +64,8 @@ struct PreviewRuntimeOptions {
     std::int32_t width{1440};
     std::int32_t height{900};
     std::size_t frame_limit{};
+    core::TraceContext trace;
+    std::ostream* log_output{};
 };
 
 struct PreviewRuntimeStats {
@@ -131,6 +134,9 @@ public:
         return errors_;
     }
     [[nodiscard]] const PreviewRuntimeStats& stats() const noexcept { return stats_; }
+    [[nodiscard]] const core::TraceContext& trace_context() const noexcept {
+        return options_.trace;
+    }
     [[nodiscard]] const std::map<std::string, project::ProgressValue>&
     progress_properties() const noexcept {
         return options_.progress_properties;
