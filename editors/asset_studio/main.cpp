@@ -1426,6 +1426,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     static std::optional<fabric::editor::StudioResource> duplicate_options_request;
     static std::vector<fabric::editor::StudioResource> duplicate_candidates;
     static std::vector<char> duplicate_candidate_selected;
+    static std::vector<fabric::editor::StudioResource> selected_visuals;
     bool open_delete_popup = false;
     bool open_rename_popup = false;
     bool open_duplicate_options_popup = false;
@@ -1453,10 +1454,18 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             duplicate_candidate_selected.assign(duplicate_candidates.size(), false);
             open_duplicate_options_popup = true;
         };
-    const auto request_entity_from_visual =
-        [&](const fabric::editor::StudioResource& resource) {
+    std::erase_if(selected_visuals, [&](const auto& selected) {
+        return std::ranges::none_of(session.resources(), [&](const auto& resource) {
+            return resource.kind == selected.kind && resource.id == selected.id;
+        });
+    });
+    const auto request_entity_from_visuals =
+        [&](const std::vector<fabric::editor::StudioResource>& resources) {
+            if (resources.empty()) return;
+            const auto& resource = resources.front();
             fabric::editor::CreateEntityPrompt prompt;
-            const auto base_name = resource.name + " Entity";
+            const auto base_name = resources.size() == 1U
+                ? resource.name + " Entity" : "Composed Entity";
             prompt.name = base_name;
             for (std::size_t suffix = 2U; std::ranges::any_of(
                      session.resources(), [&](const auto& candidate) {
@@ -1473,10 +1482,27 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                       fabric::editor::StudioResourceKind::visual_component
                 ? fabric::project::EntityDrawableKind::visual_component
                 : fabric::project::EntityDrawableKind::vector;
+            for (std::size_t index = 1U; index < resources.size(); ++index) {
+                const auto& selected = resources[index];
+                prompt.blocks.push_back({
+                    .name = selected.name,
+                    .drawable = selected.kind ==
+                            fabric::editor::StudioResourceKind::texture
+                        ? fabric::project::EntityDrawableKind::texture
+                        : selected.kind ==
+                              fabric::editor::StudioResourceKind::visual_component
+                        ? fabric::project::EntityDrawableKind::visual_component
+                        : fabric::project::EntityDrawableKind::vector,
+                    .resource_id = selected.id.value,
+                    .z_order = static_cast<float>(index),
+                });
+            }
             creation.prepared_entity = std::move(prompt);
             creation.guided_contextual_entity = true;
             creation.request_entity = true;
-            status = "Create an Entity from the selected visual.";
+            status = resources.size() == 1U
+                ? "Create an Entity from the selected visual."
+                : "Create an Entity from the selected visuals.";
         };
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
@@ -1493,9 +1519,16 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     ImGui::SameLine();
     ImGui::TextDisabled("generated paths, borders and compositions");
     if (const auto* selected = session.selected_resource()) {
-        if (is_entity_artwork_kind(selected->kind) &&
-            ImGui::Button("Create Entity from visual"))
-            request_entity_from_visual(*selected);
+        if (is_entity_artwork_kind(selected->kind) && selected_visuals.empty())
+            selected_visuals.push_back(*selected);
+        if (!selected_visuals.empty()) {
+            const auto label = selected_visuals.size() == 1U
+                ? std::string{"Create Entity from visual"}
+                : "Create Entity from " +
+                      std::to_string(selected_visuals.size()) + " visuals";
+            if (ImGui::Button(label.c_str()))
+                request_entity_from_visuals(selected_visuals);
+        }
         if (is_entity_artwork_kind(selected->kind)) same_line_if_room();
         if (ImGui::Button("Duplicate")) {
             const auto resource = *selected;
@@ -1560,9 +1593,32 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             const auto* selected = session.selected_resource();
             const bool is_selected = selected != nullptr &&
                 selected->kind == resource.kind && selected->id == resource.id;
+            const bool is_visual_selected = std::ranges::any_of(
+                selected_visuals, [&](const auto& candidate) {
+                    return candidate.kind == resource.kind &&
+                        candidate.id == resource.id;
+                });
             const std::string item_label = resource.name + "##resource-row-" +
                 resource.id.value;
-            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
+            if (ImGui::Selectable(item_label.c_str(),
+                                  is_entity_artwork_kind(resource.kind)
+                                      ? is_visual_selected : is_selected)) {
+                const bool additive = ImGui::GetIO().KeyCtrl ||
+                    ImGui::GetIO().KeySuper;
+                if (is_entity_artwork_kind(resource.kind)) {
+                    const auto found = std::ranges::find_if(
+                        selected_visuals, [&](const auto& candidate) {
+                            return candidate.kind == resource.kind &&
+                                candidate.id == resource.id;
+                        });
+                    if (!additive) selected_visuals.clear();
+                    if (additive && found != selected_visuals.end())
+                        selected_visuals.erase(found);
+                    else
+                        selected_visuals.push_back(resource);
+                } else {
+                    selected_visuals.clear();
+                }
                 select_and_preview_resource(session, resource, preview, status);
             }
             if (ui_drag_probe_enabled && resource.id.value == "beam-border") {
@@ -1586,7 +1642,7 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::BeginPopupContextItem()) {
                 if (is_entity_artwork_kind(resource.kind) &&
                     ImGui::MenuItem("Create Entity from this visual"))
-                    request_entity_from_visual(resource);
+                    request_entity_from_visuals({resource});
                 if (is_entity_artwork_kind(resource.kind)) ImGui::Separator();
                 if (ImGui::MenuItem("Duplicate")) {
                     duplicate_request = resource;
@@ -5919,7 +5975,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             fabric::project::VisualComponentInstance{};
                     const auto added_ok = session.add_selected_entity_node(
                         std::move(added));
-                    if (added_ok) canvas.selected_node = entity.nodes.size() - 1U;
+                    if (added_ok) {
+                        canvas.selected_node = entity.nodes.size() - 1U;
+                        canvas.selected_entity_nodes = {canvas.selected_node};
+                    }
                     return added_ok;
                 };
             ImGui::SeparatorText("Entity behavior");
@@ -5975,6 +6034,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         .id = "node-1", .name = "Node 1"};
                     if (session.add_selected_entity_node(std::move(new_node))) {
                         canvas.selected_node = 0U;
+                        canvas.selected_entity_nodes = {0U};
                         status = "Entity root node added.";
                     } else {
                         status = "Entity node rejected; inspect diagnostics.";
@@ -6022,7 +6082,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     new_node.id += "-copy";
                 }
                 if (session.add_selected_entity_node(std::move(new_node))) {
-                    canvas.selected_node = entity.nodes.size();
+                    canvas.selected_node = entity.nodes.size() - 1U;
+                    canvas.selected_entity_nodes = {canvas.selected_node};
                     status = "Entity child added.";
                 } else {
                     status = "Entity node rejected; inspect diagnostics.";
@@ -6058,7 +6119,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SameLine();
             if (ImGui::Button("Duplicate")) {
                 if (session.duplicate_selected_entity_node(canvas.selected_node)) {
-                    canvas.selected_node = entity.nodes.size();
+                    canvas.selected_node = entity.nodes.size() - 1U;
+                    canvas.selected_entity_nodes = {canvas.selected_node};
                     status = "Entity node duplicated.";
                 } else {
                     status = "Entity node rejected; inspect diagnostics.";
@@ -6069,6 +6131,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 session.move_selected_entity_node(
                     canvas.selected_node, canvas.selected_node - 1U)) {
                 --canvas.selected_node;
+                canvas.selected_entity_nodes = {canvas.selected_node};
                 status = "Entity node moved.";
             }
             ImGui::SameLine();
@@ -6077,6 +6140,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 session.move_selected_entity_node(
                     canvas.selected_node, canvas.selected_node + 1U)) {
                 ++canvas.selected_node;
+                canvas.selected_entity_nodes = {canvas.selected_node};
                 status = "Entity node moved.";
             }
             ImGui::SameLine();
@@ -6098,6 +6162,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     session.remove_selected_entity_node(canvas.selected_node)) {
                     canvas.selected_node = canvas.selected_node == 0U
                         ? 0U : canvas.selected_node - 1U;
+                    canvas.selected_entity_nodes = {canvas.selected_node};
                     status = "Entity node deleted.";
                     ImGui::CloseCurrentPopup();
                 }
@@ -6106,24 +6171,64 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
                 ImGui::EndPopup();
             }
-            for (std::size_t node_index = 0; node_index < entity.nodes.size();
-                 ++node_index) {
-                ImGui::PushID(entity.nodes[node_index].id.c_str());
-                const auto label = entity.nodes[node_index].name + "##entity-node-" +
-                    entity.nodes[node_index].id;
-                if (ImGui::Selectable(label.c_str(),
-                                      canvas.selected_node == node_index)) {
-                    canvas.selected_node = node_index;
-                }
-                if (ui_drag_probe_enabled && ui_drag_target_mode == 0 &&
-                    entity.nodes[node_index].id == "root") {
+            ImGui::TextDisabled("Cmd/Ctrl-click selects several nodes; drag a node onto another to reparent it.");
+            const std::function<void(const std::optional<std::string>&)>
+                draw_entity_children = [&](const auto& parent_id) {
+                for (std::size_t node_index = 0;
+                     node_index < entity.nodes.size(); ++node_index) {
+                    const auto& candidate = entity.nodes[node_index];
+                    if (candidate.parent != parent_id) continue;
+                    ImGui::PushID(candidate.id.c_str());
+                    const bool has_children = std::ranges::any_of(
+                        entity.nodes, [&](const auto& child) {
+                            return child.parent && *child.parent == candidate.id;
+                        });
+                    const bool selected_in_group = std::ranges::find(
+                        canvas.selected_entity_nodes, node_index) !=
+                        canvas.selected_entity_nodes.end();
+                    auto flags = ImGuiTreeNodeFlags_OpenOnArrow |
+                        ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                        ImGuiTreeNodeFlags_SpanAvailWidth;
+                    if (!has_children) flags |= ImGuiTreeNodeFlags_Leaf;
+                    if (selected_in_group) flags |= ImGuiTreeNodeFlags_Selected;
+                    const bool open = ImGui::TreeNodeEx(candidate.name.c_str(), flags);
+                    if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+                        const bool additive = ImGui::GetIO().KeyCtrl ||
+                            ImGui::GetIO().KeySuper;
+                        const auto found = std::ranges::find(
+                            canvas.selected_entity_nodes, node_index);
+                        if (additive &&
+                            found != canvas.selected_entity_nodes.end() &&
+                            canvas.selected_entity_nodes.size() > 1U) {
+                            canvas.selected_entity_nodes.erase(found);
+                            canvas.selected_node =
+                                canvas.selected_entity_nodes.back();
+                        } else {
+                            if (!additive)
+                                canvas.selected_entity_nodes.clear();
+                            if (std::ranges::find(
+                                    canvas.selected_entity_nodes, node_index) ==
+                                canvas.selected_entity_nodes.end())
+                                canvas.selected_entity_nodes.push_back(node_index);
+                            canvas.selected_node = node_index;
+                        }
+                    }
+                    if (!candidate.locked && ImGui::BeginDragDropSource()) {
+                        ImGui::SetDragDropPayload("VERTEX_LOOM_ENTITY_NODE",
+                                                  &node_index,
+                                                  sizeof(node_index));
+                        ImGui::Text("Move %s", candidate.name.c_str());
+                        ImGui::EndDragDropSource();
+                    }
+                    if (ui_drag_probe_enabled && ui_drag_target_mode == 0 &&
+                        candidate.id == "root") {
                     const auto minimum = ImGui::GetItemRectMin();
                     const auto maximum = ImGui::GetItemRectMax();
                     ui_drag_target_screen = {(minimum.x + maximum.x) * 0.5F,
                                              (minimum.y + maximum.y) * 0.5F};
                     ui_drag_target_seen = true;
-                }
-                if (ImGui::BeginDragDropTarget()) {
+                    }
+                    if (ImGui::BeginDragDropTarget()) {
                     if (const auto* payload = ImGui::AcceptDragDropPayload(
                             "VERTEX_LOOM_RESOURCE");
                         payload && payload->DataSize == sizeof(ResourceDragPayload)) {
@@ -6131,6 +6236,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                 node_index,
                                 *static_cast<const ResourceDragPayload*>(payload->Data))) {
                             canvas.selected_node = node_index;
+                            canvas.selected_entity_nodes = {node_index};
                             if (ui_drag_probe_enabled && ui_drag_target_mode == 0 &&
                                 entity.nodes[node_index].id == "root")
                                 ui_drag_probe_applied = true;
@@ -6145,10 +6251,37 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             status = "Artwork kind cannot be used on an entity node.";
                         }
                     }
+                    if (const auto* payload = ImGui::AcceptDragDropPayload(
+                            "VERTEX_LOOM_ENTITY_NODE");
+                        payload && payload->DataSize == sizeof(std::size_t)) {
+                        const auto moved_index =
+                            *static_cast<const std::size_t*>(payload->Data);
+                        if (moved_index != node_index &&
+                            moved_index < entity.nodes.size()) {
+                            auto moved = entity.nodes[moved_index];
+                            moved.parent = candidate.id;
+                            status = session.set_selected_entity_node(
+                                moved_index, std::move(moved))
+                                ? "Entity node reparented."
+                                : "Reparenting rejected; a hierarchy cycle is not allowed.";
+                        }
+                    }
                     ImGui::EndDragDropTarget();
+                    }
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%s%s", candidate.id.c_str(),
+                                        candidate.locked ? " · locked" : "");
+                    if (open) {
+                        draw_entity_children(candidate.id);
+                        ImGui::TreePop();
+                    }
+                    ImGui::PopID();
                 }
-                ImGui::PopID();
-            }
+            };
+            draw_entity_children(std::nullopt);
+            if (canvas.selected_entity_nodes.size() > 1U)
+                ImGui::Text("%zu nodes selected · canvas moves them together",
+                            canvas.selected_entity_nodes.size());
             auto node = entity.nodes[canvas.selected_node];
             const auto commit_entity_node =
                 [&](fabric::project::EntityNode changed) {
@@ -6282,8 +6415,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         ? "texture"
                         : kind == fabric::project::EntityDrawableKind::vector
                         ? "vector" : "visualComponent";
+                    const bool reference_exists = changed.drawable.resource &&
+                        std::ranges::any_of(
+                            session.resources(), [&](const auto& resource) {
+                                return resource.kind == resource_kind &&
+                                    resource.id == changed.drawable.resource->id;
+                            });
                     if (!changed.drawable.resource ||
-                        changed.drawable.resource->expected_type != expected)
+                        changed.drawable.resource->expected_type != expected ||
+                        !reference_exists)
                         changed.drawable.resource =
                             fabric::project::ResourceReference{first->id, expected};
                     if (kind == fabric::project::EntityDrawableKind::visual_component) {
@@ -6296,6 +6436,34 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     return true;
                 };
+            if (node.drawable.kind !=
+                    fabric::project::EntityDrawableKind::none &&
+                node.drawable.resource) {
+                const auto expected_kind = node.drawable.kind ==
+                        fabric::project::EntityDrawableKind::texture
+                    ? fabric::editor::StudioResourceKind::texture
+                    : node.drawable.kind ==
+                          fabric::project::EntityDrawableKind::vector
+                    ? fabric::editor::StudioResourceKind::vector
+                    : fabric::editor::StudioResourceKind::visual_component;
+                const bool reference_exists = std::ranges::any_of(
+                    session.resources(), [&](const auto& resource) {
+                        return resource.kind == expected_kind &&
+                            resource.id == node.drawable.resource->id;
+                    });
+                if (!reference_exists) {
+                    ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
+                                       "Missing %s: %s",
+                                       studio_resource_kind_label(expected_kind).data(),
+                                       node.drawable.resource->id.value.c_str());
+                    if (ImGui::Button("Repair with first compatible resource")) {
+                        if (apply_drawable_kind(node, node.drawable.kind))
+                            commit_entity_node(node);
+                        else
+                            status = "No compatible resource is available for repair.";
+                    }
+                }
+            }
             if (ImGui::BeginCombo("Kind", drawable_label.c_str())) {
                 for (const auto kind : {
                          fabric::project::EntityDrawableKind::none,
@@ -9606,11 +9774,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool entity_gizmo_e2e_active = false;
     std::size_t entity_gizmo_e2e_frame = 0U;
     fabric::core::Vec2 entity_gizmo_e2e_initial_position{};
+    fabric::core::Vec2 entity_gizmo_e2e_secondary_position{};
     if (entity_e2e && entity_e2e_complete && session.selected_entity() &&
         session.selected_entity()->nodes.size() > 1U) {
         canvas.selected_node = 1U;
+        canvas.selected_entity_id =
+            session.selected_entity()->document.id.value;
+        canvas.selected_entity_nodes = {1U, 2U};
         entity_gizmo_e2e_initial_position =
             session.selected_entity()->nodes[1].transform.position;
+        entity_gizmo_e2e_secondary_position =
+            session.selected_entity()->nodes[2].transform.position;
         entity_gizmo_e2e_active = true;
     }
 
@@ -10945,7 +11119,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     canvas.xpbd_overlay_visible &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=
-                        entity_gizmo_e2e_initial_position.x;
+                        entity_gizmo_e2e_initial_position.x &&
+                    reloaded.selected_entity()->nodes[2].transform.position.x !=
+                        entity_gizmo_e2e_secondary_position.x;
                 entity_e2e_complete = entity_e2e_complete &&
                     reloaded.selected_entity()->animation_state_machine &&
                     !reloaded.selected_entity()->animation_state_machine

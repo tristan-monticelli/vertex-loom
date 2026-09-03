@@ -66,3 +66,10 @@ existantes. Le modèle Entity v4, AnimationClip v3 et les commandes de session
 restent la source de vérité. La timeline textuelle actuelle peut servir de
 fallback avancé pendant la transition, mais ne constitue plus le parcours
 nominal.
+
+La sélection multiple Entity reste un état d'interface ; elle ne change aucun
+schéma. Une transformation de groupe remplace l'Entity validée dans une seule
+commande undoable. L'arbre utilise les identifiants persistés pour afficher la
+parenté, mais toutes ses mutations passent par les indices résolus de la session
+et sont refusées si elles créent un cycle. La création depuis plusieurs visuels
+réutilise les `EntityCreationBlock` existants et ne copie pas les ressources.

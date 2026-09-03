@@ -60,10 +60,20 @@ clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
 tangentes, composition additive et segment A→B sont avancés, jamais requis pour
 la première animation. Voir ADR-0147.
 
-La première tranche conserve le layout desktop existant et matérialise le dock
+La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
+vectoriels ou composants. `Create Entity from N visuals` publie alors la racine
+et ses blocs enfants en une seule transition. Dans l'Entity, l'arbre récursif,
+le canvas et l'inspecteur partagent une sélection primaire et un groupe. Un
+drag de nœud change son parent après validation de cycle ; un drag du gizmo
+déplace atomiquement tous les nœuds sélectionnés non verrouillés. Changer
+d'Entity réinitialise la sélection sur sa racine afin d'éviter un index hérité.
+Une référence drawable absente propose une réparation limitée au même type de
+ressource et ne choisit jamais un type incompatible.
+
+Le layout desktop conserve le triptyque existant et matérialise le dock
 Timeline sous le canvas lorsqu'un clip est actif. L'action contextuelle de
-l'explorateur prépare l'Entity depuis le visuel courant ; elle ne duplique ni ne
-convertit la ressource source. Le dock rend les pistes et clés sur un axe de
+l'explorateur prépare l'Entity depuis les visuels courants ; elle ne duplique ni
+ne convertit les ressources sources. Le dock rend les pistes et clés sur un axe de
 temps manipulable et réutilise les commandes undoables de `ProjectSession`.
 La lecture, le scrub et le déplacement des clés restent des états d'interface ;
 seule une commande de clé validée modifie le document.

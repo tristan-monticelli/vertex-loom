@@ -129,41 +129,115 @@ void draw_packet_preview_canvas(
                         canvas.zoom * 100.0F);
     if (editable_session && editable_session->selected_entity() &&
         canvas.selected_node < editable_session->selected_entity()->nodes.size()) {
-        const auto& node = editable_session->selected_entity()->nodes[
-            canvas.selected_node];
-        const auto gizmo = to_screen(node.transform.position);
-        canvas.entity_gizmo_screen = gizmo;
-        draw_list->AddLine({gizmo.x - 12.0F, gizmo.y},
-                           {gizmo.x + 12.0F, gizmo.y},
-                           IM_COL32(100, 210, 255, 230), 2.0F);
-        draw_list->AddLine({gizmo.x, gizmo.y - 12.0F},
-                           {gizmo.x, gizmo.y + 12.0F},
-                           IM_COL32(100, 210, 255, 230), 2.0F);
-        draw_list->AddCircleFilled(gizmo, 5.0F,
-                                   IM_COL32(100, 210, 255, 255));
+        const auto& entity = *editable_session->selected_entity();
+        if (canvas.selected_entity_id != entity.document.id.value) {
+            canvas.selected_entity_id = entity.document.id.value;
+            canvas.selected_node = 0U;
+            canvas.selected_entity_nodes = {0U};
+        }
+        std::erase_if(canvas.selected_entity_nodes, [&](const auto index) {
+            return index >= entity.nodes.size();
+        });
+        if (std::ranges::find(canvas.selected_entity_nodes,
+                              canvas.selected_node) ==
+            canvas.selected_entity_nodes.end())
+            canvas.selected_entity_nodes.push_back(canvas.selected_node);
+
+        std::optional<std::size_t> clicked_node;
+        float clicked_distance = 15.0F;
         const bool canvas_hovered = ImGui::IsMouseHoveringRect(
             origin, {origin.x + available.x, origin.y + available.y});
-        if (canvas_hovered && !node.locked &&
-            ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
-            std::hypot(ImGui::GetIO().MousePos.x - gizmo.x,
-                       ImGui::GetIO().MousePos.y - gizmo.y) <= 14.0F) {
-            canvas.entity_gizmo_dragging = true;
-            canvas.entity_gizmo_start_mouse = ImGui::GetIO().MousePos;
-            canvas.entity_gizmo_start_transform = node.transform;
+        if (canvas_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            const auto primary = to_screen(
+                entity.nodes[canvas.selected_node].transform.position);
+            if (std::hypot(ImGui::GetIO().MousePos.x - primary.x,
+                           ImGui::GetIO().MousePos.y - primary.y) <= 14.0F) {
+                clicked_node = canvas.selected_node;
+                clicked_distance = -1.0F;
+            }
+        }
+        for (std::size_t index = 0; index < entity.nodes.size(); ++index) {
+            const auto& candidate = entity.nodes[index];
+            const auto gizmo = to_screen(candidate.transform.position);
+            const bool selected = std::ranges::find(
+                canvas.selected_entity_nodes, index) !=
+                canvas.selected_entity_nodes.end();
+            const auto color = selected
+                ? IM_COL32(100, 210, 255, 255)
+                : IM_COL32(145, 155, 170, 210);
+            draw_list->AddLine({gizmo.x - 10.0F, gizmo.y},
+                               {gizmo.x + 10.0F, gizmo.y}, color,
+                               selected ? 2.0F : 1.0F);
+            draw_list->AddLine({gizmo.x, gizmo.y - 10.0F},
+                               {gizmo.x, gizmo.y + 10.0F}, color,
+                               selected ? 2.0F : 1.0F);
+            draw_list->AddCircleFilled(gizmo, selected ? 5.0F : 4.0F, color);
+            if (index == canvas.selected_node)
+                canvas.entity_gizmo_screen = gizmo;
+            const float distance = std::hypot(
+                ImGui::GetIO().MousePos.x - gizmo.x,
+                ImGui::GetIO().MousePos.y - gizmo.y);
+            if (canvas_hovered &&
+                ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                distance <= 14.0F &&
+                clicked_distance >= 0.0F &&
+                (distance < clicked_distance ||
+                 (distance == clicked_distance &&
+                  index == canvas.selected_node))) {
+                clicked_node = index;
+                clicked_distance = distance;
+            }
+        }
+        if (clicked_node) {
+            const bool additive = ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper;
+            const auto found = std::ranges::find(canvas.selected_entity_nodes,
+                                                 *clicked_node);
+            if (additive && found != canvas.selected_entity_nodes.end() &&
+                canvas.selected_entity_nodes.size() > 1U) {
+                canvas.selected_entity_nodes.erase(found);
+                canvas.selected_node = canvas.selected_entity_nodes.back();
+            } else {
+                if (!additive && found == canvas.selected_entity_nodes.end())
+                    canvas.selected_entity_nodes.clear();
+                if (std::ranges::find(canvas.selected_entity_nodes,
+                                      *clicked_node) ==
+                    canvas.selected_entity_nodes.end())
+                    canvas.selected_entity_nodes.push_back(*clicked_node);
+                canvas.selected_node = *clicked_node;
+            }
+            const auto& node = entity.nodes[canvas.selected_node];
+            if (!node.locked) {
+                canvas.entity_gizmo_dragging = true;
+                canvas.entity_gizmo_start_mouse = ImGui::GetIO().MousePos;
+                canvas.entity_gizmo_start_transform = node.transform;
+                canvas.entity_gizmo_start_transforms.clear();
+                for (const auto index : canvas.selected_entity_nodes)
+                    if (!entity.nodes[index].locked)
+                        canvas.entity_gizmo_start_transforms.push_back(
+                            {index, entity.nodes[index].transform});
+            }
         }
         if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
             canvas.entity_gizmo_dragging = false;
-        if (canvas.entity_gizmo_dragging && !node.locked) {
+        if (canvas.entity_gizmo_dragging &&
+            !canvas.entity_gizmo_start_transforms.empty()) {
             const ImVec2 delta{
                 ImGui::GetIO().MousePos.x - canvas.entity_gizmo_start_mouse.x,
                 ImGui::GetIO().MousePos.y - canvas.entity_gizmo_start_mouse.y};
             const auto scale = std::max(0.01F, pixels_per_unit);
-            auto changed = node;
-            changed.transform = canvas.entity_gizmo_start_transform;
-            changed.transform.position.x += delta.x / scale;
-            changed.transform.position.y -= delta.y / scale;
-            if (editable_session->set_selected_entity_node(
-                    canvas.selected_node, std::move(changed)))
+            std::vector<std::pair<std::size_t, fabric::project::EntityNode>>
+                changed_nodes;
+            changed_nodes.reserve(canvas.entity_gizmo_start_transforms.size());
+            for (const auto& [index, transform] :
+                 canvas.entity_gizmo_start_transforms) {
+                auto changed = entity.nodes[index];
+                changed.transform = transform;
+                changed.transform.position.x += delta.x / scale;
+                changed.transform.position.y -= delta.y / scale;
+                changed_nodes.emplace_back(index, std::move(changed));
+            }
+            if (editable_session->set_selected_entity_nodes(
+                    std::move(changed_nodes)))
                 ImGui::SetTooltip("Move node · %.2f, %.2f",
                                   delta.x / scale, -delta.y / scale);
         }

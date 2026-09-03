@@ -39,6 +39,8 @@ struct CanvasUiState {
     float zoom{1.0F};
     ImVec2 pan{};
     std::size_t selected_node{};
+    std::string selected_entity_id;
+    std::vector<std::size_t> selected_entity_nodes;
     bool native_canvas{};
     Tool tool{Tool::move};
     fabric::editor::BezierHandleMode bezier_handle_mode{
@@ -53,6 +55,8 @@ struct CanvasUiState {
     ImVec2 entity_gizmo_screen{};
     bool xpbd_overlay_visible{};
     fabric::core::Transform entity_gizmo_start_transform;
+    std::vector<std::pair<std::size_t, fabric::core::Transform>>
+        entity_gizmo_start_transforms;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;
     std::optional<fabric::project::VectorNode> pen_start_node;

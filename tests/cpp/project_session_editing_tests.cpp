@@ -1448,6 +1448,22 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
         .id = "child", .name = "Child", .parent = "root"};
     REQUIRE(session.add_selected_entity_node(child, start));
     REQUIRE(session.selected_entity()->nodes.size() == 2U);
+    auto moved_root = session.selected_entity()->nodes[0];
+    auto moved_child = session.selected_entity()->nodes[1];
+    moved_root.transform.position.x += 3.0F;
+    moved_child.transform.position.x += 3.0F;
+    REQUIRE(session.set_selected_entity_nodes(
+        {{0U, moved_root}, {1U, moved_child}}, start));
+    CHECK(session.selected_entity()->nodes[0].transform.position.x == 5.0F);
+    CHECK(session.selected_entity()->nodes[1].transform.position.x == 3.0F);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_entity()->nodes[0].transform.position.x == 2.0F);
+    CHECK(session.selected_entity()->nodes[1].transform.position.x == 0.0F);
+    REQUIRE(session.redo(start));
+    auto invalid_group = moved_child;
+    invalid_group.parent = "child";
+    CHECK_FALSE(session.set_selected_entity_nodes(
+        {{1U, invalid_group}, {1U, moved_child}}, start));
     CHECK_FALSE(session.remove_selected_entity_node(0, start));
     REQUIRE(session.duplicate_selected_entity_node(0, start));
     REQUIRE(session.selected_entity()->nodes.size() == 3U);
@@ -1479,6 +1495,37 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
             *session.manifest(), session.selected_entity()->document.id));
     REQUIRE(loaded.ok());
     CHECK(*loaded.entity == *session.selected_entity());
+}
+
+TEST_CASE("entity prompt composes several selected visuals in one action") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Body visual";
+    REQUIRE(session.create_vector_artwork(artwork));
+    artwork.name = "Shadow visual";
+    REQUIRE(session.create_vector_artwork(artwork));
+
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Composed character";
+    prompt.node_name = "Body visual";
+    prompt.drawable = fabric::project::EntityDrawableKind::vector;
+    prompt.resource_id = "body-visual";
+    prompt.blocks = {{.name = "Shadow visual",
+                      .drawable = fabric::project::EntityDrawableKind::vector,
+                      .resource_id = "shadow-visual",
+                      .z_order = 1.0F}};
+    REQUIRE(session.create_entity(prompt));
+
+    REQUIRE(session.selected_entity()->nodes.size() == 2U);
+    CHECK(session.selected_entity()->nodes[0].drawable.resource->id.value ==
+          "body-visual");
+    REQUIRE(session.selected_entity()->nodes[1].parent.has_value());
+    CHECK(*session.selected_entity()->nodes[1].parent == "root");
+    CHECK(session.selected_entity()->nodes[1].drawable.resource->id.value ==
+          "shadow-visual");
 }
 
 TEST_CASE("entity artwork destinations cover existing root and new root or child nodes") {

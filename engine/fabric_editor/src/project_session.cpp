@@ -2852,6 +2852,47 @@ bool ProjectSession::set_selected_entity_node(
     return true;
 }
 
+bool ProjectSession::set_selected_entity_nodes(
+    std::vector<std::pair<std::size_t, project::EntityNode>> nodes,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || nodes.empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select one or more entity nodes before editing them"}};
+        return false;
+    }
+    auto candidate = *selected_entity_;
+    std::vector<bool> visited(candidate.nodes.size(), false);
+    for (auto& [index, node] : nodes) {
+        if (index >= candidate.nodes.size() || visited[index]) {
+            errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                        "entity node selection contains an invalid or duplicate index"}};
+            return false;
+        }
+        visited[index] = true;
+        candidate.nodes[index] = std::move(node);
+    }
+    const auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing an entity",
+            now)) return false;
+    if (!commands_.execute(
+            std::make_unique<ReplaceValueCommand<project::EntityDefinition>>(
+                *selected_entity_, std::move(candidate)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "cannot execute the entity node group modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_entity_behavior(
     std::optional<project::ResourceReference> behavior,
     const AutosaveScheduler::Clock::time_point now) {

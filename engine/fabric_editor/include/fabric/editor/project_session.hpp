@@ -171,6 +171,10 @@ public:
         std::size_t node_index, project::EntityNode node,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool set_selected_entity_nodes(
+        std::vector<std::pair<std::size_t, project::EntityNode>> nodes,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_entity_behavior(
         std::optional<project::ResourceReference> behavior,
         AutosaveScheduler::Clock::time_point now =
