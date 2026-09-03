@@ -124,10 +124,11 @@ explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
 échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
 graphique et ne ferme aucune case de couverture visuelle.
 
-Le smoke OpenGL des profils shader vérifie quatre invariants pixels : `Thread`
-ne conserve aucune dominante du PNG avec une teinte blanche neutre, la couleur
-holographique reste inactive à `0`, l'holographie utilise seulement la couleur
-choisie à `1`, et `Keep image colors` restitue les canaux du PNG. Il contrôle
+Le smoke OpenGL des profils shader vérifie quatre invariants pixels : le mode
+`Source intacte` avec teinte, holographie et shine à zéro restitue les canaux et
+l'alpha utiles du PNG, la couleur holographique reste inactive à `0`,
+l'holographie utilise seulement la couleur choisie à `1`, et `Recoloration`
+utilise seulement la couleur utilisateur. Il contrôle
 aussi un gain de shine identique sur deux texels distincts et produit
 `build/test-artifacts/fabric-render-shader-smoke.ppm` pour inspection isolée. La seule présence des
 paramètres dans un draw packet ou un document JSON ne constitue pas une preuve

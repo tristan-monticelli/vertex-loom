@@ -1,0 +1,177 @@
+# Audit des assets et comparaison multi-moteurs — 2026-09-03
+
+## Portée et méthode
+
+Audit statique du dépôt au 3 septembre 2026, complété par les tests nommés
+ci-dessous et par les documentations officielles du registre de sources.
+`Implémenté` exige un contrat, un parcours d'authoring, une preview et une preuve
+runtime publié. `Partiel` signifie qu'au moins une de ces surfaces manque.
+`Contrat seulement`, `planifié`, `absent` et `non prouvé` ne sont jamais assimilés
+à une livraison. Les comparaisons externes indiquent `✓`, `partiel`, `—` ou `N/A`.
+Une inférence est préfixée `Inférence:`.
+
+Les cinq concepts suivants ne sont pas interchangeables :
+
+- chemin visuel texturé : `TexturedPath`, ruban rendu, UV et apparence ;
+- rail de déplacement : trajectoire qui pilote la transform d'une instance ;
+- spline géométrique : courbe éditable utilisée pour construire une géométrie ;
+- contrainte physique : relation résolue entre corps par la simulation ;
+- animation guidée par chemin : animation d'une transform ou de bones sur une courbe.
+
+## Tableau maître
+
+| Domaine | Capacité | Preuve Vertex Loom | Studio | Preview | Runtime publié | État | Godot | Unity | Unreal | GameMaker | Construct | Spine | Rive | Écart/impact | Priorité | Recommandation | Sources officielles |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Projet | A01 — manifeste, création, chemins sûrs, sauvegarde atomique | `manifest.cpp`, `document_storage.cpp`, `project_tests`, ADR-0006/0009/0013 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Pas d'écart critique prouvé | P2 | Conserver les fixtures de traversée et crash-recovery | G1, C1 |
+| Projet | A02 — registre typé et fermeture transitive des dépendances | `resource_registry.cpp`, `map_package.cpp`, ADR-0019/0141 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | partiel | partiel | Diagnostic de cycle moins visuel que les grands moteurs | P2 | Afficher le chemin complet du cycle dans les Studios | G1, U1, E1 |
+| Import | A03 — PNG intact, crop non destructif, alpha | `texture_asset.cpp`, `raster_view`, `asset_studio_texture_e2e` | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Fidélité couverte, mais recette GPU publique encore externe | P1 | Garder une fixture RGBA asymétrique dans la gate graphique | G1, U1, E1 |
+| Import | A04 — SVG lié puis conversion vectorielle native | `svg_vector.cpp`, ADR-0016/0036, tests SVG | oui | oui | oui | implémenté | ✓ | partiel | partiel | partiel | ✓ | ✓ | ✓ | Pas de réimport différentiel documenté | P2 | Ajouter un diff de réimport lié | G1, U1, E1 |
+| Surfaces | A05 — Material v2, blend, texture/vector pattern, UV | `material.hpp`, `material_entity_tests`, ADR-0038/0138 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Bibliothèque de matériaux limitée | P2 | Ajouter duplication et aperçu comparatif | G1, U1, E1 |
+| Surfaces | A06 — pile Tint/Holography/Shine ordonnée | `shader_profile.hpp`, `opengl_vector_smoke`, ADR-0143 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | N/A | partiel | Effets limités à trois familles | P2 | N'ajouter un effet qu'avec contrat, UI et test pixel | G1, U1, E1, R2 |
+| Surfaces | A07 — source intacte par défaut, recoloration explicite | Défaut Beam/Button antérieur bleu/reflet ; ADR-0136/0138 corrigés par cet audit | oui | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | ✓ | Défaut produit confirmé avant correction | P0 | `preserve_source` par défaut ; zéro tint/glow/shine | G1, U1, E1, R2 |
+| Vecteur | A08 — formes, fills, strokes, clips, hiérarchie et Bézier | `vector_asset.hpp`, ADR-0022..0035/0128, canvas E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | ✓ | Opérations booléennes non prouvées | P2 | Documenter ou ajouter les booléens si requis par un projet | G1, U1, E1, S1, R1 |
+| Chemins | A09 — spline géométrique ligne/cubique, ouverte/fermée | `TexturedPathCommandKind`, `textured_path_geometry_tests` | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | Pas de subdivision utilisateur | P2 | Exposer la tolérance uniquement avec budget perf | G2, U2, E2, S2 |
+| Chemins | A10 — chemin visuel texturé repeat/mirror/stretch | `TexturedPathUvMode`, tests UV et OpenGL | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | N/A | N/A | Couverture graphique de toutes variantes à consolider | P1 | Matrice pixel repeat/mirror/stretch dans la recette GL | G2, U2 |
+| Chemins | A11 — largeur, profil, joins, caps, orientation, transparence | `width_profile`, `join`, `cap`, `opacity`, six captures join/cap | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | N/A | N/A | Recette publiée non isolée pour chaque combinaison | P1 | Fixture asymétrique et probes par mode | G2, U2 |
+| Déplacement | A12 — rail de déplacement d'instance | Aucun contrat de rail cinématique ; ne pas confondre avec A09/A10 | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Impossible d'authorer une plateforme ou caméra sur rail | P1 | Ajouter un composant générique PathFollower séparé du rendu | G2, U2, E2, C2, S2 |
+| Animation | A13 — animation guidée par chemin | Aucun binding distance/tangente sur spline | non | non | non | absent | ✓ | ✓ | ✓ | partiel | partiel | ✓ | partiel | Courbes visuelles inutilisables comme trajectoires animées | P1 | ADR dédiée, binding `progress`, orientation optionnelle | G2, U2, E2, S2 |
+| Composition | A14 — compositions, composants, paramètres, variantes, ancres | `visual_composition.hpp`, `visual_component.hpp`, ADR-0104/0105 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | Pas de bibliothèque de variantes visuelle avancée | P2 | Conserver le résolveur commun et améliorer seulement l'UX | G1, U1, E1, R1 |
+| Entités | A15 — entité/prefab, arbre et overrides d'instance | `entity.hpp`, `map.hpp`, ADR-0071/0075/0089 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Overrides incompatibles diagnostiqués mais peu guidés | P2 | Ajouter réparation assistée par type | G1, U1, E1 |
+| Entités | A16 — transformation atomique A→B avec transfert d'état | `entity_transformation.hpp`, ADR-0115, tests runtime | oui | oui | oui | implémenté | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Capacité spécialisée différenciante | P2 | Garder politiques versionnées et replay déterministe | G1, U1, E1 |
+| Animation | A17 — clips, clés, interpolation, easing, segments, événements | `animation.hpp`, timeline, ADR-0039..0043/0125/0126 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Audio sur timeline non prouvé | P2 | Relier événements animation aux événements audio typés | G3, U3, E3, GM1, S1, R1 |
+| Animation | A18 — machine à états d'animation | `animation_state_machine.hpp`, ADR-0042/0045 | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | partiel | ✓ | Authoring Studio incomplet/non prouvé | P1 | Ajouter édition de transitions et E2E reload | G3, U3, E3, R1 |
+| Rig | A19 — bones, skinning pondéré et déformation mesh | `entity.hpp`, ADR-0046/0097, tests déformation | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Outils de peinture de poids moins complets | P1 | Ajouter métriques et édition visuelle des poids | G4, U3, E3, S1, R1 |
+| Rig | A20 — IK FABRIK et ordre des contraintes | ADR-0043/0044/0096, tests contraintes | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Bibliothèque de contraintes réduite | P2 | Étendre seulement sur cas utilisateur mesuré | G4, U3, E3, S2, R1 |
+| Physique | A21 — XPBD et substeps/interpolation | ADR-0098/0100/0139, `entity_simulation` tests | partiel | oui | oui | partiel | partiel | partiel | partiel | — | — | partiel | partiel | Authoring/diagnostics moins complets | P1 | Visualiser particules, contraintes et énergie | G5, U4, E4, S1, R1 |
+| Input | A22 — actions sémantiques, clavier/gamepad, remap | `input.hpp`, ADR-0055/0101/0119/0123, UI E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Touch/gestures non prouvés | P2 | Ajouter seulement avec cible plateforme | G1, U5, E5, C1 |
+| Comportement | A23 — BehaviorGraph générique signaux/actions | `behavior_graph.hpp`, ADR-0114, scenario E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | N/A | ✓ | Debug pas-à-pas non prouvé | P1 | Ajouter trace de ports et breakpoint non persistant | G1, U1, E1, C1, R1 |
+| Maps | A24 — map, layers, verrouillage, ordre, snapping et instances | `map.hpp`, ADR-0047/0070..0083/0134 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Peinture de masse moins productive | P2 | Mesurer avant d'ajouter brush/multi-placement | G6, U6, E6, GM1, C3 |
+| Maps | A25 — tileset/tilemap/autotiling/terrain | Aucun type Studio ou schéma tile | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Création de grands niveaux répétitifs coûteuse | P1 | ADR tilemap après stabilisation du placement actuel | G6, U6, E6, C3 |
+| Physique | A26 — collisions éditables, triggers et payloads | ADR-0048/0077..0080/0113, Map Studio E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | bounding box | listeners | Formes/filtrage avancé limités | P2 | Ajouter catégories/masques seulement avec diagnostics | G5, U4, E4, GM2, C4 |
+| Mécaniques | A27 — nœuds body/pivot/joint/motor | `MechanicNodeKind`, `mechanic_graph.cpp`, presets | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Variétés de joints limitées au schéma actuel | P2 | Ajouter un type uniquement avec preset et runtime | G5, U4, E4, GM2, C4 |
+| Mécaniques | A28 — nœuds sensor/constraint/event | mêmes contrats, compilateur Box2D, debug log | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | contraintes | listeners | Éditeur de graphe moins observable | P1 | Afficher handles résolus et dernier événement | G5, U4, E4, S2, R2 |
+| Scènes | A29 — scène, campagnes, transitions et map montée | `scene.hpp`, ADR-0054/0111/0112, scene E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Transitions visuelles avancées absentes | P2 | Garder contrat générique avant effets dédiés | G1, U1, E1 |
+| Caméra | A30 — Camera2D follow, limites et réglages runtime | ADR-0064/0122, runtime tests | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Blend multi-caméra absent | P2 | Ajouter seulement si scènes le demandent | G1, U1, E1 |
+| Audio | A31 — événements audio, volume, loop et mixer PCM | `audio.hpp`, ADR-0062/0121 | oui | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | timeline | audio events | Spatialisation et buses non prouvées | P1 | Ajouter contrat bus/spatial et test audible | G1, U1, E1, GM3 |
+| Replay | A32 — capture/relecture déterministe | `replay.hpp`, ADR-0057/0058, runtime tests | oui | oui | oui | implémenté | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Vérification longue durée non prouvée | P2 | Ajouter checksum d'état sur session longue | G1, U1, E1 |
+| Sauvegarde | A33 — progression et reprise | `progress_save.hpp`, ADR-0060/0061 | partiel | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | UX de slots non prouvée | P2 | Ajouter parcours utilisateur si plusieurs slots deviennent requis | G1, U1, E1, C1 |
+| Performance | A34 — batching, culling, benchmark 60 FPS | ADR-0066..0068, deux benchmarks, qualité | non | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | métriques | métriques | Gate GPU native pas encore prouvée dans ce checkout | P0 | Exécuter la matrice et archiver rapports GPU natifs | G1, U1, E1, S1 |
+| Validation | A35 — validation unifiée, erreurs de champ, recovery | validateur CLI, ADR-0008/0020/0085, recovery smoke | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Certains éditeurs restent moins guidés | P2 | Étendre focus/réparation aux types restants | G1, U1, E1 |
+| Publication | A36 — paquet map/campagne portable, dépendances, version runtime | `map_package.cpp`, ADR-0103/0141, package tests | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | export runtime | export `.riv` | Signature/contenu public encore gated | P0 | Fermer licences, signature et runner GPU avant tag | G7, U7, E7, C5, S3, R3 |
+| Observabilité | A37 — logs JSONL, overlay, diagnostics render/physics | ADR-0010/0145, tests logs et benchmark | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | métriques | listeners | Corrélation Studio→runtime insuffisante | P1 | Propager un ID de session/ressource dans les traces | G1, U1, E1 |
+| Sécurité | A38 — validation imports, chemins relatifs, licences/SBOM | tests traversée, ADR-0144/0146 | oui | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | export | export | Trois preuves de redistribution restent bloquantes | P0 | Ne pas publier avant statut `approved` réel | G7, U7, E7 |
+
+## Couverture exhaustive interne
+
+### 17 types de ressources
+
+| Type recensé | Lignes |
+| --- | --- |
+| projet/manifeste | A01, A02, A30, A38 |
+| texture | A03, A07, A10 |
+| vector | A04, A08 |
+| material | A05, A06, A07 |
+| entity | A15, A16, A19, A21 |
+| animation | A17, A18 |
+| input | A22 |
+| behavior | A23 |
+| transformation | A16 |
+| texturedPath | A09, A10, A11 |
+| visualComposition | A14 |
+| visualComponent | A14 |
+| map | A24, A25, A26 |
+| scene | A29 |
+| mechanic | A27, A28 |
+| replay | A32 |
+| audio | A31 |
+
+Le compte est dérivé de `StudioResourceKind` (16 valeurs) plus le manifeste
+projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
+
+### Nœuds, enums et paramètres publics
+
+- Nœuds mécaniques : `body`, `pivot`, `joint`, `motor` → A27 ; `sensor`,
+  `constraint`, `event` → A28.
+- Valeurs mécaniques : booléen, entier, scalaire, texte, vec2, ressource et
+  handles body/pivot/joint → A27/A28.
+- TexturedPath : commandes move/line/cubic, closed → A09 ; texture,
+  repeat/mirror/stretch, `uvScale`, `uvOffset`, `textureMetrics` → A10 ; width,
+  widthProfile, color, opacity, miter/round/bevel, butt/round/square,
+  miterLimit → A11.
+- Shader/Material : profile, classification, primary/effect color, intensity,
+  repetition, tint/holography/shine enabled/color/amount/patternScale, opacity,
+  blend, texture, vectorPattern, UV transform → A05/A06/A07.
+- VisualComponent : scalar, angle, integer, boolean, text, vec2, color,
+  resource, bounds, anchors, variants, defaults, overrides, animatable → A14.
+- Entity/animation/rig : node transform/drawable/material, prefab overrides,
+  clips, keys, easing, interpolation, composition, markers, state transitions,
+  bones, weights, IK/constraints, XPBD/substeps → A15/A17/A18/A19/A20/A21.
+- Map/runtime : layers, order, locks, prefab/entity overrides, collision,
+  triggers/payload, scene transition, camera follow/limits, audio volume/loop,
+  input bindings, replay/progress → A22/A24/A26/A29/A30/A31/A32/A33.
+- Pipeline : create/import, inspect, save/reload/recovery, preview, validate,
+  package, published runtime, benchmark/logging → A01/A03/A35/A36/A34/A37.
+
+### Groupes d'ADR
+
+| Groupe | ADR | Lignes |
+| --- | --- | --- |
+| Gouvernance, format, validation, stockage | 0001–0020 | A01–A04, A35, A37 |
+| Vecteur et rendu | 0022–0037 | A04, A08 |
+| Matériaux, animation, rig | 0038–0046 | A05–A07, A17–A20 |
+| Map, runtime, input, replay, audio, caméra, perf | 0047–0085 | A22, A24–A34 |
+| Prompts, entités, preview, simulation | 0086–0103 | A14–A21, A24–A28 |
+| Composition, chemins, comportements, publication | 0104–0135 | A09–A16, A22–A23, A29, A31, A36 |
+| Beam/Button/surfaces/release | 0136–0146 | A06–A07, A10–A11, A21, A34, A36–A38 |
+
+## Registre affirmation → source officielle
+
+Consulté le 3 septembre 2026. Les capacités cochées signifient que la
+documentation officielle décrit une capacité comparable, pas une équivalence
+de qualité ou de format.
+
+| ID | Affirmation utilisée | Source officielle |
+| --- | --- | --- |
+| G1 | Godot 4 possède un pipeline 2D intégré (rendu, physique, animation, ressources). | [Godot — 2D](https://docs.godotengine.org/en/stable/tutorials/2d/index.html) |
+| G2 | `PathFollow2D` échantillonne un `Path2D`, expose progression et rotation. | [Godot — PathFollow2D](https://docs.godotengine.org/en/stable/classes/class_pathfollow2d.html) |
+| G3 | AnimationTree fournit des machines/blends autour d'animations. | [Godot — AnimationTree](https://docs.godotengine.org/en/stable/tutorials/animation/animation_tree.html) |
+| G4 | Godot documente skeletons 2D, bones et déformation. | [Godot — 2D skeletons](https://docs.godotengine.org/en/stable/tutorials/animation/2d_skeletons.html) |
+| G5 | Godot fournit corps, collisions, joints et moteur physique 2D. | [Godot — Physics introduction](https://docs.godotengine.org/en/stable/tutorials/physics/physics_introduction.html) |
+| G6 | TileMapLayer gère calques, collisions, navigation, terrains et motifs. | [Godot — Using TileMaps](https://docs.godotengine.org/en/stable/tutorials/2d/using_tilemaps.html) |
+| G7 | Godot exporte projets et ressources vers des paquets exécutables. | [Godot — Exporting projects](https://docs.godotengine.org/en/stable/tutorials/export/exporting_projects.html) |
+| U1 | Unity 6 organise scènes, GameObjects, composants, assets et prefabs. | [Unity 6 — Manual](https://docs.unity3d.com/6000.0/Documentation/Manual/index.html) |
+| U2 | SpriteShape fournit outil et runtime pour mondes 2D fondés sur splines. | [Unity 6 — 2D SpriteShape](https://docs.unity3d.com/6000.0/Documentation/Manual/com.unity.2d.spriteshape.html) |
+| U3 | Unity fournit animation, Animator et 2D Animation. | [Unity 6 — Animation](https://docs.unity3d.com/6000.0/Documentation/Manual/AnimationSection.html) |
+| U4 | Unity expose physique et joints 2D. | [Unity 6 — Physics 2D](https://docs.unity3d.com/6000.0/Documentation/Manual/Physics2D.html) |
+| U5 | Input System sépare actions et périphériques. | [Unity Input System](https://docs.unity3d.com/Packages/com.unity.inputsystem@1.11/manual/Actions.html) |
+| U6 | Tilemap permet de créer des niveaux 2D à base de tuiles. | [Unity 6 — Tilemaps](https://docs.unity3d.com/6000.0/Documentation/Manual/tilemaps/tilemaps.html) |
+| U7 | Build Profiles configurent et produisent les builds joueurs. | [Unity 6 — Build Profiles](https://docs.unity3d.com/6000.0/Documentation/Manual/build-profiles.html) |
+| E1 | Unreal organise assets, Actors, Components et Blueprints. | [Unreal Engine — Get Started](https://dev.epicgames.com/documentation/en-us/unreal-engine/get-started) |
+| E2 | Unreal permet aux acteurs/components de suivre une spline. | [Unreal Engine — Blueprint Spline Components](https://dev.epicgames.com/documentation/en-us/unreal-engine/blueprint-spline-components-overview-in-unreal-engine) |
+| E3 | Control Rig crée des rigs et anime des contrôles dans Sequencer. | [Unreal Engine — Control Rig Quick Start](https://dev.epicgames.com/documentation/en-us/unreal-engine/how-to-create-control-rigs-in-unreal-engine) |
+| E4 | Unreal documente moteur physique, collisions et contraintes. | [Unreal Engine — Physics](https://dev.epicgames.com/documentation/en-us/unreal-engine/physics-in-unreal-engine) |
+| E5 | Enhanced Input repose sur actions et contextes de mapping. | [Unreal Engine — Enhanced Input](https://dev.epicgames.com/documentation/en-us/unreal-engine/enhanced-input-in-unreal-engine) |
+| E6 | Paper 2D fournit sprites, flipbooks et tile maps. | [Unreal Engine — Paper 2D](https://dev.epicgames.com/documentation/en-us/unreal-engine/paper-2d-in-unreal-engine) |
+| E7 | Unreal documente packaging et publication par plateforme. | [Unreal Engine — Packaging](https://dev.epicgames.com/documentation/en-us/unreal-engine/packaging-your-project) |
+| GM1 | GameMaker Sequences combine objets, instances, tracks, clés et événements. | [GameMaker — Sequences](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Asset_Management/Sequences/Sequences.htm) |
+| GM2 | GameMaker intègre Box2D avec fixtures, joints, collisions et debug. | [GameMaker — Physics](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Physics/Physics.htm) |
+| GM3 | Les Sequences acceptent pistes son, emitters et effets. | [GameMaker — Sound in Sequences](https://manual.gamemaker.io/monthly/en/The_Asset_Editors/Sequence_Properties/Sound_in_Sequences.htm) |
+| C1 | Construct 3 documente projets, objets, behaviors, événements et export. | [Construct 3 — Manual](https://www.construct.net/en/make-games/manuals/construct-3) |
+| C2 | Pathfinding calcule et peut suivre une liste de nœuds. | [Construct 3 — Pathfinding](https://www.construct.net/en/make-games/manuals/construct-3/behavior-reference/pathfinding) |
+| C3 | Tilemap fournit une grille de tuiles éditable. | [Construct 3 — Tilemap](https://www.construct.net/en/make-games/manuals/construct-3/plugin-reference/tilemap) |
+| C4 | Physics est fondé sur Box2D et expose joints/forces/collisions. | [Construct 3 — Physics](https://www.construct.net/en/make-games/manuals/construct-3/behavior-reference/physics) |
+| C5 | Construct exporte vers plusieurs plateformes web/app. | [Construct 3 — Exporting projects](https://www.construct.net/en/make-games/manuals/construct-3/tips-and-guides/exporting) |
+| S1 | Spine couvre bones, meshes, weights, skins, animations et événements. | [Spine — User Guide](https://esotericsoftware.com/spine-user-guide) |
+| S2 | Les contraintes Spine sont ordonnées ; la path constraint translate/oriente des bones sur un path. | [Spine — Constraints](https://esotericsoftware.com/spine-constraints), [Path constraints](https://esotericsoftware.com/spine-path-constraints) |
+| S3 | Spine exporte données runtime et atlas/textures. | [Spine — Export](https://esotericsoftware.com/spine-export) |
+| R1 | Rive fournit artboards, bones, contraintes, clés et machines à états. | [Rive — Keys](https://rive.app/docs/editor/keys), [State machines](https://rive.app/docs/runtimes/state-machines) |
+| R2 | Les runtimes Rive avancent les machines et exposent événements/data binding. | [Rive — State machine playback](https://rive.app/docs/runtimes/state-machines), [Events](https://rive.app/docs/runtimes/rive-events) |
+| R3 | `.riv` est le format exporté consommé par les runtimes. | [Rive — Exporting](https://rive.app/docs/editor/exporting) |
+
+## Conclusion et ordre de correction
+
+La seule régression P0 corrigeable localement sans nouvelle architecture est
+A07 : les nouveaux Beam et Button doivent préserver la source sans effet.
+Les autres P0 sont des gates de release externes et restent explicitement
+ouverts. Les P1 structurants (rail cinématique, animation par chemin, tilemap)
+nécessitent des ADR séparées ; cet audit ne les implémente pas implicitement.

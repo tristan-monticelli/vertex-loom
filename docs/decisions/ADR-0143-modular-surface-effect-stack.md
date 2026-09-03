@@ -23,8 +23,10 @@ et les Beams. Il permet d'ajouter, dupliquer, monter, descendre et retirer des
 blocs sans maximum applicatif. L'ordre affiché est l'ordre d'évaluation.
 
 Pour les parcours guidés Beam et Button, ce même éditeur présente d'abord une
-façade compacte : looks de départ, couleurs, forces de recoloration et de lueur,
-et reflet. Chaque modification synchronise aussi les champs historiques afin
+façade compacte : mode source/recoloration, couleur choisie, forces de
+recoloration et de lueur, et reflet. Une seule action neutre réinitialise depuis
+la source ; aucune palette colorée n'est proposée. Chaque modification
+synchronise aussi les champs historiques afin
 que les anciens bindings et la pile modulaire ne présentent pas deux valeurs
 contradictoires. Les opérations d'ordre et de duplication restent dans la
 section avancée repliée.

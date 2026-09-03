@@ -66,16 +66,20 @@ PNG source. Les terminaisons d'un Beam guidé restent droites et l'offset U
 n'est pas exposé : les bords gauche et droit du PNG ne sont ni arrondis, ni
 décalés, ni recadrés par l'outil.
 
-Le Beam guidé commence avec une palette bleu textile perceptible, une
-holographie légère et une brillance contenue. L'inspecteur expose trois looks
-rapides (`Neutral thread`, `Cool glow`, `Warm glow`) puis les couleurs et
-intensités principales sans ouvrir la pile technique. La pile ordonnée reste
+Un nouveau Beam guidé commence en `Source intacte` : couleurs, alpha et détails
+du PNG sont conservés, et les intensités de teinte, holographie et brillance
+valent zéro. Aucune palette produit n'est implicite. L'unique action rapide
+`Réinitialiser depuis la source` restaure cet état ; la pile ordonnée reste
 disponible dans `Advanced effect stack`.
 
-Le réglage utilisateur `Color handling` distingue `Recolor from detail`, qui
-utilise la luminance et l'alpha du PNG avec la teinte de base, de `Keep image
-colors`, qui conserve les couleurs du PNG. Ce choix est persisté comme
-paramètre du composant et résolu par le même renderer dans Studio et runtime.
+Le réglage `Traitement des couleurs` distingue `Source intacte`, sélectionné par
+défaut, de `Recoloration`, qui utilise la luminance et l'alpha du PNG avec
+uniquement la couleur choisie. `VisualPresetRequest::BeamColorMode` mappe ce
+choix vers les profils shaders existants. Le JSON persistant ne change pas : le
+paramètre texte historique du composant et les profils `plastic`/`thread`
+restent le pont de compatibilité. Les ressources existantes conservent leurs
+valeurs enregistrées ; seule une nouvelle création ou une réinitialisation
+explicite reçoit le nouveau défaut.
 
 Le renderer OpenGL applique aussi le shader aux lots de remplissage et sépare
 les lots quand leurs paramètres shader diffèrent ; une composition ne perd

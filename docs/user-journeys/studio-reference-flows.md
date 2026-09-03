@@ -15,6 +15,7 @@ et historique, `Retry` recommence l'écriture, `Discard` exige une confirmation.
 | Joueur et monstre | BehaviorGraph + signal action/IA | mêmes actions runtime et même trace | port/type/source invalide | aucun code dédié au rôle de l'instance |
 | Transformation | instance source + politique A→B | instance B valide dans la même frame | destination absente, mapping invalide, cycle interdit | état transféré exactement selon la politique |
 | Vectoriel natif | arbre + outils de points/fill/stroke | draw packet identique dans les trois surfaces | géométrie/fill invalide annulable | édition complète sans JSON ou SVG externe |
+| Beam ou Button | PNG choisi + `Source intacte` par défaut | source inchangée dans Studio, Preview et runtime | recoloration uniquement après choix explicite | reset neutre, intensités nulles, ancien JSON inchangé |
 
 Vocabulaire normatif : `Input bindings` désigne uniquement les périphériques ;
 `Behavior` désigne la logique d'une entité humaine ou non ; `Transformation`

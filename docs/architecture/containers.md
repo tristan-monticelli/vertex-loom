@@ -78,7 +78,10 @@ produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
 
 Les apparences de surface peuvent porter une pile ordonnée d'effets (teinte,
-holographie et brillance). `fabric_project` persiste cette liste sans plafond
+holographie et brillance). Les créations guidées Beam et Button choisissent par
+défaut la conservation exacte de la source avec toutes les intensités à zéro ;
+la recoloration est une action explicite mappée vers les profils existants, sans
+nouveau champ JSON. `fabric_project` persiste cette liste sans plafond
 fonctionnel et `fabric_render` la parcourt dans le fragment shader au moyen
 d'une texture de paramètres dimensionnée à l'exécution. La seule borne est la
 capacité de texture annoncée par le GPU ; elle produit une erreur de rendu
