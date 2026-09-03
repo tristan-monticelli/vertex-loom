@@ -13,6 +13,7 @@ void draw_packet_preview_canvas(
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
     const ImVec2 origin = ImGui::GetItemRectMin();
+    canvas.xpbd_overlay_visible = false;
     canvas.native_canvas = true;
     canvas.native_origin = origin;
     canvas.native_size = available;
