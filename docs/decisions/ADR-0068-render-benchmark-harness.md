@@ -34,3 +34,11 @@ Sur macOS, la scène générée de 10 000 instances visibles en 1440 × 900 donn
 chargement réel, l’index de chunks, le culling, le chemin statique du runtime
 et le renderer ; la validation Windows/Linux reste nécessaire avant de fermer
 le gate multiplateforme.
+
+Le 4 septembre 2026, une reconstruction `Release` native sur Apple M1 Pro a
+rejoué les trois gates à 600 frames avec `--min-fps 60`. Le renderer synthétique
+atteint `795,993 FPS` p95, le runtime à 10 000 instances `125,812 FPS` p95 et la
+scène textile de référence `251,251 FPS` p95. Le rapport brut consolidé est
+versionné dans `docs/reports/performance-macos-2026-09-04.json`. Cette preuve
+ferme le gate du checkout macOS ; les gates Windows/Linux restent des
+préconditions indépendantes de la release multiplateforme.

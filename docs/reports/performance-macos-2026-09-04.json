@@ -1,0 +1,37 @@
+{
+  "date": "2026-09-04",
+  "buildType": "Release",
+  "platform": "macOS arm64",
+  "gpuVendor": "Apple",
+  "gpuRenderer": "Apple M1 Pro",
+  "gpuVersion": "4.1 Metal - 90.5",
+  "runs": [
+    {
+      "name": "renderer-10000",
+      "command": "fabric_render_benchmark --packets 10000 --frames 600 --min-fps 60",
+      "frames": 600,
+      "p95FrameMs": 1.25629,
+      "fpsP95": 795.993,
+      "peakMemoryBytes": 97091584,
+      "passed": true
+    },
+    {
+      "name": "runtime-10000",
+      "command": "fabric_runtime_benchmark --instances 10000 --frames 600 --min-fps 60",
+      "frames": 600,
+      "p95FrameMs": 7.94838,
+      "fpsP95": 125.812,
+      "peakMemoryBytes": 190038016,
+      "passed": true
+    },
+    {
+      "name": "textile-reference",
+      "command": "fabric_runtime_benchmark --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60",
+      "frames": 600,
+      "p95FrameMs": 3.98008,
+      "fpsP95": 251.251,
+      "peakMemoryBytes": 157220864,
+      "passed": true
+    }
+  ]
+}
