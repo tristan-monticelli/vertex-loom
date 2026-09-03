@@ -78,6 +78,19 @@ TEST_CASE("animation clips round-trip and publish atomically") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("animation dependencies exclude the authoring preview entity") {
+    auto source = clip();
+    source.preview_entity = fabric::project::ResourceReference{
+        {.value = "animated-entity"}, "entity"};
+
+    const auto references =
+        fabric::project::animation_resource_references(source);
+
+    REQUIRE(references.size() == 1U);
+    CHECK(references.front() == fabric::project::ResourceReference{
+        {.value = "hero"}, "texture"});
+}
+
 TEST_CASE("animation evaluation interpolates supported values and loops") {
     const auto source = clip();
     const auto evaluated = fabric::project::evaluate_animation(source, 0.5F);

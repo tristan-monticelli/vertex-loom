@@ -71,6 +71,15 @@ La preuve E2E Animation doit activer une commande de clé rapide dans l'interfac
 sauvegarder, recharger et vérifier la piste typée correspondante avant de
 capturer le workspace avec un contexte OpenGL réel.
 
+`Animation Graph` est un panneau dédié ouvert depuis l'Entity. Il édite des
+états toujours associés à un clip existant, leurs transitions, conditions,
+priorités et temps de sortie, puis simule le choix déterministe avec des
+paramètres éphémères. Il ne mélange pas ces paramètres de preview au document.
+L'ancien formulaire de state machine dans `Advanced Entity systems` est retiré
+du parcours : il pouvait tenter de sauvegarder un état sans clip valide.
+L'E2E du panneau et celui du gizmo Entity s'exécutent successivement afin qu'une
+fenêtre au premier plan ne masque pas artificiellement l'interaction canvas.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

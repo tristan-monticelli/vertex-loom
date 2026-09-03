@@ -101,6 +101,8 @@ bool ui_animation_probe_enabled = false;
 bool ui_animation_timeline_seen = false;
 bool ui_animation_quick_key_seen = false;
 ImVec2 ui_animation_quick_key_screen{};
+bool ui_animation_graph_probe_enabled = false;
+bool ui_animation_graph_seen = false;
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -581,6 +583,14 @@ struct AnimationUiState {
     float dragging_key_original_time{};
     std::vector<KeySelection> selected_keys;
     std::vector<ClipboardEntry> key_clipboard;
+};
+
+struct AnimationGraphUiState {
+    bool open{};
+    std::string current_state;
+    std::string last_transition;
+    float normalized_time{};
+    std::vector<fabric::project::AnimationParameter> parameters;
 };
 
 bool same_animation_key(const AnimationUiState::KeySelection& left,
@@ -3005,6 +3015,353 @@ void draw_transformation_editor(
     ImGui::End();
 }
 
+const char* animation_condition_label(
+    const fabric::project::AnimationConditionOperator operation) {
+    using Operator = fabric::project::AnimationConditionOperator;
+    switch (operation) {
+    case Operator::equal: return "Equal";
+    case Operator::not_equal: return "Not equal";
+    case Operator::less: return "Less";
+    case Operator::less_equal: return "Less or equal";
+    case Operator::greater: return "Greater";
+    case Operator::greater_equal: return "Greater or equal";
+    }
+    return "Equal";
+}
+
+void draw_animation_graph_editor(
+    fabric::editor::ProjectSession& session,
+    AnimationGraphUiState& ui,
+    std::string& status) {
+    if (!ui.open) return;
+    if (ui_animation_graph_probe_enabled) ui_animation_graph_seen = true;
+    const auto* selected = session.selected_resource();
+    if (!selected || selected->kind != fabric::editor::StudioResourceKind::entity ||
+        !session.selected_entity()) {
+        ui.open = false;
+        return;
+    }
+    ImGui::SetNextWindowSize({760.0F, 720.0F}, ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Animation Graph", &ui.open)) {
+        ImGui::End();
+        return;
+    }
+    const auto commit_machine =
+        [&](std::optional<fabric::project::AnimationStateMachine> machine,
+            const char* success) {
+            auto entity = *session.selected_entity();
+            entity.animation_state_machine = std::move(machine);
+            if (session.set_selected_entity_definition(std::move(entity)))
+                status = success;
+            else
+                status = "Animation Graph change rejected; inspect diagnostics.";
+        };
+    const auto first_animation = std::ranges::find_if(
+        session.resources(), [](const auto& resource) {
+            return resource.kind == fabric::editor::StudioResourceKind::animation;
+        });
+    if (!session.selected_entity()->animation_state_machine) {
+        ImGui::TextWrapped(
+            "Create a deterministic animation graph from an existing clip. "
+            "Runtime parameters remain instance-owned.");
+        ImGui::BeginDisabled(first_animation == session.resources().end());
+        if (ImGui::Button("Create Animation Graph")) {
+            fabric::project::AnimationStateMachine machine{
+                .initial_state = "state-1",
+                .states = {{"state-1", {first_animation->id, "animation"}}}};
+            commit_machine(std::move(machine), "Animation Graph created.");
+            ui.current_state = "state-1";
+        }
+        ImGui::EndDisabled();
+        draw_disabled_reason(first_animation == session.resources().end(),
+                             "Create an Animation clip before creating a graph.");
+        ImGui::End();
+        return;
+    }
+
+    const auto machine_snapshot = *session.selected_entity()->animation_state_machine;
+    ImGui::Text("Entity: %s", session.selected_entity()->document.name.c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("%zu states · %zu transitions",
+                        machine_snapshot.states.size(),
+                        machine_snapshot.transitions.size());
+    if (ImGui::BeginTabBar("Animation graph tabs")) {
+        if (ImGui::BeginTabItem("States")) {
+            auto machine = machine_snapshot;
+            const auto initial = std::ranges::find_if(
+                machine.states, [&](const auto& state) {
+                    return state.id == machine.initial_state;
+                });
+            const char* initial_label = initial == machine.states.end()
+                ? "Choose initial state..." : initial->id.c_str();
+            if (ImGui::BeginCombo("Initial state", initial_label)) {
+                for (const auto& state : machine.states) {
+                    if (ImGui::Selectable(state.id.c_str(),
+                                          state.id == machine.initial_state)) {
+                        machine.initial_state = state.id;
+                        commit_machine(machine, "Initial animation state changed.");
+                        ui.current_state = state.id;
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            bool removed = false;
+            for (std::size_t index = 0; index < machine.states.size(); ++index) {
+                auto state = machine.states[index];
+                const auto old_id = state.id;
+                ImGui::PushID(static_cast<int>(index));
+                ImGui::SeparatorText(("State " + std::to_string(index + 1U)).c_str());
+                ImGui::InputText("Id", &state.id);
+                std::string clip_id = state.clip.id.value;
+                static_cast<void>(draw_project_resource_picker(
+                    "Clip", session.resources(),
+                    fabric::editor::StudioResourceKind::animation,
+                    clip_id, false));
+                state.clip = {{.value = clip_id}, "animation"};
+                if (ImGui::Button("Save state")) {
+                    auto next = machine;
+                    next.states[index] = state;
+                    if (old_id != state.id) {
+                        if (next.initial_state == old_id) next.initial_state = state.id;
+                        for (auto& transition : next.transitions) {
+                            if (transition.from_state == old_id)
+                                transition.from_state = state.id;
+                            if (transition.to_state == old_id)
+                                transition.to_state = state.id;
+                        }
+                    }
+                    commit_machine(std::move(next), "Animation state saved.");
+                }
+                ImGui::SameLine();
+                ImGui::BeginDisabled(machine.states.size() <= 1U);
+                if (ImGui::Button("Remove state")) {
+                    auto next = machine;
+                    next.states.erase(next.states.begin() +
+                                      static_cast<std::ptrdiff_t>(index));
+                    std::erase_if(next.transitions, [&](const auto& transition) {
+                        return transition.from_state == old_id ||
+                            transition.to_state == old_id;
+                    });
+                    if (next.initial_state == old_id)
+                        next.initial_state = next.states.front().id;
+                    commit_machine(std::move(next), "Animation state removed.");
+                    removed = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::PopID();
+                if (removed) break;
+            }
+            ImGui::BeginDisabled(first_animation == session.resources().end());
+            if (ImGui::Button("Add state")) {
+                auto next = machine_snapshot;
+                std::string id = "state-" + std::to_string(next.states.size() + 1U);
+                while (std::ranges::any_of(next.states, [&](const auto& state) {
+                    return state.id == id;
+                })) id += "-copy";
+                next.states.push_back({id, {first_animation->id, "animation"}});
+                commit_machine(std::move(next), "Animation state added.");
+            }
+            ImGui::EndDisabled();
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Transitions")) {
+            auto machine = machine_snapshot;
+            bool removed = false;
+            for (std::size_t index = 0; index < machine.transitions.size(); ++index) {
+                auto transition = machine.transitions[index];
+                ImGui::PushID(static_cast<int>(index));
+                ImGui::SeparatorText(
+                    ("Transition " + std::to_string(index + 1U)).c_str());
+                ImGui::InputText("Id", &transition.id);
+                const auto draw_state_picker = [&](const char* label,
+                                                   std::string& state_id) {
+                    if (ImGui::BeginCombo(label, state_id.c_str())) {
+                        for (const auto& state : machine.states)
+                            if (ImGui::Selectable(state.id.c_str(),
+                                                  state.id == state_id))
+                                state_id = state.id;
+                        ImGui::EndCombo();
+                    }
+                };
+                draw_state_picker("From", transition.from_state);
+                draw_state_picker("To", transition.to_state);
+                ImGui::InputInt("Priority", &transition.priority);
+                bool has_exit_time = transition.exit_time.has_value();
+                if (ImGui::Checkbox("Require exit time", &has_exit_time)) {
+                    if (has_exit_time) transition.exit_time = 1.0F;
+                    else transition.exit_time.reset();
+                }
+                if (transition.exit_time)
+                    ImGui::SliderFloat("Normalized exit time",
+                                       &*transition.exit_time, 0.0F, 1.0F);
+                for (std::size_t condition_index = 0;
+                     condition_index < transition.conditions.size();
+                     ++condition_index) {
+                    auto& condition = transition.conditions[condition_index];
+                    ImGui::PushID(static_cast<int>(condition_index));
+                    ImGui::InputText("Parameter", &condition.parameter_id);
+                    const bool boolean = std::holds_alternative<bool>(condition.value);
+                    if (ImGui::BeginCombo("Operator",
+                                          animation_condition_label(condition.operation))) {
+                        using Operator = fabric::project::AnimationConditionOperator;
+                        for (const auto operation : {
+                                 Operator::equal, Operator::not_equal,
+                                 Operator::less, Operator::less_equal,
+                                 Operator::greater, Operator::greater_equal}) {
+                            const bool allowed = !boolean || operation == Operator::equal ||
+                                operation == Operator::not_equal;
+                            ImGui::BeginDisabled(!allowed);
+                            if (ImGui::Selectable(animation_condition_label(operation),
+                                                  condition.operation == operation))
+                                condition.operation = operation;
+                            ImGui::EndDisabled();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    bool use_boolean = boolean;
+                    if (ImGui::Checkbox("Boolean parameter", &use_boolean)) {
+                        condition.value = use_boolean
+                            ? fabric::project::AnimationParameterValue{false}
+                            : fabric::project::AnimationParameterValue{0.0F};
+                        if (use_boolean && condition.operation !=
+                                fabric::project::AnimationConditionOperator::equal &&
+                            condition.operation !=
+                                fabric::project::AnimationConditionOperator::not_equal)
+                            condition.operation =
+                                fabric::project::AnimationConditionOperator::equal;
+                    }
+                    if (auto* value = std::get_if<bool>(&condition.value))
+                        ImGui::Checkbox("Expected", value);
+                    else
+                        ImGui::InputFloat("Expected", &std::get<float>(condition.value));
+                    if (ImGui::SmallButton("Remove condition")) {
+                        transition.conditions.erase(
+                            transition.conditions.begin() +
+                            static_cast<std::ptrdiff_t>(condition_index));
+                        ImGui::PopID();
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+                if (ImGui::Button("Add condition"))
+                    transition.conditions.push_back({"parameter",
+                        fabric::project::AnimationConditionOperator::equal, false});
+                ImGui::SameLine();
+                if (ImGui::Button("Save transition")) {
+                    auto next = machine;
+                    next.transitions[index] = std::move(transition);
+                    commit_machine(std::move(next), "Animation transition saved.");
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Remove transition")) {
+                    auto next = machine;
+                    next.transitions.erase(
+                        next.transitions.begin() +
+                        static_cast<std::ptrdiff_t>(index));
+                    commit_machine(std::move(next), "Animation transition removed.");
+                    removed = true;
+                }
+                ImGui::PopID();
+                if (removed) break;
+            }
+            ImGui::BeginDisabled(machine.states.size() < 2U);
+            if (ImGui::Button("Add transition")) {
+                auto next = machine_snapshot;
+                std::string id = "transition-" +
+                    std::to_string(next.transitions.size() + 1U);
+                while (std::ranges::any_of(next.transitions,
+                                            [&](const auto& candidate) {
+                    return candidate.id == id;
+                })) id += "-copy";
+                next.transitions.push_back({
+                    .id = id,
+                    .from_state = next.states[0].id,
+                    .to_state = next.states[1].id});
+                commit_machine(std::move(next), "Animation transition added.");
+            }
+            ImGui::EndDisabled();
+            draw_disabled_reason(machine.states.size() < 2U,
+                                 "Add at least two states before connecting them.");
+            ImGui::EndTabItem();
+        }
+
+        if (ImGui::BeginTabItem("Preview")) {
+            const auto& machine = machine_snapshot;
+            if (!fabric::project::find_animation_state(machine, ui.current_state))
+                ui.current_state = machine.initial_state;
+            for (const auto& transition : machine.transitions) {
+                for (const auto& condition : transition.conditions) {
+                    const auto found = std::ranges::find(
+                        ui.parameters, condition.parameter_id,
+                        &fabric::project::AnimationParameter::id);
+                    if (found == ui.parameters.end())
+                        ui.parameters.push_back({condition.parameter_id,
+                            std::holds_alternative<bool>(condition.value)
+                                ? fabric::project::AnimationParameterValue{false}
+                                : fabric::project::AnimationParameterValue{0.0F}});
+                }
+            }
+            ImGui::Text("Active state: %s", ui.current_state.c_str());
+            if (const auto* state = fabric::project::find_animation_state(
+                    machine, ui.current_state))
+                ImGui::TextDisabled("Clip: %s", state->clip.id.value.c_str());
+            if (!ui.last_transition.empty())
+                ImGui::Text("Last transition: %s", ui.last_transition.c_str());
+            ImGui::SliderFloat("Normalized time", &ui.normalized_time, 0.0F, 1.0F);
+            for (auto& parameter : ui.parameters) {
+                ImGui::PushID(parameter.id.c_str());
+                if (auto* value = std::get_if<bool>(&parameter.value))
+                    ImGui::Checkbox(parameter.id.c_str(), value);
+                else
+                    ImGui::InputFloat(parameter.id.c_str(),
+                                      &std::get<float>(parameter.value));
+                ImGui::PopID();
+            }
+            if (ImGui::Button("Evaluate transition")) {
+                if (const auto* transition =
+                        fabric::project::select_animation_transition(
+                            machine, ui.current_state, ui.parameters,
+                            ui.normalized_time)) {
+                    ui.current_state = transition->to_state;
+                    ui.last_transition = transition->id;
+                    ui.normalized_time = 0.0F;
+                    status = "Animation Graph preview transitioned.";
+                } else {
+                    ui.last_transition.clear();
+                    status = "No animation transition matched.";
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Reset preview")) {
+                ui.current_state = machine.initial_state;
+                ui.last_transition.clear();
+                ui.normalized_time = 0.0F;
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
+
+    if (ImGui::Button("Remove Animation Graph..."))
+        ImGui::OpenPopup("Remove Animation Graph?");
+    if (ImGui::BeginPopupModal("Remove Animation Graph?", nullptr,
+                               ImGuiWindowFlags_AlwaysAutoResize)) {
+        ImGui::TextUnformatted(
+            "Remove all animation states and transitions from this Entity?");
+        if (ImGui::Button("Remove graph")) {
+            commit_machine(std::nullopt, "Animation Graph removed.");
+            ui.current_state.clear();
+            ui.last_transition.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+    }
+    ImGui::End();
+}
+
 ImU32 color_to_u32(const fabric::core::Color& color) {
     const auto channel = [](const float value) {
         return static_cast<int>(std::clamp(value, 0.0F, 1.0F) * 255.0F);
@@ -3160,6 +3517,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const fabric::render::VisualCompositionDrawResult&
                         visual_preview,
                     AnimationUiState& animation_ui,
+                    AnimationGraphUiState& animation_graph_ui,
                     TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
                     std::optional<std::pair<std::size_t,
@@ -5433,63 +5791,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_advanced_entity(std::move(next));
                 }
             }
-            if (ImGui::CollapsingHeader("Animation state machine")) {
-                if (entity.animation_state_machine) {
-                    auto machine = *entity.animation_state_machine;
-                    const auto initial_state = std::ranges::find_if(
-                        machine.states, [&](const auto& state) {
-                            return state.id == machine.initial_state;
-                        });
-                    const std::string initial_state_label =
-                        initial_state == machine.states.end()
-                        ? machine.initial_state.empty()
-                            ? std::string{"Choose an initial state..."}
-                            : std::string{"Missing: "} + machine.initial_state
-                        : initial_state->id;
-                    if (ImGui::BeginCombo("Initial state", initial_state_label.c_str())) {
-                        if (ImGui::Selectable("No initial state", machine.initial_state.empty()))
-                            machine.initial_state.clear();
-                        for (const auto& state : machine.states) {
-                            const bool selected = state.id == machine.initial_state;
-                            if (ImGui::Selectable(state.id.c_str(), selected))
-                                machine.initial_state = state.id;
-                            if (selected) ImGui::SetItemDefaultFocus();
-                        }
-                        if (initial_state == machine.states.end() && !machine.initial_state.empty())
-                            ImGui::TextDisabled("Missing state: %s", machine.initial_state.c_str());
-                        ImGui::EndCombo();
-                    }
-                    ImGui::SetItemTooltip("Select an existing state-machine state; new state IDs are authored below.");
-                    for (std::size_t index = 0; index < machine.states.size(); ++index) {
-                        ImGui::PushID(static_cast<int>(index));
-                        ImGui::InputText("State id", &machine.states[index].id);
-                        if (ImGui::Button("Save state")) {
-                            auto next = entity;
-                            *next.animation_state_machine = std::move(machine);
-                            commit_advanced_entity(std::move(next));
-                        }
-                        ImGui::PopID();
-                    }
-                    if (ImGui::Button("Add state")) {
-                        machine.states.push_back({
-                            .id = "state-" + std::to_string(machine.states.size() + 1U),
-                            .clip = {{.value = ""}, "animation"}});
-                        auto next = entity;
-                        *next.animation_state_machine = std::move(machine);
-                        commit_advanced_entity(std::move(next));
-                    }
-                    if (ImGui::Button("Remove state machine")) {
-                        auto next = entity;
-                        next.animation_state_machine.reset();
-                        commit_advanced_entity(std::move(next));
-                    }
-                } else if (ImGui::Button("Create state machine")) {
-                    auto next = entity;
-                    next.animation_state_machine =
-                        fabric::project::AnimationStateMachine{};
-                    commit_advanced_entity(std::move(next));
-                }
-            }
             }
         }
         if (selected != nullptr &&
@@ -5566,6 +5867,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     return added_ok;
                 };
             ImGui::SeparatorText("Entity behavior");
+            if (ImGui::Button("Open Animation Graph")) {
+                animation_graph_ui.open = true;
+                if (entity.animation_state_machine)
+                    animation_graph_ui.current_state =
+                        entity.animation_state_machine->initial_state;
+            }
+            ImGui::SameLine();
             if (ImGui::Button("Add animation clip...")) {
                 if (!entity.nodes.empty())
                     animation_ui.node_id =
@@ -8758,6 +9066,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     AssetPreview pending_import_preview;
     CanvasUiState canvas;
     AnimationUiState animation_ui;
+    AnimationGraphUiState animation_graph_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     std::optional<std::pair<std::size_t, fabric::project::EntityDrawableKind>>
@@ -9040,6 +9349,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     bool entity_e2e_complete = false;
     if (entity_e2e && session.has_project()) {
+        ui_animation_graph_probe_enabled = true;
+        ui_animation_graph_seen = false;
         const fabric::core::ResourceId entity_id{.value =
             "beam-entity"};
         const bool selected = session.select_resource(
@@ -9083,6 +9394,29 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             authored = session.set_selected_entity_node(2U, component) &&
                 session.move_selected_entity_node(2U, 1U) && session.save();
         }
+        if (authored) {
+            auto with_graph = *session.selected_entity();
+            with_graph.animation_state_machine =
+                fabric::project::AnimationStateMachine{
+                    .initial_state = "idle",
+                    .states = {
+                        {"idle", {{.value = "beam-scroll"}, "animation"}},
+                        {"active", {{.value = "beam-scroll"}, "animation"}}},
+                    .transitions = {{
+                        .id = "activate",
+                        .from_state = "idle",
+                        .to_state = "active",
+                        .conditions = {{
+                            "enabled",
+                            fabric::project::AnimationConditionOperator::equal,
+                            true}},
+                        .priority = 1}}};
+            authored = session.set_selected_entity_definition(
+                std::move(with_graph)) && session.save();
+            animation_graph_ui.open = authored;
+            animation_graph_ui.current_state = "idle";
+            animation_graph_ui.parameters = {{"enabled", true}};
+        }
         fabric::editor::ProjectSession reloaded;
         const bool reopened = authored && reloaded.open(initial_project) &&
             reloaded.select_resource(
@@ -9105,6 +9439,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 fabric::project::EntityDrawableKind::visual_component &&
             reloaded.selected_entity()->nodes[2].drawable.kind ==
                 fabric::project::EntityDrawableKind::vector &&
+            reloaded.selected_entity()->animation_state_machine &&
+            reloaded.selected_entity()->animation_state_machine->states.size() == 2U &&
+            reloaded.selected_entity()->animation_state_machine
+                    ->transitions.size() == 1U &&
             visual.packets.size() >= 3U;
         if (!entity_e2e_complete)
             std::cerr << "Asset Studio Entity E2E failed\n";
@@ -9646,6 +9984,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 static_cast<void>(SDL_PushEvent(&key));
             }
         }
+        if (entity_e2e && entity_gizmo_e2e_frame == 1U &&
+            ui_animation_graph_seen)
+            animation_graph_ui.open = false;
         if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 1U &&
             entity_gizmo_e2e_frame < 4U) {
             const auto start = canvas.entity_gizmo_screen;
@@ -9914,7 +10255,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        window, path_buffer, creation, imports, preview,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
-                       animation_ui, textured_path_ui,
+                       animation_ui, animation_graph_ui, textured_path_ui,
                        project_settings,
                        pending_drawable_kind,
                        request_open, request_png, request_svg,
@@ -9922,6 +10263,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         draw_behavior_editor(session, behavior_session, creation, status);
         draw_transformation_editor(session, transformation_session, creation,
                                    status);
+        draw_animation_graph_editor(session, animation_graph_ui, status);
 
         const auto* active_resource = session.selected_resource();
         if (behavior_session.dirty() && behavior_session.graph() &&
@@ -10443,9 +10785,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::editor::StudioResourceKind::entity,
                         {.value = "beam-entity"});
                 entity_e2e_complete = entity_e2e_complete && reopened &&
+                    ui_animation_graph_seen &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=
                         entity_gizmo_e2e_initial_position.x;
+                entity_e2e_complete = entity_e2e_complete &&
+                    reloaded.selected_entity()->animation_state_machine &&
+                    !reloaded.selected_entity()->animation_state_machine
+                         ->transitions.empty() &&
+                    reloaded.selected_entity()->animation_state_machine
+                            ->transitions.front().id == "activate";
                 if (!entity_e2e_complete)
                     std::cerr << "Asset Studio Entity Gizmo E2E failed: initial="
                               << entity_gizmo_e2e_initial_position.x << "\n";

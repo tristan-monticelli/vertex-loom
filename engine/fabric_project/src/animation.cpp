@@ -119,7 +119,7 @@ ValidationReport validate_animation(const ProjectManifest&, const AnimationClip&
     }
     return report;
 }
-std::vector<ResourceReference> animation_resource_references(const AnimationClip& a){std::vector<ResourceReference> r;if(a.preview_entity)r.push_back(*a.preview_entity);for(const auto& t:a.tracks)for(const auto& k:t.keys)if(const auto* ref=std::get_if<ResourceReference>(&k.value))r.push_back(*ref);return r;}
+std::vector<ResourceReference> animation_resource_references(const AnimationClip& a){std::vector<ResourceReference> r;for(const auto& t:a.tracks)for(const auto& k:t.keys)if(const auto* ref=std::get_if<ResourceReference>(&k.value))r.push_back(*ref);return r;}
 std::string serialize_animation(const AnimationClip& animation) {
     Json document = {
         {"schemaVersion", animation.document.schema_version},
