@@ -97,6 +97,10 @@ bool ui_button_create_seen = false;
 bool ui_button_created = false;
 bool ui_button_reloaded = false;
 ImVec2 ui_button_create_screen{};
+bool ui_animation_probe_enabled = false;
+bool ui_animation_timeline_seen = false;
+bool ui_animation_quick_key_seen = false;
+ImVec2 ui_animation_quick_key_screen{};
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -435,6 +439,7 @@ struct CreationUiState {
     fabric::editor::CreateInputPrompt input;
     fabric::editor::VisualPresetRequest visual_preset;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
+    std::optional<fabric::editor::CreateEntityPrompt> prepared_entity;
     bool request_project{};
     bool request_artwork{};
     bool request_material{};
@@ -448,6 +453,7 @@ struct CreationUiState {
     bool request_transformation{};
     bool guided_button{};
     bool guided_composed_entity{};
+    bool guided_contextual_entity{};
     bool project_publish_attempted{};
     bool input_capture{};
     std::size_t input_capture_action{};
@@ -568,9 +574,202 @@ struct AnimationUiState {
         fabric::project::AnimationComposition::replace};
     bool snap_keys{true};
     float key_snap_interval{0.1F};
+    bool playing{};
+    float timeline_zoom{1.0F};
+    std::optional<KeySelection> dragging_key;
+    float dragging_key_time{};
+    float dragging_key_original_time{};
     std::vector<KeySelection> selected_keys;
     std::vector<ClipboardEntry> key_clipboard;
 };
+
+bool same_animation_key(const AnimationUiState::KeySelection& left,
+                        const AnimationUiState::KeySelection& right) {
+    return left.index == right.index && left.binding == right.binding;
+}
+
+void draw_animation_timeline_dock(
+    fabric::editor::ProjectSession& session,
+    AnimationUiState& ui,
+    std::string& status) {
+    if (!session.selected_animation()) return;
+    if (ui_animation_probe_enabled) ui_animation_timeline_seen = true;
+    auto& clip = *session.selected_animation();
+    if (ui.playing) {
+        ui.scrub_time += ImGui::GetIO().DeltaTime;
+        if (ui.scrub_time > clip.duration) {
+            if (clip.loop && clip.duration > 0.0F) {
+                ui.scrub_time = std::fmod(ui.scrub_time, clip.duration);
+            } else {
+                ui.scrub_time = clip.duration;
+                ui.playing = false;
+            }
+        }
+    }
+
+    ImGui::TextUnformatted("Timeline");
+    ImGui::SameLine();
+    if (ImGui::Button(ui.playing ? "Pause" : "Play")) ui.playing = !ui.playing;
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) {
+        ui.playing = false;
+        ui.scrub_time = 0.0F;
+    }
+    ImGui::SameLine();
+    ImGui::Text("%.2f / %.2f s", ui.scrub_time, clip.duration);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(120.0F);
+    ImGui::SliderFloat("Zoom", &ui.timeline_zoom, 0.5F, 4.0F, "%.1fx");
+
+    if (!ImGui::BeginChild("Animation timeline scroll", {0.0F, 0.0F}, true,
+                           ImGuiWindowFlags_HorizontalScrollbar)) {
+        ImGui::EndChild();
+        return;
+    }
+    constexpr float label_width = 220.0F;
+    constexpr float header_height = 28.0F;
+    constexpr float row_height = 30.0F;
+    const float available_width = std::max(320.0F, ImGui::GetContentRegionAvail().x);
+    const float time_width = std::max(
+        available_width - label_width - 12.0F,
+        std::max(1.0F, clip.duration) * 120.0F * ui.timeline_zoom);
+    const auto row_count = std::max<std::size_t>(1U, clip.tracks.size());
+    const ImVec2 surface_size{label_width + time_width,
+                              header_height + row_height *
+                                  static_cast<float>(row_count)};
+    ImGui::InvisibleButton("##timeline-surface", surface_size);
+    const ImVec2 origin = ImGui::GetItemRectMin();
+    const ImVec2 end = ImGui::GetItemRectMax();
+    const bool hovered = ImGui::IsItemHovered();
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(origin, end, IM_COL32(19, 22, 28, 255));
+    draw->AddRectFilled(origin, {origin.x + label_width, end.y},
+                        IM_COL32(27, 31, 39, 255));
+    const float time_start = origin.x + label_width;
+    const auto x_for_time = [&](const float time) {
+        return time_start + std::clamp(time / std::max(0.01F, clip.duration),
+                                       0.0F, 1.0F) * time_width;
+    };
+    const auto time_for_x = [&](const float x) {
+        const float raw = std::clamp((x - time_start) / time_width, 0.0F, 1.0F) *
+            clip.duration;
+        if (!ui.snap_keys) return raw;
+        return std::round(raw / ui.key_snap_interval) * ui.key_snap_interval;
+    };
+
+    const int tick_count = std::max(2, static_cast<int>(std::ceil(clip.duration)));
+    for (int tick = 0; tick <= tick_count; ++tick) {
+        const float time = clip.duration * static_cast<float>(tick) /
+            static_cast<float>(tick_count);
+        const float x = x_for_time(time);
+        draw->AddLine({x, origin.y}, {x, end.y}, IM_COL32(62, 69, 82, 150));
+        char label[32]{};
+        std::snprintf(label, sizeof(label), "%.1f", time);
+        draw->AddText({x + 3.0F, origin.y + 5.0F},
+                      IM_COL32(178, 187, 201, 255), label);
+    }
+    draw->AddLine({time_start, origin.y + header_height},
+                  {end.x, origin.y + header_height}, IM_COL32(91, 99, 114, 255));
+
+    std::optional<AnimationUiState::KeySelection> hovered_key;
+    float hovered_distance = 9.0F;
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    for (std::size_t track_index = 0; track_index < clip.tracks.size(); ++track_index) {
+        const auto& track = clip.tracks[track_index];
+        const float top = origin.y + header_height + row_height *
+            static_cast<float>(track_index);
+        const float center = top + row_height * 0.5F;
+        if ((track_index % 2U) == 0U)
+            draw->AddRectFilled({origin.x, top}, {end.x, top + row_height},
+                                IM_COL32(255, 255, 255, 6));
+        const auto track_label = track.binding.node_id + "  ·  " +
+            track.binding.component_id + "/" + track.binding.property_id;
+        draw->AddText({origin.x + 8.0F, top + 7.0F},
+                      IM_COL32(216, 221, 230, 255), track_label.c_str());
+        for (std::size_t key_index = 0; key_index < track.keys.size(); ++key_index) {
+            const AnimationUiState::KeySelection candidate{track.binding, key_index};
+            const bool dragging = ui.dragging_key &&
+                same_animation_key(*ui.dragging_key, candidate);
+            const float key_time = dragging ? ui.dragging_key_time
+                                            : track.keys[key_index].time;
+            const float x = x_for_time(key_time);
+            const bool selected = std::ranges::any_of(
+                ui.selected_keys, [&](const auto& value) {
+                    return same_animation_key(value, candidate);
+                });
+            const ImU32 color = selected ? IM_COL32(255, 190, 80, 255)
+                                         : IM_COL32(104, 190, 255, 255);
+            draw->AddQuadFilled({x, center - 6.0F}, {x + 6.0F, center},
+                                {x, center + 6.0F}, {x - 6.0F, center}, color);
+            const float distance = std::hypot(mouse.x - x, mouse.y - center);
+            if (hovered && distance < hovered_distance) {
+                hovered_distance = distance;
+                hovered_key = candidate;
+            }
+        }
+    }
+    if (clip.tracks.empty())
+        draw->AddText({origin.x + 8.0F, origin.y + header_height + 7.0F},
+                      IM_COL32(151, 160, 175, 255),
+                      "No tracks yet — use a key button in the Inspector");
+
+    for (const auto& marker : clip.markers) {
+        const float x = x_for_time(marker.time);
+        draw->AddTriangleFilled({x, origin.y + header_height - 2.0F},
+                                {x - 5.0F, origin.y + header_height - 10.0F},
+                                {x + 5.0F, origin.y + header_height - 10.0F},
+                                IM_COL32(224, 116, 198, 255));
+    }
+    const float playhead_x = x_for_time(ui.scrub_time);
+    draw->AddLine({playhead_x, origin.y}, {playhead_x, end.y},
+                  IM_COL32(255, 96, 96, 255), 2.0F);
+
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        ui.playing = false;
+        if (hovered_key) {
+            const bool additive = ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper;
+            if (!additive) ui.selected_keys.clear();
+            const auto selected = std::ranges::find_if(
+                ui.selected_keys, [&](const auto& value) {
+                    return same_animation_key(value, *hovered_key);
+                });
+            if (selected == ui.selected_keys.end())
+                ui.selected_keys.push_back(*hovered_key);
+            else if (additive)
+                ui.selected_keys.erase(selected);
+            const auto track = std::ranges::find(
+                clip.tracks, hovered_key->binding,
+                &fabric::project::AnimationTrack::binding);
+            if (track != clip.tracks.end() && hovered_key->index < track->keys.size()) {
+                ui.scrub_time = track->keys[hovered_key->index].time;
+                ui.dragging_key = hovered_key;
+                ui.dragging_key_time = ui.scrub_time;
+                ui.dragging_key_original_time = ui.scrub_time;
+            }
+        } else if (mouse.x >= time_start) {
+            ui.selected_keys.clear();
+            ui.scrub_time = time_for_x(mouse.x);
+        }
+    }
+    if (ui.dragging_key && ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        ui.dragging_key_time = time_for_x(mouse.x);
+    if (ui.dragging_key && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        const auto moving = *ui.dragging_key;
+        if (std::abs(ui.dragging_key_time - ui.dragging_key_original_time) <
+            0.0001F) {
+            ui.scrub_time = ui.dragging_key_time;
+        } else if (session.move_selected_animation_key(
+                       moving.binding, moving.index, ui.dragging_key_time)) {
+            ui.scrub_time = ui.dragging_key_time;
+            ui.selected_keys.clear();
+            status = "Animation key moved.";
+        } else {
+            status = "Key move rejected; inspect diagnostics.";
+        }
+        ui.dragging_key.reset();
+    }
+    ImGui::EndChild();
+}
 
 struct TexturedPathUiState {
     bool animate_texture{};
@@ -1193,6 +1392,7 @@ std::string_view studio_resource_kind_label(
 }
 
 void draw_project_tree(fabric::editor::ProjectSession& session,
+                       CreationUiState& creation,
                        AssetPreview& preview, std::string& status) {
     if (!session.has_project()) {
         ImGui::TextDisabled("No project open");
@@ -1243,6 +1443,31 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             duplicate_candidate_selected.assign(duplicate_candidates.size(), false);
             open_duplicate_options_popup = true;
         };
+    const auto request_entity_from_visual =
+        [&](const fabric::editor::StudioResource& resource) {
+            fabric::editor::CreateEntityPrompt prompt;
+            const auto base_name = resource.name + " Entity";
+            prompt.name = base_name;
+            for (std::size_t suffix = 2U; std::ranges::any_of(
+                     session.resources(), [&](const auto& candidate) {
+                         return candidate.id == fabric::editor::generated_resource_id(
+                             prompt.name, "entity");
+                     }); ++suffix)
+                prompt.name = base_name + " " + std::to_string(suffix);
+            prompt.node_name = resource.name;
+            prompt.resource_id = resource.id.value;
+            prompt.drawable = resource.kind ==
+                    fabric::editor::StudioResourceKind::texture
+                ? fabric::project::EntityDrawableKind::texture
+                : resource.kind ==
+                      fabric::editor::StudioResourceKind::visual_component
+                ? fabric::project::EntityDrawableKind::visual_component
+                : fabric::project::EntityDrawableKind::vector;
+            creation.prepared_entity = std::move(prompt);
+            creation.guided_contextual_entity = true;
+            creation.request_entity = true;
+            status = "Create an Entity from the selected visual.";
+        };
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
     const char* kind_filters[] = {
@@ -1258,6 +1483,10 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     ImGui::SameLine();
     ImGui::TextDisabled("generated paths, borders and compositions");
     if (const auto* selected = session.selected_resource()) {
+        if (is_entity_artwork_kind(selected->kind) &&
+            ImGui::Button("Create Entity from visual"))
+            request_entity_from_visual(*selected);
+        if (is_entity_artwork_kind(selected->kind)) same_line_if_room();
         if (ImGui::Button("Duplicate")) {
             const auto resource = *selected;
             duplicate_project_resource(session, resource, preview, status);
@@ -1345,6 +1574,10 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 ImGui::EndDragDropSource();
             }
             if (ImGui::BeginPopupContextItem()) {
+                if (is_entity_artwork_kind(resource.kind) &&
+                    ImGui::MenuItem("Create Entity from this visual"))
+                    request_entity_from_visual(resource);
+                if (is_entity_artwork_kind(resource.kind)) ImGui::Separator();
                 if (ImGui::MenuItem("Duplicate")) {
                     duplicate_request = resource;
                 }
@@ -2959,12 +3192,23 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     right_width = std::clamp(right_width, 270.0F,
                              std::max(270.0F, viewport->Size.x - left_width - 320.0F));
     const float content_height = viewport->Size.y - menu_height - status_height;
+    const bool animation_workspace = session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::animation &&
+        session.selected_animation();
+    static float timeline_height = 260.0F;
+    timeline_height = std::clamp(
+        timeline_height, 190.0F, std::max(190.0F, content_height - 200.0F));
+    constexpr float timeline_gap = 6.0F;
+    const float preview_height = animation_workspace
+        ? content_height - timeline_height - timeline_gap
+        : content_height;
 
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({right_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
-    draw_project_tree(session, preview, status);
+    draw_project_tree(session, creation, preview, status);
     if (!session.has_project()) {
         ImGui::Spacing();
         if (ImGui::Button("Create project", {-1.0F, 0.0F})) {
@@ -3053,7 +3297,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({viewport->Size.x - left_width - right_width,
-                              content_height});
+                              preview_height});
     ImGui::Begin("Preview", nullptr,
                  fixed_panel_flags | ImGuiWindowFlags_NoBackground);
     const ImVec2 available = ImGui::GetContentRegionAvail();
@@ -3217,6 +3461,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         right_width, -1.0F, 270.0F,
                         std::max(270.0F, viewport->Size.x - left_width - 320.0F));
     ImGui::End();
+
+    if (animation_workspace) {
+        const float center_width = viewport->Size.x - left_width - right_width;
+        ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
+                                 viewport->Pos.y + menu_height + preview_height +
+                                     timeline_gap});
+        ImGui::SetNextWindowSize({center_width, timeline_height});
+        ImGui::Begin("Timeline workspace", nullptr,
+                     fixed_panel_flags | ImGuiWindowFlags_NoTitleBar);
+        ImGui::InvisibleButton("##timeline-height-splitter", {-1.0F, 5.0F});
+        if (ImGui::IsItemActive()) {
+            timeline_height = std::clamp(
+                timeline_height - ImGui::GetIO().MouseDelta.y,
+                190.0F, std::max(190.0F, content_height - 200.0F));
+        }
+        if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
+        draw_animation_timeline_dock(session, animation_ui, status);
+        ImGui::End();
+    }
 
     ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({left_width, content_height});
@@ -5303,6 +5567,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 };
             ImGui::SeparatorText("Entity behavior");
             if (ImGui::Button("Add animation clip...")) {
+                if (!entity.nodes.empty())
+                    animation_ui.node_id =
+                        entity.nodes[std::min(canvas.selected_node,
+                                              entity.nodes.size() - 1U)].id;
                 creation.request_animation = true;
                 status = "Create a clip targeted at this entity.";
             }
@@ -6216,6 +6484,72 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                   value_label.c_str(),
                                   fabric::project::to_string(property.composition).data());
             }
+            if (session.selected_entity() &&
+                !session.selected_entity()->nodes.empty()) {
+                const auto& nodes = session.selected_entity()->nodes;
+                auto selected_node = std::ranges::find(
+                    nodes, animation_ui.node_id,
+                    &fabric::project::EntityNode::id);
+                if (selected_node == nodes.end()) {
+                    animation_ui.node_id = nodes.front().id;
+                    selected_node = nodes.begin();
+                }
+                ImGui::SeparatorText("Quick keys");
+                const auto current_value =
+                    [&](const fabric::project::PropertyBinding& binding,
+                        fabric::project::AnimationValue fallback) {
+                        const auto found = std::ranges::find(
+                            evaluated.properties, binding,
+                            &fabric::project::EvaluatedProperty::binding);
+                        return found == evaluated.properties.end()
+                            ? fallback : found->value;
+                    };
+                const auto set_quick_key =
+                    [&](const char* label,
+                        const std::string_view property,
+                        fabric::project::AnimationValue value) {
+                        const auto binding = fabric::project::PropertyBinding{
+                            .node_id = animation_ui.node_id,
+                            .component_id = "transform",
+                            .property_id = std::string{property}};
+                        const bool clicked = ImGui::Button(label);
+                        if (ui_animation_probe_enabled &&
+                            property == "rotationDegrees") {
+                            const auto minimum = ImGui::GetItemRectMin();
+                            const auto maximum = ImGui::GetItemRectMax();
+                            ui_animation_quick_key_screen = {
+                                (minimum.x + maximum.x) * 0.5F,
+                                (minimum.y + maximum.y) * 0.5F};
+                            ui_animation_quick_key_seen = true;
+                        }
+                        if (!clicked) return;
+                        if (session.set_selected_animation_key(
+                                binding, animation_ui.scrub_time,
+                                current_value(binding, std::move(value)),
+                                animation_ui.interpolation,
+                                fabric::editor::AutosaveScheduler::Clock::now(),
+                                animation_ui.composition, animation_ui.easing)) {
+                            animation_ui.component_id = "transform";
+                            animation_ui.property_id = std::string{property};
+                            status = std::string{label} + " key set at playhead.";
+                        } else {
+                            status = "Quick key rejected; inspect diagnostics.";
+                        }
+                    };
+                ImGui::TextDisabled("%s", selected_node->name.c_str());
+                set_quick_key("Key Position", "position",
+                              selected_node->transform.position);
+                ImGui::SameLine();
+                set_quick_key("Key Rotation", "rotationDegrees",
+                              selected_node->transform.rotation_degrees);
+                set_quick_key("Key Scale", "scale",
+                              selected_node->transform.scale);
+                ImGui::SameLine();
+                set_quick_key("Key Pivot", "pivot",
+                              selected_node->transform.pivot);
+                ImGui::TextDisabled(
+                    "Creates the typed track when missing and captures the current value.");
+            }
             ImGui::SeparatorText("Markers");
             ImGui::InputText("Marker id", &animation_ui.marker_id);
             animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
@@ -7106,7 +7440,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (!session.refresh_resources()) {
             status = "Project resources could not be refreshed; inspect diagnostics.";
         }
-        creation.entity.reset();
+        if (creation.prepared_entity) {
+            creation.entity = std::move(*creation.prepared_entity);
+            creation.prepared_entity.reset();
+        } else {
+            creation.entity.reset();
+        }
         if (creation.guided_composed_entity) {
             creation.entity.name = "Composed entity";
             creation.entity.node_name = "Root";
@@ -7138,7 +7477,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                          .amount = 0.0F}},
                 };
         }
-        ImGui::OpenPopup("Create entity");
+        if (creation.guided_contextual_entity) {
+            if (session.create_entity(creation.entity)) {
+                clear_asset_preview(preview);
+                status = "Entity created from the selected visual.";
+            } else {
+                status = "Entity creation failed; inspect diagnostics.";
+            }
+            creation.guided_contextual_entity = false;
+        } else {
+            ImGui::OpenPopup("Create entity");
+        }
         creation.request_entity = false;
     }
     if (creation.request_animation && session.has_project()) {
@@ -8773,6 +9122,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     bool animation_e2e_complete = false;
     if (animation_e2e && session.has_project()) {
+        ui_animation_probe_enabled = true;
+        ui_animation_timeline_seen = false;
+        ui_animation_quick_key_seen = false;
         fabric::editor::CreateAnimationPrompt prompt;
         prompt.name = "Targeted Animation E2E";
         prompt.preview_entity_id = "beam-entity";
@@ -8935,6 +9287,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_button_frame = 0U;
     bool entity_e2e_capture_written = false;
     bool animation_e2e_capture_written = false;
+    std::size_t animation_ui_e2e_frame = 0U;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -9315,6 +9668,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (entity_gizmo_e2e_frame != 2U)
                 static_cast<void>(SDL_PushEvent(&button));
         }
+        if (animation_e2e && animation_ui_e2e_frame == 1U &&
+            ui_animation_quick_key_seen) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(ui_animation_quick_key_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(ui_animation_quick_key_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
+                SDL_Event button{};
+                button.type = type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
         SDL_Event event;
         while (SDL_PollEvent(&event) != 0) {
             if (creation.input_capture) {
@@ -9676,6 +10049,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             entity_e2e_capture_written = true;
         }
         if (animation_e2e && animation_e2e_complete &&
+            animation_ui_e2e_frame >= 3U &&
             !animation_e2e_capture_written) {
             write_frame_capture(initial_project, window,
                                 "asset-studio-animation-e2e.ppm");
@@ -10078,7 +10452,30 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 running = false;
             }
         }
-        if (behavior_e2e || transformation_e2e || entity_e2e || animation_e2e ||
+        if (animation_e2e && ++animation_ui_e2e_frame >= 4U) {
+            const bool saved = session.save();
+            fabric::editor::ProjectSession reloaded;
+            const bool reopened = saved && reloaded.open(initial_project) &&
+                reloaded.select_resource(
+                    fabric::editor::StudioResourceKind::animation,
+                    {.value = "targeted-animation-e2e"});
+            const bool rotation_track = reopened &&
+                std::ranges::any_of(
+                    reloaded.selected_animation()->tracks,
+                    [](const auto& track) {
+                        return track.binding.node_id == "root" &&
+                            track.binding.component_id == "transform" &&
+                            track.binding.property_id == "rotationDegrees" &&
+                            !track.keys.empty();
+                    });
+            animation_e2e_complete = animation_e2e_complete &&
+                ui_animation_timeline_seen && ui_animation_quick_key_seen &&
+                rotation_track;
+            if (!animation_e2e_complete)
+                std::cerr << "Asset Studio Animation workspace E2E failed\n";
+            running = false;
+        }
+        if (behavior_e2e || transformation_e2e || entity_e2e ||
             texture_e2e || vector_e2e)
             running = running && entity_gizmo_e2e_active;
     }

@@ -60,6 +60,17 @@ clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
 tangentes, composition additive et segment A→B sont avancés, jamais requis pour
 la première animation. Voir ADR-0147.
 
+La première tranche conserve le layout desktop existant et matérialise le dock
+Timeline sous le canvas lorsqu'un clip est actif. L'action contextuelle de
+l'explorateur prépare l'Entity depuis le visuel courant ; elle ne duplique ni ne
+convertit la ressource source. Le dock rend les pistes et clés sur un axe de
+temps manipulable et réutilise les commandes undoables de `ProjectSession`.
+La lecture, le scrub et le déplacement des clés restent des états d'interface ;
+seule une commande de clé validée modifie le document.
+La preuve E2E Animation doit activer une commande de clé rapide dans l'interface,
+sauvegarder, recharger et vérifier la piste typée correspondante avant de
+capturer le workspace avec un contexte OpenGL réel.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne
