@@ -252,22 +252,8 @@ bool draw_surface_effect_stack(
         shader.classification == fabric::project::TextureClassification::beam ||
         shader.classification ==
             fabric::project::TextureClassification::button_eye;
-    const bool is_beam =
-        shader.classification == fabric::project::TextureClassification::beam;
     const auto effect_of_kind = [&](const Kind kind) {
         return std::ranges::find(shader.effects, kind, &Effect::kind);
-    };
-    const auto set_effect = [&](const Kind kind, const fabric::core::Color color,
-                                const float amount) {
-        auto effect = effect_of_kind(kind);
-        if (effect == shader.effects.end()) {
-            shader.effects.push_back(
-                Effect{.kind = kind, .color = color, .amount = amount});
-        } else {
-            effect->enabled = true;
-            effect->color = color;
-            effect->amount = amount;
-        }
     };
     const auto sync_legacy_settings = [&]() {
         if (const auto tint = effect_of_kind(Kind::tint);
@@ -283,85 +269,6 @@ bool draw_surface_effect_stack(
             shader.shine = shine->amount;
     };
     changed |= draw_surface_color_mode(shader, identifier);
-    if (false && guided_surface && !shader.effects.empty()) {
-        ImGui::SeparatorText("Quick look");
-        ImGui::TextDisabled(
-            "Preserve the source or recolor it with your selected color.");
-        auto tint = effect_of_kind(Kind::tint);
-        const bool source_mode = is_beam
-            ? shader.profile != fabric::project::SurfaceShaderProfile::thread
-            : tint == shader.effects.end() || tint->amount <= 0.0F;
-        if (ImGui::BeginCombo("Traitement des couleurs",
-                              source_mode ? "Source intacte" : "Recoloration")) {
-            if (ImGui::Selectable("Source intacte", source_mode)) {
-                set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
-                shader.profile = fabric::project::SurfaceShaderProfile::plastic;
-                changed = true;
-            }
-            if (ImGui::Selectable("Recoloration", !source_mode)) {
-                const auto selected_color = tint == shader.effects.end()
-                    ? fabric::core::Color{1.0F, 1.0F, 1.0F, 1.0F}
-                    : tint->color;
-                set_effect(Kind::tint, selected_color, 1.0F);
-                shader.profile = is_beam
-                    ? fabric::project::SurfaceShaderProfile::thread
-                    : fabric::project::SurfaceShaderProfile::custom;
-                changed = true;
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Réinitialiser depuis la source")) {
-            shader.profile = fabric::project::SurfaceShaderProfile::plastic;
-            set_effect(Kind::tint, {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
-            set_effect(Kind::holography,
-                       {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
-            set_effect(Kind::shine,
-                       {1.0F, 1.0F, 1.0F, 1.0F}, 0.0F);
-            sync_legacy_settings();
-            changed = true;
-        }
-
-        if (tint = effect_of_kind(Kind::tint);
-            tint != shader.effects.end()) {
-            bool quick_changed = ImGui::ColorEdit4(
-                "Base color##quick", &tint->color.red);
-            quick_changed |= ImGui::SliderFloat(
-                "Recolor strength##quick", &tint->amount, 0.0F, 1.0F,
-                "%.2f");
-            if (quick_changed) {
-                tint->enabled = true;
-                shader.profile = tint->amount <= 0.0F
-                    ? fabric::project::SurfaceShaderProfile::plastic
-                    : is_beam
-                    ? fabric::project::SurfaceShaderProfile::thread
-                    : fabric::project::SurfaceShaderProfile::custom;
-                changed = true;
-            }
-        }
-        if (auto holography = effect_of_kind(Kind::holography);
-            holography != shader.effects.end()) {
-            bool quick_changed = ImGui::ColorEdit4(
-                "Glow color##quick", &holography->color.red);
-            quick_changed |= ImGui::SliderFloat(
-                "Glow strength##quick", &holography->amount, 0.0F, 1.0F,
-                "%.2f");
-            if (quick_changed) {
-                holography->enabled = true;
-                changed = true;
-            }
-        }
-        if (auto shine = effect_of_kind(Kind::shine);
-            shine != shader.effects.end()) {
-            const bool quick_changed = ImGui::SliderFloat(
-                "Highlight##quick", &shine->amount, 0.0F, 1.0F, "%.2f");
-            if (quick_changed) {
-                shine->enabled = true;
-                changed = true;
-            }
-        }
-        if (changed) sync_legacy_settings();
-    }
 
     const bool show_advanced = !guided_surface ||
         ImGui::CollapsingHeader("Advanced effect stack");
