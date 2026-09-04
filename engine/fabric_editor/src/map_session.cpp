@@ -329,7 +329,7 @@ bool MapSession::set_instances_layer(const std::vector<core::ResourceId>& instan
 }
 
 bool MapSession::set_instance_property(const core::ResourceId& instance_id,
-                                       project::MapProperty property) {
+                                        project::MapProperty property) {
     if (!map_ || property.id.empty()) return false;
     const auto found = find_instance(*map_, instance_id);
     if (!found) return false;
@@ -340,6 +340,18 @@ bool MapSession::set_instance_property(const core::ResourceId& instance_id,
         [&](const auto& candidate) { return candidate.id == property.id; });
     if (existing != properties.end()) existing->value = std::move(property.value);
     else properties.push_back(std::move(property));
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
+bool MapSession::set_instance_path_follower(
+    const core::ResourceId& instance_id,
+    std::optional<project::PathFollowerState> follower) {
+    if (!map_) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found || instance_locked(*map_, *found)) return false;
+    auto next = *map_;
+    next.instances[*found].path_follower = std::move(follower);
     auto before = *map_;
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
