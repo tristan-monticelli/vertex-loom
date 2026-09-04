@@ -30,6 +30,13 @@ plan compilé mais aucun handle Box2D dans les fichiers ; chaque ouverture,
 mutation ou reset reconstruit ces handles. Le pas manuel est fixé à `1/60 s` et
 le mode lecture accumule uniquement du temps de frame borné.
 
+Le parcours nominal de Map Studio est un canevas de cartes, ports et flèches.
+Une commande part d'un port de sortie ; cliquer une carte cible choisit son
+premier port d'entrée de même type et soumet la connexion à
+`MechanicSession`. Les listes de nœuds, propriétés et extrémités restent des
+inspecteurs avancés. Sélection, layout et connexion en cours sont éphémères :
+`MechanicGraph v1` reste inchangé.
+
 La première mécanique de référence est une plateforme tournante avec pivot,
 vitesse, direction, accélération, limites optionnelles, capteur de présence,
 activation événementielle, collision et transport du personnage.
@@ -95,3 +102,5 @@ inspectable sans exécuter de code arbitraire.
   Box2D et leurs pas exécutés sont observables dans les métriques runtime.
 - Un prefab peut référencer une mécanique et exposer certains paramètres comme
   overrides typés.
+- La validation visuelle doit partir de nœuds non reliés, connecter deux ports
+  par gestes UI, sauvegarder/recharger puis démarrer la simulation compilée.

@@ -1192,6 +1192,8 @@ struct MechanicEditorState {
     std::string from_port;
     std::string to_node;
     std::string to_port;
+    std::string canvas_connection_source;
+    bool pending_canvas_connection{};
     fabric::editor::RotatingPlatformPresetRequest platform;
     int platform_activation{};
     int platform_direction{};
@@ -1410,6 +1412,15 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         ImGui::End();
         return;
     }
+    if (state.pending_canvas_connection) {
+        status = session.connect({state.from_node, state.from_port,
+                                  state.to_node, state.to_port})
+            ? "Ports connected from canvas"
+            : "Canvas connection rejected (types, direction or cycle)";
+        state.pending_canvas_connection = false;
+        if (status == "Ports connected from canvas")
+            state.canvas_connection_source.clear();
+    }
     const auto& graph = *session.graph();
     if (session.has_recovery()) {
         ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
@@ -1446,6 +1457,110 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
 
     ImGui::Columns(2, "mechanic-columns", true);
     ImGui::SeparatorText("Graph");
+    ImGui::TextDisabled(
+        "Choose Connect from output, then click a compatible destination.");
+    if (ImGui::BeginChild("Mechanic graph canvas", {0.0F, 260.0F},
+                          ImGuiChildFlags_Borders)) {
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        constexpr float card_width = 174.0F;
+        constexpr float card_height = 78.0F;
+        constexpr float cell_width = 202.0F;
+        constexpr float cell_height = 126.0F;
+        const int columns = std::max(1, static_cast<int>(
+            ImGui::GetContentRegionAvail().x / cell_width));
+        std::vector<ImVec2> positions;
+        positions.reserve(graph.nodes.size());
+        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+            positions.push_back({
+                14.0F + static_cast<float>(static_cast<int>(index) % columns) *
+                    cell_width,
+                14.0F + static_cast<float>(static_cast<int>(index) / columns) *
+                    cell_height});
+        }
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImU32 line_color = ImGui::GetColorU32(ImGuiCol_PlotLines);
+        for (const auto& connection : graph.connections) {
+            const auto source = std::ranges::find(
+                graph.nodes, connection.from_node,
+                &fabric::project::MechanicNodeDefinition::id);
+            const auto target = std::ranges::find(
+                graph.nodes, connection.to_node,
+                &fabric::project::MechanicNodeDefinition::id);
+            if (source == graph.nodes.end() || target == graph.nodes.end())
+                continue;
+            const auto source_index = static_cast<std::size_t>(
+                std::distance(graph.nodes.begin(), source));
+            const auto target_index = static_cast<std::size_t>(
+                std::distance(graph.nodes.begin(), target));
+            const ImVec2 start{origin.x + positions[source_index].x + card_width,
+                               origin.y + positions[source_index].y +
+                                   card_height * 0.5F};
+            const ImVec2 end{origin.x + positions[target_index].x,
+                             origin.y + positions[target_index].y +
+                                 card_height * 0.5F};
+            const float bend = std::max(36.0F, std::abs(end.x - start.x) * 0.4F);
+            draw->AddBezierCubic(start, {start.x + bend, start.y},
+                                 {end.x - bend, end.y}, end, line_color, 2.0F);
+            draw->AddTriangleFilled(end, {end.x - 8.0F, end.y - 5.0F},
+                                    {end.x - 8.0F, end.y + 5.0F}, line_color);
+        }
+        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+            const auto& node = graph.nodes[index];
+            const auto output = std::ranges::find(
+                node.ports, fabric::project::MechanicPortDirection::output,
+                &fabric::project::MechanicPortDefinition::direction);
+            const auto input = std::ranges::find(
+                node.ports, fabric::project::MechanicPortDirection::input,
+                &fabric::project::MechanicPortDefinition::direction);
+            ImGui::SetCursorScreenPos(
+                {origin.x + positions[index].x, origin.y + positions[index].y});
+            ImGui::PushID(node.id.c_str());
+            std::string label = node.type + "\n" + node.id;
+            if (input != node.ports.end()) label += "\nin: " + input->id;
+            if (output != node.ports.end()) label += "\nout: " + output->id;
+            if (ImGui::Button(label.c_str(), {card_width, card_height})) {
+                state.selected_node = node.id;
+                if (!state.canvas_connection_source.empty() &&
+                    state.canvas_connection_source != node.id) {
+                    const auto source = std::ranges::find(
+                        graph.nodes, state.canvas_connection_source,
+                        &fabric::project::MechanicNodeDefinition::id);
+                    if (source != graph.nodes.end()) {
+                        const auto source_port = std::ranges::find(
+                            source->ports,
+                            fabric::project::MechanicPortDirection::output,
+                            &fabric::project::MechanicPortDefinition::direction);
+                        const auto target_port = std::ranges::find_if(
+                            node.ports, [&](const auto& port) {
+                                return source_port != source->ports.end() &&
+                                    port.direction ==
+                                        fabric::project::MechanicPortDirection::input &&
+                                    port.type == source_port->type;
+                            });
+                        if (source_port != source->ports.end() &&
+                            target_port != node.ports.end()) {
+                            state.from_node = source->id;
+                            state.from_port = source_port->id;
+                            state.to_node = node.id;
+                            state.to_port = target_port->id;
+                            state.pending_canvas_connection = true;
+                        } else status = "No compatible mechanic input on target.";
+                    }
+                }
+            }
+            ImGui::BeginDisabled(output == node.ports.end());
+            if (state.canvas_connection_source == node.id) {
+                if (ImGui::SmallButton("Cancel connection"))
+                    state.canvas_connection_source.clear();
+            } else if (ImGui::SmallButton("Connect from output")) {
+                state.canvas_connection_source = node.id;
+                state.selected_node = node.id;
+            }
+            ImGui::EndDisabled();
+            ImGui::PopID();
+        }
+    }
+    ImGui::EndChild();
     for (const auto& node : graph.nodes) {
         const auto label = node.id + " [" + node.type + "]";
         if (ImGui::Selectable(label.c_str(), state.selected_node == node.id))
