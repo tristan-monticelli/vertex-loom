@@ -2933,6 +2933,56 @@ bool ProjectSession::set_selected_entity_definition(
     return true;
 }
 
+bool ProjectSession::create_selected_entity_ik_chain(
+    const std::vector<std::size_t>& joint_indices,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || joint_indices.size() < 2U) return false;
+    std::vector<std::size_t> unique_indices;
+    unique_indices.reserve(joint_indices.size());
+    for (const auto index : joint_indices) {
+        if (index >= selected_entity_->nodes.size() ||
+            std::ranges::find(unique_indices, index) != unique_indices.end()) {
+            return false;
+        }
+        unique_indices.push_back(index);
+    }
+    auto next = *selected_entity_;
+    const auto unique_node_id = [&](const std::string& base) {
+        std::string candidate = base;
+        std::size_t suffix = 2U;
+        while (std::ranges::any_of(next.nodes, [&](const auto& node) {
+            return node.id == candidate;
+        })) candidate = base + "-" + std::to_string(suffix++);
+        return candidate;
+    };
+    const auto unique_chain_id = [&](const std::string& base) {
+        std::string candidate = base;
+        std::size_t suffix = 2U;
+        while (std::ranges::any_of(next.ik_chains, [&](const auto& chain) {
+            return chain.id == candidate;
+        })) candidate = base + "-" + std::to_string(suffix++);
+        return candidate;
+    };
+    const auto& tip = next.nodes[unique_indices.back()];
+    project::EntityNode target{
+        .id = unique_node_id("ik-target"),
+        .name = "IK Target",
+        .parent = tip.parent,
+        .transform = tip.transform,
+    };
+    target.transform.position.x += 1.0F;
+    project::FabrikChainDefinition chain{
+        .id = unique_chain_id("ik-chain"),
+        .target_node = target.id,
+    };
+    chain.joints.reserve(unique_indices.size());
+    for (const auto index : unique_indices)
+        chain.joints.push_back(next.nodes[index].id);
+    next.nodes.push_back(std::move(target));
+    next.ik_chains.push_back(std::move(chain));
+    return set_selected_entity_definition(std::move(next), now);
+}
+
 bool ProjectSession::set_selected_visual_composition(
     project::VisualComposition composition,
     const AutosaveScheduler::Clock::time_point now) {

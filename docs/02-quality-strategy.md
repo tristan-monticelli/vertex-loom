@@ -196,6 +196,11 @@ Entity exige en plus que l'action nominale d'animation et le transform soient
 réellement rendus ; le scénario Animation exige le picker nominal de nœud et
 une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
 puisse pas satisfaire la recette UX.
+Le scénario Entity sélectionne aussi deux articulations, clique
+`Create IK from selection`, exige une chaîne et une cible générées atomiquement,
+leur round-trip et l'overlay os→cible dans
+`asset-studio-entity-ik-e2e.ppm`. Le test de session couvre entrée invalide,
+undo et redo de la création complète.
 Le même E2E Entity initialise un seul état, clique `Add state from clip`, puis
 utilise les coordonnées réelles de `Connect from here` et de la nouvelle carte
 cible dans le canevas Animation Graph. Après sauvegarde/rechargement, il exige

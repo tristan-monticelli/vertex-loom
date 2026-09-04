@@ -15,6 +15,7 @@ void draw_packet_preview_canvas(
                                ImGuiButtonFlags_MouseButtonMiddle);
     const ImVec2 origin = ImGui::GetItemRectMin();
     canvas.xpbd_overlay_visible = false;
+    canvas.ik_overlay_visible = false;
     canvas.native_canvas = true;
     canvas.native_origin = origin;
     canvas.native_size = available;
@@ -139,6 +140,40 @@ void draw_packet_preview_canvas(
                 ? canvas.entity_display_transforms[index]
                 : entity.nodes[index].transform;
         };
+        for (const auto& chain : entity.ik_chains) {
+            std::vector<std::size_t> joints;
+            joints.reserve(chain.joints.size());
+            for (const auto& id : chain.joints) {
+                const auto node = std::ranges::find(
+                    entity.nodes, id, &fabric::project::EntityNode::id);
+                if (node != entity.nodes.end())
+                    joints.push_back(static_cast<std::size_t>(
+                        std::distance(entity.nodes.begin(), node)));
+            }
+            const auto target = std::ranges::find(
+                entity.nodes, chain.target_node,
+                &fabric::project::EntityNode::id);
+            if (joints.size() != chain.joints.size() ||
+                target == entity.nodes.end()) continue;
+            canvas.ik_overlay_visible = true;
+            for (std::size_t index = 1U; index < joints.size(); ++index) {
+                draw_list->AddLine(
+                    to_screen(display_transform(joints[index - 1U]).position),
+                    to_screen(display_transform(joints[index]).position),
+                    IM_COL32(245, 185, 75, 235), 4.0F);
+            }
+            const auto target_index = static_cast<std::size_t>(
+                std::distance(entity.nodes.begin(), target));
+            const auto tip = to_screen(display_transform(joints.back()).position);
+            const auto target_point =
+                to_screen(display_transform(target_index).position);
+            draw_list->AddLine(tip, target_point,
+                               IM_COL32(245, 105, 185, 220), 2.0F);
+            draw_list->AddCircle(target_point, 9.0F,
+                                 IM_COL32(245, 105, 185, 255), 20, 3.0F);
+            draw_list->AddText({target_point.x + 10.0F, target_point.y - 10.0F},
+                               IM_COL32(245, 180, 220, 255), chain.id.c_str());
+        }
         if (canvas.selected_entity_id != entity.document.id.value) {
             canvas.selected_entity_id = entity.document.id.value;
             canvas.selected_node = 0U;

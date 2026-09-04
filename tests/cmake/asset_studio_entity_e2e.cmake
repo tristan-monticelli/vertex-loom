@@ -25,6 +25,9 @@ endif()
 if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-animation-graph-e2e.ppm")
     message(FATAL_ERROR "Animation Graph E2E did not produce a visual capture")
 endif()
+if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-entity-ik-e2e.ppm")
+    message(FATAL_ERROR "Entity IK E2E did not produce a visual capture")
+endif()
 
 execute_process(
     COMMAND "${PROJECT_VALIDATE}" "${TEST_ROOT}/project"

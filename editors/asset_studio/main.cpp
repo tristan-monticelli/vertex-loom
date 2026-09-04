@@ -162,6 +162,9 @@ ImVec2 ui_behavior_graph_breakpoint_screen{};
 ImVec2 ui_behavior_graph_evaluate_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
+bool ui_entity_ik_create_seen = false;
+bool ui_entity_ik_create_clicked = false;
+ImVec2 ui_entity_ik_create_screen{};
 bool ui_entity_animation_workflow_probe_enabled = false;
 bool ui_entity_from_visual_seen = false;
 bool ui_entity_animate_seen = false;
@@ -4721,6 +4724,39 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ui_workspace_background_seen = true;
     if (ImGui::IsItemHovered())
         ImGui::SetTooltip("Viewer background; it never changes the asset.");
+    const bool entity_rig_selected = session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::entity &&
+        session.selected_entity();
+    if (entity_rig_selected) {
+        ImGui::SameLine();
+        const bool can_create_ik = canvas.selected_entity_nodes.size() >= 2U;
+        ImGui::BeginDisabled(!can_create_ik);
+        if (ImGui::Button("Create IK from selection")) {
+            if (session.create_selected_entity_ik_chain(
+                    canvas.selected_entity_nodes)) {
+                canvas.selected_node = session.selected_entity()->nodes.size() - 1U;
+                canvas.selected_entity_nodes = {canvas.selected_node};
+                status = "IK chain and movable target created.";
+                if (ui_animation_graph_probe_enabled)
+                    ui_entity_ik_create_clicked = true;
+            } else {
+                status = "IK creation rejected; select distinct joint nodes.";
+            }
+        }
+        ImGui::EndDisabled();
+        draw_disabled_reason(
+            !can_create_ik,
+            "Ctrl/Cmd-click at least two joints in root-to-tip order.");
+        if (ui_animation_graph_probe_enabled) {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_entity_ik_create_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_entity_ik_create_seen = true;
+        }
+    }
     ImGui::Separator();
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
@@ -6836,6 +6872,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     else
                         status = "Advanced entity section saved.";
                 };
+            ImGui::SeparatorText("Rig and IK");
+            ImGui::TextDisabled(
+                "Create chains from the Viewer toolbar, then drag their target handle.");
+            if (!entity.ik_chains.empty())
+                ImGui::TextDisabled(
+                    "%zu IK chain(s) shown on the Entity canvas.",
+                    entity.ik_chains.size());
             if (entity_advanced_mode &&
                 ImGui::CollapsingHeader(
                     "Advanced systems: constraints, IK and deformation")) {
@@ -6896,15 +6939,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::PopID();
                 }
-                if (ImGui::Button("Add IK chain")) {
-                    auto next = entity;
-                    next.ik_chains.push_back({
-                        .id = "ik-" + std::to_string(next.ik_chains.size() + 1U),
-                        .target_node = next.nodes.empty() ? "" : next.nodes.back().id});
-                    commit_advanced_entity(std::move(next));
-                }
                 if (entity.ik_chains.empty())
-                    ImGui::TextDisabled("No IK chains configured.");
+                    ImGui::TextDisabled(
+                        "No IK chains configured; use the guided canvas action above.");
             }
             if (ImGui::CollapsingHeader("Whole Entity deformation (advanced)")) {
                 if (entity.deformation_mesh) {
@@ -10950,6 +10987,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_animation_graph_target_seen = false;
         ui_entity_animate_action_seen = false;
         ui_entity_transform_seen = false;
+        ui_entity_ik_create_seen = false;
+        ui_entity_ik_create_clicked = false;
         const fabric::core::ResourceId entity_id{.value =
             "beam-entity"};
         const bool selected = session.select_resource(
@@ -11247,6 +11286,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_beam_frame = 0U;
     std::size_t ui_button_frame = 0U;
     bool entity_e2e_capture_written = false;
+    bool entity_ik_e2e_capture_written = false;
     bool animation_graph_e2e_capture_written = false;
     bool behavior_graph_e2e_capture_written = false;
     bool animation_e2e_capture_written = false;
@@ -12070,6 +12110,25 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             if (entity_gizmo_e2e_frame != 10U)
                 static_cast<void>(SDL_PushEvent(&button));
         }
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 13U &&
+            entity_gizmo_e2e_frame <= 14U && ui_entity_ik_create_seen) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(ui_entity_ik_create_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(ui_entity_ik_create_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = entity_gizmo_e2e_frame == 13U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
         if (animation_e2e && animation_ui_e2e_frame == 1U &&
             ui_animation_quick_key_seen) {
             SDL_Event motion{};
@@ -12572,6 +12631,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                 "asset-studio-entity-e2e.ppm");
             entity_e2e_capture_written = true;
         }
+        if (entity_e2e && canvas.ik_overlay_visible &&
+            ui_entity_ik_create_clicked && !entity_ik_e2e_capture_written) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-entity-ik-e2e.ppm");
+            entity_ik_e2e_capture_written = true;
+        }
         if (animation_e2e && animation_e2e_complete &&
             animation_ui_e2e_frame >= 3U &&
             !animation_e2e_capture_written) {
@@ -13024,7 +13089,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (entity_gizmo_e2e_active) {
             ++entity_gizmo_e2e_frame;
-            if (entity_gizmo_e2e_frame == 12U) {
+            if (entity_gizmo_e2e_frame == 18U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool reopened = saved && reloaded.open(initial_project) &&
@@ -13038,12 +13103,23 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     ui_entity_animate_action_seen &&
                     ui_entity_transform_seen &&
                     canvas.xpbd_overlay_visible &&
+                    canvas.ik_overlay_visible &&
+                    ui_entity_ik_create_seen &&
+                    ui_entity_ik_create_clicked &&
+                    entity_ik_e2e_capture_written &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=
                         entity_gizmo_e2e_initial_position.x &&
                     reloaded.selected_entity()->nodes[2].transform.position.x !=
                         entity_gizmo_e2e_secondary_position.x;
                 entity_e2e_complete = entity_e2e_complete &&
+                    reloaded.selected_entity()->nodes.size() == 4U &&
+                    reloaded.selected_entity()->ik_chains.size() == 1U &&
+                    reloaded.selected_entity()->ik_chains.front().joints ==
+                        std::vector<std::string>{"studio-child-copy",
+                                                 "studio-child"} &&
+                    reloaded.selected_entity()->ik_chains.front().target_node ==
+                        "ik-target" &&
                     reloaded.selected_entity()->animation_state_machine &&
                     !reloaded.selected_entity()->animation_state_machine
                          ->transitions.empty() &&
@@ -13058,6 +13134,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                               << ", target-seen="
                               << ui_animation_graph_target_seen
                               << ", link-seen=" << ui_animation_graph_link_seen
+                              << ", ik-create=" << ui_entity_ik_create_clicked
+                              << ", ik-overlay=" << canvas.ik_overlay_visible
                               << ", states="
                               << (reloaded.selected_entity()
                                           ->animation_state_machine

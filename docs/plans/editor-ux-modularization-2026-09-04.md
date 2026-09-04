@@ -127,6 +127,10 @@ Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne
 ces clics et le runtime embarqué préserve les sous-systèmes SDL du Studio.
+Entity propose maintenant `Create IK from selection` dans la barre du Viewer :
+une commande atomique crée chaîne+cible, l'overlay montre os et liaison cible,
+et les gizmos Entity déplacent cette cible. Le test réel couvre clic, capture,
+sauvegarde/reload et le test de session couvre undo/redo.
 
 ## Tranche 4 — authoring direct manquant
 
@@ -134,7 +138,8 @@ ces clics et le runtime embarqué préserve les sous-systèmes SDL du Studio.
 
 - Map : palette, duplication/multi-placement, collisions directes, bodies,
   pivots, joints, sensors et liens sélectionnables sur le canvas.
-- Rig : bones, mesh, poids colorés, IK et contraintes éditables sur le Stage.
+- Rig : création et cible IK de base réalisées ; création de bones, mesh,
+  poids colorés et contraintes directes restent à faire sur le Stage.
 - Animation : courbes avancées et événements ; box-select, déplacement groupé
   et `Alt`+glisser pour scaler une sélection autour du playhead sont réalisés.
 - Logic : erreurs sur ports/liens, trace live, pause, step et breakpoints.

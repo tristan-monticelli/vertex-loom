@@ -1613,6 +1613,37 @@ TEST_CASE("entity advanced definition edits validate and undo") {
     CHECK_FALSE(session.selected_entity()->deformation_mesh.has_value());
 }
 
+TEST_CASE("entity IK chain creation adds a valid movable target atomically") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "IK authoring";
+    prompt.node_name = "Root";
+    REQUIRE(session.create_entity(prompt));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.add_selected_entity_node(
+        {.id = "joint", .name = "Joint", .parent = "root",
+         .transform = {.position = {2.0F, 0.0F}}}, start));
+
+    CHECK_FALSE(session.create_selected_entity_ik_chain({}, start));
+    CHECK_FALSE(session.create_selected_entity_ik_chain({0U, 0U}, start));
+    REQUIRE(session.create_selected_entity_ik_chain({0U, 1U}, start));
+    REQUIRE(session.selected_entity()->ik_chains.size() == 1U);
+    const auto& chain = session.selected_entity()->ik_chains.front();
+    CHECK(chain.joints == std::vector<std::string>{"root", "joint"});
+    CHECK(chain.target_node == "ik-target");
+    REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    CHECK(session.selected_entity()->nodes.back().transform.position ==
+          fabric::core::Vec2{3.0F, 0.0F});
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_entity()->ik_chains.empty());
+    CHECK(session.selected_entity()->nodes.size() == 2U);
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_entity()->nodes.back().id == "ik-target");
+}
+
 TEST_CASE("animation prompt publishes and indexes a clip") {
     const TemporaryDirectory project;
     write_project(project.path());
