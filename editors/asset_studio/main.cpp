@@ -10967,6 +10967,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t vector_canvas_e2e_frame = 0U;
     std::size_t vector_canvas_e2e_initial_path_size = 0U;
     bool vector_canvas_e2e_freeform_seed_applied = false;
+    std::string vector_canvas_e2e_failure_stage;
+    std::size_t vector_canvas_e2e_target_path_point{1U};
+    std::size_t vector_canvas_e2e_selected_path_count{};
+    std::size_t vector_canvas_e2e_path_size_before_delete{};
+    std::size_t vector_canvas_e2e_path_size_before_right_click{};
+    ImVec2 vector_canvas_e2e_segment_screen{};
+    bool vector_canvas_e2e_segment_screen_ready = false;
     fabric::core::Vec2 vector_canvas_e2e_initial_anchor{};
     fabric::core::Vec2 vector_canvas_e2e_initial_control1{};
     if (vector_canvas_e2e && session.has_project()) {
@@ -11295,7 +11302,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             canvas.dragging = false;
             canvas.drag_operation = CanvasUiState::DragOperation::none;
             canvas.drag_start_node = {};
-            canvas.tool = CanvasUiState::Tool::pen;
+            canvas.tool = CanvasUiState::Tool::move;
         }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 22U &&
             vector_canvas_e2e_freeform_seed_applied &&
@@ -11470,6 +11477,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 6U)
             canvas.tool = CanvasUiState::Tool::move;
+        if (vector_canvas_e2e && vector_canvas_e2e_frame == 5U &&
+            session.created_vector() && session.created_vector()->native) {
+            vector_canvas_e2e_path_size_before_right_click =
+                session.created_vector()->native->nodes.front().shape.path.size();
+        }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 9U) {
             canvas.tool = CanvasUiState::Tool::move;
             canvas.bezier_handle_mode = fabric::editor::BezierHandleMode::free;
@@ -11489,7 +11501,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 node.stroke->join = fabric::project::VectorStrokeJoin::bevel;
                 node.stroke->cap = fabric::project::VectorStrokeCap::square;
                 node.stroke->image.reset();
-            } else if (node.stroke->image) {
+            } else {
+                if (!node.stroke->image) {
+                    node.stroke->image = fabric::project::VectorImageFill{
+                        .texture = {vector_canvas_texture_id, "texture"}};
+                }
                 node.stroke->image->transform.position = {0.35F, -0.15F};
                 node.stroke->image->transform.scale = {1.8F, 0.7F};
                 node.stroke->image->opacity = 0.35F;
@@ -11507,7 +11523,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         const bool handle_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame >= 9U && vector_canvas_e2e_frame < 12U;
         const bool point_selection_gesture = vector_canvas_e2e &&
-            vector_canvas_e2e_frame >= 12U && vector_canvas_e2e_frame < 16U;
+            vector_canvas_e2e_frame >= 12U && vector_canvas_e2e_frame <= 16U;
         const bool freeform_gesture = false;
         const bool release_gesture = vector_canvas_e2e &&
             vector_canvas_e2e_frame == 16U;
@@ -11517,12 +11533,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             point_selection_gesture || freeform_gesture || release_gesture) {
             const auto frame = vector_canvas_e2e_frame;
             const bool freeform_down = freeform_gesture;
-            const bool button_event = frame == 2U || frame == 3U || frame == 4U ||
+            const bool button_event = frame == 2U || frame == 4U ||
                 frame == 5U || frame == 6U || frame == 8U ||
-                frame == 9U || frame == 11U || frame == 12U || frame == 16U ||
+                frame == 9U || frame == 11U || frame == 13U || frame == 14U ||
+                frame == 16U ||
                 freeform_down;
-            const bool button_down = frame == 2U || frame == 3U || frame == 5U ||
-                (move_gesture ? frame == 6U : frame == 9U) || frame == 12U ||
+            const bool button_down = frame == 2U || frame == 5U ||
+                (move_gesture ? frame == 6U : frame == 9U) || frame == 13U ||
                 freeform_down;
             const bool right_click = frame == 5U;
             const auto canvas_point = [&](const fabric::core::Vec2 point) {
@@ -11556,6 +11573,47 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             };
             const auto& test_node = session.created_vector()->native->nodes.front();
             const auto& test_path = test_node.shape.path;
+            if (pen_gesture && !vector_canvas_e2e_segment_screen_ready &&
+                canvas.rendered_path_points.size() == test_path.size()) {
+                for (std::size_t index = 1U; index < test_path.size(); ++index) {
+                    if (test_path[index].kind !=
+                            fabric::project::VectorPathCommandKind::line)
+                        continue;
+                    const auto start = canvas.rendered_path_points[index - 1U];
+                    const auto end = canvas.rendered_path_points[index];
+                    const ImVec2 midpoint{
+                        (start.x + end.x) * 0.5F,
+                        (start.y + end.y) * 0.5F};
+                    if (midpoint.x >= canvas.native_origin.x + 12.0F &&
+                        midpoint.x <= canvas.native_origin.x +
+                            canvas.native_size.x - 12.0F &&
+                        midpoint.y >= canvas.native_origin.y + 12.0F &&
+                        midpoint.y <= canvas.native_origin.y +
+                            canvas.native_size.y - 12.0F &&
+                        std::hypot(end.x - start.x, end.y - start.y) > 30.0F) {
+                        vector_canvas_e2e_segment_screen = midpoint;
+                        vector_canvas_e2e_segment_screen_ready = true;
+                        break;
+                    }
+                }
+            }
+            if (point_selection_gesture) {
+                for (std::size_t index = 1U;
+                     index < canvas.rendered_path_points.size(); ++index) {
+                    if (index >= test_path.size() ||
+                        test_path[index].kind !=
+                            fabric::project::VectorPathCommandKind::line)
+                        continue;
+                    const auto point = canvas.rendered_path_points[index];
+                    if (point.x >= canvas.native_origin.x &&
+                        point.x <= canvas.native_origin.x + canvas.native_size.x &&
+                        point.y >= canvas.native_origin.y &&
+                        point.y <= canvas.native_origin.y + canvas.native_size.y) {
+                        vector_canvas_e2e_target_path_point = index;
+                        break;
+                    }
+                }
+            }
             const auto inserted_index = !canvas.selected_path_points.empty()
                 ? canvas.selected_path_points.front() : 1U;
             const auto test_point = release_gesture
@@ -11589,7 +11647,22 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 : point_selection_gesture && test_path.size() > 1U
                 ? test_path[1].point
                 : fabric::core::Vec2{0.0F, 0.0F};
-            const auto mouse = canvas_point(test_point);
+            const auto mouse = pen_gesture &&
+                    vector_canvas_e2e_segment_screen_ready
+                ? frame == 5U && inserted_index <
+                        canvas.rendered_path_points.size()
+                    ? canvas.rendered_path_points[inserted_index]
+                    : ImVec2{
+                          vector_canvas_e2e_segment_screen.x +
+                              (frame >= 3U ? 24.0F : 0.0F),
+                          vector_canvas_e2e_segment_screen.y +
+                              (frame >= 3U ? -18.0F : 0.0F)}
+                : point_selection_gesture &&
+                    vector_canvas_e2e_target_path_point <
+                        canvas.rendered_path_points.size()
+                ? canvas.rendered_path_points[
+                      vector_canvas_e2e_target_path_point]
+                : canvas_point(test_point);
             const int mouse_x = static_cast<int>(std::lround(mouse.x));
             const int mouse_y = static_cast<int>(std::lround(mouse.y));
             SDL_Event motion{};
@@ -11600,6 +11673,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             motion.motion.x = mouse_x;
             motion.motion.y = mouse_y;
             static_cast<void>(SDL_PushEvent(&motion));
+            if (frame == 6U) {
+                SDL_Event right_release{};
+                right_release.type = SDL_MOUSEBUTTONUP;
+                right_release.button.button = SDL_BUTTON_RIGHT;
+                right_release.button.state = SDL_RELEASED;
+                right_release.button.windowID = SDL_GetWindowID(window);
+                right_release.button.x = mouse_x;
+                right_release.button.y = mouse_y;
+                static_cast<void>(SDL_PushEvent(&right_release));
+            }
             if (button_event) {
                 SDL_Event event{};
                 event.type = button_down ? SDL_MOUSEBUTTONDOWN
@@ -11612,9 +11695,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 event.button.y = mouse_y;
                 static_cast<void>(SDL_PushEvent(&event));
             }
-            if (point_selection_gesture && frame == 14U) {
+            if (point_selection_gesture &&
+                (frame == 15U || frame == 16U)) {
                 SDL_Event key{};
-                key.type = SDL_KEYDOWN;
+                key.type = frame == 15U ? SDL_KEYDOWN : SDL_KEYUP;
                 key.key.windowID = SDL_GetWindowID(window);
                 key.key.keysym.sym = SDLK_DELETE;
                 key.key.keysym.scancode = SDL_SCANCODE_DELETE;
@@ -12516,27 +12600,63 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (vector_canvas_e2e) {
             ++vector_canvas_e2e_frame;
             if (vector_canvas_e2e_frame == 4U && session.created_vector()) {
-                vector_canvas_e2e_complete =
-                    vector_canvas_e2e_complete &&
-                    session.created_vector()->native &&
+                const bool valid = session.created_vector()->native &&
                     session.created_vector()->native->nodes.front().shape.path.size() ==
                         vector_canvas_e2e_initial_path_size + 1U;
+                if (!valid && vector_canvas_e2e_failure_stage.empty())
+                    vector_canvas_e2e_failure_stage = "pen-add(" +
+                        std::to_string(session.created_vector()->native
+                            ? session.created_vector()->native->nodes.front()
+                                  .shape.path.size()
+                            : 0U) + ")";
+                vector_canvas_e2e_complete &= valid;
             } else if (vector_canvas_e2e_frame == 6U && session.created_vector()) {
-                vector_canvas_e2e_complete =
-                    vector_canvas_e2e_complete &&
+                const auto path_size = session.created_vector()->native
+                    ? session.created_vector()->native->nodes.front().shape.path.size()
+                    : 0U;
+                const bool valid = session.created_vector()->native &&
+                    path_size == vector_canvas_e2e_initial_path_size;
+                if (!valid && vector_canvas_e2e_failure_stage.empty())
+                    vector_canvas_e2e_failure_stage = "pen-remove(" +
+                        std::to_string(path_size) + ")";
+                vector_canvas_e2e_complete &= valid;
+            } else if (vector_canvas_e2e_frame == 15U) {
+                const bool valid = std::ranges::find(
+                    canvas.selected_path_points,
+                    vector_canvas_e2e_target_path_point) !=
+                    canvas.selected_path_points.end();
+                vector_canvas_e2e_selected_path_count =
+                    canvas.selected_path_points.size();
+                if (session.created_vector() && session.created_vector()->native)
+                    vector_canvas_e2e_path_size_before_delete =
+                        session.created_vector()->native->nodes.front()
+                            .shape.path.size();
+                if (!valid) {
+                    vector_canvas_e2e_failure_stage = "point-select(" +
+                        std::to_string(canvas.selected_path_points.size()) +
+                        ", hit=" +
+                        (canvas.last_hit_path_point
+                             ? std::to_string(*canvas.last_hit_path_point)
+                             : std::string{"none"}) + ", point=" +
+                        (vector_canvas_e2e_target_path_point <
+                                 canvas.rendered_path_points.size()
+                             ? std::to_string(canvas.rendered_path_points[
+                                                  vector_canvas_e2e_target_path_point].x) +
+                                   ":" + std::to_string(
+                                       canvas.rendered_path_points[
+                                           vector_canvas_e2e_target_path_point].y)
+                             : std::string{"missing"}) + ")";
+                }
+                vector_canvas_e2e_complete &= valid;
+            } else if (vector_canvas_e2e_frame == 18U) {
+                const bool deleted = session.created_vector() &&
                     session.created_vector()->native &&
-                    session.created_vector()->native->nodes.front().shape.path.size() ==
-                        vector_canvas_e2e_initial_path_size;
-            } else if (vector_canvas_e2e_frame == 13U) {
-                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
-                    canvas.selected_path_points.size() == 1U &&
-                    canvas.selected_path_points.front() == 1U;
-            } else if (vector_canvas_e2e_frame == 15U && session.created_vector()) {
-                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
-                    session.created_vector()->native &&
-                    session.created_vector()->native->nodes.front().shape.path.size() ==
-                        vector_canvas_e2e_initial_path_size - 1U;
-            } else if (vector_canvas_e2e_frame == 16U) {
+                    session.created_vector()->native->nodes.front()
+                            .shape.path.size() ==
+                        vector_canvas_e2e_path_size_before_delete -
+                            vector_canvas_e2e_selected_path_count;
+                if (!deleted) vector_canvas_e2e_failure_stage = "point-delete";
+                vector_canvas_e2e_complete &= deleted;
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool reloaded_ok = saved && reloaded.open(initial_project) &&
@@ -12548,7 +12668,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
                     reloaded_ok &&
                     reloaded.created_vector()->native->nodes.front().shape.path.size() ==
-                        vector_canvas_e2e_initial_path_size - 1U;
+                        vector_canvas_e2e_path_size_before_delete -
+                            vector_canvas_e2e_selected_path_count;
             } else if (vector_canvas_e2e_frame == 21U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
@@ -12566,8 +12687,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             command.control1 != fabric::core::Vec2{} &&
                             command.control2 != fabric::core::Vec2{};
                     });
-                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
-                    handles_persisted && node.stroke && node.stroke->image &&
+                const bool stroke_persisted = node.stroke && node.stroke->image &&
                     node.stroke->join == fabric::project::VectorStrokeJoin::bevel &&
                     node.stroke->cap == fabric::project::VectorStrokeCap::square &&
                     node.stroke->image->transform.position ==
@@ -12576,6 +12696,17 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::core::Vec2{1.8F, 0.7F} &&
                     node.stroke->image->opacity == 0.35F &&
                     node.stroke->image->deform_with_shape;
+                if ((!reloaded_ok || !handles_persisted || !stroke_persisted) &&
+                    vector_canvas_e2e_failure_stage.empty()) {
+                    vector_canvas_e2e_failure_stage = "persistence(reload=" +
+                        std::string{reloaded_ok ? "yes" : "no"} +
+                        ", handles=" +
+                        std::string{handles_persisted ? "yes" : "no"} +
+                        ", stroke=" +
+                        std::string{stroke_persisted ? "yes" : "no"} + ")";
+                }
+                vector_canvas_e2e_complete = vector_canvas_e2e_complete &&
+                    reloaded_ok && handles_persisted && stroke_persisted;
             } else if (vector_canvas_e2e_frame == 23U &&
                        session.created_vector()) {
                 auto freeform_node = session.created_vector()->native
@@ -12620,7 +12751,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         std::to_string(freeform_path.size()) +
                         ", reloaded=" + std::to_string(reloaded_path.size()) +
                         ", seed=" +
-                        (vector_canvas_e2e_freeform_seed_applied ? "yes" : "no");
+                        (vector_canvas_e2e_freeform_seed_applied ? "yes" : "no") +
+                        ", stage=" + vector_canvas_e2e_failure_stage +
+                        ", initial=" +
+                        std::to_string(vector_canvas_e2e_initial_path_size) +
+                        ", before-delete=" + std::to_string(
+                            vector_canvas_e2e_path_size_before_delete) +
+                        ", before-right-click=" + std::to_string(
+                            vector_canvas_e2e_path_size_before_right_click) +
+                        ", segment=" +
+                        (vector_canvas_e2e_segment_screen_ready ? "yes" : "no") +
+                        ", selected=" + std::to_string(
+                            vector_canvas_e2e_selected_path_count);
                 running = false;
             }
         }

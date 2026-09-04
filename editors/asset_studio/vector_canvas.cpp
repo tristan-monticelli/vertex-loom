@@ -254,6 +254,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                     }
                 }
                 if (operation == CanvasUiState::DragOperation::none && hit_anchor) {
+                    canvas.last_hit_path_point = *hit_anchor;
                     const auto selected = std::ranges::find(
                         canvas.selected_path_points, *hit_anchor);
                     if (io.KeyShift) {
@@ -795,6 +796,8 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                                {pivot_handle.x, pivot_handle.y + 7.0F},
                                IM_COL32(180, 110, 235, 255), 2.0F);
         } else if (selected_node->shape.kind == fabric::project::VectorShapeKind::path) {
+            canvas.rendered_path_points.assign(
+                selected_node->shape.path.size(), ImVec2{});
             std::optional<std::size_t> hovered_path_point;
             float hovered_path_distance = 10.0F;
             for (std::size_t index = 0;
@@ -823,6 +826,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
                         canvas.selected_path_points.end();
                     const auto point = to_screen(
                         transform_point(*selected_node, command.point));
+                    canvas.rendered_path_points[index] = point;
                     const auto point_color = point_selected
                         ? IM_COL32(100, 210, 255, 255)
                         : IM_COL32(236, 180, 75, 255);

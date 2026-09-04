@@ -67,6 +67,8 @@ struct CanvasUiState {
         entity_gizmo_start_transforms;
     std::size_t path_command_index{};
     std::vector<std::size_t> selected_path_points;
+    std::vector<ImVec2> rendered_path_points;
+    std::optional<std::size_t> last_hit_path_point;
     std::optional<fabric::project::VectorNode> pen_start_node;
     ImVec2 native_origin{};
     ImVec2 native_size{};
