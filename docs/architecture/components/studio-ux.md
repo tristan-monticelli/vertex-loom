@@ -106,6 +106,8 @@ priorités et temps de sortie, puis simule le choix déterministe avec des
 paramètres éphémères. Il ne mélange pas ces paramètres de preview au document.
 Son entrée nominale est un canevas auto-layouté : les cartes exposent le nom et
 le clip, l'état initial est marqué, et les transitions sont des flèches. Une
+palette compacte au-dessus du canevas choisit un clip puis ajoute une carte avec
+un identifiant dérivé et unique. Une
 commande de liaison sur la carte source suivie d'un clic sur la carte cible
 ajoute une transition avec un identifiant unique. Le layout et la sélection
 restent éphémères ; les états, liens et options continuent à passer par la

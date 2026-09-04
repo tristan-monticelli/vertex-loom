@@ -42,6 +42,10 @@ une flèche. `Relier depuis cet état`, puis la sélection d'une carte cible, cr
 une transition valide avec un identifiant généré. Les onglets de formulaire
 restent disponibles pour les conditions, priorités et temps de sortie. Le layout
 automatique du canevas est un état de présentation et ne modifie aucun contrat.
+La barre du canevas permet de choisir un clip puis `Ajouter un état depuis le
+clip` ; l'identifiant est dérivé du clip et rendu unique. L'utilisateur ne doit
+pas ouvrir l'onglet technique `States` ni saisir d'identifiant pour agrandir le
+graphe nominal.
 
 La Timeline expose aussi `Ajouter un événement au playhead` dans sa barre
 principale. Cette action génère un nom `event-N` unique et crée un marqueur sans
@@ -86,9 +90,9 @@ ne contiennent plus l'arbre, les blocs ou les pistes.
   après rechargement ; modifier directement l'état du document ou du playhead
   depuis le harnais ne satisfait pas ce critère.
 - L'Animation Graph rend tous les états et toutes les transitions dans le
-  canevas. Une liaison peut être créée en choisissant la source puis la cible,
-  sans saisir les identifiants techniques ; elle reste éditable dans
-  l'inspecteur et persiste après rechargement.
+  canevas. Un état peut être ajouté depuis un clip et une liaison créée en
+  choisissant la source puis la cible, sans saisir les identifiants techniques ;
+  ils restent éditables dans l'inspecteur et persistent après rechargement.
 - Le workflow transversal lit effectivement le clip, le met en pause, déplace
   une clé sur l'axe temporel et ajoute un événement au playhead par les widgets
   réels. Le temps corrigé et le marqueur doivent persister après rechargement.

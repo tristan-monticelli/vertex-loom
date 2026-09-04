@@ -196,12 +196,13 @@ Entity exige en plus que l'action nominale d'animation et le transform soient
 réellement rendus ; le scénario Animation exige le picker nominal de nœud et
 une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
 puisse pas satisfaire la recette UX.
-Le même E2E Entity initialise deux états sans transition, puis utilise les
-coordonnées réelles de `Connect from here` et de la carte cible dans le canevas
-Animation Graph. Après sauvegarde/rechargement, il exige la transition
-`idle-to-active` et produit `asset-studio-animation-graph-e2e.ppm` avec les
-deux cartes et leur flèche. Une transition injectée par la session avant
-l'affichage ne satisfait pas cette recette.
+Le même E2E Entity initialise un seul état, clique `Add state from clip`, puis
+utilise les coordonnées réelles de `Connect from here` et de la nouvelle carte
+cible dans le canevas Animation Graph. Après sauvegarde/rechargement, il exige
+la transition `idle-to-beam-scroll` et produit
+`asset-studio-animation-graph-e2e.ppm` avec les deux cartes et leur flèche. Un
+état ou une transition injectés par la session avant l'affichage ne satisfont
+pas cette recette.
 Le test `asset_studio_behavior_e2e` crée deux nœuds sans connexion, ouvre la
 ressource Behavior, clique `Connect from output` puis la carte cible, sauvegarde
 et recharge. Il exige la connexion `monster-ai-to-emit-attack`, exécute le
