@@ -29,6 +29,8 @@ inline constexpr std::string_view toggle_animation_graph =
     "toggle_animation_graph";
 inline constexpr std::string_view configure_path_follower =
     "configure_path_follower";
+inline constexpr std::string_view create_path_animation =
+    "create_path_animation";
 } // namespace editor_action_ids
 
 struct EditorActionAvailability {

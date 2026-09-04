@@ -888,6 +888,7 @@ int run(const std::filesystem::path& project_root,
         ? std::vector<std::string>{"rotating-platform-instance"}
         : std::vector<std::string>{};
     bool focus_path_follower_panel = false;
+    bool create_path_animation_request = false;
     std::string active_layer_id = placement_e2e ? "instances" : "";
     std::string new_layer_id;
     std::string new_layer_name;
@@ -948,6 +949,23 @@ int run(const std::filesystem::path& project_root,
         .execute = [&] {
             focus_path_follower_panel = true;
             status = "PathFollower inspector focused";
+            return true;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::create_path_animation},
+        .label = "Create path animation",
+        .shortcut = "",
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = selected_instances.size() == 1U,
+                .disabled_reason = "Select one map instance before creating a path animation.",
+            };
+        },
+        .execute = [&] {
+            create_path_animation_request = true;
+            focus_path_follower_panel = true;
+            status = "Path animation workflow focused";
             return true;
         },
     }));
@@ -2506,7 +2524,9 @@ int run(const std::filesystem::path& project_root,
                     const bool can_create_path_animation = path_reference_valid &&
                         selected_entity.has_value();
                     ImGui::BeginDisabled(!can_create_path_animation);
-                    if (ImGui::Button("Create path animation")) {
+                    if (ImGui::Button("Create path animation") ||
+                        create_path_animation_request) {
+                        create_path_animation_request = false;
                         fabric::project::PathFollowerState follower{
                             .path = {{.value = path_follower_id}, "texturedPath"},
                             .progress = path_follower_progress,
