@@ -124,6 +124,11 @@ que leur remise à zéro lors d'un changement de document. Il reçoit le picker
 typé partagé et ne persiste une modification qu'au travers de
 `ProjectSession`; le shell conserve le preview et le routage de document.
 
+`VisualCompositionLayerPanel` poursuit cette frontière sans absorber le crop
+raster ni le preview. Il possède la sélection de layer et le brouillon d'ajout
+(type et ressource), résout ces valeurs par identifiants au changement de
+document et délègue l'ajout/duplication à `ProjectSession`.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

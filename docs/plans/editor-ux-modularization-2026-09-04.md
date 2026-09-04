@@ -138,6 +138,11 @@ continuent de passer par `ProjectSession` et le picker typé reste injecté. Les
 compositions, chemins texturés et surfaces raster restent les frontières
 Visual suivantes.
 
+La sous-frontière suivante extrait l'arbre et les commandes d'ajout/duplication
+de `Visual Composition`. Le crop raster et l'inspecteur transformé restent dans
+le shell jusqu'à ce qu'un callback de dimensions et un état de layer complet
+puissent être testés sans accès fichier caché.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

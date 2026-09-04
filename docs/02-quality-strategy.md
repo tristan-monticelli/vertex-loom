@@ -304,6 +304,10 @@ l'attachement persistant à l'Entity d'origine et l'ouverture du Behavior.
 L'extraction de `VisualComponentInspector` doit préserver les E2E Beam,
 Vector canvas, Entity et le rechargement des ressources Visual Component ; son
 état de sélection est détenu par le workspace et non par un widget statique.
+L'extraction du panneau de layers Visual Composition doit conserver l'ajout,
+la duplication, la sélection par identifiant et les E2E de composition ; le
+crop raster reste couvert par le shell jusqu'à extraction de son callback de
+dimensions.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre

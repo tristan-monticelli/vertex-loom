@@ -28,6 +28,7 @@
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
 #include "visual_component_inspector.hpp"
+#include "visual_composition_layer_panel.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -77,6 +78,7 @@ using fabric::asset_studio::EntityRigInspectorProbe;
 using fabric::asset_studio::EntityWorkflowProbe;
 using fabric::asset_studio::EntityWorkflowState;
 using fabric::asset_studio::VisualComponentInspectorState;
+using fabric::asset_studio::VisualCompositionLayerPanelState;
 using fabric::asset_studio::EntityHierarchyProbe;
 using fabric::asset_studio::ResourceDragPayload;
 using fabric::asset_studio::draw_entity_hierarchy_workspace;
@@ -91,6 +93,7 @@ using fabric::asset_studio::draw_animation_timeline_workspace;
 using fabric::asset_studio::draw_behavior_workspace;
 using fabric::asset_studio::draw_entity_rig_inspector;
 using fabric::asset_studio::draw_visual_component_inspector;
+using fabric::asset_studio::draw_visual_composition_layer_panel;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -2904,6 +2907,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const fabric::render::VisualCompositionDrawResult&
                         visual_preview,
                     VisualComponentInspectorState& visual_component_ui,
+                    VisualCompositionLayerPanelState& visual_composition_ui,
                     AnimationWorkspaceState& animation_ui,
                     AnimationTimelineProbe& animation_timeline_probe,
                     AnimationInspectorProbe& animation_inspector_probe,
@@ -4017,159 +4021,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         path_ui.preview_offset = 0.0F;
                 }
             } else if (session.selected_visual_composition()) {
-                const auto& composition =
-                    *session.selected_visual_composition();
-                static std::string selected_composition_id;
-                static std::size_t selected_layer{};
-                if (selected_composition_id != composition.document.id.value) {
-                    selected_composition_id = composition.document.id.value;
-                    selected_layer = 0U;
-                }
-                ImGui::SeparatorText("Layer tree");
-                for (std::size_t index = 0; index < composition.layers.size();
-                     ++index) {
-                    const auto& layer = composition.layers[index];
-                    ImGui::PushID(static_cast<int>(index));
-                    auto flags = ImGuiTreeNodeFlags_Leaf |
-                        ImGuiTreeNodeFlags_NoTreePushOnOpen |
-                        ImGuiTreeNodeFlags_SpanAvailWidth;
-                    if (index == selected_layer)
-                        flags |= ImGuiTreeNodeFlags_Selected;
-                    ImGui::TreeNodeEx("layer", flags, "%s  ·  %s",
-                                      layer.name.c_str(),
-                                      std::string(fabric::project::to_string(
-                                          layer.kind)).c_str());
-                    if (ImGui::IsItemClicked()) selected_layer = index;
-                    ImGui::PopID();
-                }
-                static std::string add_layer_composition_id;
-                static fabric::project::VisualLayerKind add_layer_kind{
-                    fabric::project::VisualLayerKind::raster};
-                static std::string add_layer_resource_id;
-                if (add_layer_composition_id != composition.document.id.value) {
-                    add_layer_composition_id = composition.document.id.value;
-                    add_layer_kind = fabric::project::VisualLayerKind::raster;
-                    add_layer_resource_id.clear();
-                }
-                ImGui::SeparatorText("Add layer");
-                const auto add_kind_label = std::string(
-                    fabric::project::to_string(add_layer_kind));
-                if (ImGui::BeginCombo("Layer type", add_kind_label.c_str())) {
-                    for (const auto kind : {
-                             fabric::project::VisualLayerKind::raster,
-                             fabric::project::VisualLayerKind::vector,
-                             fabric::project::VisualLayerKind::component,
-                             fabric::project::VisualLayerKind::textured_path}) {
-                        const bool selected = add_layer_kind == kind;
-                        const auto label = std::string(
-                            fabric::project::to_string(kind));
-                        if (ImGui::Selectable(label.c_str(), selected)) {
-                            add_layer_kind = kind;
-                            add_layer_resource_id.clear();
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                const auto accepts_kind = [&](const auto& resource) {
-                    using Kind = fabric::editor::StudioResourceKind;
-                    return (add_layer_kind ==
-                                fabric::project::VisualLayerKind::raster &&
-                            resource.kind == Kind::texture) ||
-                        (add_layer_kind ==
-                                fabric::project::VisualLayerKind::vector &&
-                            resource.kind == Kind::vector) ||
-                        (add_layer_kind ==
-                                fabric::project::VisualLayerKind::component &&
-                            resource.kind == Kind::visual_component) ||
-                        (add_layer_kind ==
-                                fabric::project::VisualLayerKind::textured_path &&
-                            resource.kind == Kind::textured_path);
-                };
-                const auto add_resource = std::ranges::find_if(
-                    session.resources(), [&](const auto& resource) {
-                        return accepts_kind(resource) &&
-                            resource.id.value == add_layer_resource_id;
-                    });
-                const char* add_resource_label =
-                    add_resource == session.resources().end()
-                    ? "Choose a resource..." : add_resource->name.c_str();
-                if (ImGui::BeginCombo("Resource", add_resource_label)) {
-                    for (const auto& resource : session.resources()) {
-                        if (!accepts_kind(resource)) continue;
-                        const bool selected =
-                            resource.id.value == add_layer_resource_id;
-                        if (ImGui::Selectable(resource.name.c_str(), selected))
-                            add_layer_resource_id = resource.id.value;
-                    }
-                    ImGui::EndCombo();
-                }
-                ImGui::BeginDisabled(add_resource == session.resources().end());
-                if (ImGui::Button("Add selected resource")) {
-                    auto candidate = composition;
-                    auto id = add_resource->id.value;
-                    const auto base = id;
-                    std::size_t suffix = 2U;
-                    while (std::ranges::any_of(
-                        candidate.layers, [&](const auto& layer) {
-                            return layer.id == id;
-                        })) id = base + "-" + std::to_string(suffix++);
-                    std::string expected_type;
-                    if (add_layer_kind ==
-                        fabric::project::VisualLayerKind::raster)
-                        expected_type = "texture";
-                    else if (add_layer_kind ==
-                             fabric::project::VisualLayerKind::vector)
-                        expected_type = "vector";
-                    else if (add_layer_kind ==
-                             fabric::project::VisualLayerKind::component)
-                        expected_type = "visualComponent";
-                    else expected_type = "texturedPath";
-                    fabric::project::VisualCompositionLayer layer{
-                        .id = id,
-                        .name = add_resource->name,
-                        .kind = add_layer_kind,
-                        .resource = {add_resource->id, expected_type},
-                        .z_order = static_cast<float>(candidate.layers.size())};
-                    if (add_layer_kind ==
-                        fabric::project::VisualLayerKind::component)
-                        layer.component_instance =
-                            fabric::project::VisualComponentInstance{};
-                    candidate.layers.push_back(std::move(layer));
-                    if (session.set_selected_visual_composition(
-                            std::move(candidate))) {
-                        selected_layer = session.selected_visual_composition()
-                            ->layers.size() - 1U;
-                    }
-                }
-                ImGui::EndDisabled();
-                draw_disabled_reason(add_resource == session.resources().end(),
-                                     "Choose a compatible indexed resource first.");
-                if (!composition.layers.empty() &&
-                    selected_layer < composition.layers.size()) {
-                    if (ImGui::Button("Duplicate layer")) {
-                        auto candidate = composition;
-                        auto copy = candidate.layers[selected_layer];
-                        const auto base = copy.id + "-copy";
-                        copy.id = base;
-                        std::size_t suffix = 2U;
-                        while (std::ranges::any_of(
-                            candidate.layers, [&](const auto& layer) {
-                                return layer.id == copy.id;
-                            })) {
-                            copy.id = base + "-" +
-                                std::to_string(suffix++);
-                        }
-                        copy.name += " copy";
-                        candidate.layers.insert(
-                            candidate.layers.begin() +
-                                static_cast<std::ptrdiff_t>(selected_layer + 1U),
-                            std::move(copy));
-                        if (session.set_selected_visual_composition(
-                                std::move(candidate))) ++selected_layer;
-                    }
-                    const auto& current =
-                        session.selected_visual_composition()
-                            ->layers[selected_layer];
+                draw_visual_composition_layer_panel(
+                    session, visual_composition_ui, status);
+                const auto current_composition =
+                    session.selected_visual_composition();
+                if (current_composition) {
+                    const auto selected_layer = std::ranges::find(
+                        current_composition->layers,
+                        visual_composition_ui.selected_layer_id,
+                        &fabric::project::VisualCompositionLayer::id);
+                    if (selected_layer != current_composition->layers.end()) {
+                    const auto selected_layer_index = static_cast<std::size_t>(
+                        std::ranges::distance(current_composition->layers.begin(),
+                                              selected_layer));
+                    const auto& current = *selected_layer;
                     auto layer = current;
                     bool changed = false;
                     ImGui::SeparatorText("Selected layer");
@@ -4265,10 +4130,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (changed) {
                         auto candidate =
                             *session.selected_visual_composition();
-                        candidate.layers[selected_layer] = std::move(layer);
+                        candidate.layers[selected_layer_index] = std::move(layer);
                         (void)session.set_selected_visual_composition(
                             std::move(candidate));
                     }
+                }
                 }
             } else if (session.selected_visual_component()) {
                 draw_visual_component_inspector(
@@ -6970,6 +6836,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     EntityWorkflowState entity_workflow_state;
     EntityRigInspectorProbe entity_rig_probe;
     VisualComponentInspectorState visual_component_ui;
+    VisualCompositionLayerPanelState visual_composition_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     EntityArtworkInspectorState entity_artwork_state;
@@ -9031,6 +8898,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
                        visual_component_ui,
+                       visual_composition_ui,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,
