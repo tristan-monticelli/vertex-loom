@@ -977,6 +977,17 @@ int run(const std::filesystem::path& project_root,
                 return fabric::editor::EditorActionAvailability{
                     .enabled = false,
                     .disabled_reason = "Configure a valid PathFollower before creating its animation."};
+            if (!session.manifest())
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "The project manifest is not available."};
+            const auto path_document = fabric::project::textured_path_document_path(
+                *session.manifest(), instance->path_follower->path.id);
+            if (!fabric::project::load_textured_path(
+                    session.project_root(), *session.manifest(), path_document).ok())
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "The configured PathFollower resource is missing or invalid."};
             return fabric::editor::EditorActionAvailability{};
         },
         .execute = [&] {
