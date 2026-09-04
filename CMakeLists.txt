@@ -316,6 +316,7 @@ if(FABRIC_BUILD_EDITORS)
     endif()
     add_executable(map_studio
         editors/map_studio/main.cpp
+        editors/map_studio/map_canvas.cpp
         editors/map_studio/mechanic_workspace.cpp
         editors/map_studio/resource_picker.cpp
         editors/map_studio/scene_workspace.cpp
