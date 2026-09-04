@@ -6,6 +6,7 @@
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/scene_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/editor/studio_workspace.hpp"
 #include "fabric/editor/transformation_session.hpp"
 #include "fabric/project/document_storage.hpp"
 #include "fabric/project/map_package.hpp"
@@ -49,6 +50,7 @@
 namespace {
 
 using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_document_navigation;
 using fabric::editor_ui::draw_resource_name_field;
 using fabric::editor_ui::draw_searchable_id_picker;
 using fabric::editor_ui::draw_technical_tooltip;
@@ -2693,6 +2695,7 @@ int run(const std::filesystem::path& project_root,
 #endif
 
     fabric::editor::MapSession session;
+    fabric::editor::EditorContext editor_context;
     fabric::editor::ProjectSession resource_catalog;
     fabric::editor::MechanicSession mechanic_session;
     fabric::editor::SceneSession scene_session;
@@ -3015,6 +3018,19 @@ int run(const std::filesystem::path& project_root,
         .renderer = &map_renderer,
         .textures = &map_textures,
     };
+    if (session.map()) {
+        static_cast<void>(editor_context.open_document(
+            session.map()->document.id, fabric::editor::EditorWorkspace::map));
+        static_cast<void>(editor_context.set_view({
+            .zoom = canvas_zoom,
+            .pan = {canvas_pan.x, canvas_pan.y},
+            .playhead = preview_time,
+            .active_tool = "select",
+            .active_panel = "inspector",
+        }));
+    }
+    std::string known_scene_document;
+    std::string known_mechanic_document;
     bool running = true;
     while (running) {
         if (mechanic_e2e &&
@@ -3069,6 +3085,33 @@ int run(const std::filesystem::path& project_root,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
+        const auto* active_document = editor_context.active_document();
+        if (active_document != nullptr &&
+            active_document->workspace == fabric::editor::EditorWorkspace::map) {
+            static_cast<void>(editor_context.set_view({
+                .zoom = canvas_zoom,
+                .pan = {canvas_pan.x, canvas_pan.y},
+                .playhead = preview_time,
+                .active_tool = placement_mode ? "place" : "select",
+                .active_panel = "inspector",
+            }));
+        }
+        if (scene_session.scene() &&
+            known_scene_document != scene_session.scene()->document.id.value) {
+            known_scene_document = scene_session.scene()->document.id.value;
+            static_cast<void>(editor_context.open_document(
+                scene_session.scene()->document.id,
+                fabric::editor::EditorWorkspace::scene));
+        }
+        if (mechanic_session.graph() &&
+            known_mechanic_document !=
+                mechanic_session.graph()->document.id.value) {
+            known_mechanic_document =
+                mechanic_session.graph()->document.id.value;
+            static_cast<void>(editor_context.open_document(
+                mechanic_session.graph()->document.id,
+                fabric::editor::EditorWorkspace::logic));
+        }
         const auto& imgui_io_frame = ImGui::GetIO();
 #if defined(__APPLE__)
         const bool command_modifier = imgui_io_frame.KeySuper;
@@ -3153,6 +3196,64 @@ int run(const std::filesystem::path& project_root,
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
+        }
+        if (!editor_context.open_documents().empty()) {
+            static_cast<void>(draw_document_navigation(
+                editor_context,
+                [&](const fabric::core::ResourceId& id) {
+                    if (session.map() && session.map()->document.id == id)
+                        return session.map()->document.name;
+                    if (scene_session.scene() &&
+                        scene_session.scene()->document.id == id)
+                        return scene_session.scene()->document.name;
+                    if (mechanic_session.graph() &&
+                        mechanic_session.graph()->document.id == id)
+                        return mechanic_session.graph()->document.name;
+                    const auto resource = std::ranges::find(
+                        resource_catalog.resources(), id,
+                        &fabric::editor::StudioResource::id);
+                    return resource == resource_catalog.resources().end()
+                        ? id.value
+                        : resource->name;
+                },
+                [&](const fabric::editor::EditorDocumentState& document) {
+                    if (document.workspace ==
+                        fabric::editor::EditorWorkspace::map) {
+                        canvas_zoom = document.view.zoom;
+                        canvas_pan = {document.view.pan.x, document.view.pan.y};
+                        preview_time = document.view.playhead;
+                        placement_mode = document.view.active_tool == "place";
+                        selected_instances.clear();
+                        if (document.selection_id && session.map() &&
+                            std::ranges::any_of(
+                                session.map()->instances,
+                                [&](const auto& instance) {
+                                    return instance.id ==
+                                        document.selection_id->value;
+                                })) {
+                            selected_instances.push_back(
+                                document.selection_id->value);
+                        }
+                        ImGui::SetWindowFocus("Map Studio");
+                        return true;
+                    }
+                    if (document.workspace ==
+                            fabric::editor::EditorWorkspace::scene &&
+                        scene_session.scene() &&
+                        scene_session.scene()->document.id == document.id) {
+                        ImGui::SetWindowFocus("Scene Studio");
+                        return true;
+                    }
+                    if (document.workspace ==
+                            fabric::editor::EditorWorkspace::logic &&
+                        mechanic_session.graph() &&
+                        mechanic_session.graph()->document.id == document.id) {
+                        ImGui::SetWindowFocus("Mechanics");
+                        return true;
+                    }
+                    return false;
+                }));
+            ImGui::Separator();
         }
         if (!session.has_map()) {
             const float start_width = std::min(640.0F, ImGui::GetContentRegionAvail().x);
@@ -4420,6 +4521,28 @@ int run(const std::filesystem::path& project_root,
             draw_errors(session);
         }
         ImGui::End();
+        const auto* selected_document = editor_context.active_document();
+        if (selected_document != nullptr &&
+            selected_document->workspace ==
+                fabric::editor::EditorWorkspace::map) {
+            static_cast<void>(editor_context.set_view({
+                .zoom = canvas_zoom,
+                .pan = {canvas_pan.x, canvas_pan.y},
+                .playhead = preview_time,
+                .active_tool = placement_mode ? "place" : "select",
+                .active_panel = "inspector",
+            }));
+            std::optional<fabric::core::ResourceId> stable_selection;
+            if (!selected_instances.empty() &&
+                fabric::core::ResourceId::is_valid(
+                    selected_instances.front())) {
+                stable_selection = fabric::core::ResourceId{
+                    .value = selected_instances.front()};
+            }
+            static_cast<void>(
+                editor_context.set_selection(std::move(stable_selection)));
+        }
+
         draw_mechanic_editor(mechanic_session, session, mechanic_editor, status,
                              resource_catalog);
         draw_scene_editor(scene_session, project_root, window, scene_editor,
