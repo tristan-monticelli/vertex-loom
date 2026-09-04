@@ -18,7 +18,8 @@ void draw_entity_rig_inspector(
     fabric::editor::ProjectSession& session,
     const bool advanced_mode,
     std::string& status,
-    const EntityNodePicker node_picker) {
+    const EntityNodePicker node_picker,
+    EntityRigInspectorProbe* probe) {
     const auto* selected = session.selected_resource();
     if (selected == nullptr ||
         selected->kind != fabric::editor::StudioResourceKind::entity ||
@@ -46,6 +47,27 @@ void draw_entity_rig_inspector(
                 ImGui::TextDisabled(
                     "%zu IK chain(s) shown on the Entity canvas.",
                     entity.ik_chains.size());
+            if (!entity.deformation_mesh) {
+                if (ImGui::Button("Create starter deformation mesh")) {
+                    const bool created =
+                        session.create_selected_entity_starter_deformation_mesh();
+                    status = created
+                        ? "Starter deformation mesh created."
+                        : "Starter mesh creation rejected; inspect diagnostics.";
+                    if (probe != nullptr && probe->enabled)
+                        probe->starter_mesh_clicked = created;
+                }
+                if (probe != nullptr && probe->enabled) {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    probe->starter_mesh_screen = {
+                        (minimum.x + maximum.x) * 0.5F,
+                        (minimum.y + maximum.y) * 0.5F};
+                    probe->starter_mesh_seen = true;
+                }
+                ImGui::TextDisabled(
+                    "Creates one valid triangle weighted to the root node.");
+            }
             if (advanced_mode &&
                 ImGui::CollapsingHeader(
                     "Advanced systems: constraints, IK and deformation")) {
@@ -133,10 +155,6 @@ void draw_entity_rig_inspector(
                         next.deformation_mesh.reset();
                         commit_advanced_entity(std::move(next));
                     }
-                } else if (ImGui::Button("Create deformation mesh")) {
-                    auto next = entity;
-                    next.deformation_mesh = fabric::project::DeformationMesh{};
-                    commit_advanced_entity(std::move(next));
                 }
             }
             if (ImGui::CollapsingHeader("Whole Entity simulation (advanced)")) {

@@ -1644,6 +1644,48 @@ TEST_CASE("entity IK chain creation adds a valid movable target atomically") {
     CHECK(session.selected_entity()->nodes.back().id == "ik-target");
 }
 
+TEST_CASE("entity starter deformation mesh is valid undoable and reloadable") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    CHECK_FALSE(session.create_selected_entity_starter_deformation_mesh());
+
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Mesh authoring";
+    prompt.node_name = "Root";
+    REQUIRE(session.create_entity(prompt));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.create_selected_entity_starter_deformation_mesh(start));
+    CHECK_FALSE(session.create_selected_entity_starter_deformation_mesh(start));
+    REQUIRE(session.selected_entity()->deformation_mesh.has_value());
+    const auto mesh = *session.selected_entity()->deformation_mesh;
+    REQUIRE(mesh.vertices.size() == 3U);
+    REQUIRE(mesh.triangles.size() == 1U);
+    CHECK(mesh.triangles.front() == fabric::project::MeshTriangle{0U, 1U, 2U});
+    for (const auto& vertex : mesh.vertices) {
+        REQUIRE(vertex.influences.size() == 1U);
+        CHECK(vertex.influences.front().node_id == "root");
+        CHECK(vertex.influences.front().weight == 1.0F);
+    }
+    CHECK(fabric::project::validate_deformation_mesh(mesh).ok());
+
+    REQUIRE(session.undo(start));
+    CHECK_FALSE(session.selected_entity()->deformation_mesh.has_value());
+    REQUIRE(session.redo(start));
+    REQUIRE(session.selected_entity()->deformation_mesh.has_value());
+    REQUIRE(session.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::entity,
+        {.value = "mesh-authoring"}));
+    REQUIRE(reloaded.selected_entity()->deformation_mesh.has_value());
+    CHECK(reloaded.selected_entity()->deformation_mesh->vertices == mesh.vertices);
+    CHECK(reloaded.selected_entity()->deformation_mesh->triangles == mesh.triangles);
+}
+
 TEST_CASE("animation prompt publishes and indexes a clip") {
     const TemporaryDirectory project;
     write_project(project.path());

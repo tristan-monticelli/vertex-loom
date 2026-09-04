@@ -161,3 +161,7 @@ action Behavior. `fabric_project` valide source, destination et mappings puis
 ferme la destination dans les paquets. Preview Runtime prépare un candidat hors
 monde, applique les mappings et ne remplace l'état d'instance qu'après
 validation ; un échec conserve intégralement la source.
+
+Le module Rig/Physics reçoit une sonde d'interaction uniquement pour les E2E.
+L'action nominale de maillage appelle `ProjectSession`; la sonde observe le
+bouton et le résultat sans posséder ni modifier l'`EntityDefinition`.

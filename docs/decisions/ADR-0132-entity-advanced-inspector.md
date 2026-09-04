@@ -28,10 +28,21 @@ cible et les poignées existantes ; déplacer la cible réutilise le gizmo Entit
 et l'historique normal. Les itérations et la tolérance restent dans l'inspecteur
 avancé.
 
+La création de déformation ne produit pas un conteneur vide. L'action nominale
+`Create starter deformation mesh` ajoute atomiquement un triangle éditable,
+dont les trois sommets ont une influence unitaire sur le premier nœud de
+l'Entity. Cette base déterministe passe par `ProjectSession`, peut être annulée
+et ne change pas le contrat `deformationMesh`.
+
 ## Conséquences
 
 - Les contrats avancés sont découvrables et éditables sans modifier le JSON.
 - Une chaîne IK valide peut être créée et manipulée sur le canvas sans saisir
   d'identifiants ni ouvrir le JSON.
+- Un premier maillage valide peut être créé sans saisir indices, influences ou
+  poids dans le JSON ; l'édition directe des sommets et la peinture de poids
+  restent une étape ultérieure du workspace Rig.
 - La validation reste la source unique des contraintes de cohérence.
-- La couverture UX E2E des interactions de ces panneaux reste à compléter.
+- Le parcours Entity E2E clique la création du maillage sur un affichage réel,
+  puis exige sa validation et son rechargement ; l'édition directe et la
+  peinture de poids restent à couvrir lorsqu'elles seront implémentées.

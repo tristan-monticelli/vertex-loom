@@ -138,6 +138,10 @@ des commandes `ProjectSession`, avec une sonde E2E explicitement injectée.
 La migration Entity commence par le sous-workspace Rig/Physics : contraintes,
 IK, déformation et XPBD quittent le shell, mais chaque édition remplace une
 `EntityDefinition` validée par la session existante.
+La création de déformation vide est remplacée par un triangle de départ valide,
+pondéré sur le nœud racine et créé par une commande undoable de la session ;
+l'action reste visible dans la section nominale Rig et sa sonde E2E appartient
+au module extrait.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne

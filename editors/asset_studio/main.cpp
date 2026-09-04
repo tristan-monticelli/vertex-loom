@@ -65,6 +65,7 @@ using fabric::asset_studio::AnimationTimelineProbe;
 using fabric::asset_studio::AnimationWorkspaceState;
 using fabric::asset_studio::BehaviorWorkspaceProbe;
 using fabric::asset_studio::BehaviorWorkspaceState;
+using fabric::asset_studio::EntityRigInspectorProbe;
 using fabric::asset_studio::ImportUiState;
 using fabric::asset_studio::PreviewKind;
 using fabric::asset_studio::SourceImportFields;
@@ -2778,6 +2779,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AnimationInspectorProbe& animation_inspector_probe,
                     AnimationGraphWorkspaceState& animation_graph_ui,
                     AnimationGraphWorkspaceProbe& animation_graph_probe,
+                    EntityRigInspectorProbe& entity_rig_probe,
                     TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
                     std::optional<std::pair<std::size_t,
@@ -5235,7 +5237,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         draw_entity_rig_inspector(
-            session, entity_advanced_mode, status, draw_entity_node_picker);
+            session, entity_advanced_mode, status, draw_entity_node_picker,
+            &entity_rig_probe);
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
@@ -7837,6 +7840,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     AnimationInspectorProbe animation_inspector_probe;
     AnimationGraphWorkspaceState animation_graph_ui;
     AnimationGraphWorkspaceProbe animation_graph_probe;
+    EntityRigInspectorProbe entity_rig_probe;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     std::optional<std::pair<std::size_t, fabric::project::EntityDrawableKind>>
@@ -8165,6 +8169,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         animation_graph_probe.add_seen = false;
         animation_graph_probe.connect_seen = false;
         animation_graph_probe.target_seen = false;
+        entity_rig_probe.enabled = true;
+        entity_rig_probe.starter_mesh_seen = false;
+        entity_rig_probe.starter_mesh_clicked = false;
         ui_entity_animate_action_seen = false;
         ui_entity_transform_seen = false;
         ui_entity_ik_create_seen = false;
@@ -9310,6 +9317,26 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             button.button.y = motion.motion.y;
             static_cast<void>(SDL_PushEvent(&button));
         }
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 16U &&
+            entity_gizmo_e2e_frame <= 17U &&
+            entity_rig_probe.starter_mesh_seen) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(entity_rig_probe.starter_mesh_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(entity_rig_probe.starter_mesh_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = entity_gizmo_e2e_frame == 16U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
         if (animation_e2e && animation_ui_e2e_frame == 1U &&
             animation_inspector_probe.quick_key_seen) {
             SDL_Event motion{};
@@ -9663,6 +9690,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,
+                       entity_rig_probe,
                        textured_path_ui,
                        project_settings,
                        pending_drawable_kind,
@@ -10281,6 +10309,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.select_resource(
                         fabric::editor::StudioResourceKind::entity,
                         {.value = "beam-entity"});
+                const auto* reloaded_entity = reopened
+                    ? &*reloaded.selected_entity() : nullptr;
+                const bool starter_mesh_valid = reloaded_entity != nullptr &&
+                    reloaded_entity->deformation_mesh &&
+                    fabric::project::validate_deformation_mesh(
+                        *reloaded_entity->deformation_mesh).ok() &&
+                    reloaded_entity->deformation_mesh->vertices.size() == 3U &&
+                    reloaded_entity->deformation_mesh->triangles.size() == 1U;
                 entity_e2e_complete = entity_e2e_complete && reopened &&
                     animation_graph_probe.graph_seen && animation_graph_probe.canvas_seen &&
                     animation_graph_probe.add_seen &&
@@ -10291,24 +10327,27 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     canvas.ik_overlay_visible &&
                     ui_entity_ik_create_seen &&
                     ui_entity_ik_create_clicked &&
+                    entity_rig_probe.starter_mesh_seen &&
+                    entity_rig_probe.starter_mesh_clicked &&
+                    starter_mesh_valid &&
                     entity_ik_e2e_capture_written &&
-                    reloaded.selected_entity()->nodes.size() > 1U &&
-                    reloaded.selected_entity()->nodes[1].transform.position.x !=
+                    reloaded_entity->nodes.size() > 1U &&
+                    reloaded_entity->nodes[1].transform.position.x !=
                         entity_gizmo_e2e_initial_position.x &&
-                    reloaded.selected_entity()->nodes[2].transform.position.x !=
+                    reloaded_entity->nodes[2].transform.position.x !=
                         entity_gizmo_e2e_secondary_position.x;
                 entity_e2e_complete = entity_e2e_complete &&
-                    reloaded.selected_entity()->nodes.size() == 4U &&
-                    reloaded.selected_entity()->ik_chains.size() == 1U &&
-                    reloaded.selected_entity()->ik_chains.front().joints ==
+                    reloaded_entity->nodes.size() == 4U &&
+                    reloaded_entity->ik_chains.size() == 1U &&
+                    reloaded_entity->ik_chains.front().joints ==
                         std::vector<std::string>{"studio-child-copy",
                                                  "studio-child"} &&
-                    reloaded.selected_entity()->ik_chains.front().target_node ==
+                    reloaded_entity->ik_chains.front().target_node ==
                         "ik-target" &&
-                    reloaded.selected_entity()->animation_state_machine &&
-                    !reloaded.selected_entity()->animation_state_machine
+                    reloaded_entity->animation_state_machine &&
+                    !reloaded_entity->animation_state_machine
                          ->transitions.empty() &&
-                    reloaded.selected_entity()->animation_state_machine
+                    reloaded_entity->animation_state_machine
                             ->transitions.front().id == "idle-to-beam-scroll";
                 if (!entity_e2e_complete)
                     std::cerr << "Asset Studio Entity Gizmo E2E failed: initial="
@@ -10321,11 +10360,16 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                               << ", link-seen=" << animation_graph_probe.link_seen
                               << ", ik-create=" << ui_entity_ik_create_clicked
                               << ", ik-overlay=" << canvas.ik_overlay_visible
+                              << ", mesh-seen="
+                              << entity_rig_probe.starter_mesh_seen
+                              << ", mesh-clicked="
+                              << entity_rig_probe.starter_mesh_clicked
+                              << ", mesh-valid=" << starter_mesh_valid
                               << ", states="
-                              << (reloaded.selected_entity()
-                                          ->animation_state_machine
-                                      ? reloaded.selected_entity()
-                                            ->animation_state_machine->states.size()
+                              << (reloaded_entity != nullptr &&
+                                          reloaded_entity->animation_state_machine
+                                      ? reloaded_entity->animation_state_machine
+                                            ->states.size()
                                       : 0U)
                               << "\n";
                 running = false;

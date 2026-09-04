@@ -2983,6 +2983,31 @@ bool ProjectSession::create_selected_entity_ik_chain(
     return set_selected_entity_definition(std::move(next), now);
 }
 
+bool ProjectSession::create_selected_entity_starter_deformation_mesh(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || selected_entity_->nodes.empty() ||
+        selected_entity_->deformation_mesh) {
+        return false;
+    }
+    const auto& root_id = selected_entity_->nodes.front().id;
+    const auto influenced_vertex = [&](const core::Vec2 position) {
+        return project::MeshVertex{
+            .rest_position = position,
+            .influences = {{root_id, 1.0F}},
+        };
+    };
+    auto next = *selected_entity_;
+    next.deformation_mesh = project::DeformationMesh{
+        .vertices = {
+            influenced_vertex({-1.0F, -1.0F}),
+            influenced_vertex({1.0F, -1.0F}),
+            influenced_vertex({0.0F, 1.0F}),
+        },
+        .triangles = {{0U, 1U, 2U}},
+    };
+    return set_selected_entity_definition(std::move(next), now);
+}
+
 bool ProjectSession::set_selected_visual_composition(
     project::VisualComposition composition,
     const AutosaveScheduler::Clock::time_point now) {
