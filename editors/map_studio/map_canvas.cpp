@@ -369,10 +369,35 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 }
                 const auto progress = fabric::project::sample_textured_path(
                     *path.asset, selected->path_follower->progress);
-                draw->AddCircleFilled(world_to_screen(progress.position), 6.0F,
-                                      IM_COL32(255, 220, 90, 255));
-                draw->AddText(world_to_screen(progress.position),
+                const auto marker = world_to_screen(progress.position);
+                draw->AddCircleFilled(marker, 6.0F, IM_COL32(255, 220, 90, 255));
+                draw->AddText(marker,
                               IM_COL32(255, 240, 160, 255), "PathFollower");
+                if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) &&
+                    std::hypot(ImGui::GetIO().MousePos.x - marker.x,
+                               ImGui::GetIO().MousePos.y - marker.y) <= 14.0F) {
+                    const auto mouse = ImGui::GetIO().MousePos;
+                    std::size_t nearest_index = 0U;
+                    float nearest_distance = std::numeric_limits<float>::max();
+                    for (std::size_t index = 0; index <= samples; ++index) {
+                        const auto candidate = fabric::project::sample_textured_path(
+                            *path.asset, static_cast<float>(index) /
+                                static_cast<float>(samples));
+                        const auto screen = world_to_screen(candidate.position);
+                        const auto distance = std::hypot(mouse.x - screen.x,
+                                                         mouse.y - screen.y);
+                        if (distance < nearest_distance) {
+                            nearest_distance = distance;
+                            nearest_index = index;
+                        }
+                    }
+                    auto follower = *selected->path_follower;
+                    follower.progress = static_cast<float>(nearest_index) /
+                        static_cast<float>(samples);
+                    status = session.set_instance_path_follower(
+                        {.value = selected->id}, std::move(follower))
+                        ? "PathFollower progress moved" : "PathFollower progress rejected";
+                }
             }
         }
     }
