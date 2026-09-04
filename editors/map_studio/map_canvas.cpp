@@ -331,6 +331,22 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                       y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
     }
     }
+    const auto framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
+    preview_render_state.viewport = {
+        .width = std::max(1, static_cast<std::int32_t>(
+            canvas_size.x * framebuffer_scale.x)),
+        .height = std::max(1, static_cast<std::int32_t>(
+            canvas_size.y * framebuffer_scale.y)),
+        .world_bounds = {{top_left.x, bottom_right.y},
+                         {bottom_right.x - top_left.x, top_left.y - bottom_right.y}},
+        .x = std::max(0, static_cast<std::int32_t>(
+            canvas_pos.x * framebuffer_scale.x)),
+        .y = std::max(0, static_cast<std::int32_t>(
+            (ImGui::GetIO().DisplaySize.y - canvas_pos.y - canvas_size.y) *
+            framebuffer_scale.y)),
+    };
+    draw->AddCallback(render_map_preview_callback, &preview_render_state);
+    draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
     if (selected_instances.size() == 1U && session.manifest()) {
         const auto selected = std::ranges::find(map.instances,
             selected_instances.front(), &fabric::project::MapInstance::id);
@@ -360,22 +376,6 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             }
         }
     }
-    const auto framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
-    preview_render_state.viewport = {
-        .width = std::max(1, static_cast<std::int32_t>(
-            canvas_size.x * framebuffer_scale.x)),
-        .height = std::max(1, static_cast<std::int32_t>(
-            canvas_size.y * framebuffer_scale.y)),
-        .world_bounds = {{top_left.x, bottom_right.y},
-                         {bottom_right.x - top_left.x, top_left.y - bottom_right.y}},
-        .x = std::max(0, static_cast<std::int32_t>(
-            canvas_pos.x * framebuffer_scale.x)),
-        .y = std::max(0, static_cast<std::int32_t>(
-            (ImGui::GetIO().DisplaySize.y - canvas_pos.y - canvas_size.y) *
-            framebuffer_scale.y)),
-    };
-    draw->AddCallback(render_map_preview_callback, &preview_render_state);
-    draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
     if (probe != nullptr) probe->mechanic.enabled = probe->enabled;
     const auto mechanic_overlay = draw_mechanic_map_overlay(
         session, mechanic_session, mechanic_gizmo,
