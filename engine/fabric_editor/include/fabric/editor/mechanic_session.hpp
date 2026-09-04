@@ -26,6 +26,7 @@ public:
         const std::filesystem::path& project_root,
         const project::MapDocument& map,
         const core::ResourceId& instance_id);
+    [[nodiscard]] bool sync_preview_instance(const project::MapDocument& map);
     [[nodiscard]] bool save();
     [[nodiscard]] AutosaveStatus update_autosave(
         AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());

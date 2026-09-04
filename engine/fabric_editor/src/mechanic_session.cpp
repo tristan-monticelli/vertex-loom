@@ -179,6 +179,28 @@ bool MechanicSession::open_prefab_instance(
     return preview_errors_.empty();
 }
 
+bool MechanicSession::sync_preview_instance(const project::MapDocument& map) {
+    if (!graph_ || !preview_instance_id_ || !preview_prefab_id_) return false;
+    const auto instance = std::ranges::find(
+        map.instances, preview_instance_id_->value,
+        &project::MapInstance::id);
+    if (instance == map.instances.end() || !instance->prefab ||
+        instance->prefab->id != *preview_prefab_id_) return false;
+    const auto prefab = std::ranges::find(
+        map.prefabs, preview_prefab_id_->value,
+        &project::PrefabDefinition::id);
+    if (prefab == map.prefabs.end() || !prefab->mechanic ||
+        prefab->mechanic->id != graph_->document.id) return false;
+    map_ = map;
+    if (instance_transform_ == instance->transform &&
+        parameter_overrides_ == prefab->mechanic_overrides)
+        return preview_errors_.empty();
+    instance_transform_ = instance->transform;
+    parameter_overrides_ = prefab->mechanic_overrides;
+    rebuild_preview();
+    return preview_errors_.empty();
+}
+
 bool MechanicSession::save() {
     if (!graph_ || !manifest_) return false;
     const auto result = project::publish_mechanic_graph(

@@ -177,9 +177,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
                      MapPreviewRenderer& preview_render_state,
-                     const fabric::physics::MechanicSimulation& mechanic_preview,
-                     const std::optional<fabric::core::ResourceId>&
-                         mechanic_preview_instance,
+                     fabric::editor::MechanicSession& mechanic_session,
+                     MapMechanicOverlayState& mechanic_gizmo,
                      std::string& status,
                      MapPlacementProbe* probe) {
     if (!session.map()) return;
@@ -219,6 +218,14 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     ImGui::BeginDisabled(selected_instances.empty());
     if (ImGui::Button("Frame selection"))
         status = frame_instances(true) ? "Selection framed" : "No visible selected instance";
+    if (probe != nullptr && probe->enabled) {
+        const auto minimum = ImGui::GetItemRectMin();
+        const auto maximum = ImGui::GetItemRectMax();
+        probe->frame_selection_seen = true;
+        probe->frame_selection_screen = {
+            (minimum.x + maximum.x) * 0.5F,
+            (minimum.y + maximum.y) * 0.5F};
+    }
     ImGui::EndDisabled();
     draw_disabled_reason(selected_instances.empty(),
                          "Select at least one instance before framing the selection.");
@@ -273,6 +280,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         return fabric::core::Vec2{(point.x - canvas_center.x - pan.x) / zoom,
                                   -(point.y - canvas_center.y - pan.y) / zoom};
     };
+    const auto& io = ImGui::GetIO();
     auto transform_for = [&](const fabric::project::MapInstance& instance) {
         if (!gizmo.active) return instance.transform;
         if (gizmo.mode == CanvasGizmoMode::translate &&
@@ -338,50 +346,18 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     };
     draw->AddCallback(render_map_preview_callback, &preview_render_state);
     draw->AddCallback(ImDrawCallback_ResetRenderState, nullptr);
-    auto draw_mechanic_box = [&](const fabric::core::Vec2 position,
-                                 const fabric::core::Vec2 size,
-                                 const float rotation_degrees,
-                                 const ImU32 fill, const ImU32 outline) {
-        constexpr float degrees_to_radians = 0.01745329251994329577F;
-        const auto angle = rotation_degrees * degrees_to_radians;
-        const auto cosine = std::cos(angle);
-        const auto sine = std::sin(angle);
-        const fabric::core::Vec2 local[4] = {
-            {-size.x * 0.5F, -size.y * 0.5F},
-            {size.x * 0.5F, -size.y * 0.5F},
-            {size.x * 0.5F, size.y * 0.5F},
-            {-size.x * 0.5F, size.y * 0.5F}};
-        ImVec2 points[4];
-        for (std::size_t index = 0; index < 4; ++index)
-            points[index] = world_to_screen({
-                position.x + local[index].x * cosine - local[index].y * sine,
-                position.y + local[index].x * sine + local[index].y * cosine});
-        draw->AddQuadFilled(points[0], points[1], points[2], points[3], fill);
-        draw->AddQuad(points[0], points[1], points[2], points[3], outline, 2.0F);
-    };
-    const bool show_mechanic_preview = mechanic_preview.valid() &&
-        selected_instances.size() == 1U && mechanic_preview_instance &&
-        mechanic_preview_instance->value == selected_instances.front();
-    if (show_mechanic_preview) {
-        if (probe != nullptr && probe->enabled)
-            probe->mechanic_overlay_seen = true;
-        for (const auto& body : mechanic_preview.body_states())
-            draw_mechanic_box(body.position, body.size, body.rotation_degrees,
-                              IM_COL32(75, 165, 180, 42),
-                              IM_COL32(90, 220, 235, 235));
-        for (const auto& sensor : mechanic_preview.sensor_states())
-            draw_mechanic_box(sensor.position, sensor.size,
-                              sensor.rotation_degrees,
-                              sensor.active ? IM_COL32(105, 235, 135, 58)
-                                            : IM_COL32(240, 190, 80, 35),
-                              sensor.active ? IM_COL32(105, 235, 135, 245)
-                                            : IM_COL32(240, 190, 80, 220));
-        if (const auto character = mechanic_preview.preview_character_state())
-            draw_mechanic_box(character->position, character->size,
-                              character->rotation_degrees,
-                              IM_COL32(225, 105, 190, 72),
-                              IM_COL32(255, 145, 220, 245));
-    }
+    if (probe != nullptr) probe->mechanic.enabled = probe->enabled;
+    const auto mechanic_overlay = draw_mechanic_map_overlay(
+        session, mechanic_session, mechanic_gizmo,
+        selected_instances.size() == 1U ? selected_instances.front()
+                                        : std::string{},
+        canvas_center, pan, zoom, hovered,
+        placement_mode || gizmo.active || point_gizmo.active ||
+            selection_box.active,
+        status, probe != nullptr ? &probe->mechanic : nullptr);
+    const bool mechanic_pointer_captured =
+        mechanic_overlay.pointer_captured || mechanic_gizmo.active;
+    if (mechanic_overlay.map_changed) return;
     for (std::size_t collision_index = 0; collision_index < map.collisions.size();
          ++collision_index) {
         const auto& collision = map.collisions[collision_index];
@@ -519,7 +495,6 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         draw->AddRect(minimum, maximum, IM_COL32(100, 190, 255, 220));
     }
 
-    const auto& io = ImGui::GetIO();
     if (placement_mode && !io.WantTextInput &&
         ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
         placement_mode = false;
@@ -579,7 +554,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 return;
             }
         }
-        if (!placement_mode && !gizmo.active && !point_gizmo.active && io.KeyCtrl &&
+        if (!mechanic_pointer_captured && !mechanic_gizmo.active &&
+            !placement_mode && !gizmo.active && !point_gizmo.active && io.KeyCtrl &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_instances.size() == 1U) {
             const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
                                                [&](const auto& instance) {
@@ -624,7 +600,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
             }
             return;
         }
-        if (!gizmo.active && !point_gizmo.active &&
+        if (!mechanic_pointer_captured && !mechanic_gizmo.active &&
+            !gizmo.active && !point_gizmo.active &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && selected_collision_index >= 0) {
             const auto collision_index = static_cast<std::size_t>(selected_collision_index);
             if (collision_index < map.collisions.size()) {
@@ -663,7 +640,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 point_gizmo.collision_index = -1;
             }
         }
-        if (!gizmo.active && !point_gizmo.active &&
+        if (!mechanic_pointer_captured && !mechanic_gizmo.active &&
+            !gizmo.active && !point_gizmo.active &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !selected_instances.empty()) {
             const auto selected = std::find_if(map.instances.begin(), map.instances.end(),
                                                [&](const auto& instance) {
@@ -764,7 +742,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 gizmo.preview_delta = {};
             }
         }
-        if (!gizmo.active && !point_gizmo.active && !placement_mode &&
+        if (!mechanic_pointer_captured && !mechanic_gizmo.active &&
+            !gizmo.active && !point_gizmo.active && !placement_mode &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !io.KeyCtrl) {
             selection_box.active = true;
             selection_box.append = io.KeyShift;
@@ -826,7 +805,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 selection_box.active = false;
             }
         }
-        if (!gizmo.active && !selection_box.active &&
+        if (!mechanic_pointer_captured && !mechanic_gizmo.active &&
+            !gizmo.active && !selection_box.active &&
             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             const auto world = screen_to_world(io.MousePos);
             auto hit = map.instances.end();

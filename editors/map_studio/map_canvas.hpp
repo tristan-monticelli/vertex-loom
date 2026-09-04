@@ -1,9 +1,9 @@
 #pragma once
 
 #include "fabric/editor/map_session.hpp"
-#include "fabric/physics/mechanic_simulation.hpp"
 #include "fabric/render/map_preview.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
+#include "mechanic_workspace.hpp"
 
 #include <SDL_opengl.h>
 #include <imgui.h>
@@ -53,7 +53,9 @@ struct MapPlacementProbe {
     bool enabled{};
     bool canvas_seen{};
     bool canvas_hovered{};
-    bool mechanic_overlay_seen{};
+    bool frame_selection_seen{};
+    ImVec2 frame_selection_screen{};
+    MechanicMapOverlayProbe mechanic;
     ImVec2 canvas_center{};
     bool placement_button_seen{};
     ImVec2 placement_button_screen{};
@@ -103,8 +105,8 @@ void draw_map_canvas(
     int& placement_kind,
     editor::MapSnapSettings& snapping,
     MapPreviewRenderer& preview_render_state,
-    const physics::MechanicSimulation& mechanic_preview,
-    const std::optional<core::ResourceId>& mechanic_preview_instance,
+    editor::MechanicSession& mechanic_session,
+    MapMechanicOverlayState& mechanic_gizmo,
     std::string& status,
     MapPlacementProbe* probe = nullptr);
 

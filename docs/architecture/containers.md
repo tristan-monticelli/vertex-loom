@@ -136,6 +136,19 @@ le chargement des overrides ou du transform d'instance.
 canvas Map compare cette identité à sa sélection unique avant de dessiner
 l'overlay. Une preview de graphe ou de prefab non liée à une instance ne peut
 donc pas contaminer visuellement la map active.
+Les poignées de cet overlay sont dérivées des paramètres spatiaux publiés par
+le graphe. Leur relâchement convertit le geste monde vers la valeur locale,
+demande à `MapSession` une mutation undoable du prefab, puis demande à
+`MechanicSession` de reconstruire la preview d'instance. Le canvas ne possède
+ni copie du graphe, ni accès JSON, ni mutation hors paramètre déclaré.
+Le hit-testing, les poignées et cette conversion restent dans le module
+`mechanic_workspace`; `map_canvas` fournit seulement le viewport et arbitre le
+pointeur avec placement, collision et transform d'instance.
+Une synchronisation idempotente compare également, avant le rendu, le transform
+et les overrides Map aux valeurs déjà compilées ; elle absorbe donc Undo/Redo et
+les autres mutations d'instance sans rechargement du document Mechanics.
+Avant l'édition, le module remet la simulation au pas zéro afin de séparer pose
+auteur Map et pose physique live.
 
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview

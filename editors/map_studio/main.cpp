@@ -79,6 +79,7 @@ using fabric::map_studio::CanvasGizmoState;
 using fabric::map_studio::CollisionPointGizmoState;
 using fabric::map_studio::MapPreviewRenderer;
 using fabric::map_studio::MapPlacementProbe;
+using fabric::map_studio::MapMechanicOverlayState;
 using fabric::map_studio::MapTexture;
 using fabric::map_studio::MechanicWorkspaceProbe;
 using fabric::map_studio::MechanicWorkspaceState;
@@ -680,12 +681,15 @@ int run(const std::filesystem::path& project_root,
     };
     bool mechanic_e2e_complete = false;
     bool mechanic_authoring_verified = false;
+    bool mechanic_map_parameter_verified = false;
     bool mechanic_connection_removed = false;
     std::size_t mechanic_e2e_frame = 0U;
+    std::size_t mechanic_map_e2e_frame = 0U;
     std::size_t publish_e2e_frame = 0U;
     std::optional<ImVec2> mechanic_resize_drag_origin;
     std::optional<ImVec2> mechanic_rotation_drag_origin;
     std::optional<ImVec2> mechanic_joint_drag_origin;
+    std::optional<ImVec2> mechanic_map_resize_drag_origin;
     bool mechanic_e2e_capture_written = false;
     bool mechanic_map_overlay_capture_written = false;
     bool publish_e2e_capture_written = false;
@@ -912,6 +916,7 @@ int run(const std::filesystem::path& project_root,
     float canvas_zoom = 1.0F;
     bool canvas_grid_visible = true;
     CanvasGizmoState canvas_gizmo;
+    MapMechanicOverlayState map_mechanic_gizmo;
     CollisionPointGizmoState collision_point_gizmo;
     SelectionBoxState selection_box;
     MapPlacementProbe placement_probe{.enabled = placement_e2e || mechanic_e2e};
@@ -1088,6 +1093,39 @@ int run(const std::filesystem::path& project_root,
             }
         }
         if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            mechanic_map_e2e_frame == 2U &&
+            placement_probe.frame_selection_seen) {
+            push_left_click(placement_probe.frame_selection_screen);
+        }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            mechanic_map_e2e_frame == 4U &&
+            placement_probe.mechanic.parameter_body_seen) {
+            push_left_click(placement_probe.mechanic.parameter_body_screen);
+        }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            placement_probe.mechanic.parameter_handle_seen &&
+            mechanic_map_e2e_frame >= 6U && mechanic_map_e2e_frame <= 8U) {
+            if (!mechanic_map_resize_drag_origin)
+                mechanic_map_resize_drag_origin =
+                    placement_probe.mechanic.parameter_handle_screen;
+            ImVec2 target = *mechanic_map_resize_drag_origin;
+            if (mechanic_map_e2e_frame >= 7U) {
+                target.x += 8.0F;
+                target.y -= 4.0F;
+            }
+            push_mouse_position(target);
+            if (mechanic_map_e2e_frame == 6U || mechanic_map_e2e_frame == 8U) {
+                push_left_button(mechanic_map_e2e_frame == 6U
+                                     ? SDL_MOUSEBUTTONDOWN
+                                     : SDL_MOUSEBUTTONUP,
+                                 target);
+            }
+        }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::publish &&
             ((publish_e2e_frame >= 2U && publish_e2e_frame <= 3U &&
               publish_probe.validate_seen) ||
              (publish_e2e_frame >= 5U && publish_e2e_frame <= 6U &&
@@ -1734,8 +1772,7 @@ int run(const std::filesystem::path& project_root,
                             placement_mode, keep_placement_active,
                             placement_id, placement_resource_id, placement_kind,
                             canvas_snapping, preview_render_state,
-                            mechanic_session.simulation(),
-                            mechanic_session.preview_instance_id(), status,
+                            mechanic_session, map_mechanic_gizmo, status,
                             &placement_probe);
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
@@ -2866,7 +2903,53 @@ int run(const std::filesystem::path& project_root,
         }
         if (mechanic_e2e && mechanic_authoring_verified &&
             active_workspace == ActiveWorkspace::map &&
-            placement_probe.mechanic_overlay_seen &&
+            placement_probe.mechanic.overlay_seen &&
+            placement_probe.mechanic.parameter_handle_moved &&
+            !mechanic_map_parameter_verified) {
+            const auto body = std::ranges::find(
+                mechanic_session.simulation().body_states(),
+                std::string{"platform"},
+                &fabric::physics::MechanicBodyState::node_id);
+            const bool preview_changed =
+                body != mechanic_session.simulation().body_states().end() &&
+                body->size.x >
+                    placement_probe.mechanic.parameter_original_size.x &&
+                body->size.y >
+                    placement_probe.mechanic.parameter_original_size.y;
+            const bool saved = session.save();
+            fabric::editor::MapSession reloaded_map;
+            const bool reopened = saved && session.map() && reloaded_map.open(
+                project_root, session.map()->document.id);
+            bool override_reloaded = false;
+            if (reopened && reloaded_map.map()) {
+                const auto prefab = std::ranges::find(
+                    reloaded_map.map()->prefabs,
+                    std::string{"rotating-platform-prefab"},
+                    &fabric::project::PrefabDefinition::id);
+                if (prefab != reloaded_map.map()->prefabs.end()) {
+                    const auto size_override = std::ranges::find(
+                        prefab->mechanic_overrides, std::string{"size"},
+                        &fabric::project::MechanicParameterOverride::parameter_id);
+                    if (size_override != prefab->mechanic_overrides.end()) {
+                        if (const auto* value = std::get_if<fabric::core::Vec2>(
+                                &size_override->value)) {
+                            override_reloaded = body !=
+                                    mechanic_session.simulation().body_states().end() &&
+                                *value == body->size;
+                        }
+                    }
+                }
+            }
+            mechanic_map_parameter_verified = preview_changed && override_reloaded;
+            if (!mechanic_map_parameter_verified) {
+                fail_e2e(
+                    "Map mechanic handle did not persist and rebuild its prefab override");
+                running = false;
+            }
+        }
+        if (mechanic_e2e && mechanic_map_parameter_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            mechanic_map_e2e_frame >= 9U &&
             !mechanic_map_overlay_capture_written) {
             write_frame_capture(project_root, window,
                                 "map-studio-mechanic-map-overlay-e2e.ppm");
@@ -3036,6 +3119,25 @@ int run(const std::filesystem::path& project_root,
             }
         }
         if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map)
+            ++mechanic_map_e2e_frame;
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            mechanic_map_e2e_frame == 20U &&
+            !mechanic_map_parameter_verified) {
+            fail_e2e("Map mechanic gesture timed out: frame=" +
+                std::to_string(mechanic_map_e2e_frame) + ",frame-selection=" +
+                std::to_string(placement_probe.frame_selection_seen) +
+                ",body=" + std::to_string(
+                    placement_probe.mechanic.parameter_body_seen) +
+                ",handle=" + std::to_string(
+                    placement_probe.mechanic.parameter_handle_seen) +
+                ",moved=" + std::to_string(
+                    placement_probe.mechanic.parameter_handle_moved));
+            running = false;
+        }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::publish &&
             ++publish_e2e_frame == 9U) {
             const auto destination = publish_editor.destination_parent /
                 (session.map()->document.id.value + ".map-package");
@@ -3043,6 +3145,7 @@ int run(const std::filesystem::path& project_root,
                 publish_probe.validate_seen && publish_probe.validate_clicked &&
                 publish_probe.publish_seen && publish_probe.publish_clicked &&
                 publish_probe.dependency_seen && publish_probe.runtime_verified &&
+                mechanic_map_parameter_verified &&
                 mechanic_map_overlay_capture_written &&
                 publish_e2e_capture_written &&
                 std::filesystem::is_regular_file(

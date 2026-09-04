@@ -18,6 +18,33 @@ enum class MechanicSpatialDragKind {
     rotate,
 };
 
+enum class MapMechanicDragKind { none, move, resize, rotate };
+
+struct MapMechanicOverlayState {
+    bool active{};
+    std::string selected_node;
+    std::string parameter_id;
+    MapMechanicDragKind kind{MapMechanicDragKind::none};
+    core::Vec2 start_position{};
+    float start_rotation{};
+};
+
+struct MechanicMapOverlayProbe {
+    bool enabled{};
+    bool overlay_seen{};
+    bool parameter_body_seen{};
+    bool parameter_handle_seen{};
+    bool parameter_handle_moved{};
+    ImVec2 parameter_body_screen{};
+    ImVec2 parameter_handle_screen{};
+    core::Vec2 parameter_original_size{};
+};
+
+struct MechanicMapOverlayResult {
+    bool pointer_captured{};
+    bool map_changed{};
+};
+
 struct MechanicWorkspaceState {
     std::string open_id;
     std::string new_id;
@@ -94,5 +121,18 @@ void draw_mechanic_workspace(
     std::string& status,
     editor::ProjectSession& resource_catalog,
     MechanicWorkspaceProbe* probe = nullptr);
+
+[[nodiscard]] MechanicMapOverlayResult draw_mechanic_map_overlay(
+    editor::MapSession& map_session,
+    editor::MechanicSession& mechanic_session,
+    MapMechanicOverlayState& state,
+    const std::string& selected_instance_id,
+    ImVec2 canvas_center,
+    ImVec2 pan,
+    float zoom,
+    bool hovered,
+    bool interaction_blocked,
+    std::string& status,
+    MechanicMapOverlayProbe* probe = nullptr);
 
 } // namespace fabric::map_studio

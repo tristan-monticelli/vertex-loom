@@ -15,6 +15,7 @@
 #include <ranges>
 #include <span>
 #include <string_view>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -507,6 +508,312 @@ bool draw_mechanic_spatial_canvas(
 }
 
 } // namespace
+
+MechanicMapOverlayResult draw_mechanic_map_overlay(
+    fabric::editor::MapSession& map_session,
+    fabric::editor::MechanicSession& mechanic_session,
+    MapMechanicOverlayState& state,
+    const std::string& selected_instance_id,
+    const ImVec2 canvas_center,
+    const ImVec2 pan,
+    const float zoom,
+    const bool hovered,
+    const bool interaction_blocked,
+    std::string& status,
+    MechanicMapOverlayProbe* probe) {
+    MechanicMapOverlayResult result{.pointer_captured = state.active};
+    if (!map_session.map() || selected_instance_id.empty()) return result;
+    const auto& map = *map_session.map();
+    if (mechanic_session.preview_instance_id())
+        static_cast<void>(mechanic_session.sync_preview_instance(map));
+    if (mechanic_session.simulation().playing() ||
+        mechanic_session.simulation().step_count() != 0U) {
+        mechanic_session.pause();
+        if (!mechanic_session.reset_preview()) {
+            status = "Mechanic authoring pose could not reset";
+            return result;
+        }
+    }
+    const auto& preview = mechanic_session.simulation();
+    if (!preview.valid() || !mechanic_session.preview_instance_id() ||
+        mechanic_session.preview_instance_id()->value != selected_instance_id)
+        return result;
+    if (probe && probe->enabled) probe->overlay_seen = true;
+    const auto instance = std::ranges::find(
+        map.instances, selected_instance_id,
+        &fabric::project::MapInstance::id);
+    if (instance == map.instances.end() || !instance->prefab) return result;
+    const bool layer_locked = std::ranges::any_of(
+        map.layers, [&](const auto& layer) {
+            return layer.id == instance->layer_id && layer.locked;
+        });
+    const auto to_screen = [&](const fabric::core::Vec2 point) {
+        return ImVec2{canvas_center.x + pan.x + point.x * zoom,
+                      canvas_center.y + pan.y - point.y * zoom};
+    };
+    const auto to_world = [&](const ImVec2 point) {
+        return fabric::core::Vec2{
+            (point.x - canvas_center.x - pan.x) / zoom,
+            -(point.y - canvas_center.y - pan.y) / zoom};
+    };
+    const auto inverse_transform_point = [&](fabric::core::Vec2 point) {
+        point = subtract_mechanic_vectors(point, instance->transform.position);
+        point = rotate_mechanic_vector(
+            point, -instance->transform.rotation_degrees);
+        point.x = point.x / instance->transform.scale.x +
+            instance->transform.pivot.x;
+        point.y = point.y / instance->transform.scale.y +
+            instance->transform.pivot.y;
+        return point;
+    };
+    const auto parameter_for = [&](const std::string_view node_id,
+                                   const std::string_view property_id) {
+        if (!mechanic_session.graph()) return std::string{};
+        const auto parameter = std::ranges::find_if(
+            mechanic_session.graph()->parameters, [&](const auto& candidate) {
+                return candidate.target_node == node_id &&
+                    candidate.target_property == property_id;
+            });
+        return parameter == mechanic_session.graph()->parameters.end()
+            ? std::string{} : parameter->id;
+    };
+    struct Handle {
+        std::string node_id;
+        std::string move_parameter;
+        std::string size_parameter;
+        std::string rotation_parameter;
+        fabric::core::Vec2 position{};
+        fabric::core::Vec2 size{};
+        float rotation{};
+        bool sensor{};
+    };
+    std::vector<Handle> handles;
+    for (const auto& body : preview.body_states())
+        handles.push_back({
+            .node_id = body.node_id,
+            .move_parameter = parameter_for(body.node_id, "position"),
+            .size_parameter = parameter_for(body.node_id, "size"),
+            .rotation_parameter = parameter_for(body.node_id, "rotation"),
+            .position = body.position,
+            .size = body.size,
+            .rotation = body.rotation_degrees});
+    for (const auto& sensor : preview.sensor_states())
+        handles.push_back({
+            .node_id = sensor.node_id,
+            .move_parameter = parameter_for(sensor.node_id, "center"),
+            .size_parameter = parameter_for(sensor.node_id, "size"),
+            .position = sensor.position,
+            .size = sensor.size,
+            .rotation = sensor.rotation_degrees,
+            .sensor = true});
+    const auto& io = ImGui::GetIO();
+    if (state.active && !io.WantTextInput &&
+        ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        state.active = false;
+        state.parameter_id.clear();
+        state.kind = MapMechanicDragKind::none;
+        result.pointer_captured = false;
+        status = "Mechanic parameter gesture cancelled";
+        return result;
+    }
+    const auto current_values = [&](const Handle& handle) {
+        auto position = handle.position;
+        auto size = handle.size;
+        auto rotation = handle.rotation;
+        if (state.active && state.selected_node == handle.node_id) {
+            const auto world_mouse = to_world(io.MousePos);
+            if (state.kind == MapMechanicDragKind::move) {
+                position = world_mouse;
+            } else if (state.kind == MapMechanicDragKind::resize) {
+                const auto local_delta = rotate_mechanic_vector(
+                    subtract_mechanic_vectors(world_mouse, state.start_position),
+                    -state.start_rotation);
+                size = {std::max(0.1F, std::abs(local_delta.x) * 2.0F),
+                        std::max(0.1F, std::abs(local_delta.y) * 2.0F)};
+            } else if (state.kind == MapMechanicDragKind::rotate) {
+                const auto delta = subtract_mechanic_vectors(
+                    world_mouse, state.start_position);
+                rotation = std::atan2(delta.y, delta.x) *
+                    57.29577951308232F - 90.0F;
+            }
+        }
+        return std::tuple{position, size, rotation};
+    };
+    if (hovered && !layer_locked && !interaction_blocked &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        std::optional<std::size_t> hit;
+        auto hit_kind = MapMechanicDragKind::none;
+        for (std::size_t index = 0; index < handles.size(); ++index) {
+            const auto& handle = handles[index];
+            if (state.selected_node != handle.node_id) continue;
+            const auto corner = add_mechanic_vectors(
+                handle.position, rotate_mechanic_vector(
+                    {handle.size.x * 0.5F, handle.size.y * 0.5F},
+                    handle.rotation));
+            const auto corner_screen = to_screen(corner);
+            if (!handle.size_parameter.empty() &&
+                std::hypot(io.MousePos.x - corner_screen.x,
+                           io.MousePos.y - corner_screen.y) <= 10.0F) {
+                hit = index;
+                hit_kind = MapMechanicDragKind::resize;
+                break;
+            }
+            if (!handle.rotation_parameter.empty()) {
+                const auto rotate_point = add_mechanic_vectors(
+                    handle.position, rotate_mechanic_vector(
+                        {0.0F, handle.size.y * 0.5F + 24.0F / zoom},
+                        handle.rotation));
+                const auto rotate_screen = to_screen(rotate_point);
+                if (std::hypot(io.MousePos.x - rotate_screen.x,
+                               io.MousePos.y - rotate_screen.y) <= 10.0F) {
+                    hit = index;
+                    hit_kind = MapMechanicDragKind::rotate;
+                    break;
+                }
+            }
+        }
+        if (!hit) {
+            for (std::size_t index = 0; index < handles.size(); ++index) {
+                const auto& handle = handles[index];
+                const auto local_mouse = rotate_mechanic_vector(
+                    subtract_mechanic_vectors(to_world(io.MousePos),
+                                              handle.position),
+                    -handle.rotation);
+                if (std::abs(local_mouse.x) <= handle.size.x * 0.5F &&
+                    std::abs(local_mouse.y) <= handle.size.y * 0.5F) {
+                    hit = index;
+                    hit_kind = handle.move_parameter.empty()
+                        ? MapMechanicDragKind::none
+                        : MapMechanicDragKind::move;
+                }
+            }
+        }
+        if (hit) {
+            const auto& handle = handles[*hit];
+            state.selected_node = handle.node_id;
+            result.pointer_captured = true;
+            if (hit_kind == MapMechanicDragKind::none) {
+                status = "Mechanic shape selected; highlighted handles edit all prefab instances";
+            } else {
+                state.active = true;
+                state.kind = hit_kind;
+                state.parameter_id = hit_kind == MapMechanicDragKind::move
+                    ? handle.move_parameter
+                    : hit_kind == MapMechanicDragKind::resize
+                        ? handle.size_parameter : handle.rotation_parameter;
+                state.start_position = handle.position;
+                state.start_rotation = handle.rotation;
+            }
+        }
+    }
+    if (state.active && ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        const auto handle = std::ranges::find(
+            handles, state.selected_node, &Handle::node_id);
+        bool committed = false;
+        bool preview_refreshed = false;
+        if (handle != handles.end()) {
+            const auto [position, size, rotation] = current_values(*handle);
+            fabric::project::MechanicValue value;
+            if (state.kind == MapMechanicDragKind::move)
+                value = inverse_transform_point(position);
+            else if (state.kind == MapMechanicDragKind::resize)
+                value = fabric::core::Vec2{
+                    size.x / instance->transform.scale.x,
+                    size.y / instance->transform.scale.y};
+            else
+                value = rotation - instance->transform.rotation_degrees;
+            committed = map_session.set_prefab_mechanic_override(
+                instance->prefab->id, {state.parameter_id, std::move(value)});
+            if (committed) {
+                const auto refreshed_map = *map_session.map();
+                preview_refreshed =
+                    mechanic_session.sync_preview_instance(refreshed_map);
+            }
+        }
+        if (probe && probe->enabled && committed && preview_refreshed)
+            probe->parameter_handle_moved = true;
+        status = committed && preview_refreshed
+            ? "Prefab mechanic parameter changed for all its instances"
+            : committed
+                ? "Prefab mechanic changed, but its preview could not rebuild"
+                : "Mechanic parameter unchanged or rejected";
+        state.active = false;
+        state.parameter_id.clear();
+        state.kind = MapMechanicDragKind::none;
+        result.map_changed = committed;
+        return result;
+    }
+    auto* draw = ImGui::GetWindowDrawList();
+    const auto draw_box = [&](const fabric::core::Vec2 position,
+                              const fabric::core::Vec2 size,
+                              const float rotation,
+                              const ImU32 fill,
+                              const ImU32 outline) {
+        const fabric::core::Vec2 corners[4] = {
+            {-size.x * 0.5F, -size.y * 0.5F},
+            { size.x * 0.5F, -size.y * 0.5F},
+            { size.x * 0.5F,  size.y * 0.5F},
+            {-size.x * 0.5F,  size.y * 0.5F}};
+        ImVec2 points[4];
+        for (std::size_t index = 0; index < 4U; ++index)
+            points[index] = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(corners[index], rotation)));
+        draw->AddQuadFilled(points[0], points[1], points[2], points[3], fill);
+        draw->AddQuad(points[0], points[1], points[2], points[3], outline, 2.0F);
+    };
+    for (const auto& body : preview.body_states())
+        draw_box(body.position, body.size, body.rotation_degrees,
+                 IM_COL32(75, 165, 180, 42), IM_COL32(90, 220, 235, 235));
+    for (const auto& sensor : preview.sensor_states())
+        draw_box(sensor.position, sensor.size, sensor.rotation_degrees,
+                 sensor.active ? IM_COL32(105, 235, 135, 58)
+                               : IM_COL32(240, 190, 80, 35),
+                 sensor.active ? IM_COL32(105, 235, 135, 245)
+                               : IM_COL32(240, 190, 80, 220));
+    if (const auto character = preview.preview_character_state())
+        draw_box(character->position, character->size,
+                 character->rotation_degrees,
+                 IM_COL32(225, 105, 190, 72),
+                 IM_COL32(255, 145, 220, 245));
+    for (const auto& handle : handles) {
+        const auto [position, size, rotation] = current_values(handle);
+        if (probe && probe->enabled && !handle.sensor) {
+            probe->parameter_body_screen = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(
+                    {size.x * 0.25F, -size.y * 0.4F}, rotation)));
+            probe->parameter_body_seen = true;
+        }
+        if (state.selected_node != handle.node_id) continue;
+        draw_box(position, size, rotation, IM_COL32(255, 180, 70, 24),
+                 IM_COL32(255, 190, 80, 255));
+        if (!handle.size_parameter.empty()) {
+            const auto point = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(
+                    {size.x * 0.5F, size.y * 0.5F}, rotation)));
+            draw->AddRectFilled({point.x - 6.0F, point.y - 6.0F},
+                                {point.x + 6.0F, point.y + 6.0F},
+                                IM_COL32(255, 190, 80, 255));
+            if (probe && probe->enabled && !handle.sensor) {
+                if (!probe->parameter_handle_seen)
+                    probe->parameter_original_size = handle.size;
+                probe->parameter_handle_seen = true;
+                probe->parameter_handle_screen = point;
+            }
+        }
+        if (!handle.rotation_parameter.empty()) {
+            const auto edge = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(
+                    {0.0F, size.y * 0.5F}, rotation)));
+            const auto point = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(
+                    {0.0F, size.y * 0.5F + 24.0F / zoom}, rotation)));
+            draw->AddLine(edge, point, IM_COL32(255, 190, 80, 255), 1.5F);
+            draw->AddCircleFilled(point, 6.0F,
+                                  IM_COL32(255, 190, 80, 255));
+        }
+    }
+    return result;
+}
 
 void draw_mechanic_value_editor(
     fabric::editor::MechanicSession& session,

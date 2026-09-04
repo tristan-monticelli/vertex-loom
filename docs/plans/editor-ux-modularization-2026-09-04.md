@@ -130,7 +130,13 @@ résolu sans recherche de prefab.
 `MechanicSession` conserve désormais l'identité de l'instance ouverte. Le
 retour historique sur Map exige cette même sélection avant d'afficher l'overlay
 et produit une troisième capture dédiée. Les poignées de cet overlay restent à
-router vers les commandes Mechanics.
+router vers les paramètres publiés du prefab : la taille et les autres valeurs
+spatiales exposées sont éditées dans le canvas, undoables dans la Map et
+rechargées dans la preview, tandis qu'une propriété privée du graphe reste en
+lecture seule et renvoie vers Mechanics.
+La géométrie, le hit-testing et la conversion monde→local vivent dans
+`mechanic_workspace`; `map_canvas` ne duplique pas ce métier et arbitre
+seulement l'interaction avec ses autres outils.
 Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,

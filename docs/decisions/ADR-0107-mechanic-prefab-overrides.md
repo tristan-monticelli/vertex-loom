@@ -36,6 +36,24 @@ document `MechanicGraph` ni son fichier. Map Studio crée le prefab, édite les
 overrides par commandes undoables et ouvre la preview de son instance avec les
 valeurs effectives du prefab.
 
+Le canvas Map peut manipuler directement une forme de l'overlay uniquement
+lorsque la propriété spatiale correspondante (`position`, `center`, `size` ou
+`rotation`) est publiée comme paramètre du graphe. Le geste convertit la valeur
+monde vers l'espace local de l'instance, écrit un `mechanicOverride` du prefab
+via le `CommandStack` de `MapSession`, puis recharge la preview de cette même
+instance. L'interface nomme explicitement la portée prefab : la modification
+s'applique à toutes ses instances. Une propriété non paramétrée reste en lecture
+seule dans la Map et s'édite dans le document Mechanics ; le canvas ne modifie
+jamais implicitement le graphe partagé.
+À chaque frame Map, `MechanicSession` compare aussi le transform et les
+overrides mémorisés au document courant. Elle ne recompile que s'ils ont changé,
+ce qui garde l'overlay aligné après Undo/Redo ou déplacement d'instance sans
+relire le graphe ni perdre un authoring Mechanics non sauvegardé.
+La Map est une surface d'authoring : si la preview avait avancé dans Mechanics,
+elle est pausée et remise au pas zéro avant d'exposer ses poignées. La pose
+physique live reste observable dans Mechanics et Preview, mais ne devient jamais
+accidentellement une nouvelle valeur persistée.
+
 ## Conséquences
 
 - Un même graphe mécanique peut servir à plusieurs prefabs configurés.
@@ -43,3 +61,5 @@ valeurs effectives du prefab.
 - Les overrides invalides sont refusés avant toute création Box2D.
 - Preview Runtime utilise la même résolution d'overrides et le même transform
   d'instance que la preview de Map Studio.
+- Undo/Redo Map couvre les manipulations d'overlay paramétrées sans mélanger
+  l'historique du document Mechanics.

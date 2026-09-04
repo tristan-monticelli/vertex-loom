@@ -438,6 +438,24 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     REQUIRE(prefab_preview.preview_instance_id().has_value());
     CHECK(prefab_preview.preview_instance_id()->value ==
           "rotating-platform-instance");
+    auto synchronized_map = *loaded_map.asset;
+    const auto synchronized_instance = std::ranges::find(
+        synchronized_map.instances, std::string{"rotating-platform-instance"},
+        &fabric::project::MapInstance::id);
+    REQUIRE(synchronized_instance != synchronized_map.instances.end());
+    synchronized_instance->transform.position.x = 3.0F;
+    const auto synchronized_prefab = std::ranges::find(
+        synchronized_map.prefabs, std::string{"rotating-platform-prefab"},
+        &fabric::project::PrefabDefinition::id);
+    REQUIRE(synchronized_prefab != synchronized_map.prefabs.end());
+    synchronized_prefab->mechanic_overrides.push_back(
+        {"size", fabric::core::Vec2{9.0F, 3.0F}});
+    REQUIRE(prefab_preview.sync_preview_instance(synchronized_map));
+    REQUIRE(prefab_preview.simulation().body_states().size() == 1U);
+    CHECK(prefab_preview.simulation().body_states().front().position ==
+          fabric::core::Vec2{3.0F, 2.0F});
+    CHECK(prefab_preview.simulation().body_states().front().size ==
+          fabric::core::Vec2{9.0F, 3.0F});
     REQUIRE(prefab_preview.open_prefab(
         fixture, *loaded_map.asset,
         {.value = "rotating-platform-prefab"}));

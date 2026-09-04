@@ -235,6 +235,12 @@ que l'identité conservée par `MechanicSession` autorise son overlay physique ;
 `map-studio-mechanic-map-overlay-e2e.ppm` prouve ce rendu avant la publication.
 Une autre sélection ou une preview de prefab sans instance ne satisfait pas la
 condition d'affichage.
+Le même scénario cadre l'instance, sélectionne une forme paramétrée de
+l'overlay, glisse sa poignée de taille, exige une mutation d'override dans la
+Map, une preview reconstruite à la nouvelle dimension, puis sauvegarde et
+recharge la Map avant de poursuivre. Cette preuve distingue une vraie
+interaction utilisateur d'un simple dessin décoratif et vérifie sa portée
+prefab explicite.
 Le scénario continue ensuite dans le workspace `Publish` : il clique Validate,
 exige une fermeture de dépendances visible, clique Publish, recharge le dossier
 produit avec `PreviewRuntime` pour un smoke d'une frame et capture
