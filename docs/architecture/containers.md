@@ -149,6 +149,9 @@ et les overrides Map aux valeurs déjà compilées ; elle absorbe donc Undo/Redo
 les autres mutations d'instance sans rechargement du document Mechanics.
 Avant l'édition, le module remet la simulation au pas zéro afin de séparer pose
 auteur Map et pose physique live.
+Le module peut remonter une intention `open_node` sans connaître la navigation.
+Le shell conserve alors le document Map, ouvre le document Mechanics courant et
+positionne son inspecteur sur le nœud demandé.
 
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview

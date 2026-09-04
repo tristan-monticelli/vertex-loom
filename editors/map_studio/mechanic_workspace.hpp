@@ -43,6 +43,7 @@ struct MechanicMapOverlayProbe {
 struct MechanicMapOverlayResult {
     bool pointer_captured{};
     bool map_changed{};
+    std::string open_node;
 };
 
 struct MechanicWorkspaceState {

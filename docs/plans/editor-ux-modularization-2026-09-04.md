@@ -137,6 +137,9 @@ lecture seule et renvoie vers Mechanics.
 La géométrie, le hit-testing et la conversion monde→local vivent dans
 `mechanic_workspace`; `map_canvas` ne duplique pas ce métier et arbitre
 seulement l'interaction avec ses autres outils.
+Le double-clic d'une forme remonte désormais au shell le nœud Mechanics exact,
+ce qui supprime la recherche manuelle pour les propriétés privées tout en
+conservant le retour vers l'instance Map.
 Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,

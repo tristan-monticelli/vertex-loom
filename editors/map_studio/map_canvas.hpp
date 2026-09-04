@@ -107,6 +107,7 @@ void draw_map_canvas(
     MapPreviewRenderer& preview_render_state,
     editor::MechanicSession& mechanic_session,
     MapMechanicOverlayState& mechanic_gizmo,
+    std::string& requested_mechanic_node,
     std::string& status,
     MapPlacementProbe* probe = nullptr);
 

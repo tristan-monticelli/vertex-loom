@@ -54,6 +54,11 @@ elle est pausée et remise au pas zéro avant d'exposer ses poignées. La pose
 physique live reste observable dans Mechanics et Preview, mais ne devient jamais
 accidentellement une nouvelle valeur persistée.
 
+Un double-clic sur une forme, paramétrée ou protégée, demande au shell d'ouvrir
+le document Mechanics déjà résolu et de sélectionner son nœud exact. Le shell
+enregistre d'abord le contexte Map dans `EditorContext`; Retour restaure donc
+la même map et la même instance sans nouvelle recherche.
+
 ## Conséquences
 
 - Un même graphe mécanique peut servir à plusieurs prefabs configurés.

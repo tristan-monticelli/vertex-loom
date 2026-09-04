@@ -692,7 +692,13 @@ MechanicMapOverlayResult draw_mechanic_map_overlay(
             const auto& handle = handles[*hit];
             state.selected_node = handle.node_id;
             result.pointer_captured = true;
-            if (hit_kind == MapMechanicDragKind::none) {
+            if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                state.active = false;
+                state.parameter_id.clear();
+                state.kind = MapMechanicDragKind::none;
+                result.open_node = handle.node_id;
+                status = "Opening the selected mechanic node";
+            } else if (hit_kind == MapMechanicDragKind::none) {
                 status = "Mechanic shape selected; highlighted handles edit all prefab instances";
             } else {
                 state.active = true;

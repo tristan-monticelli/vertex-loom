@@ -179,6 +179,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      MapPreviewRenderer& preview_render_state,
                      fabric::editor::MechanicSession& mechanic_session,
                      MapMechanicOverlayState& mechanic_gizmo,
+                     std::string& requested_mechanic_node,
                      std::string& status,
                      MapPlacementProbe* probe) {
     if (!session.map()) return;
@@ -355,6 +356,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         placement_mode || gizmo.active || point_gizmo.active ||
             selection_box.active,
         status, probe != nullptr ? &probe->mechanic : nullptr);
+    requested_mechanic_node = mechanic_overlay.open_node;
     const bool mechanic_pointer_captured =
         mechanic_overlay.pointer_captured || mechanic_gizmo.active;
     if (mechanic_overlay.map_changed) return;

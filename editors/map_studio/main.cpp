@@ -682,6 +682,7 @@ int run(const std::filesystem::path& project_root,
     bool mechanic_e2e_complete = false;
     bool mechanic_authoring_verified = false;
     bool mechanic_map_parameter_verified = false;
+    bool mechanic_map_reopen_verified = false;
     bool mechanic_connection_removed = false;
     std::size_t mechanic_e2e_frame = 0U;
     std::size_t mechanic_map_e2e_frame = 0U;
@@ -917,6 +918,7 @@ int run(const std::filesystem::path& project_root,
     bool canvas_grid_visible = true;
     CanvasGizmoState canvas_gizmo;
     MapMechanicOverlayState map_mechanic_gizmo;
+    std::string requested_mechanic_node;
     CollisionPointGizmoState collision_point_gizmo;
     SelectionBoxState selection_box;
     MapPlacementProbe placement_probe{.enabled = placement_e2e || mechanic_e2e};
@@ -1123,6 +1125,13 @@ int run(const std::filesystem::path& project_root,
                                      : SDL_MOUSEBUTTONUP,
                                  target);
             }
+        }
+        if (mechanic_e2e && mechanic_map_parameter_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            (mechanic_map_e2e_frame == 10U ||
+             mechanic_map_e2e_frame == 11U) &&
+            placement_probe.mechanic.parameter_body_seen) {
+            push_left_click(placement_probe.mechanic.parameter_body_screen);
         }
         if (mechanic_e2e && mechanic_authoring_verified &&
             active_workspace == ActiveWorkspace::publish &&
@@ -1772,8 +1781,22 @@ int run(const std::filesystem::path& project_root,
                             placement_mode, keep_placement_active,
                             placement_id, placement_resource_id, placement_kind,
                             canvas_snapping, preview_render_state,
-                            mechanic_session, map_mechanic_gizmo, status,
+                            mechanic_session, map_mechanic_gizmo,
+                            requested_mechanic_node, status,
                             &placement_probe);
+            if (!requested_mechanic_node.empty() && mechanic_session.graph() &&
+                selected_instances.size() == 1U) {
+                static_cast<void>(editor_context.navigate(
+                    map.document.id, fabric::editor::EditorWorkspace::map,
+                    fabric::core::ResourceId{
+                        .value = selected_instances.front()}));
+                mechanic_editor.selected_node = requested_mechanic_node;
+                static_cast<void>(editor_context.open_document(
+                    mechanic_session.graph()->document.id,
+                    fabric::editor::EditorWorkspace::logic));
+                active_workspace = ActiveWorkspace::mechanic;
+                status = "Mechanic node opened from its Map shape";
+            }
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             for (const auto& error : preview_render_state.errors)
@@ -2954,8 +2977,30 @@ int run(const std::filesystem::path& project_root,
             write_frame_capture(project_root, window,
                                 "map-studio-mechanic-map-overlay-e2e.ppm");
             mechanic_map_overlay_capture_written = true;
-            publish_e2e_frame = 0U;
-            active_workspace = ActiveWorkspace::publish;
+        }
+        if (mechanic_e2e && mechanic_map_overlay_capture_written &&
+            active_workspace == ActiveWorkspace::mechanic &&
+            !mechanic_map_reopen_verified) {
+            const auto* mechanic_document = editor_context.active_document();
+            const bool opened_exact_node = mechanic_document != nullptr &&
+                mechanic_document->workspace ==
+                    fabric::editor::EditorWorkspace::logic &&
+                mechanic_document->id.value == "rotating-platform" &&
+                mechanic_editor.selected_node == "platform";
+            const bool returned = editor_context.go_back();
+            const auto* map_document = editor_context.active_document();
+            const bool restored_instance = returned && map_document != nullptr &&
+                map_document->workspace == fabric::editor::EditorWorkspace::map &&
+                map_document->selection_id == fabric::core::ResourceId{
+                    .value = "rotating-platform-instance"};
+            mechanic_map_reopen_verified = opened_exact_node && restored_instance;
+            if (!mechanic_map_reopen_verified) {
+                fail_e2e("Map shape did not open its exact mechanic node and history");
+                running = false;
+            } else {
+                publish_e2e_frame = 0U;
+                active_workspace = ActiveWorkspace::publish;
+            }
         }
         if (mechanic_e2e && publish_probe.runtime_verified &&
             !publish_e2e_capture_written) {
@@ -3146,6 +3191,7 @@ int run(const std::filesystem::path& project_root,
                 publish_probe.publish_seen && publish_probe.publish_clicked &&
                 publish_probe.dependency_seen && publish_probe.runtime_verified &&
                 mechanic_map_parameter_verified &&
+                mechanic_map_reopen_verified &&
                 mechanic_map_overlay_capture_written &&
                 publish_e2e_capture_written &&
                 std::filesystem::is_regular_file(

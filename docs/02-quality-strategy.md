@@ -241,6 +241,9 @@ Map, une preview reconstruite à la nouvelle dimension, puis sauvegarde et
 recharge la Map avant de poursuivre. Cette preuve distingue une vraie
 interaction utilisateur d'un simple dessin décoratif et vérifie sa portée
 prefab explicite.
+Enfin, le scénario double-clique la forme depuis la Map, exige l'ouverture du
+document Mechanics avec le nœud `platform` sélectionné et vérifie que
+l'historique conserve l'instance Map avant de passer à Publish.
 Le scénario continue ensuite dans le workspace `Publish` : il clique Validate,
 exige une fermeture de dépendances visible, clique Publish, recharge le dossier
 produit avec `PreviewRuntime` pour un smoke d'une frame et capture
