@@ -21,6 +21,6 @@ format et sera intégré dans un incrément ultérieur.
 - Les meshes sont sauvegardés et rechargés sans rasterisation persistante.
 - Les documents historiques sans ce champ restent compatibles.
 - La topologie et les influences sont déterministes et inspectables headless.
-- Le Studio peut initialiser un triangle de départ pondéré sur le premier nœud
-  via une commande de session ; il persiste exactement le même contrat et
-  n'introduit aucune migration.
+- Le Studio peut initialiser un quad quatre points pondéré sur le premier nœud
+  via une commande de session ; ses positions correspondent au preset tissu
+  XPBD, il persiste exactement le même contrat et n'introduit aucune migration.

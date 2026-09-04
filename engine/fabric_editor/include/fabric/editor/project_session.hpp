@@ -191,6 +191,9 @@ public:
     [[nodiscard]] bool create_selected_entity_starter_deformation_mesh(
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool create_selected_entity_starter_xpbd_cloth(
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_visual_composition(
         project::VisualComposition composition,
         AutosaveScheduler::Clock::time_point now =

@@ -1660,9 +1660,10 @@ TEST_CASE("entity starter deformation mesh is valid undoable and reloadable") {
     CHECK_FALSE(session.create_selected_entity_starter_deformation_mesh(start));
     REQUIRE(session.selected_entity()->deformation_mesh.has_value());
     const auto mesh = *session.selected_entity()->deformation_mesh;
-    REQUIRE(mesh.vertices.size() == 3U);
-    REQUIRE(mesh.triangles.size() == 1U);
-    CHECK(mesh.triangles.front() == fabric::project::MeshTriangle{0U, 1U, 2U});
+    REQUIRE(mesh.vertices.size() == 4U);
+    REQUIRE(mesh.triangles.size() == 2U);
+    CHECK(mesh.triangles.front() == fabric::project::MeshTriangle{0U, 2U, 1U});
+    CHECK(mesh.triangles.back() == fabric::project::MeshTriangle{1U, 2U, 3U});
     for (const auto& vertex : mesh.vertices) {
         REQUIRE(vertex.influences.size() == 1U);
         CHECK(vertex.influences.front().node_id == "root");
@@ -1684,6 +1685,45 @@ TEST_CASE("entity starter deformation mesh is valid undoable and reloadable") {
     REQUIRE(reloaded.selected_entity()->deformation_mesh.has_value());
     CHECK(reloaded.selected_entity()->deformation_mesh->vertices == mesh.vertices);
     CHECK(reloaded.selected_entity()->deformation_mesh->triangles == mesh.triangles);
+}
+
+TEST_CASE("entity starter XPBD cloth is complete undoable and reloadable") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    CHECK_FALSE(session.create_selected_entity_starter_xpbd_cloth());
+
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Cloth authoring";
+    prompt.node_name = "Root";
+    REQUIRE(session.create_entity(prompt));
+    const fabric::editor::AutosaveScheduler::Clock::time_point start{};
+    REQUIRE(session.create_selected_entity_starter_xpbd_cloth(start));
+    CHECK_FALSE(session.create_selected_entity_starter_xpbd_cloth(start));
+    REQUIRE(session.selected_entity()->xpbd.has_value());
+    const auto cloth = *session.selected_entity()->xpbd;
+    CHECK(fabric::project::validate_xpbd_system(
+        cloth, 1.0F / 60.0F, 1U).ok());
+    CHECK(cloth.particles.size() == 4U);
+    CHECK(cloth.distance_constraints.size() == 4U);
+    CHECK(cloth.pin_constraints.size() == 2U);
+    CHECK(cloth.bending_constraints.size() == 1U);
+    CHECK(cloth.area_constraints.size() == 2U);
+    CHECK(cloth.collision_constraints.size() == 2U);
+
+    REQUIRE(session.undo(start));
+    CHECK_FALSE(session.selected_entity()->xpbd.has_value());
+    REQUIRE(session.redo(start));
+    REQUIRE(session.save());
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::entity,
+        {.value = "cloth-authoring"}));
+    REQUIRE(reloaded.selected_entity()->xpbd.has_value());
+    CHECK(*reloaded.selected_entity()->xpbd == cloth);
 }
 
 TEST_CASE("animation prompt publishes and indexes a clip") {

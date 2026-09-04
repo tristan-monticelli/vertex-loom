@@ -29,10 +29,17 @@ et l'historique normal. Les itérations et la tolérance restent dans l'inspecte
 avancé.
 
 La création de déformation ne produit pas un conteneur vide. L'action nominale
-`Create starter deformation mesh` ajoute atomiquement un triangle éditable,
-dont les trois sommets ont une influence unitaire sur le premier nœud de
-l'Entity. Cette base déterministe passe par `ProjectSession`, peut être annulée
-et ne change pas le contrat `deformationMesh`.
+`Create starter deformation mesh` ajoute atomiquement un quad éditable à quatre
+points et deux triangles, dont les sommets ont une influence unitaire sur le
+premier nœud de l'Entity. Il partage ses positions avec le preset tissu XPBD :
+les deux actions restent compatibles quel que soit leur ordre. Cette base
+déterministe passe par `ProjectSession`, peut être annulée et ne change pas le
+contrat `deformationMesh`.
+
+La création XPBD suit la même règle. `Create 4-point cloth simulation` est
+visible dans la section nominale et initialise une fixture valide contenant
+les cinq familles de contraintes. Les champs numériques et le reset restent
+dans la divulgation avancée.
 
 ## Conséquences
 

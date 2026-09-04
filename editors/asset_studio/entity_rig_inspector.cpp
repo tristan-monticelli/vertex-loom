@@ -66,7 +66,28 @@ void draw_entity_rig_inspector(
                     probe->starter_mesh_seen = true;
                 }
                 ImGui::TextDisabled(
-                    "Creates one valid triangle weighted to the root node.");
+                    "Creates a valid 4-point quad weighted to the root node.");
+            }
+            if (!entity.xpbd) {
+                if (ImGui::Button("Create 4-point cloth simulation")) {
+                    const bool created =
+                        session.create_selected_entity_starter_xpbd_cloth();
+                    status = created
+                        ? "Four-point cloth simulation created."
+                        : "Cloth creation rejected; inspect diagnostics.";
+                    if (probe != nullptr && probe->enabled)
+                        probe->starter_cloth_clicked = created;
+                }
+                if (probe != nullptr && probe->enabled) {
+                    const auto minimum = ImGui::GetItemRectMin();
+                    const auto maximum = ImGui::GetItemRectMax();
+                    probe->starter_cloth_screen = {
+                        (minimum.x + maximum.x) * 0.5F,
+                        (minimum.y + maximum.y) * 0.5F};
+                    probe->starter_cloth_seen = true;
+                }
+                ImGui::TextDisabled(
+                    "Creates two fixed and two dynamic particles with all constraints.");
             }
             if (advanced_mode &&
                 ImGui::CollapsingHeader(

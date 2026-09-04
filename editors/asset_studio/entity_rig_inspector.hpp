@@ -14,6 +14,9 @@ struct EntityRigInspectorProbe {
     bool starter_mesh_seen{};
     bool starter_mesh_clicked{};
     ImVec2 starter_mesh_screen{};
+    bool starter_cloth_seen{};
+    bool starter_cloth_clicked{};
+    ImVec2 starter_cloth_screen{};
 };
 
 using EntityNodePicker = bool (*)(

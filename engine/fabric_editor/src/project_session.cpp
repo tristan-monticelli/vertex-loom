@@ -2999,12 +2999,40 @@ bool ProjectSession::create_selected_entity_starter_deformation_mesh(
     auto next = *selected_entity_;
     next.deformation_mesh = project::DeformationMesh{
         .vertices = {
+            influenced_vertex({-1.0F, 1.0F}),
+            influenced_vertex({1.0F, 1.0F}),
             influenced_vertex({-1.0F, -1.0F}),
             influenced_vertex({1.0F, -1.0F}),
-            influenced_vertex({0.0F, 1.0F}),
         },
-        .triangles = {{0U, 1U, 2U}},
+        .triangles = {{0U, 2U, 1U}, {1U, 2U, 3U}},
     };
+    return set_selected_entity_definition(std::move(next), now);
+}
+
+bool ProjectSession::create_selected_entity_starter_xpbd_cloth(
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || selected_entity_->xpbd) return false;
+    auto next = *selected_entity_;
+    next.xpbd = project::XpbdSystem{
+        .particles = {
+            {{-1.0F, 1.0F}, 0.0F}, {{1.0F, 1.0F}, 0.0F},
+            {{-1.0F, -1.0F}, 1.0F}, {{1.0F, -1.0F}, 1.0F}},
+        .distance_constraints = {
+            {0, 1, 2.0F, 0.0F, 0.0F},
+            {0, 2, 2.0F, 0.001F, 0.0F},
+            {1, 3, 2.0F, 0.001F, 0.0F},
+            {2, 3, 2.0F, 0.001F, 0.0F}},
+        .pin_constraints = {
+            {0, {-1.0F, 1.0F}, 0.0F, {}},
+            {1, {1.0F, 1.0F}, 0.0F, {}}},
+        .bending_constraints = {
+            {0, 2, 3, 2.828427F, 0.01F, 0.0F}},
+        .area_constraints = {
+            {0, 2, 1, 2.0F, 0.001F, 0.0F},
+            {1, 2, 3, 2.0F, 0.001F, 0.0F}},
+        .collision_constraints = {
+            {2, {0.0F, 1.0F}, -2.0F, 0.0F, 0.0F},
+            {3, {0.0F, 1.0F}, -2.0F, 0.0F, 0.0F}}};
     return set_selected_entity_definition(std::move(next), now);
 }
 

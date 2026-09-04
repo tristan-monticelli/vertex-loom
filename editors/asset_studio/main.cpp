@@ -8172,6 +8172,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         entity_rig_probe.enabled = true;
         entity_rig_probe.starter_mesh_seen = false;
         entity_rig_probe.starter_mesh_clicked = false;
+        entity_rig_probe.starter_cloth_seen = false;
+        entity_rig_probe.starter_cloth_clicked = false;
         ui_entity_animate_action_seen = false;
         ui_entity_transform_seen = false;
         ui_entity_ik_create_seen = false;
@@ -8226,14 +8228,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     .initial_state = "idle",
                     .states = {
                         {"idle", {{.value = "beam-scroll"}, "animation"}}}};
-            with_graph.xpbd = fabric::project::XpbdSystem{
-                .particles = {
-                    {{-5.0F, -2.0F}, 0.0F}, {{0.0F, 2.0F}, 1.0F},
-                    {{5.0F, -2.0F}, 1.0F}},
-                .distance_constraints = {
-                    {0, 1, 6.403124F, 0.001F, 0.0F},
-                    {1, 2, 6.403124F, 0.001F, 0.0F}},
-                .pin_constraints = {{0, {-5.0F, -2.0F}, 0.0F, {}}}};
             authored = session.set_selected_entity_definition(
                 std::move(with_graph)) && session.save();
             animation_graph_ui.open = authored;
@@ -9317,8 +9311,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             button.button.y = motion.motion.y;
             static_cast<void>(SDL_PushEvent(&button));
         }
-        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 16U &&
-            entity_gizmo_e2e_frame <= 17U &&
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 22U &&
+            entity_gizmo_e2e_frame <= 23U &&
             entity_rig_probe.starter_mesh_seen) {
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
@@ -9329,9 +9323,33 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 std::lround(entity_rig_probe.starter_mesh_screen.y));
             static_cast<void>(SDL_PushEvent(&motion));
             SDL_Event button{};
+            button.type = entity_gizmo_e2e_frame == 22U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.state = button.type == SDL_MOUSEBUTTONDOWN
+                ? SDL_PRESSED : SDL_RELEASED;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 16U &&
+            entity_gizmo_e2e_frame <= 17U &&
+            entity_rig_probe.starter_cloth_seen) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(
+                std::lround(entity_rig_probe.starter_cloth_screen.x));
+            motion.motion.y = static_cast<int>(
+                std::lround(entity_rig_probe.starter_cloth_screen.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
             button.type = entity_gizmo_e2e_frame == 16U
                 ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
             button.button.button = SDL_BUTTON_LEFT;
+            button.button.state = button.type == SDL_MOUSEBUTTONDOWN
+                ? SDL_PRESSED : SDL_RELEASED;
             button.button.windowID = SDL_GetWindowID(window);
             button.button.x = motion.motion.x;
             button.button.y = motion.motion.y;
@@ -10302,7 +10320,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (entity_gizmo_e2e_active) {
             ++entity_gizmo_e2e_frame;
-            if (entity_gizmo_e2e_frame == 18U) {
+            if (entity_gizmo_e2e_frame == 26U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool reopened = saved && reloaded.open(initial_project) &&
@@ -10315,8 +10333,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded_entity->deformation_mesh &&
                     fabric::project::validate_deformation_mesh(
                         *reloaded_entity->deformation_mesh).ok() &&
-                    reloaded_entity->deformation_mesh->vertices.size() == 3U &&
-                    reloaded_entity->deformation_mesh->triangles.size() == 1U;
+                    reloaded_entity->deformation_mesh->vertices.size() == 4U &&
+                    reloaded_entity->deformation_mesh->triangles.size() == 2U;
+                const bool starter_cloth_valid = reloaded_entity != nullptr &&
+                    reloaded_entity->xpbd &&
+                    fabric::project::validate_xpbd_system(
+                        *reloaded_entity->xpbd, 1.0F / 60.0F, 1U).ok() &&
+                    reloaded_entity->xpbd->particles.size() == 4U &&
+                    reloaded_entity->xpbd->distance_constraints.size() == 4U &&
+                    reloaded_entity->xpbd->pin_constraints.size() == 2U &&
+                    reloaded_entity->xpbd->bending_constraints.size() == 1U &&
+                    reloaded_entity->xpbd->area_constraints.size() == 2U &&
+                    reloaded_entity->xpbd->collision_constraints.size() == 2U;
                 entity_e2e_complete = entity_e2e_complete && reopened &&
                     animation_graph_probe.graph_seen && animation_graph_probe.canvas_seen &&
                     animation_graph_probe.add_seen &&
@@ -10330,6 +10358,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     entity_rig_probe.starter_mesh_seen &&
                     entity_rig_probe.starter_mesh_clicked &&
                     starter_mesh_valid &&
+                    entity_rig_probe.starter_cloth_seen &&
+                    entity_rig_probe.starter_cloth_clicked &&
+                    starter_cloth_valid &&
                     entity_ik_e2e_capture_written &&
                     reloaded_entity->nodes.size() > 1U &&
                     reloaded_entity->nodes[1].transform.position.x !=
@@ -10365,6 +10396,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                               << ", mesh-clicked="
                               << entity_rig_probe.starter_mesh_clicked
                               << ", mesh-valid=" << starter_mesh_valid
+                              << ", cloth-seen="
+                              << entity_rig_probe.starter_cloth_seen
+                              << ", cloth-clicked="
+                              << entity_rig_probe.starter_cloth_clicked
+                              << ", cloth-valid=" << starter_cloth_valid
                               << ", states="
                               << (reloaded_entity != nullptr &&
                                           reloaded_entity->animation_state_machine
