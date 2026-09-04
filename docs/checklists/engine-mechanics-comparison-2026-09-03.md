@@ -101,8 +101,8 @@ tranches sont détaillées dans le
 [plan de refactoring UX](../plans/editor-ux-modularization-2026-09-04.md).
 
 Les preuves structurelles sont mesurables au 4 septembre après extraction de
-Behavior, Animation Graph et timeline Animation : `asset_studio/main.cpp`
-contient 11 886 lignes et 1 002 appels
+Behavior et l'ensemble Animation : `asset_studio/main.cpp` contient désormais
+10 885 lignes et 1 417 appels
 ImGui ; `map_studio/main.cpp` contient 2 937 lignes et 423 appels ImGui. Le
 premier mélange encore bootstrap, état UI, plusieurs workspaces,
 orchestration des sessions et E2E ; le second a déjà sorti Scene, Mechanics,
@@ -233,7 +233,7 @@ modifier aucun schéma persistant.
 | UX globale | A58 — layout adaptatif, panneaux repliables et préférences locales | Tailles minimale testées ; positions forcées, largeurs statiques en mémoire et fenêtres auxiliaires | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Le canvas Map devient trop petit et l'espace n'est pas restauré entre sessions | P1 | Deux layouts bornés large/compact puis persistance locale ; garder le Stage prioritaire | G16, U15, E18, GM8, C10, S5, R6 |
 | Outils canvas | A59 — modes contextuels et manipulation directe des relations | Gizmos Entity/vectoriels, IK chaîne+cible, placement Map et déplacement Mechanics corps/pivots/capteurs ; mesh, poids, XPBD et joints restent form-heavy | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | IK et Mechanics de base sont prouvés, mais plusieurs systèmes avancés restent derrière le runtime | P0 | Poignées mécaniques restantes, puis mesh/poids et Physics canvas | G6, U8, E18, GM9, C6, S6, R6 |
 | Debug UX | A60 — diagnostics cliquables, trace, breakpoints et inspection live | Behavior colore la trace et fournit breakpoint/pause/step éphémères ; erreurs et overlays des autres workspaces restent textuels | partiel | partiel | partiel | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Première boucle de debug prouvée ; navigation diagnostic→objet et inspection live globale manquent | P0 | Généraliser cible navigable et brancher la trace Behavior au Preview Runtime | G10, U10, E11, GM7, C8, R5 |
-| Architecture UX | A61 — shell et workspaces modulaires testables | `map_studio/main.cpp` est descendu à 2 937 lignes après extraction de cinq modules ; Behavior, Animation Graph et la timeline Animation possèdent désormais leurs modules et états, mais `asset_studio/main.cpp` reste à 11 886 lignes | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | non prouvé | partiel | non prouvé | non prouvé | La frontière de workspace est prouvée, mais Visual, Entity, l'inspecteur Animation et les harnais E2E restent fortement couplés au shell Asset | P0 | Continuer tranche 3 : inspecteur Animation puis Entity/Visual hors du bootstrap, mêmes sessions et E2E | G18, U17, E19, GM5, C11, S5, R6 |
+| Architecture UX | A61 — shell et workspaces modulaires testables | `map_studio/main.cpp` est descendu à 2 937 lignes après extraction de cinq modules ; Behavior, Animation Graph, timeline et inspecteur Animation possèdent désormais leurs modules et états, mais `asset_studio/main.cpp` reste à 10 885 lignes | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | non prouvé | partiel | non prouvé | non prouvé | La frontière Animation est complète, mais Visual, Entity et les harnais E2E restent fortement couplés au shell Asset | P0 | Continuer tranche 3 : Entity puis Visual hors du bootstrap, mêmes sessions et E2E | G18, U17, E19, GM5, C11, S5, R6 |
 | Accessibilité UX | A62 — focus, clavier, échelle et langue cohérente | contraste et navigation ImGui testés ; focus partiel ; libellés français/anglais mélangés et aucune localisation du Studio | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Utilisation clavier et compréhension inégales selon panneau et taille d'écran | P1 | Catalogue de libellés, ordre de focus, échelle UI et scénarios clavier par parcours | G9, U15, E9, GM8, C10, S5, R6 |
 
 ## Couverture exhaustive interne
@@ -429,8 +429,8 @@ et rechargés par l'UI. Ils ne deviennent pas L4 tant que le même scénario ne
 va pas jusqu'au runtime publié.
 
 Le déficit dominant est désormais transversal. A54–A61 montrent que Map Studio,
-Behavior, Animation Graph et la timeline Animation délèguent leurs workspaces,
-mais que Visual, Entity, l'inspecteur Animation et une grande partie de leurs E2E restent assemblés dans le point
+Behavior et l'ensemble Animation délèguent leurs workspaces, mais que Visual,
+Entity et une grande partie de leurs E2E restent assemblés dans le point
 d'entrée Asset Studio, avec des sélections, actions et diagnostics encore
 locaux. Le refactoring progressif d'ADR-0151 reste donc un prérequis P0, pas un
 nettoyage facultatif.

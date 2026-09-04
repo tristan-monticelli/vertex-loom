@@ -15,6 +15,7 @@
 #include "fabric/render/vector_geometry.hpp"
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "animation_graph_workspace.hpp"
+#include "animation_inspector.hpp"
 #include "animation_timeline_workspace.hpp"
 #include "behavior_workspace.hpp"
 #include "import_workflow.hpp"
@@ -58,6 +59,7 @@ namespace {
 using fabric::asset_studio::AssetPreview;
 using fabric::asset_studio::AnimationGraphWorkspaceProbe;
 using fabric::asset_studio::AnimationGraphWorkspaceState;
+using fabric::asset_studio::AnimationInspectorProbe;
 using fabric::asset_studio::AnimationTimelineProbe;
 using fabric::asset_studio::AnimationWorkspaceState;
 using fabric::asset_studio::BehaviorWorkspaceProbe;
@@ -68,6 +70,7 @@ using fabric::asset_studio::SourceImportFields;
 using fabric::asset_studio::clear_asset_preview;
 using fabric::asset_studio::draw_import_workflow;
 using fabric::asset_studio::draw_animation_graph_workspace;
+using fabric::asset_studio::draw_animation_inspector;
 using fabric::asset_studio::draw_animation_timeline_workspace;
 using fabric::asset_studio::draw_behavior_workspace;
 using fabric::asset_studio::upload_preview;
@@ -123,16 +126,6 @@ bool ui_button_create_seen = false;
 bool ui_button_created = false;
 bool ui_button_reloaded = false;
 ImVec2 ui_button_create_screen{};
-bool ui_animation_probe_enabled = false;
-bool ui_animation_quick_key_seen = false;
-bool ui_animation_node_picker_seen = false;
-ImVec2 ui_animation_quick_key_screen{};
-bool ui_workflow_position_key_seen = false;
-bool ui_animation_auto_key_seen = false;
-bool ui_animation_playhead_seen = false;
-ImVec2 ui_workflow_position_key_screen{};
-ImVec2 ui_animation_auto_key_screen{};
-ImVec2 ui_animation_playhead_target_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_ik_create_seen = false;
@@ -2101,6 +2094,7 @@ void write_ui_button_probe(const std::filesystem::path& project_path) {
 void write_entity_animation_workflow_probe(
     const std::filesystem::path& project_path,
     const AnimationTimelineProbe& timeline_probe,
+    const AnimationInspectorProbe& inspector_probe,
     const bool entity_created, const bool animation_created,
     const bool key_persisted, const bool key_corrected,
     const bool marker_persisted, const bool child_composed,
@@ -2117,10 +2111,10 @@ void write_entity_animation_workflow_probe(
         {"animate_selected_button_clicked", ui_entity_animate_clicked},
         {"animation_create_button_seen", ui_animation_create_seen},
         {"animation_created_by_click", animation_created},
-        {"quick_key_button_seen", ui_animation_quick_key_seen},
-        {"position_key_button_seen", ui_workflow_position_key_seen},
-        {"auto_key_button_seen", ui_animation_auto_key_seen},
-        {"playhead_seen", ui_animation_playhead_seen},
+        {"quick_key_button_seen", inspector_probe.quick_key_seen},
+        {"position_key_button_seen", inspector_probe.workflow_position_key_seen},
+        {"auto_key_button_seen", inspector_probe.auto_key_seen},
+        {"playhead_seen", inspector_probe.playhead_seen},
         {"play_button_seen", timeline_probe.play_seen},
         {"playback_advanced", timeline_probe.playback_advanced},
         {"second_key_seen", timeline_probe.second_key_seen},
@@ -2779,6 +2773,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         visual_preview,
                     AnimationWorkspaceState& animation_ui,
                     AnimationTimelineProbe& animation_timeline_probe,
+                    AnimationInspectorProbe& animation_inspector_probe,
                     AnimationGraphWorkspaceState& animation_graph_ui,
                     AnimationGraphWorkspaceProbe& animation_graph_probe,
                     TexturedPathUiState& path_ui,
@@ -6580,1010 +6575,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 status = "Input action could not be added; inspect diagnostics.";
             }
         }
-        if (selected != nullptr &&
-            selected->kind == fabric::editor::StudioResourceKind::animation &&
-            session.selected_animation()) {
-            auto& clip = *session.selected_animation();
-            ImGui::SeparatorText("Animation");
-            ImGui::TextWrapped(
-                "Choose a node, move the playhead, then key the property you want to animate.");
-            std::string preview_entity_id = clip.preview_entity
-                ? clip.preview_entity->id.value : std::string{};
-            if (draw_project_resource_picker(
-                    "Preview with", session.resources(),
-                    fabric::editor::StudioResourceKind::entity,
-                    preview_entity_id, true, false)) {
-                const auto target = preview_entity_id.empty()
-                    ? std::optional<fabric::project::ResourceReference>{}
-                    : std::optional<fabric::project::ResourceReference>{
-                        fabric::project::ResourceReference{
-                            {.value = preview_entity_id}, "entity"}};
-                status = session.set_selected_animation_preview_entity(target)
-                    ? "Animation preview target changed."
-                    : "Animation target rejected; inspect diagnostics.";
-            }
-            if (!clip.preview_entity)
-                ImGui::TextDisabled("Generic clip: no entity preview.");
-            float duration = clip.duration;
-            if (ImGui::InputFloat("Duration", &duration, 0.1F, 1.0F, "%.2f s")) {
-                if (!session.set_selected_animation_duration(duration)) {
-                    status = "Animation duration rejected; inspect diagnostics.";
-                }
-            }
-            ImGui::SetItemTooltip("Total clip duration; key times are constrained to this range.");
-            bool loop = clip.loop;
-            if (ImGui::Checkbox("Loop", &loop)) {
-                if (!session.set_selected_animation_loop(loop)) {
-                    status = "Animation loop rejected; inspect diagnostics.";
-                }
-            }
-            animation_ui.scrub_time = std::clamp(animation_ui.scrub_time, 0.0F,
-                                                  std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Playhead", &animation_ui.scrub_time, 0.0F,
-                               std::max(0.01F, clip.duration), "%.2f s");
-            if (ui_entity_animation_workflow_probe_enabled) {
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_animation_playhead_target_screen = {
-                    minimum.x + (maximum.x - minimum.x) * 0.75F,
-                    (minimum.y + maximum.y) * 0.5F};
-                ui_animation_playhead_seen = true;
-            }
-            ImGui::SetItemTooltip("Preview time used to evaluate the animation clip.");
-            ImGui::Checkbox("Auto-key while moving in the Viewer",
-                            &animation_ui.auto_key);
-            if (ui_entity_animation_workflow_probe_enabled) {
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_animation_auto_key_screen = {
-                    (minimum.x + maximum.x) * 0.5F,
-                    (minimum.y + maximum.y) * 0.5F};
-                ui_animation_auto_key_seen = true;
-            }
-            ImGui::TextDisabled(animation_ui.auto_key
-                ? "Viewer edits now create keys at the playhead."
-                : "Turn this on to animate directly in the Viewer.");
-            if (ImGui::CollapsingHeader("Timeline options")) {
-                ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
-                ImGui::SetNextItemWidth(-1.0F);
-                ImGui::InputFloat("Snap interval (seconds)",
-                                  &animation_ui.key_snap_interval,
-                                  0.05F, 0.5F, "%.2f s");
-                draw_technical_tooltip(
-                    "Key times are rounded to this interval when snapping is enabled.");
-            }
-            animation_ui.key_snap_interval = std::max(0.01F,
-                                                      animation_ui.key_snap_interval);
-            const auto snap_key_time = [&](const float time) {
-                if (!animation_ui.snap_keys) return time;
-                return std::round(time / animation_ui.key_snap_interval) *
-                    animation_ui.key_snap_interval;
-            };
-            const auto evaluated = fabric::project::evaluate_animation(
-                clip, animation_ui.scrub_time);
-            if (ImGui::CollapsingHeader("Evaluated values")) {
-              ImGui::TextDisabled("Evaluated properties: %zu",
-                                  evaluated.properties.size());
-              for (const auto& property : evaluated.properties) {
-                const bool target_node_missing = session.selected_entity().has_value() &&
-                    std::ranges::none_of(session.selected_entity()->nodes,
-                        [&](const auto& node) { return node.id == property.binding.node_id; });
-                if (target_node_missing) {
-                    ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
-                                       "Invalid animation binding: missing node '%s'",
-                                       property.binding.node_id.c_str());
-                    if (ImGui::SmallButton("Repair to first target node") &&
-                        session.selected_entity() && !session.selected_entity()->nodes.empty()) {
-                        auto repaired = property.binding;
-                        repaired.node_id = session.selected_entity()->nodes.front().id;
-                        status = session.replace_selected_animation_binding(
-                                     property.binding, repaired)
-                            ? "Animation binding repaired."
-                            : "Animation binding repair failed; inspect diagnostics.";
-                    }
-                }
-                const auto value_label = std::visit(
-                    [](const auto& value) {
-                        using Value = std::decay_t<decltype(value)>;
-                        if constexpr (std::is_same_v<Value, float>) {
-                            return std::to_string(value);
-                        } else if constexpr (std::is_same_v<Value, fabric::core::Vec2>) {
-                            return "(" + std::to_string(value.x) + ", " +
-                                std::to_string(value.y) + ")";
-                        } else if constexpr (std::is_same_v<Value, fabric::core::Color>) {
-                            return "rgba(" + std::to_string(value.red) + ", " +
-                                std::to_string(value.green) + ", " +
-                                std::to_string(value.blue) + ", " +
-                                std::to_string(value.alpha) + ")";
-                        } else if constexpr (std::is_same_v<Value, bool>) {
-                            return value ? std::string{"true"} : std::string{"false"};
-                        } else {
-                            return value.id.value;
-                        }
-                    }, property.value);
-                ImGui::BulletText("%s / %s / %s = %s [%s]",
-                                  property.binding.node_id.c_str(),
-                                  property.binding.component_id.c_str(),
-                                  property.binding.property_id.c_str(),
-                                  value_label.c_str(),
-                                  fabric::project::to_string(property.composition).data());
-              }
-            }
-            if (session.selected_entity() &&
-                !session.selected_entity()->nodes.empty()) {
-                const auto& nodes = session.selected_entity()->nodes;
-                auto selected_node = std::ranges::find(
-                    nodes, animation_ui.node_id,
-                    &fabric::project::EntityNode::id);
-                if (selected_node == nodes.end()) {
-                    animation_ui.node_id = nodes.front().id;
-                    selected_node = nodes.begin();
-                }
-                ImGui::SeparatorText("Animate selected node");
-                const char* selected_node_label = selected_node->name.c_str();
-                if (ImGui::BeginCombo("Node", selected_node_label)) {
-                    for (const auto& candidate : nodes) {
-                        if (ImGui::Selectable(candidate.name.c_str(),
-                                              candidate.id == animation_ui.node_id)) {
-                            animation_ui.node_id = candidate.id;
-                            selected_node = std::ranges::find(
-                                nodes, animation_ui.node_id,
-                                &fabric::project::EntityNode::id);
-                        }
-                        if (entity_advanced_mode) {
-                            ImGui::SameLine();
-                            ImGui::TextDisabled("%s", candidate.id.c_str());
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-                if (ui_animation_probe_enabled)
-                    ui_animation_node_picker_seen = true;
-                const auto current_value =
-                    [&](const fabric::project::PropertyBinding& binding,
-                        fabric::project::AnimationValue fallback) {
-                        const auto found = std::ranges::find(
-                            evaluated.properties, binding,
-                            &fabric::project::EvaluatedProperty::binding);
-                        return found == evaluated.properties.end()
-                            ? fallback : found->value;
-                    };
-                const auto set_quick_key =
-                    [&](const char* label,
-                        const std::string_view property,
-                        fabric::project::AnimationValue value) {
-                        const auto binding = fabric::project::PropertyBinding{
-                            .node_id = animation_ui.node_id,
-                            .component_id = "transform",
-                            .property_id = std::string{property}};
-                        const bool clicked = ImGui::Button(label);
-                        if (ui_entity_animation_workflow_probe_enabled &&
-                            property == "position") {
-                            const auto minimum = ImGui::GetItemRectMin();
-                            const auto maximum = ImGui::GetItemRectMax();
-                            ui_workflow_position_key_screen = {
-                                (minimum.x + maximum.x) * 0.5F,
-                                (minimum.y + maximum.y) * 0.5F};
-                            ui_workflow_position_key_seen = true;
-                        }
-                        if (ui_animation_probe_enabled &&
-                            property == "rotationDegrees") {
-                            const auto minimum = ImGui::GetItemRectMin();
-                            const auto maximum = ImGui::GetItemRectMax();
-                            ui_animation_quick_key_screen = {
-                                (minimum.x + maximum.x) * 0.5F,
-                                (minimum.y + maximum.y) * 0.5F};
-                            ui_animation_quick_key_seen = true;
-                        }
-                        if (!clicked) return;
-                        if (session.set_selected_animation_key(
-                                binding, animation_ui.scrub_time,
-                                current_value(binding, std::move(value)),
-                                animation_ui.interpolation,
-                                fabric::editor::AutosaveScheduler::Clock::now(),
-                                animation_ui.composition, animation_ui.easing)) {
-                            animation_ui.component_id = "transform";
-                            animation_ui.property_id = std::string{property};
-                            status = std::string{label} + " key set at playhead.";
-                        } else {
-                            status = "Quick key rejected; inspect diagnostics.";
-                        }
-                    };
-                set_quick_key("Key Position", "position",
-                              selected_node->transform.position);
-                ImGui::SameLine();
-                set_quick_key("Key Rotation", "rotationDegrees",
-                              selected_node->transform.rotation_degrees);
-                set_quick_key("Key Scale", "scale",
-                              selected_node->transform.scale);
-                ImGui::SameLine();
-                set_quick_key("Key Pivot", "pivot",
-                              selected_node->transform.pivot);
-                ImGui::TextWrapped(
-                    "Creates the track when missing and captures the current value.");
-            }
-            if (ImGui::CollapsingHeader("Markers and audio cues")) {
-            ImGui::InputText("Marker id", &animation_ui.marker_id);
-            animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
-                                                   std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Marker time (seconds)", &animation_ui.marker_time, 0.0F,
-                               std::max(0.01F, clip.duration), "%.2f s");
-            draw_technical_tooltip("Timeline position at which the marker is stored.");
-            ImGui::Checkbox("Trigger audio event", &animation_ui.marker_audio_enabled);
-            if (animation_ui.marker_audio_enabled) {
-                draw_project_resource_picker(
-                    "Audio document##animation-marker", session.resources(),
-                    fabric::editor::StudioResourceKind::audio,
-                    animation_ui.marker_audio_id, false);
-                std::optional<fabric::project::AudioDocument> marker_audio;
-                if (!animation_ui.marker_audio_id.empty()) {
-                    const auto loaded = fabric::project::load_audio(
-                        session.project_root(), *session.manifest(),
-                        fabric::project::audio_document_path(
-                            *session.manifest(),
-                            {.value = animation_ui.marker_audio_id}));
-                    if (loaded.ok()) marker_audio = *loaded.audio;
-                }
-                const char* event_preview = animation_ui.marker_audio_event_id.empty()
-                    ? "Choose an event..."
-                    : animation_ui.marker_audio_event_id.c_str();
-                if (ImGui::BeginCombo("Audio event", event_preview)) {
-                    if (marker_audio)
-                        for (const auto& event : marker_audio->events)
-                            if (ImGui::Selectable(
-                                    event.id.c_str(),
-                                    event.id == animation_ui.marker_audio_event_id))
-                                animation_ui.marker_audio_event_id = event.id;
-                    ImGui::EndCombo();
-                }
-            }
-            const bool marker_audio_valid = !animation_ui.marker_audio_enabled ||
-                (!animation_ui.marker_audio_id.empty() &&
-                 !animation_ui.marker_audio_event_id.empty());
-            ImGui::BeginDisabled(animation_ui.marker_id.empty() ||
-                                 !marker_audio_valid);
-            if (ImGui::Button("Add marker")) {
-                std::optional<fabric::project::AnimationAudioCue> audio;
-                if (animation_ui.marker_audio_enabled)
-                    audio = fabric::project::AnimationAudioCue{
-                        .audio = {{.value = animation_ui.marker_audio_id}, "audio"},
-                        .event_id = animation_ui.marker_audio_event_id};
-                if (session.insert_selected_animation_marker(
-                        animation_ui.marker_id, animation_ui.marker_time,
-                        std::move(audio))) {
-                    status = "Animation marker added.";
-                } else {
-                    status = "Animation marker rejected; inspect diagnostics.";
-                }
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(animation_ui.marker_id.empty(),
-                                 "Enter a marker id before adding a marker.");
-            draw_disabled_reason(!marker_audio_valid,
-                                 "Choose an audio document and one of its events.");
-            bool marker_removed = false;
-            for (const auto& marker : clip.markers) {
-                if (marker.audio)
-                    ImGui::BulletText("%s · %.2f s · %s/%s", marker.id.c_str(),
-                                      marker.time,
-                                      marker.audio->audio.id.value.c_str(),
-                                      marker.audio->event_id.c_str());
-                else
-                    ImGui::BulletText("%s · %.2f s", marker.id.c_str(), marker.time);
-                ImGui::SameLine();
-                const auto marker_button = "Remove##animation-marker-" + marker.id;
-                if (ImGui::SmallButton(marker_button.c_str())) {
-                    marker_removed = session.remove_selected_animation_marker(marker.id);
-                    status = marker_removed
-                        ? "Animation marker removed."
-                        : "Animation marker could not be removed; inspect diagnostics.";
-                    break;
-                }
-            }
-            }
-            if (ImGui::CollapsingHeader("Advanced key authoring")) {
-            ImGui::SeparatorText("Set key");
-            const std::vector<fabric::project::EntityNode>* target_nodes = nullptr;
-            const fabric::project::EntityNode* selected_node = nullptr;
-            if (session.selected_entity() &&
-                !session.selected_entity()->nodes.empty()) {
-                target_nodes = &session.selected_entity()->nodes;
-                const auto selected_iterator = std::ranges::find(
-                    *target_nodes, animation_ui.node_id,
-                    &fabric::project::EntityNode::id);
-                selected_node = selected_iterator == target_nodes->end()
-                    ? nullptr : &*selected_iterator;
-                const char* node_label = selected_node == nullptr
-                    ? "Choose target node..." : selected_node->name.c_str();
-                if (ImGui::BeginCombo("Target node", node_label)) {
-                    for (const auto& target_node : *target_nodes) {
-                        if (ImGui::Selectable(target_node.name.c_str(),
-                                target_node.id == animation_ui.node_id))
-                            animation_ui.node_id = target_node.id;
-                        ImGui::SameLine();
-                        ImGui::TextDisabled("%s", target_node.id.c_str());
-                    }
-                    ImGui::EndCombo();
-                }
-            } else {
-                ImGui::TextDisabled(
-                    "Choose a preview entity to bind one of its nodes.");
-                animation_ui.node_id.clear();
-            }
-            if (selected_node != nullptr) {
-                fabric::project::PropertyDescriptorRegistry entity_registry;
-                const auto add_entity_property =
-                    [&](const char* component, const char* property,
-                        const char* path, fabric::project::PropertyValueKind kind,
-                        const char* unit = "") {
-                        (void)entity_registry.register_descriptor({
-                            .component_id = component,
-                            .property_id = property,
-                            .display_path = path,
-                            .value_kind = kind,
-                            .readable = true,
-                            .writable = true,
-                            .animatable = true,
-                            .minimum = property == std::string_view{"rotationDegrees"}
-                                ? -360.0F : 0.0F,
-                            .maximum = property == std::string_view{"rotationDegrees"}
-                                ? 360.0F : 1.0F,
-                            .unit = unit});
-                    };
-                using PropertyKind = fabric::project::PropertyValueKind;
-                add_entity_property("transform", "position", "Transform / Position",
-                                    PropertyKind::vec2, "px");
-                add_entity_property("transform", "scale", "Transform / Scale",
-                                    PropertyKind::vec2, "×");
-                add_entity_property("transform", "rotationDegrees",
-                                    "Transform / Rotation", PropertyKind::angle, "°");
-                add_entity_property("transform", "pivot", "Transform / Pivot",
-                                    PropertyKind::vec2, "px");
-                if (selected_node->drawable.material) {
-                    add_entity_property("material", "color", "Material / Color",
-                                        PropertyKind::color);
-                    add_entity_property("material", "opacity", "Material / Opacity",
-                                        PropertyKind::scalar, "%");
-                }
-                if (selected_node->drawable.kind ==
-                    fabric::project::EntityDrawableKind::vector) {
-                    add_entity_property("fill", "color", "Fill / Color",
-                                        PropertyKind::color);
-                    add_entity_property("imageFill", "opacity", "Image fill / Opacity",
-                                        PropertyKind::scalar, "%");
-                    add_entity_property("imageFill", "position", "Image fill / Position",
-                                        PropertyKind::vec2, "px");
-                    add_entity_property("imageFill", "scale", "Image fill / Scale",
-                                        PropertyKind::vec2, "×");
-                    add_entity_property("imageFill", "rotationDegrees",
-                                        "Image fill / Rotation", PropertyKind::angle, "°");
-                    add_entity_property("imageFill", "pivot", "Image fill / Pivot",
-                                        PropertyKind::vec2, "px");
-                }
-                const auto descriptors = entity_registry.animatable();
-                const auto current = std::ranges::find_if(
-                    descriptors, [&](const auto* descriptor) {
-                        return descriptor->component_id == animation_ui.component_id &&
-                            descriptor->property_id == animation_ui.property_id;
-                    });
-                const char* current_label = current == descriptors.end()
-                    ? "Choose an entity property..." : (*current)->display_path.c_str();
-                if (ImGui::BeginCombo("Entity property", current_label)) {
-                    for (const auto* descriptor : descriptors) {
-                        if (ImGui::Selectable(descriptor->display_path.c_str(),
-                                              descriptor == (current == descriptors.end()
-                                                  ? nullptr : *current))) {
-                            animation_ui.component_id = descriptor->component_id;
-                            animation_ui.property_id = descriptor->property_id;
-                            if (descriptor->value_kind == PropertyKind::vec2)
-                                animation_ui.key_kind = 0;
-                            else if (descriptor->value_kind == PropertyKind::color)
-                                animation_ui.key_kind = 2;
-                            else animation_ui.key_kind = 1;
-                        }
-                    }
-                    ImGui::EndCombo();
-                }
-            }
-            const char* binding_presets[] = {
-                "Custom", "Transform / Position", "Transform / Rotation",
-                "Transform / Scale", "Material / Opacity", "Material / Color",
-                "Fill / Color", "Image fill / Opacity", "Image fill / Position",
-                "Image fill / Scale", "Image fill / Rotation",
-                "Image fill / Pivot"};
-            if (ImGui::Combo("Binding preset", &animation_ui.binding_preset,
-                             binding_presets,
-                             static_cast<int>(std::size(binding_presets)))) {
-                switch (animation_ui.binding_preset) {
-                case 1:
-                    animation_ui.component_id = "transform";
-                    animation_ui.property_id = "position";
-                    animation_ui.key_kind = 0;
-                    break;
-                case 2:
-                    animation_ui.component_id = "transform";
-                    animation_ui.property_id = "rotationDegrees";
-                    animation_ui.key_kind = 1;
-                    break;
-                case 3:
-                    animation_ui.component_id = "transform";
-                    animation_ui.property_id = "scale";
-                    animation_ui.key_kind = 0;
-                    break;
-                case 4:
-                    animation_ui.component_id = "material";
-                    animation_ui.property_id = "opacity";
-                    animation_ui.key_kind = 1;
-                    break;
-                case 5:
-                    animation_ui.component_id = "material";
-                    animation_ui.property_id = "color";
-                    animation_ui.key_kind = 2;
-                    break;
-                case 6:
-                    animation_ui.component_id = "fill";
-                    animation_ui.property_id = "color";
-                    animation_ui.key_kind = 2;
-                    break;
-                case 7:
-                    animation_ui.component_id = "imageFill";
-                    animation_ui.property_id = "opacity";
-                    animation_ui.key_kind = 1;
-                    break;
-                case 8:
-                    animation_ui.component_id = "imageFill";
-                    animation_ui.property_id = "position";
-                    animation_ui.key_kind = 0;
-                    break;
-                case 9:
-                    animation_ui.component_id = "imageFill";
-                    animation_ui.property_id = "scale";
-                    animation_ui.key_kind = 0;
-                    break;
-                case 10:
-                    animation_ui.component_id = "imageFill";
-                    animation_ui.property_id = "rotationDegrees";
-                    animation_ui.key_kind = 1;
-                    break;
-                case 11:
-                    animation_ui.component_id = "imageFill";
-                    animation_ui.property_id = "pivot";
-                    animation_ui.key_kind = 0;
-                    break;
-                default:
-                    break;
-                }
-            }
-            ImGui::SeparatorText("Visual component properties");
-            const auto selected_component_resource = std::ranges::find_if(
-                session.resources(), [&](const auto& resource) {
-                    return resource.kind ==
-                            fabric::editor::StudioResourceKind::visual_component &&
-                        resource.id.value == animation_ui.visual_component_id;
-                });
-            const char* selected_component_label =
-                selected_component_resource == session.resources().end()
-                ? "Choose a visual component..."
-                : selected_component_resource->name.c_str();
-            if (ImGui::BeginCombo("Component resource",
-                                  selected_component_label)) {
-                for (const auto& resource : session.resources()) {
-                    if (resource.kind !=
-                        fabric::editor::StudioResourceKind::visual_component)
-                        continue;
-                    const bool selected_component =
-                        resource.id.value == animation_ui.visual_component_id;
-                    if (ImGui::Selectable(resource.name.c_str(),
-                                          selected_component))
-                        animation_ui.visual_component_id = resource.id.value;
-                }
-                ImGui::EndCombo();
-            }
-            if (selected_component_resource != session.resources().end()) {
-                const auto component = fabric::project::load_visual_component(
-                    session.project_root(), *session.manifest(),
-                    selected_component_resource->document_path);
-                if (component.ok()) {
-                    fabric::project::PropertyDescriptorRegistry registry;
-                    for (auto descriptor :
-                         fabric::project::visual_component_property_descriptors(
-                             *component.asset))
-                        (void)registry.register_descriptor(
-                            std::move(descriptor));
-                    const auto descriptors = registry.animatable();
-                    const auto current_descriptor = std::ranges::find_if(
-                        descriptors, [&](const auto* descriptor) {
-                            return descriptor->component_id ==
-                                    animation_ui.component_id &&
-                                descriptor->property_id ==
-                                    animation_ui.property_id;
-                        });
-                    const char* descriptor_label =
-                        current_descriptor == descriptors.end()
-                        ? "Choose an animatable property..."
-                        : (*current_descriptor)->display_path.c_str();
-                    if (ImGui::BeginCombo("Animatable property",
-                                          descriptor_label)) {
-                        for (const auto* descriptor : descriptors) {
-                            const bool selected_descriptor =
-                                descriptor == (current_descriptor ==
-                                    descriptors.end() ? nullptr
-                                                      : *current_descriptor);
-                            if (ImGui::Selectable(
-                                    descriptor->display_path.c_str(),
-                                    selected_descriptor)) {
-                                animation_ui.component_id =
-                                    descriptor->component_id;
-                                animation_ui.property_id =
-                                    descriptor->property_id;
-                                using Kind =
-                                    fabric::project::PropertyValueKind;
-                                if (descriptor->value_kind == Kind::vec2)
-                                    animation_ui.key_kind = 0;
-                                else if (descriptor->value_kind == Kind::color)
-                                    animation_ui.key_kind = 2;
-                                else if (descriptor->value_kind == Kind::boolean)
-                                    animation_ui.key_kind = 3;
-                                else if (descriptor->value_kind == Kind::resource)
-                                    animation_ui.key_kind = 4;
-                                else animation_ui.key_kind = 1;
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
-                }
-            }
-            animation_ui.key_time = std::clamp(animation_ui.key_time, 0.0F,
-                                                std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Key time (seconds)", &animation_ui.key_time, 0.0F,
-                               std::max(0.01F, clip.duration), "%.2f s");
-            ImGui::SetItemTooltip("Time position at which the new key is inserted.");
-            ImGui::Combo("Key type", &animation_ui.key_kind,
-                         "Vec2\0Scalar\0Color\0Boolean\0Resource\0");
-            bool auto_key_changed = false;
-            if (animation_ui.key_kind == 0) {
-                auto_key_changed = ImGui::InputFloat2("Vec2 value (property units)",
-                                                      animation_ui.key_value);
-                draw_technical_tooltip(
-                    "Vector value written to the selected animatable property.");
-            } else if (animation_ui.key_kind == 1) {
-                auto_key_changed = ImGui::InputFloat("Scalar value (property units)",
-                                                     &animation_ui.key_scalar);
-                draw_technical_tooltip(
-                    "Scalar value written to the selected animatable property.");
-            } else if (animation_ui.key_kind == 2) {
-                auto_key_changed = ImGui::ColorEdit4("Color value",
-                                                     animation_ui.key_color);
-            } else if (animation_ui.key_kind == 3) {
-                auto_key_changed = ImGui::Checkbox("Boolean value",
-                                                    &animation_ui.key_boolean);
-            } else {
-                const auto selected_resource = std::ranges::find_if(
-                    session.resources(), [&](const auto& resource) {
-                        return resource.id.value == animation_ui.key_resource_id;
-                    });
-                const char* resource_label =
-                    selected_resource == session.resources().end()
-                    ? (animation_ui.key_resource_id.empty()
-                        ? "Choose a resource..." : "Missing resource")
-                    : selected_resource->name.c_str();
-                if (ImGui::BeginCombo("Resource value", resource_label)) {
-                    for (const auto& resource : session.resources()) {
-                        const bool selected =
-                            resource.id.value == animation_ui.key_resource_id;
-                        if (ImGui::Selectable(resource.name.c_str(), selected)) {
-                            animation_ui.key_resource_id = resource.id.value;
-                            auto_key_changed = true;
-                        }
-                        ImGui::SameLine();
-                        const auto kind_label = std::string(
-                            studio_resource_kind_label(resource.kind));
-                        ImGui::TextDisabled("%s · %s",
-                                           kind_label.c_str(),
-                                           resource.id.value.c_str());
-                    }
-                    ImGui::EndCombo();
-                }
-            }
-            if (animation_ui.interpolation ==
-                    fabric::project::AnimationInterpolation::cubic &&
-                animation_ui.key_kind != 3 && animation_ui.key_kind != 4) {
-                ImGui::Checkbox("Custom tangents", &animation_ui.tangents_enabled);
-                if (animation_ui.tangents_enabled) {
-                    if (animation_ui.key_kind == 0) {
-                        ImGui::InputFloat2("In tangent (property units)",
-                                           animation_ui.key_in_tangent);
-                        draw_technical_tooltip(
-                            "Incoming cubic tangent in the selected property units.");
-                        ImGui::InputFloat2("Out tangent (property units)",
-                                           animation_ui.key_out_tangent);
-                        draw_technical_tooltip(
-                            "Outgoing cubic tangent in the selected property units.");
-                    } else if (animation_ui.key_kind == 1) {
-                        ImGui::InputFloat("In tangent (property units)",
-                                          &animation_ui.key_in_tangent_scalar);
-                        draw_technical_tooltip(
-                            "Incoming cubic tangent in the selected property units.");
-                        ImGui::InputFloat("Out tangent (property units)",
-                                          &animation_ui.key_out_tangent_scalar);
-                        draw_technical_tooltip(
-                            "Outgoing cubic tangent in the selected property units.");
-                    } else {
-                        ImGui::InputFloat4("In tangent (color channels)",
-                                           animation_ui.key_in_tangent_color);
-                        draw_technical_tooltip(
-                            "Incoming cubic tangent for the color channels.");
-                        ImGui::InputFloat4("Out tangent (color channels)",
-                                           animation_ui.key_out_tangent_color);
-                        draw_technical_tooltip(
-                            "Outgoing cubic tangent for the color channels.");
-                    }
-                }
-            }
-            ImGui::SeparatorText("A → B segment");
-            animation_ui.segment_start_time = std::clamp(
-                animation_ui.segment_start_time, 0.0F,
-                std::max(0.0F, clip.duration));
-            animation_ui.segment_end_time = std::clamp(
-                animation_ui.segment_end_time, 0.0F,
-                std::max(0.0F, clip.duration));
-            ImGui::InputFloat("A time (seconds)", &animation_ui.segment_start_time,
-                              0.1F, 1.0F, "%.2f s");
-            draw_technical_tooltip("Start time of the source segment.");
-            ImGui::InputFloat("B time (seconds)", &animation_ui.segment_end_time,
-                              0.1F, 1.0F, "%.2f s");
-            draw_technical_tooltip("End time of the destination segment.");
-            if (animation_ui.key_kind == 0) {
-                ImGui::InputFloat2("A value (world units)", animation_ui.segment_start_value);
-                ImGui::InputFloat2("B value (world units)", animation_ui.segment_end_value);
-            } else if (animation_ui.key_kind == 1) {
-                ImGui::InputFloat("A value (scalar)", &animation_ui.segment_start_scalar);
-                ImGui::InputFloat("B value (scalar)", &animation_ui.segment_end_scalar);
-            } else if (animation_ui.key_kind == 2) {
-                ImGui::ColorEdit4("A value", animation_ui.segment_start_color);
-                ImGui::ColorEdit4("B value", animation_ui.segment_end_color);
-            } else if (animation_ui.key_kind == 3) {
-                ImGui::Checkbox("A value", &animation_ui.segment_start_boolean);
-                ImGui::Checkbox("B value", &animation_ui.segment_end_boolean);
-            } else {
-                const auto draw_segment_resource = [&](const char* label,
-                                                       std::string& value) {
-                    const auto selected = std::ranges::find_if(
-                        session.resources(), [&](const auto& resource) {
-                            return resource.id.value == value;
-                        });
-                    const char* preview = selected == session.resources().end()
-                        ? (value.empty() ? "Choose a resource..." : "Missing resource")
-                        : selected->name.c_str();
-                    if (ImGui::BeginCombo(label, preview)) {
-                        for (const auto& resource : session.resources()) {
-                            if (ImGui::Selectable(resource.name.c_str(),
-                                                  resource.id.value == value))
-                                value = resource.id.value;
-                            ImGui::SameLine();
-                            ImGui::TextDisabled("%s", resource.id.value.c_str());
-                        }
-                        ImGui::EndCombo();
-                    }
-                };
-                draw_segment_resource("A resource", animation_ui.segment_start_resource_id);
-                draw_segment_resource("B resource", animation_ui.segment_end_resource_id);
-            }
-            ImGui::BeginDisabled(animation_ui.node_id.empty() ||
-                                 animation_ui.component_id.empty() ||
-                                 animation_ui.property_id.empty() ||
-                                 animation_ui.segment_start_time >=
-                                     animation_ui.segment_end_time ||
-                                 (animation_ui.key_kind == 4 &&
-                                  (animation_ui.segment_start_resource_id.empty() ||
-                                   animation_ui.segment_end_resource_id.empty())));
-            if (ImGui::Button("Create A → B keys")) {
-                const auto segment_value = [&](const bool start) {
-                    if (animation_ui.key_kind == 0)
-                        return fabric::project::AnimationValue{
-                            fabric::core::Vec2{
-                                (start ? animation_ui.segment_start_value
-                                       : animation_ui.segment_end_value)[0],
-                                (start ? animation_ui.segment_start_value
-                                       : animation_ui.segment_end_value)[1]}};
-                    if (animation_ui.key_kind == 1)
-                        return fabric::project::AnimationValue{
-                            start ? animation_ui.segment_start_scalar
-                                  : animation_ui.segment_end_scalar};
-                    if (animation_ui.key_kind == 2)
-                        return fabric::project::AnimationValue{
-                            fabric::core::Color{
-                                (start ? animation_ui.segment_start_color
-                                       : animation_ui.segment_end_color)[0],
-                                (start ? animation_ui.segment_start_color
-                                       : animation_ui.segment_end_color)[1],
-                                (start ? animation_ui.segment_start_color
-                                       : animation_ui.segment_end_color)[2],
-                                (start ? animation_ui.segment_start_color
-                                       : animation_ui.segment_end_color)[3]}};
-                    if (animation_ui.key_kind == 3)
-                        return fabric::project::AnimationValue{
-                            start ? animation_ui.segment_start_boolean
-                                  : animation_ui.segment_end_boolean};
-                    return fabric::project::AnimationValue{
-                        fabric::project::ResourceReference{
-                            {.value = start
-                                ? animation_ui.segment_start_resource_id
-                                : animation_ui.segment_end_resource_id},
-                            "resource"}};
-                };
-                const bool created = session.set_selected_animation_segment(
-                    {.node_id = animation_ui.node_id,
-                     .component_id = animation_ui.component_id,
-                     .property_id = animation_ui.property_id},
-                    animation_ui.segment_start_time,
-                    segment_value(true), animation_ui.segment_end_time,
-                    segment_value(false), animation_ui.interpolation,
-                    fabric::editor::AutosaveScheduler::Clock::now(),
-                    animation_ui.composition, animation_ui.easing);
-                status = created ? "Animation A → B segment created."
-                                 : "Animation segment rejected; inspect diagnostics.";
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(
-                animation_ui.node_id.empty() ||
-                    animation_ui.component_id.empty() ||
-                    animation_ui.property_id.empty() ||
-                    animation_ui.segment_start_time >= animation_ui.segment_end_time ||
-                    (animation_ui.key_kind == 4 &&
-                     (animation_ui.segment_start_resource_id.empty() ||
-                      animation_ui.segment_end_resource_id.empty())),
-                "Choose a target node, component, property, an increasing A/B time range and resource values when required.");
-            const auto interpolation_label = std::string(
-                fabric::project::to_string(animation_ui.interpolation));
-            if (ImGui::BeginCombo("Interpolation", interpolation_label.c_str())) {
-                for (const auto option : {
-                         fabric::project::AnimationInterpolation::step,
-                         fabric::project::AnimationInterpolation::linear,
-                         fabric::project::AnimationInterpolation::cubic}) {
-                    const bool selected_option = option == animation_ui.interpolation;
-                    const auto label = std::string(fabric::project::to_string(option));
-                    if (ImGui::Selectable(label.c_str(), selected_option)) {
-                        animation_ui.interpolation = option;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            const auto easing_label = std::string(
-                fabric::project::to_string(animation_ui.easing));
-            if (ImGui::BeginCombo("Easing", easing_label.c_str())) {
-                for (const auto option : {
-                         fabric::project::AnimationEasing::linear,
-                         fabric::project::AnimationEasing::ease_in,
-                         fabric::project::AnimationEasing::ease_out,
-                         fabric::project::AnimationEasing::ease_in_out}) {
-                    const bool selected_option = option == animation_ui.easing;
-                    const auto label = std::string(
-                        fabric::project::to_string(option));
-                    if (ImGui::Selectable(label.c_str(), selected_option))
-                        animation_ui.easing = option;
-                }
-                ImGui::EndCombo();
-            }
-            const auto composition_label = std::string(
-                fabric::project::to_string(animation_ui.composition));
-            if (ImGui::BeginCombo("Composition", composition_label.c_str())) {
-                for (const auto option : {
-                         fabric::project::AnimationComposition::replace,
-                         fabric::project::AnimationComposition::additive}) {
-                    const bool selected_option = option == animation_ui.composition;
-                    const auto label = std::string(fabric::project::to_string(option));
-                    if (ImGui::Selectable(label.c_str(), selected_option)) {
-                        animation_ui.composition = option;
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            ImGui::BeginDisabled(animation_ui.node_id.empty() ||
-                                 animation_ui.component_id.empty() ||
-                                 animation_ui.property_id.empty() ||
-                                  (animation_ui.key_kind == 4 &&
-                                  animation_ui.key_resource_id.empty()));
-            const auto set_key = [&]() {
-                fabric::project::AnimationValue value;
-                if (animation_ui.key_kind == 0) {
-                    value = fabric::core::Vec2{animation_ui.key_value[0],
-                                               animation_ui.key_value[1]};
-                } else if (animation_ui.key_kind == 1) {
-                    value = animation_ui.key_scalar;
-                } else if (animation_ui.key_kind == 2) {
-                    value = fabric::core::Color{animation_ui.key_color[0],
-                                                animation_ui.key_color[1],
-                                                animation_ui.key_color[2],
-                                                animation_ui.key_color[3]};
-                } else if (animation_ui.key_kind == 3) {
-                    value = animation_ui.key_boolean;
-                } else {
-                    value = fabric::project::ResourceReference{
-                        {.value = animation_ui.key_resource_id}, "resource"};
-                }
-                std::optional<fabric::project::AnimationValue> in_tangent;
-                std::optional<fabric::project::AnimationValue> out_tangent;
-                if (animation_ui.tangents_enabled && animation_ui.key_kind == 0) {
-                    in_tangent = fabric::core::Vec2{animation_ui.key_in_tangent[0],
-                                                   animation_ui.key_in_tangent[1]};
-                    out_tangent = fabric::core::Vec2{animation_ui.key_out_tangent[0],
-                                                    animation_ui.key_out_tangent[1]};
-                } else if (animation_ui.tangents_enabled && animation_ui.key_kind == 1) {
-                    in_tangent = animation_ui.key_in_tangent_scalar;
-                    out_tangent = animation_ui.key_out_tangent_scalar;
-                } else if (animation_ui.tangents_enabled && animation_ui.key_kind == 2) {
-                    in_tangent = fabric::core::Color{animation_ui.key_in_tangent_color[0],
-                                                     animation_ui.key_in_tangent_color[1],
-                                                     animation_ui.key_in_tangent_color[2],
-                                                     animation_ui.key_in_tangent_color[3]};
-                    out_tangent = fabric::core::Color{animation_ui.key_out_tangent_color[0],
-                                                      animation_ui.key_out_tangent_color[1],
-                                                      animation_ui.key_out_tangent_color[2],
-                                                      animation_ui.key_out_tangent_color[3]};
-                }
-                if (session.set_selected_animation_key(
-                        {.node_id = animation_ui.node_id,
-                         .component_id = animation_ui.component_id,
-                         .property_id = animation_ui.property_id},
-                        animation_ui.auto_key
-                            ? animation_ui.scrub_time
-                            : animation_ui.key_time,
-                        std::move(value),
-                        animation_ui.interpolation,
-                        fabric::editor::AutosaveScheduler::Clock::now(),
-                        animation_ui.composition, animation_ui.easing,
-                        std::move(in_tangent), std::move(out_tangent))) {
-                    status = "Animation key set.";
-                } else {
-                    status = "Animation key rejected; inspect diagnostics.";
-                }
-            };
-            if (ImGui::Button("Set key") ||
-                (animation_ui.auto_key && auto_key_changed)) {
-                set_key();
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(animation_ui.node_id.empty() ||
-                                     animation_ui.component_id.empty() ||
-                                     animation_ui.property_id.empty() ||
-                                     (animation_ui.key_kind == 4 &&
-                                      animation_ui.key_resource_id.empty()),
-                                 "Choose a target node, component, property and resource value when required.");
-            ImGui::SeparatorText("Tracks");
-            if (ImGui::Button("Select all keys")) {
-                animation_ui.selected_keys.clear();
-                for (const auto& track : clip.tracks)
-                    for (std::size_t key_index = 0;
-                         key_index < track.keys.size(); ++key_index)
-                        animation_ui.selected_keys.push_back(
-                            {track.binding, key_index});
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Clear key selection"))
-                animation_ui.selected_keys.clear();
-            ImGui::SameLine();
-            ImGui::BeginDisabled(animation_ui.selected_keys.empty());
-            if (ImGui::Button("Copy selected keys")) {
-                animation_ui.key_clipboard.clear();
-                for (const auto& selected : animation_ui.selected_keys) {
-                    const auto track = std::ranges::find(
-                        clip.tracks, selected.binding,
-                        &fabric::project::AnimationTrack::binding);
-                    if (track == clip.tracks.end() ||
-                        selected.index >= track->keys.size()) continue;
-                    animation_ui.key_clipboard.push_back({
-                        selected.binding, track->keys[selected.index],
-                        track->interpolation, track->composition, track->easing});
-                }
-                status = animation_ui.key_clipboard.empty()
-                    ? "No valid animation keys selected."
-                    : "Animation keys copied.";
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(animation_ui.selected_keys.empty(),
-                                 "Select at least one valid animation key to copy.");
-            ImGui::SameLine();
-            ImGui::BeginDisabled(animation_ui.key_clipboard.empty());
-            if (ImGui::Button("Paste at key time")) {
-                const auto first = std::ranges::min_element(
-                    animation_ui.key_clipboard, {},
-                    [](const auto& entry) { return entry.key.time; });
-                const auto first_time = first->key.time;
-                bool pasted = false;
-                for (const auto& entry : animation_ui.key_clipboard) {
-                    const auto time = snap_key_time(
-                        animation_ui.key_time + entry.key.time - first_time);
-                    pasted = session.set_selected_animation_key(
-                                 entry.binding, time, entry.key.value,
-                                 entry.interpolation,
-                                 fabric::editor::AutosaveScheduler::Clock::now(),
-                                 entry.composition, entry.easing,
-                                 entry.key.in_tangent,
-                                 entry.key.out_tangent) || pasted;
-                }
-                status = pasted ? "Animation keys pasted."
-                                : "Animation keys could not be pasted; inspect diagnostics.";
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(animation_ui.key_clipboard.empty(),
-                                 "Copy animation keys before pasting them.");
-            if (!animation_ui.key_clipboard.empty())
-                ImGui::SameLine(), ImGui::TextDisabled(
-                    "%zu copied", animation_ui.key_clipboard.size());
-            if (clip.tracks.empty()) {
-                ImGui::TextDisabled("No tracks yet.");
-            }
-            bool key_removed = false;
-            for (std::size_t track_index = 0;
-                 track_index < clip.tracks.size() && !key_removed;
-                 ++track_index) {
-                const auto& track = clip.tracks[track_index];
-                ImGui::TextWrapped("%s / %s / %s (%zu keys)",
-                                   track.binding.node_id.c_str(),
-                                   track.binding.component_id.c_str(),
-                                   track.binding.property_id.c_str(),
-                                   track.keys.size());
-                for (std::size_t key_index = 0;
-                    key_index < track.keys.size(); ++key_index) {
-                    const auto& key = track.keys[key_index];
-                    const auto key_scope = "animation-key-" +
-                        std::to_string(track_index) + "-" +
-                        std::to_string(key_index);
-                    ImGui::PushID(key_scope.c_str());
-                    bool selected = std::ranges::any_of(
-                        animation_ui.selected_keys, [&](const auto& candidate) {
-                            return candidate.binding == track.binding &&
-                                   candidate.index == key_index;
-                        });
-                    if (ImGui::Checkbox("##selected", &selected)) {
-                        const auto found = std::ranges::find_if(
-                            animation_ui.selected_keys,
-                            [&](const auto& candidate) {
-                                return candidate.binding == track.binding &&
-                                       candidate.index == key_index;
-                            });
-                        if (selected && found == animation_ui.selected_keys.end())
-                            animation_ui.selected_keys.push_back(
-                                {track.binding, key_index});
-                        else if (!selected &&
-                                 found != animation_ui.selected_keys.end())
-                            animation_ui.selected_keys.erase(found);
-                    }
-                    ImGui::SameLine();
-                    ImGui::BulletText("key %zu", key_index);
-                    ImGui::SameLine();
-                    float key_time = key.time;
-                    ImGui::SetNextItemWidth(120.0F);
-                    if (ImGui::SliderFloat("##key-time", &key_time, 0.0F,
-                                           std::max(0.01F, clip.duration),
-                                           "%.2f s")) {
-                        key_time = snap_key_time(key_time);
-                        if (!session.move_selected_animation_key(
-                                track.binding, key_index, key_time)) {
-                            status = "Key move rejected; inspect diagnostics.";
-                        } else {
-                            animation_ui.selected_keys.clear();
-                        }
-                    }
-                    ImGui::SameLine();
-                    const auto button_id = "Remove##animation-key-" +
-                        std::to_string(track_index) + "-" +
-                        std::to_string(key_index);
-                    if (ImGui::SmallButton(button_id.c_str())) {
-                        key_removed = session.remove_selected_animation_key(
-                            track.binding, key_index);
-                        status = key_removed
-                            ? "Animation key removed."
-                            : "Animation key could not be removed; inspect diagnostics.";
-                        ImGui::PopID();
-                        break;
-                    }
-                    ImGui::PopID();
-                }
-            }
-            }
-        }
+        draw_animation_inspector(
+            session, animation_ui, entity_advanced_mode, status,
+            draw_project_resource_picker, studio_resource_kind_label,
+            &animation_inspector_probe);
     } else {
         ImGui::TextDisabled("No selection");
     }
@@ -9038,6 +8033,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     CanvasUiState canvas;
     AnimationWorkspaceState animation_ui;
     AnimationTimelineProbe animation_timeline_probe;
+    AnimationInspectorProbe animation_inspector_probe;
     AnimationGraphWorkspaceState animation_graph_ui;
     AnimationGraphWorkspaceProbe animation_graph_probe;
     TexturedPathUiState textured_path_ui;
@@ -9151,14 +8147,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
     if (ui_entity_animation_workflow_test && session.has_project()) {
         ui_entity_animation_workflow_probe_enabled = true;
+        animation_inspector_probe.workflow_enabled = true;
         ui_entity_from_visual_seen = false;
         ui_entity_animate_seen = false;
         ui_entity_animate_clicked = false;
         ui_animation_create_seen = false;
-        ui_animation_quick_key_seen = false;
-        ui_workflow_position_key_seen = false;
-        ui_animation_auto_key_seen = false;
-        ui_animation_playhead_seen = false;
+        animation_inspector_probe.quick_key_seen = false;
+        animation_inspector_probe.workflow_position_key_seen = false;
+        animation_inspector_probe.auto_key_seen = false;
+        animation_inspector_probe.playhead_seen = false;
         animation_timeline_probe.play_seen = false;
         animation_timeline_probe.playback_advanced = false;
         animation_timeline_probe.marker_seen = false;
@@ -9169,7 +8166,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_drag_source_seen = false;
         ui_drag_target_seen = false;
         ui_drag_target_mode = 2;
-        ui_animation_probe_enabled = true;
+        animation_inspector_probe.enabled = true;
         animation_timeline_probe.enabled = true;
         animation_timeline_probe.workflow_enabled = true;
         static_cast<void>(session.select_resource(
@@ -9485,11 +8482,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool animation_e2e_complete = false;
     bool animation_gizmo_e2e_active = false;
     if (animation_e2e && session.has_project()) {
-        ui_animation_probe_enabled = true;
+        animation_inspector_probe.enabled = true;
         animation_timeline_probe.enabled = true;
         animation_timeline_probe.timeline_seen = false;
-        ui_animation_quick_key_seen = false;
-        ui_animation_node_picker_seen = false;
+        animation_inspector_probe.quick_key_seen = false;
+        animation_inspector_probe.node_picker_seen = false;
         fabric::editor::CreateAnimationPrompt prompt;
         prompt.name = "Targeted Animation E2E";
         prompt.preview_entity_id = "beam-entity";
@@ -9840,31 +8837,31 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 push_workflow_mouse(ui_animation_create_screen, type);
             } else if (entity_animation_workflow_frame >= 22U &&
                        entity_animation_workflow_frame <= 24U &&
-                       ui_workflow_position_key_seen) {
+                       animation_inspector_probe.workflow_position_key_seen) {
                 const auto type = entity_animation_workflow_frame == 23U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 24U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_workflow_position_key_screen, type);
+                push_workflow_mouse(animation_inspector_probe.workflow_position_key_screen, type);
             } else if (entity_animation_workflow_frame >= 26U &&
                        entity_animation_workflow_frame <= 28U &&
-                       ui_animation_auto_key_seen) {
+                       animation_inspector_probe.auto_key_seen) {
                 const auto type = entity_animation_workflow_frame == 27U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 28U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_animation_auto_key_screen, type);
+                push_workflow_mouse(animation_inspector_probe.auto_key_screen, type);
             } else if (entity_animation_workflow_frame >= 30U &&
                        entity_animation_workflow_frame <= 32U &&
-                       ui_animation_playhead_seen) {
+                       animation_inspector_probe.playhead_seen) {
                 const auto type = entity_animation_workflow_frame == 31U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 32U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_animation_playhead_target_screen, type);
+                push_workflow_mouse(animation_inspector_probe.playhead_target_screen, type);
             } else if (entity_animation_workflow_frame >= 34U &&
                        entity_animation_workflow_frame <= 37U) {
                 const auto target = canvas.entity_gizmo_screen;
@@ -10513,14 +9510,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             static_cast<void>(SDL_PushEvent(&button));
         }
         if (animation_e2e && animation_ui_e2e_frame == 1U &&
-            ui_animation_quick_key_seen) {
+            animation_inspector_probe.quick_key_seen) {
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
             motion.motion.x = static_cast<int>(
-                std::lround(ui_animation_quick_key_screen.x));
+                std::lround(animation_inspector_probe.quick_key_screen.x));
             motion.motion.y = static_cast<int>(
-                std::lround(ui_animation_quick_key_screen.y));
+                std::lround(animation_inspector_probe.quick_key_screen.y));
             static_cast<void>(SDL_PushEvent(&motion));
             for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
                 SDL_Event button{};
@@ -10863,6 +9860,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
                        animation_ui, animation_timeline_probe,
+                       animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,
                        textured_path_ui,
                        project_settings,
@@ -11560,8 +10558,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             });
                     });
             animation_e2e_complete = animation_e2e_complete &&
-                animation_timeline_probe.timeline_seen && ui_animation_quick_key_seen &&
-                ui_animation_node_picker_seen &&
+                animation_timeline_probe.timeline_seen && animation_inspector_probe.quick_key_seen &&
+                animation_inspector_probe.node_picker_seen &&
                 rotation_track && canvas_auto_key && animation_ui.curve_view;
             if (!animation_e2e_complete)
                 std::cerr << "Asset Studio Animation workspace E2E failed\n";
@@ -11671,8 +10669,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         });
                 entity_animation_workflow_complete =
                     ui_entity_from_visual_seen && ui_entity_animate_seen &&
-                    ui_animation_create_seen && ui_workflow_position_key_seen &&
-                    ui_animation_auto_key_seen && ui_animation_playhead_seen &&
+                    ui_animation_create_seen && animation_inspector_probe.workflow_position_key_seen &&
+                    animation_inspector_probe.auto_key_seen && animation_inspector_probe.playhead_seen &&
                     animation_timeline_probe.play_seen && animation_timeline_probe.playback_advanced &&
                     animation_timeline_probe.second_key_seen && animation_timeline_probe.marker_seen &&
                     ui_drag_probe_applied && child_composed &&
@@ -11681,6 +10679,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     key_corrected && marker_persisted;
                 write_entity_animation_workflow_probe(
                     initial_project, animation_timeline_probe,
+                    animation_inspector_probe,
                     entity_created, animation_created,
                     key_persisted, key_corrected, marker_persisted,
                     child_composed, animation_targets_child);

@@ -132,6 +132,9 @@ preview, sélection et sonde E2E appartiennent au module du graphe, tandis que
 La timeline Animation est séparée à son tour avec son état de transport,
 sélection multiple, presse-papiers de clés et sonde graphique ; le shell et
 l'inspecteur partagent cet état explicite sans recopier le clip persistant.
+L'inspecteur Animation rejoint ensuite ce module : preview Entity, propriétés
+de clip, raccourcis de clés, marqueurs, édition avancée et diagnostics restent
+des commandes `ProjectSession`, avec une sonde E2E explicitement injectée.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne
