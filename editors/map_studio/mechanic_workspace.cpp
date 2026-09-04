@@ -152,6 +152,36 @@ std::optional<fabric::core::Vec2> mechanic_vec2_property(
     return std::nullopt;
 }
 
+std::optional<float> mechanic_float_property(
+    const fabric::project::MechanicNodeDefinition& node,
+    const std::string_view id) {
+    const auto property = std::ranges::find(
+        node.properties, id, &fabric::project::MechanicNodeProperty::id);
+    if (property == node.properties.end()) return std::nullopt;
+    if (const auto* value = std::get_if<float>(&property->value)) return *value;
+    return std::nullopt;
+}
+
+fabric::core::Vec2 rotate_mechanic_vector(
+    const fabric::core::Vec2 value, const float degrees) {
+    constexpr float radians_per_degree = 0.01745329251994329577F;
+    const float radians = degrees * radians_per_degree;
+    const float cosine = std::cos(radians);
+    const float sine = std::sin(radians);
+    return {value.x * cosine - value.y * sine,
+            value.x * sine + value.y * cosine};
+}
+
+fabric::core::Vec2 add_mechanic_vectors(
+    const fabric::core::Vec2 left, const fabric::core::Vec2 right) {
+    return {left.x + right.x, left.y + right.y};
+}
+
+fabric::core::Vec2 subtract_mechanic_vectors(
+    const fabric::core::Vec2 left, const fabric::core::Vec2 right) {
+    return {left.x - right.x, left.y - right.y};
+}
+
 bool draw_mechanic_spatial_canvas(
     fabric::editor::MechanicSession& session,
     MechanicWorkspaceState& state, std::string& status,
@@ -160,7 +190,7 @@ bool draw_mechanic_spatial_canvas(
     const auto& graph = *session.graph();
     ImGui::SeparatorText("Spatial canvas");
     ImGui::TextDisabled(
-        "Drag bodies, pivots and sensors in map units; joints follow their pivot.");
+        "Drag shapes to move; selected rectangles expose size and body rotation.");
     ImGui::SameLine();
     ImGui::SetNextItemWidth(110.0F);
     ImGui::SliderFloat("Zoom##mechanic-spatial", &state.spatial_zoom,
@@ -176,6 +206,11 @@ bool draw_mechanic_spatial_canvas(
         return ImVec2{center.x + point.x * state.spatial_zoom,
                       center.y - point.y * state.spatial_zoom};
     };
+    const auto to_world = [&](const ImVec2 point) {
+        return fabric::core::Vec2{
+            (point.x - center.x) / state.spatial_zoom,
+            (center.y - point.y) / state.spatial_zoom};
+    };
     auto* draw = ImGui::GetWindowDrawList();
     draw->AddRectFilled(minimum, maximum, IM_COL32(18, 22, 28, 255), 4.0F);
     draw->PushClipRect(minimum, maximum, true);
@@ -189,8 +224,10 @@ bool draw_mechanic_spatial_canvas(
         std::string property;
         fabric::core::Vec2 position{};
         fabric::core::Vec2 size{};
+        float rotation{};
         bool rectangle{};
         bool joint{};
+        bool rotatable{};
     };
     std::vector<Handle> handles;
     for (const auto& node : graph.nodes) {
@@ -202,11 +239,14 @@ bool draw_mechanic_spatial_canvas(
                     .value_or(fabric::core::Vec2{}),
                 mechanic_vec2_property(node, "size")
                     .value_or(fabric::core::Vec2{1.0F, 1.0F}),
-                true, false});
+                sensor ? 0.0F
+                       : mechanic_float_property(node, "rotation").value_or(0.0F),
+                true, false, !sensor});
         } else if (node.type == "pivot") {
             handles.push_back({node.id, "position",
                 mechanic_vec2_property(node, "position")
-                    .value_or(fabric::core::Vec2{}), {}, false, false});
+                    .value_or(fabric::core::Vec2{}), {}, 0.0F,
+                false, false, false});
         } else if (node.type == "joint") {
             const auto connection = std::ranges::find_if(
                 graph.connections, [&](const auto& candidate) {
@@ -220,22 +260,52 @@ bool draw_mechanic_spatial_canvas(
             if (pivot != graph.nodes.end()) {
                 handles.push_back({node.id, {},
                     mechanic_vec2_property(*pivot, "position")
-                        .value_or(fabric::core::Vec2{}), {}, false, true});
+                        .value_or(fabric::core::Vec2{}), {}, 0.0F,
+                    false, true, false});
             }
         }
     }
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     std::optional<std::size_t> hit;
-    int hit_priority = 3;
+    MechanicSpatialDragKind hit_kind = MechanicSpatialDragKind::move;
     for (std::size_t cursor = 0; cursor < handles.size(); ++cursor) {
         const auto& handle = handles[cursor];
+        if (!handle.rectangle || state.selected_node != handle.node) continue;
+        const auto resize_world = add_mechanic_vectors(
+            handle.position, rotate_mechanic_vector(
+                {handle.size.x * 0.5F, handle.size.y * 0.5F}, handle.rotation));
+        const auto resize_screen = to_screen(resize_world);
+        if (std::hypot(mouse.x - resize_screen.x,
+                       mouse.y - resize_screen.y) <= 10.0F) {
+            hit = cursor;
+            hit_kind = MechanicSpatialDragKind::resize;
+            break;
+        }
+        if (handle.rotatable) {
+            const auto rotate_world = add_mechanic_vectors(
+                handle.position, rotate_mechanic_vector(
+                    {0.0F, handle.size.y * 0.5F + 24.0F / state.spatial_zoom},
+                    handle.rotation));
+            const auto rotate_screen = to_screen(rotate_world);
+            if (std::hypot(mouse.x - rotate_screen.x,
+                           mouse.y - rotate_screen.y) <= 10.0F) {
+                hit = cursor;
+                hit_kind = MechanicSpatialDragKind::rotate;
+                break;
+            }
+        }
+    }
+    int hit_priority = 3;
+    for (std::size_t cursor = 0; !hit && cursor < handles.size(); ++cursor) {
+        const auto& handle = handles[cursor];
         const auto point = to_screen(handle.position);
-        const ImVec2 half{handle.size.x * state.spatial_zoom * 0.5F,
-                          handle.size.y * state.spatial_zoom * 0.5F};
+        const auto local_mouse = rotate_mechanic_vector(
+            subtract_mechanic_vectors(to_world(mouse), handle.position),
+            -handle.rotation);
         const bool contains = handle.rectangle
-            ? mouse.x >= point.x - half.x && mouse.x <= point.x + half.x &&
-                mouse.y >= point.y - half.y && mouse.y <= point.y + half.y
+            ? std::abs(local_mouse.x) <= handle.size.x * 0.5F &&
+                std::abs(local_mouse.y) <= handle.size.y * 0.5F
             : std::hypot(mouse.x - point.x, mouse.y - point.y) <= 11.0F;
         const int priority = handle.joint ? 2 : handle.rectangle ? 1 : 0;
         if (contains && priority < hit_priority) {
@@ -249,20 +319,41 @@ bool draw_mechanic_spatial_canvas(
         state.selected_node = handle.node;
         if (!handle.property.empty()) {
             state.spatial_drag_node = handle.node;
-            state.spatial_drag_property = handle.property;
+            state.spatial_drag_kind = hit_kind;
+            state.spatial_drag_property = hit_kind == MechanicSpatialDragKind::resize
+                ? "size"
+                : hit_kind == MechanicSpatialDragKind::rotate
+                    ? "rotation" : handle.property;
             state.spatial_drag_start_value = handle.position;
+            state.spatial_drag_start_size = handle.size;
+            state.spatial_drag_start_rotation = handle.rotation;
             state.spatial_drag_start_mouse = mouse;
         }
     }
 
     for (const auto& handle : handles) {
         auto position = handle.position;
+        auto handle_size = handle.size;
+        auto rotation = handle.rotation;
         if (state.spatial_drag_node == handle.node &&
             ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-            position.x += (mouse.x - state.spatial_drag_start_mouse.x) /
-                state.spatial_zoom;
-            position.y -= (mouse.y - state.spatial_drag_start_mouse.y) /
-                state.spatial_zoom;
+            if (state.spatial_drag_kind == MechanicSpatialDragKind::move) {
+                position.x += (mouse.x - state.spatial_drag_start_mouse.x) /
+                    state.spatial_zoom;
+                position.y -= (mouse.y - state.spatial_drag_start_mouse.y) /
+                    state.spatial_zoom;
+            } else if (state.spatial_drag_kind == MechanicSpatialDragKind::resize) {
+                const auto local = rotate_mechanic_vector(
+                    subtract_mechanic_vectors(
+                        to_world(mouse), state.spatial_drag_start_value),
+                    -state.spatial_drag_start_rotation);
+                handle_size = {std::max(0.1F, std::abs(local.x) * 2.0F),
+                               std::max(0.1F, std::abs(local.y) * 2.0F)};
+            } else if (state.spatial_drag_kind == MechanicSpatialDragKind::rotate) {
+                const auto delta = subtract_mechanic_vectors(
+                    to_world(mouse), state.spatial_drag_start_value);
+                rotation = std::atan2(delta.y, delta.x) * 57.29577951308232F - 90.0F;
+            }
         }
         const auto point = to_screen(position);
         if (probe && probe->enabled && !probe->spatial_handle_seen &&
@@ -273,16 +364,59 @@ bool draw_mechanic_spatial_canvas(
             probe->spatial_handle_property = handle.property;
             probe->spatial_handle_seen = true;
         }
+        if (probe && probe->enabled && handle.node == "platform") {
+            probe->body_handle_screen = to_screen(add_mechanic_vectors(
+                position, rotate_mechanic_vector(
+                    {handle_size.x * 0.25F, 0.0F}, rotation)));
+            probe->body_handle_seen = true;
+        }
         const bool selected = state.selected_node == handle.node;
         const ImU32 color = selected ? IM_COL32(255, 190, 80, 255)
             : handle.joint ? IM_COL32(225, 110, 210, 255)
                            : IM_COL32(95, 190, 245, 230);
         if (handle.rectangle) {
-            const ImVec2 half{handle.size.x * state.spatial_zoom * 0.5F,
-                              handle.size.y * state.spatial_zoom * 0.5F};
-            draw->AddRect({point.x - half.x, point.y - half.y},
-                          {point.x + half.x, point.y + half.y}, color,
-                          3.0F, ImDrawFlags_None, selected ? 3.0F : 2.0F);
+            const fabric::core::Vec2 local_corners[4] = {
+                {-handle_size.x * 0.5F, -handle_size.y * 0.5F},
+                { handle_size.x * 0.5F, -handle_size.y * 0.5F},
+                { handle_size.x * 0.5F,  handle_size.y * 0.5F},
+                {-handle_size.x * 0.5F,  handle_size.y * 0.5F}};
+            ImVec2 corners[4];
+            for (std::size_t index = 0; index < 4U; ++index)
+                corners[index] = to_screen(add_mechanic_vectors(
+                    position,
+                    rotate_mechanic_vector(local_corners[index], rotation)));
+            draw->AddPolyline(corners, 4, color, ImDrawFlags_Closed,
+                              selected ? 3.0F : 2.0F);
+            if (selected) {
+                const auto resize_screen = corners[2];
+                draw->AddRectFilled(
+                    {resize_screen.x - 5.0F, resize_screen.y - 5.0F},
+                    {resize_screen.x + 5.0F, resize_screen.y + 5.0F}, color);
+                if (probe && probe->enabled && handle.node == "platform") {
+                    probe->resize_handle_screen = resize_screen;
+                    if (!probe->resize_handle_seen)
+                        probe->resize_handle_original = handle.size;
+                    probe->resize_handle_seen = true;
+                }
+                if (handle.rotatable) {
+                    const auto edge_screen = to_screen(add_mechanic_vectors(
+                        position, rotate_mechanic_vector(
+                            {0.0F, handle_size.y * 0.5F}, rotation)));
+                    const auto rotate_screen = to_screen(add_mechanic_vectors(
+                        position, rotate_mechanic_vector(
+                            {0.0F, handle_size.y * 0.5F +
+                                      24.0F / state.spatial_zoom},
+                            rotation)));
+                    draw->AddLine(edge_screen, rotate_screen, color, 1.5F);
+                    draw->AddCircleFilled(rotate_screen, 6.0F, color, 16);
+                    if (probe && probe->enabled && handle.node == "platform") {
+                        probe->rotation_handle_screen = rotate_screen;
+                        if (!probe->rotation_handle_seen)
+                            probe->rotation_handle_original = handle.rotation;
+                        probe->rotation_handle_seen = true;
+                    }
+                }
+            }
         } else {
             draw->AddCircle(point, handle.joint ? 10.0F : 7.0F,
                             color, 20, selected ? 3.0F : 2.0F);
@@ -298,23 +432,53 @@ bool draw_mechanic_spatial_canvas(
 
     if (!state.spatial_drag_node.empty() &&
         ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-        const fabric::core::Vec2 value{
-            state.spatial_drag_start_value.x +
-                (mouse.x - state.spatial_drag_start_mouse.x) /
-                    state.spatial_zoom,
-            state.spatial_drag_start_value.y -
-                (mouse.y - state.spatial_drag_start_mouse.y) /
-                    state.spatial_zoom};
-        const bool changed = value != state.spatial_drag_start_value &&
-            session.set_node_property(
+        bool changed = false;
+        if (state.spatial_drag_kind == MechanicSpatialDragKind::rotate) {
+            const auto delta = subtract_mechanic_vectors(
+                to_world(mouse), state.spatial_drag_start_value);
+            const float value = std::atan2(delta.y, delta.x) *
+                57.29577951308232F - 90.0F;
+            changed = value != state.spatial_drag_start_rotation &&
+                session.set_node_property({.value = state.spatial_drag_node},
+                                          state.spatial_drag_property, value);
+            if (probe && probe->enabled && changed)
+                probe->rotation_handle_moved = true;
+        } else {
+            fabric::core::Vec2 value{};
+            fabric::core::Vec2 original{};
+            if (state.spatial_drag_kind == MechanicSpatialDragKind::resize) {
+                const auto local = rotate_mechanic_vector(
+                    subtract_mechanic_vectors(
+                        to_world(mouse), state.spatial_drag_start_value),
+                    -state.spatial_drag_start_rotation);
+                value = {std::max(0.1F, std::abs(local.x) * 2.0F),
+                         std::max(0.1F, std::abs(local.y) * 2.0F)};
+                original = state.spatial_drag_start_size;
+            } else {
+                value = {
+                    state.spatial_drag_start_value.x +
+                        (mouse.x - state.spatial_drag_start_mouse.x) /
+                            state.spatial_zoom,
+                    state.spatial_drag_start_value.y -
+                        (mouse.y - state.spatial_drag_start_mouse.y) /
+                            state.spatial_zoom};
+                original = state.spatial_drag_start_value;
+            }
+            changed = value != original && session.set_node_property(
                 {.value = state.spatial_drag_node},
                 state.spatial_drag_property, value);
-        status = changed ? "Mechanic handle moved"
-                         : "Mechanic handle unchanged or rejected";
-        if (probe && probe->enabled && changed)
-            probe->spatial_handle_moved = true;
+            if (probe && probe->enabled && changed) {
+                if (state.spatial_drag_kind == MechanicSpatialDragKind::resize)
+                    probe->resize_handle_moved = true;
+                else
+                    probe->spatial_handle_moved = true;
+            }
+        }
+        status = changed ? "Mechanic transform changed"
+                         : "Mechanic transform unchanged or rejected";
         state.spatial_drag_node.clear();
         state.spatial_drag_property.clear();
+        state.spatial_drag_kind = MechanicSpatialDragKind::none;
         return changed;
     }
     return false;

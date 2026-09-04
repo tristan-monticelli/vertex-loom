@@ -11,6 +11,13 @@
 
 namespace fabric::map_studio {
 
+enum class MechanicSpatialDragKind {
+    none,
+    move,
+    resize,
+    rotate,
+};
+
 struct MechanicWorkspaceState {
     std::string open_id;
     std::string new_id;
@@ -26,7 +33,10 @@ struct MechanicWorkspaceState {
     bool pending_canvas_connection{};
     std::string spatial_drag_node;
     std::string spatial_drag_property;
+    MechanicSpatialDragKind spatial_drag_kind{MechanicSpatialDragKind::none};
     core::Vec2 spatial_drag_start_value{};
+    core::Vec2 spatial_drag_start_size{};
+    float spatial_drag_start_rotation{};
     ImVec2 spatial_drag_start_mouse{};
     float spatial_zoom{32.0F};
     editor::RotatingPlatformPresetRequest platform;
@@ -43,6 +53,11 @@ struct MechanicWorkspaceProbe {
     bool spatial_canvas_seen{};
     bool spatial_handle_seen{};
     bool spatial_handle_moved{};
+    bool body_handle_seen{};
+    bool resize_handle_seen{};
+    bool resize_handle_moved{};
+    bool rotation_handle_seen{};
+    bool rotation_handle_moved{};
     bool link_seen{};
     bool source_seen{};
     bool target_seen{};
@@ -54,6 +69,11 @@ struct MechanicWorkspaceProbe {
     core::Vec2 spatial_handle_original{};
     std::string spatial_handle_node;
     std::string spatial_handle_property;
+    ImVec2 body_handle_screen{};
+    ImVec2 resize_handle_screen{};
+    core::Vec2 resize_handle_original{};
+    ImVec2 rotation_handle_screen{};
+    float rotation_handle_original{};
     project::MechanicConnection expected_connection;
 };
 

@@ -668,6 +668,8 @@ int run(const std::filesystem::path& project_root,
     bool mechanic_authoring_verified = false;
     std::size_t mechanic_e2e_frame = 0U;
     std::size_t publish_e2e_frame = 0U;
+    std::optional<ImVec2> mechanic_resize_drag_origin;
+    std::optional<ImVec2> mechanic_rotation_drag_origin;
     bool mechanic_e2e_capture_written = false;
     bool publish_e2e_capture_written = false;
     if (mechanic_e2e) {
@@ -924,6 +926,28 @@ int run(const std::filesystem::path& project_root,
     bool command_palette_open = ui_accessibility_test;
     bool command_palette_rendered = false;
     bool running = true;
+    const auto push_mouse_position = [&](const ImVec2 target) {
+        SDL_Event motion{};
+        motion.type = SDL_MOUSEMOTION;
+        motion.motion.windowID = SDL_GetWindowID(window);
+        motion.motion.x = static_cast<int>(std::lround(target.x));
+        motion.motion.y = static_cast<int>(std::lround(target.y));
+        static_cast<void>(SDL_PushEvent(&motion));
+    };
+    const auto push_left_button = [&](const Uint32 type, const ImVec2 target) {
+        SDL_Event button{};
+        button.type = type;
+        button.button.button = SDL_BUTTON_LEFT;
+        button.button.windowID = SDL_GetWindowID(window);
+        button.button.x = static_cast<int>(std::lround(target.x));
+        button.button.y = static_cast<int>(std::lround(target.y));
+        static_cast<void>(SDL_PushEvent(&button));
+    };
+    const auto push_left_click = [&](const ImVec2 target) {
+        push_mouse_position(target);
+        push_left_button(SDL_MOUSEBUTTONDOWN, target);
+        push_left_button(SDL_MOUSEBUTTONUP, target);
+    };
     while (running) {
         if (placement_e2e) {
             std::optional<ImVec2> target;
@@ -972,41 +996,56 @@ int run(const std::filesystem::path& project_root,
             const ImVec2 target = mechanic_e2e_frame == 2U
                 ? mechanic_probe.source_screen
                 : mechanic_probe.target_screen;
-            SDL_Event motion{};
-            motion.type = SDL_MOUSEMOTION;
-            motion.motion.windowID = SDL_GetWindowID(window);
-            motion.motion.x = static_cast<int>(std::lround(target.x));
-            motion.motion.y = static_cast<int>(std::lround(target.y));
-            static_cast<void>(SDL_PushEvent(&motion));
-            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
-                SDL_Event button{};
-                button.type = type;
-                button.button.button = SDL_BUTTON_LEFT;
-                button.button.windowID = SDL_GetWindowID(window);
-                button.button.x = motion.motion.x;
-                button.button.y = motion.motion.y;
-                static_cast<void>(SDL_PushEvent(&button));
-            }
+            push_left_click(target);
         }
         if (mechanic_e2e && mechanic_probe.spatial_handle_seen &&
             mechanic_e2e_frame >= 6U && mechanic_e2e_frame <= 8U) {
             ImVec2 target = mechanic_probe.spatial_handle_screen;
             if (mechanic_e2e_frame >= 7U) target.x += 32.0F;
-            SDL_Event motion{};
-            motion.type = SDL_MOUSEMOTION;
-            motion.motion.windowID = SDL_GetWindowID(window);
-            motion.motion.x = static_cast<int>(std::lround(target.x));
-            motion.motion.y = static_cast<int>(std::lround(target.y));
-            static_cast<void>(SDL_PushEvent(&motion));
+            push_mouse_position(target);
             if (mechanic_e2e_frame == 6U || mechanic_e2e_frame == 8U) {
-                SDL_Event button{};
-                button.type = mechanic_e2e_frame == 6U
-                    ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
-                button.button.button = SDL_BUTTON_LEFT;
-                button.button.windowID = SDL_GetWindowID(window);
-                button.button.x = motion.motion.x;
-                button.button.y = motion.motion.y;
-                static_cast<void>(SDL_PushEvent(&button));
+                push_left_button(mechanic_e2e_frame == 6U
+                                     ? SDL_MOUSEBUTTONDOWN
+                                     : SDL_MOUSEBUTTONUP,
+                                 target);
+            }
+        }
+        if (mechanic_e2e && mechanic_probe.body_handle_seen &&
+            mechanic_e2e_frame == 10U) {
+            push_left_click(mechanic_probe.body_handle_screen);
+        }
+        if (mechanic_e2e && mechanic_probe.resize_handle_seen &&
+            mechanic_e2e_frame >= 12U && mechanic_e2e_frame <= 14U) {
+            if (!mechanic_resize_drag_origin)
+                mechanic_resize_drag_origin = mechanic_probe.resize_handle_screen;
+            ImVec2 target = *mechanic_resize_drag_origin;
+            if (mechanic_e2e_frame >= 13U) {
+                target.x += 32.0F;
+                target.y -= 16.0F;
+            }
+            push_mouse_position(target);
+            if (mechanic_e2e_frame == 12U || mechanic_e2e_frame == 14U) {
+                push_left_button(mechanic_e2e_frame == 12U
+                                     ? SDL_MOUSEBUTTONDOWN
+                                     : SDL_MOUSEBUTTONUP,
+                                 target);
+            }
+        }
+        if (mechanic_e2e && mechanic_probe.rotation_handle_seen &&
+            mechanic_e2e_frame >= 16U && mechanic_e2e_frame <= 18U) {
+            if (!mechanic_rotation_drag_origin)
+                mechanic_rotation_drag_origin = mechanic_probe.rotation_handle_screen;
+            ImVec2 target = *mechanic_rotation_drag_origin;
+            if (mechanic_e2e_frame >= 17U) {
+                target.x += 24.0F;
+                target.y += 12.0F;
+            }
+            push_mouse_position(target);
+            if (mechanic_e2e_frame == 16U || mechanic_e2e_frame == 18U) {
+                push_left_button(mechanic_e2e_frame == 16U
+                                     ? SDL_MOUSEBUTTONDOWN
+                                     : SDL_MOUSEBUTTONUP,
+                                 target);
             }
         }
         if (mechanic_e2e && mechanic_authoring_verified &&
@@ -2721,6 +2760,8 @@ int run(const std::filesystem::path& project_root,
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         if (mechanic_e2e && mechanic_probe.link_seen &&
+            mechanic_probe.rotation_handle_moved &&
+            mechanic_e2e_frame >= 19U &&
             !mechanic_e2e_capture_written) {
             write_frame_capture(project_root, window,
                                 "map-studio-mechanic-graph-e2e.ppm");
@@ -2733,12 +2774,14 @@ int run(const std::filesystem::path& project_root,
             publish_e2e_capture_written = true;
         }
         if (mechanic_e2e && !mechanic_authoring_verified &&
-            ++mechanic_e2e_frame == 11U) {
+            ++mechanic_e2e_frame == 21U) {
             const bool saved = mechanic_session.save();
             fabric::editor::MechanicSession reloaded;
             const bool reopened = saved && session.map() && reloaded.open(
                 project_root, *session.map(), {.value = "rotating-platform"});
             bool spatial_value_reloaded = false;
+            bool size_value_reloaded = false;
+            bool rotation_value_reloaded = false;
             if (reopened) {
                 const auto node = std::ranges::find(
                     reloaded.graph()->nodes, mechanic_probe.spatial_handle_node,
@@ -2759,12 +2802,49 @@ int run(const std::filesystem::path& project_root,
                         }
                     }
                 }
+                const auto body = std::ranges::find(
+                    reloaded.graph()->nodes, std::string{"platform"},
+                    &fabric::project::MechanicNodeDefinition::id);
+                if (body != reloaded.graph()->nodes.end()) {
+                    const auto size = std::ranges::find(
+                        body->properties, std::string{"size"},
+                        &fabric::project::MechanicNodeProperty::id);
+                    if (size != body->properties.end()) {
+                        if (const auto* value = std::get_if<fabric::core::Vec2>(
+                                &size->value)) {
+                            size_value_reloaded =
+                                value->x > mechanic_probe.resize_handle_original.x +
+                                    1.9F &&
+                                value->x < mechanic_probe.resize_handle_original.x +
+                                    2.1F &&
+                                value->y > mechanic_probe.resize_handle_original.y +
+                                    0.9F &&
+                                value->y < mechanic_probe.resize_handle_original.y +
+                                    1.1F;
+                        }
+                    }
+                    const auto rotation = std::ranges::find(
+                        body->properties, std::string{"rotation"},
+                        &fabric::project::MechanicNodeProperty::id);
+                    if (rotation != body->properties.end()) {
+                        if (const auto* value = std::get_if<float>(
+                                &rotation->value)) {
+                            rotation_value_reloaded = std::abs(
+                                *value - mechanic_probe.rotation_handle_original) > 5.0F;
+                        }
+                    }
+                }
             }
             mechanic_e2e_complete = mechanic_e2e_complete && reopened &&
                 mechanic_probe.canvas_seen && mechanic_probe.link_seen &&
                 mechanic_probe.spatial_canvas_seen &&
                 mechanic_probe.spatial_handle_seen &&
                 mechanic_probe.spatial_handle_moved && spatial_value_reloaded &&
+                mechanic_probe.body_handle_seen &&
+                mechanic_probe.resize_handle_seen &&
+                mechanic_probe.resize_handle_moved && size_value_reloaded &&
+                mechanic_probe.rotation_handle_seen &&
+                mechanic_probe.rotation_handle_moved && rotation_value_reloaded &&
                 mechanic_e2e_capture_written && reloaded.simulation().valid() &&
                 std::ranges::find(reloaded.graph()->connections,
                                   mechanic_probe.expected_connection) !=
@@ -2779,7 +2859,14 @@ int run(const std::filesystem::path& project_root,
                     std::to_string(mechanic_probe.spatial_canvas_seen) + "," +
                     std::to_string(mechanic_probe.spatial_handle_seen) + "," +
                     std::to_string(mechanic_probe.spatial_handle_moved) + "," +
-                    std::to_string(spatial_value_reloaded));
+                    std::to_string(spatial_value_reloaded) + "," +
+                    std::to_string(mechanic_probe.body_handle_seen) + "," +
+                    std::to_string(mechanic_probe.resize_handle_seen) + "," +
+                    std::to_string(mechanic_probe.resize_handle_moved) + "," +
+                    std::to_string(size_value_reloaded) + "," +
+                    std::to_string(mechanic_probe.rotation_handle_seen) + "," +
+                    std::to_string(mechanic_probe.rotation_handle_moved) + "," +
+                    std::to_string(rotation_value_reloaded));
             if (mechanic_e2e_complete) {
                 mechanic_authoring_verified = true;
                 active_workspace = ActiveWorkspace::publish;

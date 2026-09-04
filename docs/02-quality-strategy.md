@@ -218,9 +218,11 @@ pause et le surlignage de trace, puis conserve le canevas final dans
 Le test `map_studio_mechanic_e2e` retire la liaison `platform.body` vers
 `anchor.body` de la fixture, ouvre le canevas Mechanics et la recrée par clics
 sur `Connect from output` puis la carte cible. Le même scénario glisse ensuite
-le capteur `presence` d'une unité monde dans le canevas spatial. Il sauvegarde,
-recharge, exige la connexion et la nouvelle position, compile la simulation,
-avance un pas fixe et produit
+le capteur `presence` d'une unité monde dans le canevas spatial, sélectionne le
+corps `platform`, agrandit sa poignée de taille et glisse sa poignée de
+rotation. Il sauvegarde, recharge, exige la connexion ainsi que les nouvelles
+position, taille et rotation, compile la simulation, avance un pas fixe et
+produit
 `map-studio-mechanic-graph-e2e.ppm`. Le long formulaire de preset reste replié
 par défaut afin que le graphe soit visible sans scroll préalable.
 Le scénario continue ensuite dans le workspace `Publish` : il clique Validate,

@@ -118,6 +118,12 @@ Les mutations de nœuds, propriétés et connexions passent par son propre
 Box2D. Lecture, pause, pas fixe et reset n'écrivent jamais d'état de simulation
 dans le document.
 
+Le canevas spatial Mechanics projette les propriétés persistantes des corps et
+capteurs en poignées de déplacement, de taille et, pour les corps, de rotation.
+Le glisser reste un aperçu d'interface ; son relâchement envoie une unique
+mutation typée à `MechanicSession`, sans accès direct du widget au JSON ou au
+monde Box2D.
+
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview
 évalue les signaux capteur ou événement, applique direction et accélération au
