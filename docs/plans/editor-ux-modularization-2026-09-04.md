@@ -121,6 +121,10 @@ Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,
 breakpoint et évaluation uniquement par clics avant reload.
+Publish est désormais un module Map Studio dédié : racine Map/Scene,
+fermeture et runtime minimal visibles, destination neuve obligatoire, puis
+chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne
+ces clics et le runtime embarqué préserve les sous-systèmes SDL du Studio.
 
 ## Tranche 4 — authoring direct manquant
 
@@ -132,8 +136,8 @@ breakpoint et évaluation uniquement par clics avant reload.
 - Animation : courbes avancées et événements ; box-select, déplacement groupé
   et `Alt`+glisser pour scaler une sélection autour du playhead sont réalisés.
 - Logic : erreurs sur ports/liens, trace live, pause, step et breakpoints.
-- Publish : dépendances, validations cliquables, plateforme et résultat du
-  runtime dans un workspace dédié.
+- Publish : workspace dédié Map/Scene réalisé ; le lancement du binaire release
+  séparé et le gate de distribution restent à ajouter.
 
 Tilemap/navigation, Audio, Replay, VFX et UI jeu ne commencent qu'après les
 outils directs P0 dont ils dépendent.

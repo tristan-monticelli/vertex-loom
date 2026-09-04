@@ -318,6 +318,7 @@ if(FABRIC_BUILD_EDITORS)
         editors/map_studio/main.cpp
         editors/map_studio/map_canvas.cpp
         editors/map_studio/mechanic_workspace.cpp
+        editors/map_studio/publish_workspace.cpp
         editors/map_studio/resource_picker.cpp
         editors/map_studio/scene_workspace.cpp
     )
@@ -1036,7 +1037,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
 
     add_executable(fabric_preview_runtime_tests tests/cpp/preview_runtime_tests.cpp)
     target_link_libraries(fabric_preview_runtime_tests PRIVATE
-        fabric_runtime Catch2::Catch2WithMain)
+        fabric_runtime SDL2::SDL2-static Catch2::Catch2WithMain)
     add_test(NAME fabric_preview_runtime_tests COMMAND fabric_preview_runtime_tests)
 
     add_executable(fabric_document_storage_tests

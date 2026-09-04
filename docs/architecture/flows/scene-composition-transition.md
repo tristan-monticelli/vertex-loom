@@ -2,12 +2,21 @@
 
 ```mermaid
 sequenceDiagram
+    participant Studio as Map Studio / Publish
     participant Game as game_runtime
     participant Session as SceneRuntimeSession
     participant Project as fabric_project
     participant Preview as PreviewRuntime
 
-    opt campagne portable
+    opt publication depuis le Studio
+        Studio->>Project: plan map/scene package
+        Project-->>Studio: fermeture + diagnostics + runtime minimal
+        Studio->>Project: publish vers destination neuve
+        Studio->>Preview: load(package) + smoke 1 frame
+        Preview-->>Studio: résultat et statistiques
+    end
+
+    opt campagne portable chargée par le jeu
         Game->>Project: ouvrir scene-package.json
         Project-->>Game: rootScene + fermeture transitive
     end
@@ -39,3 +48,9 @@ manifeste racine, les scènes atteignables, toutes leurs maps et les dépendance
 de chaque map sont copiés avant l'écriture atomique de `scene-package.json`.
 `game_runtime --package` détecte ensuite le type de paquet et conserve la scène
 active dans la boucle sans dépendre du projet source.
+
+Le workspace `Publish` de Map Studio utilise les mêmes opérations. Il affiche
+la fermeture avant écriture, refuse une destination existante puis recharge le
+dossier produit avec `PreviewRuntime` en mode smoke. Le résultat visible ne
+peut donc pas confondre validation du plan, copie du paquet et chargement
+effectif par le runtime.

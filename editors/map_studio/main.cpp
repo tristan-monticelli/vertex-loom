@@ -20,6 +20,7 @@
 #include "editor_widgets.hpp"
 #include "map_canvas.hpp"
 #include "mechanic_workspace.hpp"
+#include "publish_workspace.hpp"
 #include "resource_picker.hpp"
 #include "scene_workspace.hpp"
 
@@ -70,6 +71,7 @@ using fabric::editor_ui::SearchableIdPickerOptions;
 using fabric::map_studio::draw_resource_picker;
 using fabric::map_studio::draw_map_canvas;
 using fabric::map_studio::draw_mechanic_workspace;
+using fabric::map_studio::draw_publish_workspace;
 using fabric::map_studio::draw_scene_workspace;
 using fabric::map_studio::draw_transform_editor;
 using fabric::map_studio::collision_shape_text;
@@ -79,6 +81,8 @@ using fabric::map_studio::MapPreviewRenderer;
 using fabric::map_studio::MapTexture;
 using fabric::map_studio::MechanicWorkspaceProbe;
 using fabric::map_studio::MechanicWorkspaceState;
+using fabric::map_studio::PublishWorkspaceProbe;
+using fabric::map_studio::PublishWorkspaceState;
 using fabric::map_studio::SelectionBoxState;
 using fabric::map_studio::SceneWorkspaceState;
 using fabric::map_studio::TransformEditorState;
@@ -560,8 +564,10 @@ int run(const std::filesystem::path& project_root,
     fabric::editor::SessionTransitionGuard transition_guard;
     MechanicWorkspaceState mechanic_editor;
     MechanicWorkspaceProbe mechanic_probe;
+    PublishWorkspaceState publish_editor;
+    PublishWorkspaceProbe publish_probe;
     SceneWorkspaceState scene_editor;
-    enum class ActiveWorkspace { map, scene, mechanic };
+    enum class ActiveWorkspace { map, scene, mechanic, publish };
     ActiveWorkspace active_workspace = mechanic_e2e
         ? ActiveWorkspace::mechanic
         : scene_e2e ? ActiveWorkspace::scene : ActiveWorkspace::map;
@@ -656,8 +662,11 @@ int run(const std::filesystem::path& project_root,
         e2e_failed = true;
     };
     bool mechanic_e2e_complete = false;
+    bool mechanic_authoring_verified = false;
     std::size_t mechanic_e2e_frame = 0U;
+    std::size_t publish_e2e_frame = 0U;
     bool mechanic_e2e_capture_written = false;
+    bool publish_e2e_capture_written = false;
     if (mechanic_e2e) {
         mechanic_probe.enabled = true;
         const bool opened = session.map() && mechanic_session.open(
@@ -671,6 +680,8 @@ int run(const std::filesystem::path& project_root,
         }
         if (!mechanic_e2e_complete)
             fail_e2e("mechanic fixture could not remove its first connection");
+        publish_editor.destination_parent = project_root.parent_path();
+        publish_probe.enabled = true;
     }
     bool scene_e2e_complete = false;
     if (scene_e2e) {
@@ -949,6 +960,29 @@ int run(const std::filesystem::path& project_root,
                 static_cast<void>(SDL_PushEvent(&button));
             }
         }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            ((publish_e2e_frame >= 2U && publish_e2e_frame <= 3U &&
+              publish_probe.validate_seen) ||
+             (publish_e2e_frame >= 5U && publish_e2e_frame <= 6U &&
+              publish_probe.publish_seen))) {
+            const bool validate = publish_e2e_frame <= 3U;
+            const ImVec2 target = validate ? publish_probe.validate_screen
+                                           : publish_probe.publish_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = publish_e2e_frame == 2U || publish_e2e_frame == 5U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
         if (e2e_mode && !e2e_failed && !e2e_event_injected) {
             SDL_Event close_event{};
             if (*e2e_mode == CloseE2eMode::window) {
@@ -1204,6 +1238,10 @@ int run(const std::filesystem::path& project_root,
         if (ImGui::RadioButton(
                 "Mechanics", active_workspace == ActiveWorkspace::mechanic))
             active_workspace = ActiveWorkspace::mechanic;
+        ImGui::SameLine();
+        if (ImGui::RadioButton(
+                "Publish", active_workspace == ActiveWorkspace::publish))
+            active_workspace = ActiveWorkspace::publish;
         ImGui::Separator();
         if (active_workspace == ActiveWorkspace::map) {
         if (!session.has_map()) {
@@ -1295,35 +1333,6 @@ int run(const std::filesystem::path& project_root,
                 preview_time = 0.0F;
                 preview_playing = true;
                 status = "Map preview restarted";
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(renderer_blocked, renderer_block_reason);
-            ImGui::SameLine();
-            if (ImGui::Button("Validate")) {
-                if (prepare_package()) {
-                    const auto validation = fabric::project::plan_map_package(
-                        session.project_root(), map.document.id);
-                    package_errors = validation.errors;
-                    status = validation.ok() ? "Map package validated"
-                                             : "Map validation failed";
-                }
-            }
-            ImGui::SameLine();
-            ImGui::BeginDisabled(renderer_blocked);
-            if (ImGui::Button("Publish")) {
-                if (prepare_package()) {
-                    const auto parent = choose_folder(window, status);
-                    if (parent) {
-                        const auto destination = *parent /
-                            (map.document.id.value + ".map-package");
-                        const auto published = fabric::project::publish_map_package(
-                            session.project_root(), map.document.id, destination);
-                        package_errors = published.errors;
-                        status = published.ok()
-                            ? "Map package published: " + destination.string()
-                            : "Map package publication failed";
-                    }
-                }
             }
             ImGui::EndDisabled();
             draw_disabled_reason(renderer_blocked, renderer_block_reason);
@@ -2475,10 +2484,22 @@ int run(const std::filesystem::path& project_root,
             draw_scene_workspace(
                 scene_session, project_root, window, scene_editor, status,
                 package_errors, resource_catalog, choose_folder);
-        } else {
+        } else if (active_workspace == ActiveWorkspace::mechanic) {
             draw_mechanic_workspace(
                 mechanic_session, session, mechanic_editor, status,
                 resource_catalog, &mechanic_probe);
+        } else {
+            const bool publication_enabled = map_renderer.ready() &&
+                preview_render_state.errors.empty();
+            const std::string publication_disabled_reason = !map_renderer.ready()
+                ? "Preview renderer unavailable: " +
+                      map_renderer.initialization_error()
+                : "Resolve render diagnostics before publication.";
+            draw_publish_workspace(
+                session, scene_session, window, publish_editor, status,
+                package_errors, publication_enabled,
+                publication_disabled_reason, prepare_package, choose_folder,
+                &publish_probe);
         }
         ImGui::End();
         const auto* selected_document = editor_context.active_document();
@@ -2642,7 +2663,14 @@ int run(const std::filesystem::path& project_root,
                                 "map-studio-mechanic-graph-e2e.ppm");
             mechanic_e2e_capture_written = true;
         }
-        if (mechanic_e2e && ++mechanic_e2e_frame == 11U) {
+        if (mechanic_e2e && publish_probe.runtime_verified &&
+            !publish_e2e_capture_written) {
+            write_frame_capture(project_root, window,
+                                "map-studio-publish-runtime-e2e.ppm");
+            publish_e2e_capture_written = true;
+        }
+        if (mechanic_e2e && !mechanic_authoring_verified &&
+            ++mechanic_e2e_frame == 11U) {
             const bool saved = mechanic_session.save();
             fabric::editor::MechanicSession reloaded;
             const bool reopened = saved && session.map() && reloaded.open(
@@ -2689,6 +2717,32 @@ int run(const std::filesystem::path& project_root,
                     std::to_string(mechanic_probe.spatial_handle_seen) + "," +
                     std::to_string(mechanic_probe.spatial_handle_moved) + "," +
                     std::to_string(spatial_value_reloaded));
+            if (mechanic_e2e_complete) {
+                mechanic_authoring_verified = true;
+                active_workspace = ActiveWorkspace::publish;
+            } else {
+                running = false;
+            }
+        }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            ++publish_e2e_frame == 9U) {
+            const auto destination = publish_editor.destination_parent /
+                (session.map()->document.id.value + ".map-package");
+            mechanic_e2e_complete = mechanic_e2e_complete &&
+                publish_probe.validate_seen && publish_probe.validate_clicked &&
+                publish_probe.publish_seen && publish_probe.publish_clicked &&
+                publish_probe.dependency_seen && publish_probe.runtime_verified &&
+                publish_e2e_capture_written &&
+                std::filesystem::is_regular_file(
+                    destination /
+                    fabric::project::map_package_manifest_filename);
+            if (!mechanic_e2e_complete)
+                fail_e2e("Publish workspace did not validate, publish and run: " +
+                    std::to_string(publish_probe.validate_clicked) + "," +
+                    std::to_string(publish_probe.publish_clicked) + "," +
+                    std::to_string(publish_probe.dependency_seen) + "," +
+                    std::to_string(publish_probe.runtime_verified) + "," +
+                    std::to_string(publish_e2e_capture_written));
             running = false;
         }
         if (scene_e2e || transformation_e2e) running = false;

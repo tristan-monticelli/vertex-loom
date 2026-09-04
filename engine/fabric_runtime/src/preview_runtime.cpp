@@ -160,7 +160,8 @@ struct PreviewRuntime::Impl {
     project::MapChunkIndex chunk_index;
     std::unordered_map<std::string, std::vector<std::size_t>> packet_indices_by_instance;
     bool chunk_index_ready{};
-    bool sdl_initialized{};
+    bool owns_all_sdl{};
+    Uint32 owned_sdl_subsystems{};
     std::filesystem::path project_root;
     const project::ProjectManifest* manifest{};
     std::vector<std::string>* errors{};
@@ -1012,9 +1013,11 @@ PreviewRuntime::~PreviewRuntime() {
     }
     if (impl_->context != nullptr) SDL_GL_DeleteContext(impl_->context);
     if (impl_->window != nullptr) SDL_DestroyWindow(impl_->window);
-    if (impl_->sdl_initialized) {
+    if (impl_->owns_all_sdl) {
         IMG_Quit();
         SDL_Quit();
+    } else if (impl_->owned_sdl_subsystems != 0U) {
+        SDL_QuitSubSystem(impl_->owned_sdl_subsystems);
     }
 }
 
@@ -1884,26 +1887,45 @@ bool PreviewRuntime::run() {
         (options_.enable_character ? SDL_INIT_GAMECONTROLLER : 0U);
     const auto headless_flags = SDL_INIT_TIMER |
         (options_.enable_character ? SDL_INIT_GAMECONTROLLER : 0U);
+    const auto initialize_sdl = [&](const Uint32 flags) {
+        if (SDL_WasInit(0U) == 0U) {
+            if (SDL_Init(flags) != 0) return false;
+            impl_->owns_all_sdl = true;
+            return true;
+        }
+        const Uint32 missing = flags & ~SDL_WasInit(flags);
+        if (missing != 0U && SDL_InitSubSystem(missing) != 0) return false;
+        impl_->owned_sdl_subsystems |= missing;
+        return true;
+    };
+    const auto release_owned_sdl = [&] {
+        if (impl_->owns_all_sdl) {
+            SDL_Quit();
+            impl_->owns_all_sdl = false;
+        } else if (impl_->owned_sdl_subsystems != 0U) {
+            SDL_QuitSubSystem(impl_->owned_sdl_subsystems);
+            impl_->owned_sdl_subsystems = 0U;
+        }
+    };
     bool headless = options_.mode == RuntimeMode::smoke_test;
     if (headless) {
-        if (SDL_Init(headless_flags) != 0) {
+        if (!initialize_sdl(headless_flags)) {
             errors_.push_back(SDL_GetError());
             return false;
         }
-    } else if (SDL_Init(sdl_flags) != 0) {
+    } else if (!initialize_sdl(sdl_flags)) {
         if (options_.mode == RuntimeMode::interactive) {
             errors_.push_back(SDL_GetError());
             return false;
         }
-        SDL_Quit();
+        release_owned_sdl();
         SDL_SetMainReady();
-        if (SDL_Init(headless_flags) != 0) {
+        if (!initialize_sdl(headless_flags)) {
             errors_.push_back(SDL_GetError());
             return false;
         }
         headless = true;
     }
-    impl_->sdl_initialized = true;
     if (options_.enable_character) {
         for (int index = 0; index < SDL_NumJoysticks(); ++index) {
             if (!SDL_IsGameController(index)) continue;

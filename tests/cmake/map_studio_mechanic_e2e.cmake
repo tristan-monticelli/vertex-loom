@@ -24,6 +24,13 @@ endif()
 if(NOT EXISTS "${TEST_ROOT}/project/map-studio-mechanic-graph-e2e.ppm")
     message(FATAL_ERROR "Mechanic graph E2E did not produce a visual capture")
 endif()
+if(NOT EXISTS "${TEST_ROOT}/project/map-studio-publish-runtime-e2e.ppm")
+    message(FATAL_ERROR "Publish workspace E2E did not produce a visual capture")
+endif()
+if(NOT EXISTS
+   "${TEST_ROOT}/textile-head-preview.map-package/map-package.json")
+    message(FATAL_ERROR "Publish workspace did not produce a map package")
+endif()
 execute_process(
     COMMAND "${PROJECT_VALIDATE}" "${TEST_ROOT}/project"
     RESULT_VARIABLE VALIDATE_RESULT

@@ -218,6 +218,11 @@ recharge, exige la connexion et la nouvelle position, compile la simulation,
 avance un pas fixe et produit
 `map-studio-mechanic-graph-e2e.ppm`. Le long formulaire de preset reste replié
 par défaut afin que le graphe soit visible sans scroll préalable.
+Le scénario continue ensuite dans le workspace `Publish` : il clique Validate,
+exige une fermeture de dépendances visible, clique Publish, recharge le dossier
+produit avec `PreviewRuntime` pour un smoke d'une frame et capture
+`map-studio-publish-runtime-e2e.ppm`. Un test runtime séparé initialise SDL
+comme un hôte et vérifie que la destruction du smoke embarqué ne l'arrête pas.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique
 `Create Entity from visual`, dépose `button-primary` comme enfant, déplace cet

@@ -26,6 +26,7 @@
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <SDL.h>
 
 namespace {
 
@@ -748,6 +749,32 @@ TEST_CASE("preview runtime validates and loads a map before graphics") {
     REQUIRE(runtime.stats().physics_steps == 1);
     REQUIRE(runtime.stats().p95_frame_ms >= 0.0);
 
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("embedded smoke runtime preserves host SDL subsystems") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-embedded-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_map(root, manifest(), map()).ok());
+    SDL_SetMainReady();
+    REQUIRE(SDL_Init(SDL_INIT_TIMER) == 0);
+    REQUIRE((SDL_WasInit(SDL_INIT_TIMER) & SDL_INIT_TIMER) != 0U);
+
+    {
+        fabric::runtime::PreviewRuntime runtime;
+        REQUIRE(runtime.load({
+            .project_root = root,
+            .map_id = {.value = "preview"},
+            .mode = fabric::runtime::RuntimeMode::smoke_test,
+        }));
+        REQUIRE(runtime.run());
+    }
+
+    CHECK((SDL_WasInit(SDL_INIT_TIMER) & SDL_INIT_TIMER) != 0U);
+    SDL_QuitSubSystem(SDL_INIT_TIMER);
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
 }
