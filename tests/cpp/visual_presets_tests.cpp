@@ -455,6 +455,7 @@ std::vector<std::filesystem::path> fixture_files(
             filename != "asset-studio-ui-widgets.json" &&
             filename != "asset_studio-e2e-failure.txt" &&
             filename != "asset_studio-e2e-failure.ppm" &&
+            filename != "map_studio-e2e-failure.ppm" &&
             filename != "beam-original.png" &&
             relative != "assets/vectors/beam-border.vector.json")
             result.push_back(relative);
