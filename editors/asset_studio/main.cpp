@@ -2849,6 +2849,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     : "inspector",
         };
     };
+    const auto restore_entity_selection = [&] {
+        const auto* document = editor_context.active_document();
+        const auto& entity = session.selected_entity();
+        if (document == nullptr || !entity ||
+            session.selected_resource() == nullptr ||
+            session.selected_resource()->kind !=
+                fabric::editor::StudioResourceKind::entity ||
+            document->id != session.selected_resource()->id) {
+            return;
+        }
+        std::vector<fabric::core::ResourceId> node_ids;
+        node_ids.reserve(entity->nodes.size());
+        for (const auto& node : entity->nodes)
+            node_ids.push_back({.value = node.id});
+        const auto resolved = editor_context.resolve_selection(node_ids);
+        canvas.selected_entity_id = entity->document.id.value;
+        canvas.selected_entity_nodes = resolved.indices;
+        if (resolved.primary_index.has_value())
+            canvas.selected_node = *resolved.primary_index;
+        else if (!entity->nodes.empty()) {
+            canvas.selected_node = 0U;
+            canvas.selected_entity_nodes = {0U};
+        }
+    };
     const auto restore_document_state = [&] {
         const auto* document = editor_context.active_document();
         if (document == nullptr) return;
@@ -2867,18 +2891,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             canvas.tool = CanvasUiState::Tool::move;
 
         if (!document->selection_id.has_value()) return;
-        if (session.selected_entity()) {
-            const auto node = std::ranges::find(
-                session.selected_entity()->nodes,
-                document->selection_id->value,
-                &fabric::project::EntityNode::id);
-            if (node != session.selected_entity()->nodes.end()) {
-                const auto index = static_cast<std::size_t>(std::distance(
-                    session.selected_entity()->nodes.begin(), node));
-                canvas.selected_entity_nodes = {index};
-                canvas.selected_node = index;
-            }
-        } else if (session.selected_animation()) {
+        if (session.selected_animation()) {
             animation_ui.node_id = document->selection_id->value;
         }
     };
@@ -2899,6 +2912,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             restore_document_state();
         }
     }
+    restore_entity_selection();
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
@@ -3402,27 +3416,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             draw_animation_timeline_workspace(
                 session, animation_ui, status, &animation_timeline_probe);
         ImGui::End();
-    }
-
-    if (editor_context.active_document() != nullptr &&
-        session.selected_resource() != nullptr &&
-        editor_context.active_document()->id ==
-            session.selected_resource()->id) {
-        static_cast<void>(editor_context.set_view(current_view()));
-        std::optional<fabric::core::ResourceId> stable_selection;
-        if (session.selected_entity() &&
-            !canvas.selected_entity_nodes.empty() &&
-            canvas.selected_entity_nodes.front() <
-                session.selected_entity()->nodes.size()) {
-            stable_selection = fabric::core::ResourceId{
-                .value = session.selected_entity()
-                    ->nodes[canvas.selected_entity_nodes.front()].id};
-        } else if (session.selected_animation() &&
-                   fabric::core::ResourceId::is_valid(animation_ui.node_id)) {
-            stable_selection = fabric::core::ResourceId{
-                .value = animation_ui.node_id};
-        }
-        static_cast<void>(editor_context.set_selection(stable_selection));
     }
 
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
@@ -5321,7 +5314,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const auto added_ok = session.add_selected_entity_node(
                         std::move(added));
                     if (added_ok) {
-                        canvas.selected_node = entity.nodes.size();
+                        canvas.selected_node = entity.nodes.size() - 1U;
                         canvas.selected_entity_nodes = {canvas.selected_node};
                     }
                     return added_ok;
@@ -7696,6 +7689,35 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::EndPopup();
     }
 
+    if (editor_context.active_document() != nullptr &&
+        session.selected_resource() != nullptr &&
+        editor_context.active_document()->id ==
+            session.selected_resource()->id) {
+        static_cast<void>(editor_context.set_view(current_view()));
+        std::optional<fabric::core::ResourceId> stable_selection;
+        std::vector<fabric::core::ResourceId> stable_selections;
+        if (session.selected_resource()->kind ==
+                fabric::editor::StudioResourceKind::entity &&
+            session.selected_entity() &&
+            canvas.selected_node < session.selected_entity()->nodes.size()) {
+            stable_selection = fabric::core::ResourceId{
+                .value = session.selected_entity()
+                    ->nodes[canvas.selected_node].id};
+            stable_selections.reserve(canvas.selected_entity_nodes.size());
+            for (const auto index : canvas.selected_entity_nodes) {
+                if (index < session.selected_entity()->nodes.size())
+                    stable_selections.push_back({
+                        .value = session.selected_entity()->nodes[index].id});
+            }
+        } else if (session.selected_animation() &&
+                   fabric::core::ResourceId::is_valid(animation_ui.node_id)) {
+            stable_selection = fabric::core::ResourceId{
+                .value = animation_ui.node_id};
+        }
+        static_cast<void>(editor_context.set_selection_set(
+            stable_selection, std::move(stable_selections)));
+    }
+
 }
 
 int run_asset_studio(const std::filesystem::path& initial_project,
@@ -8276,6 +8298,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             std::cerr << "Asset Studio Entity E2E failed\n";
     }
     bool entity_gizmo_e2e_active = false;
+    bool entity_stable_selection_e2e_complete = false;
     std::size_t entity_gizmo_e2e_frame = 0U;
     fabric::core::Vec2 entity_gizmo_e2e_initial_position{};
     fabric::core::Vec2 entity_gizmo_e2e_secondary_position{};
@@ -8285,6 +8308,33 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         canvas.selected_entity_id =
             session.selected_entity()->document.id.value;
         canvas.selected_entity_nodes = {1U, 2U};
+        static_cast<void>(editor_context.open_document(
+            session.selected_entity()->document.id,
+            fabric::editor::EditorWorkspace::entity));
+        static_cast<void>(editor_context.set_selection_set(
+            fabric::core::ResourceId{
+                .value = session.selected_entity()->nodes[1U].id},
+            {{.value = session.selected_entity()->nodes[1U].id},
+             {.value = session.selected_entity()->nodes[2U].id}}));
+        const auto primary_node_id = session.selected_entity()->nodes[1U].id;
+        const auto secondary_node_id = session.selected_entity()->nodes[2U].id;
+        if (session.move_selected_entity_node(1U, 2U)) {
+            std::vector<fabric::core::ResourceId> reordered_ids;
+            for (const auto& node : session.selected_entity()->nodes)
+                reordered_ids.push_back({.value = node.id});
+            const auto resolved = editor_context.resolve_selection(reordered_ids);
+            entity_stable_selection_e2e_complete =
+                resolved.primary_index == 2U && resolved.indices.size() == 2U &&
+                resolved.indices[0] == 2U && resolved.indices[1] == 1U &&
+                session.selected_entity()->nodes[*resolved.primary_index].id ==
+                    primary_node_id &&
+                session.selected_entity()->nodes[resolved.indices[1]].id ==
+                    secondary_node_id;
+            if (entity_stable_selection_e2e_complete) {
+                canvas.selected_node = *resolved.primary_index;
+                canvas.selected_entity_nodes = resolved.indices;
+            }
+        }
         entity_gizmo_e2e_initial_position =
             session.selected_entity()->nodes[1].transform.position;
         entity_gizmo_e2e_secondary_position =
@@ -10357,6 +10407,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded_entity->xpbd->area_constraints.size() == 2U &&
                     reloaded_entity->xpbd->collision_constraints.size() == 2U;
                 entity_e2e_complete = entity_e2e_complete && reopened &&
+                    entity_stable_selection_e2e_complete &&
                     animation_graph_probe.graph_seen && animation_graph_probe.canvas_seen &&
                     animation_graph_probe.add_seen &&
                     animation_graph_probe.link_seen &&
@@ -10400,6 +10451,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                               << ", target-seen="
                               << animation_graph_probe.target_seen
                               << ", link-seen=" << animation_graph_probe.link_seen
+                              << ", stable-selection="
+                              << entity_stable_selection_e2e_complete
                               << ", ik-create=" << ui_entity_ik_create_clicked
                               << ", ik-overlay=" << canvas.ik_overlay_visible
                               << ", mesh-seen="

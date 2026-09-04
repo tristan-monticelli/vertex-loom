@@ -196,6 +196,11 @@ Entity exige en plus que l'action nominale d'animation et le transform soient
 réellement rendus ; le scénario Animation exige le picker nominal de nœud et
 une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
 puisse pas satisfaire la recette UX.
+Avant le premier frame du scénario Entity, les deux nœuds sélectionnés sont
+réordonnés par `ProjectSession` ; le test exige que `EditorContext` résolve le
+même primaire et le même groupe aux nouveaux indices. Le reste du scénario
+manipule ensuite cette sélection sur le canvas, ce qui couvre ensemble le
+contrat stable et son usage graphique.
 Le scénario Entity sélectionne aussi deux articulations, clique
 `Create IK from selection`, exige une chaîne et une cible générées atomiquement,
 leur round-trip et l'overlay os→cible dans

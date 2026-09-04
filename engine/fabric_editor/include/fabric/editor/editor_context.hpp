@@ -27,6 +27,7 @@ struct EditorLocation {
     core::ResourceId document_id;
     EditorWorkspace workspace{EditorWorkspace::visual};
     std::optional<core::ResourceId> selection_id;
+    std::vector<core::ResourceId> selection_ids;
 
     friend bool operator==(const EditorLocation&, const EditorLocation&) =
         default;
@@ -47,7 +48,13 @@ struct EditorDocumentState {
     core::ResourceId id;
     EditorWorkspace workspace{EditorWorkspace::visual};
     std::optional<core::ResourceId> selection_id;
+    std::vector<core::ResourceId> selection_ids;
     EditorViewState view;
+};
+
+struct ResolvedEditorSelection {
+    std::optional<std::size_t> primary_index;
+    std::vector<std::size_t> indices;
 };
 
 class EditorContext {
@@ -56,21 +63,29 @@ public:
         const core::ResourceId& id,
         EditorWorkspace workspace = EditorWorkspace::visual) {
         const auto existing = find_document(id);
-        return navigate(id, workspace,
-                        existing == documents_.end()
-                            ? std::nullopt
-                            : existing->selection_id);
+        return navigate(
+            id, workspace,
+            existing == documents_.end() ? std::nullopt
+                                         : existing->selection_id,
+            existing == documents_.end()
+                ? std::vector<core::ResourceId>{}
+                : existing->selection_ids);
     }
 
     [[nodiscard]] bool navigate(
         const core::ResourceId& document_id,
         EditorWorkspace workspace,
-        std::optional<core::ResourceId> selection_id = std::nullopt) {
+        std::optional<core::ResourceId> selection_id = std::nullopt,
+        std::vector<core::ResourceId> selection_ids = {}) {
         if (!core::ResourceId::is_valid(document_id.value) ||
             (selection_id.has_value() &&
-             !core::ResourceId::is_valid(selection_id->value))) {
+             !core::ResourceId::is_valid(selection_id->value)) ||
+            std::ranges::any_of(selection_ids, [](const auto& id) {
+                return !core::ResourceId::is_valid(id.value);
+            })) {
             return false;
         }
+        normalize_selection(selection_id, selection_ids);
 
         auto document = find_document(document_id);
         if (document == documents_.end()) {
@@ -78,17 +93,20 @@ public:
                 .id = document_id,
                 .workspace = workspace,
                 .selection_id = selection_id,
+                .selection_ids = selection_ids,
             });
             document = std::prev(documents_.end());
         } else {
             document->workspace = workspace;
             document->selection_id = selection_id;
+            document->selection_ids = selection_ids;
         }
 
         const EditorLocation next{
             .document_id = document_id,
             .workspace = workspace,
             .selection_id = std::move(selection_id),
+            .selection_ids = std::move(selection_ids),
         };
         active_document_ = document_index(document_id);
         if (!history_.empty() && history_[history_cursor_] == next) {
@@ -142,6 +160,7 @@ public:
             .document_id = active.id,
             .workspace = active.workspace,
             .selection_id = active.selection_id,
+            .selection_ids = active.selection_ids,
         });
         history_cursor_ = 0;
         return true;
@@ -149,15 +168,30 @@ public:
 
     [[nodiscard]] bool set_selection(
         std::optional<core::ResourceId> selection_id) {
+        std::vector<core::ResourceId> selection_ids;
+        if (selection_id.has_value()) selection_ids.push_back(*selection_id);
+        return set_selection_set(std::move(selection_id),
+                                 std::move(selection_ids));
+    }
+
+    [[nodiscard]] bool set_selection_set(
+        std::optional<core::ResourceId> primary_id,
+        std::vector<core::ResourceId> selection_ids) {
         if (!active_document_.has_value() ||
-            (selection_id.has_value() &&
-             !core::ResourceId::is_valid(selection_id->value))) {
+            (primary_id.has_value() &&
+             !core::ResourceId::is_valid(primary_id->value)) ||
+            std::ranges::any_of(selection_ids, [](const auto& id) {
+                return !core::ResourceId::is_valid(id.value);
+            })) {
             return false;
         }
+        normalize_selection(primary_id, selection_ids);
         auto& document = documents_[*active_document_];
-        document.selection_id = selection_id;
+        document.selection_id = primary_id;
+        document.selection_ids = selection_ids;
         if (!history_.empty()) {
-            history_[history_cursor_].selection_id = std::move(selection_id);
+            history_[history_cursor_].selection_id = std::move(primary_id);
+            history_[history_cursor_].selection_ids = std::move(selection_ids);
         }
         return true;
     }
@@ -208,6 +242,29 @@ public:
         return documents_;
     }
 
+    [[nodiscard]] ResolvedEditorSelection resolve_selection(
+        const std::vector<core::ResourceId>& available_ids) const {
+        ResolvedEditorSelection resolved;
+        if (!active_document_.has_value()) return resolved;
+        const auto& document = documents_[*active_document_];
+        const auto resolve = [&](const core::ResourceId& id)
+            -> std::optional<std::size_t> {
+            const auto found = std::ranges::find(available_ids, id);
+            if (found == available_ids.end()) return std::nullopt;
+            return static_cast<std::size_t>(
+                std::distance(available_ids.begin(), found));
+        };
+        for (const auto& id : document.selection_ids) {
+            if (const auto index = resolve(id); index.has_value())
+                resolved.indices.push_back(*index);
+        }
+        if (document.selection_id.has_value())
+            resolved.primary_index = resolve(*document.selection_id);
+        if (!resolved.primary_index.has_value() && !resolved.indices.empty())
+            resolved.primary_index = resolved.indices.front();
+        return resolved;
+    }
+
 private:
     using DocumentIterator = std::vector<EditorDocumentState>::iterator;
 
@@ -223,6 +280,25 @@ private:
             std::distance(documents_.begin(), find_document(id)));
     }
 
+    static void normalize_selection(
+        std::optional<core::ResourceId>& primary_id,
+        std::vector<core::ResourceId>& selection_ids) {
+        std::vector<core::ResourceId> unique;
+        unique.reserve(selection_ids.size() + (primary_id.has_value() ? 1U : 0U));
+        for (auto& id : selection_ids) {
+            if (std::ranges::find(unique, id) == unique.end())
+                unique.push_back(std::move(id));
+        }
+        if (!primary_id.has_value() && !unique.empty())
+            primary_id = unique.front();
+        if (primary_id.has_value()) {
+            const auto primary = std::ranges::find(unique, *primary_id);
+            if (primary != unique.end()) unique.erase(primary);
+            unique.insert(unique.begin(), *primary_id);
+        }
+        selection_ids = std::move(unique);
+    }
+
     void apply(const EditorLocation& location) {
         auto document = find_document(location.document_id);
         if (document == documents_.end()) {
@@ -230,6 +306,7 @@ private:
         }
         document->workspace = location.workspace;
         document->selection_id = location.selection_id;
+        document->selection_ids = location.selection_ids;
         active_document_ = document_index(location.document_id);
     }
 

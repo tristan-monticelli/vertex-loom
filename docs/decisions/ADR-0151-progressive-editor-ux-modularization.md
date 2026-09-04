@@ -59,6 +59,15 @@ du document. Les IDs techniques restent disponibles dans un inspecteur avancé,
 mais ne sont pas demandés dans un parcours nominal lorsque le système peut les
 générer ou les résoudre.
 
+`EditorContext` conserve pour chaque document l'identifiant de sélection
+primaire et, lorsqu'elle existe, la sélection multiple ordonnée. Les indices de
+tableau utilisés par un widget ne sont qu'une projection recalculée depuis ces
+identifiants au début du frame. Une réorganisation, un undo/redo ou le retour
+dans l'historique ne peut donc pas déplacer silencieusement l'inspecteur vers un
+autre objet. Si l'objet primaire disparaît, le premier objet encore sélectionné
+devient primaire ; si toute la sélection disparaît, le workspace choisit son
+fallback visible et le republie dans le contexte.
+
 La migration suit quatre tranches vérifiables :
 
 1. extraire l’état d’application, les actions et les widgets partagés sans
@@ -88,8 +97,11 @@ La migration suit quatre tranches vérifiables :
   raisons de désactivation utilisés par Asset Studio et Map Studio.
 - Ouvrir Entity → Animation → Map puis revenir restaure document, sélection,
   playhead, zoom et panneau actif.
-- La sélection d’une instance ou d’un nœud désigne le même objet dans toutes
+- La sélection d'une instance ou d'un nœud désigne le même objet dans toutes
   les surfaces visibles et ne repose pas sur un index statique partagé.
+- Une sélection Entity multiple survit à la réorganisation des nœuds et au
+  retour historique ; arbre, canvas et inspecteur résolvent le même nœud
+  primaire par identifiant.
 - Les parcours graphiques actuels restent verts pendant chaque tranche ; un
   nouveau E2E transversal prouve navigation, modification, reload, package et
   runtime publié avec affichage réel.

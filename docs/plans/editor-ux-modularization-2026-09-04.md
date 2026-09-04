@@ -161,6 +161,15 @@ des commandes `ProjectSession`, avec une sonde E2E explicitement injectée.
 La migration Entity commence par le sous-workspace Rig/Physics : contraintes,
 IK, déformation et XPBD quittent le shell, mais chaque édition remplace une
 `EntityDefinition` validée par la session existante.
+La sélection Entity quitte maintenant le contrat implicite fondé sur les
+positions du tableau : `EditorContext` mémorise le nœud primaire et la sélection
+multiple par identifiants, puis l'arbre, le canvas et l'inspecteur résolvent les
+indices du document courant à chaque frame. Une réorganisation ou un retour
+historique conserve ainsi l'objet logique au lieu de sélectionner son ancien
+emplacement.
+Le test de fondation couvre déduplication, ordre et retour historique ; l'E2E
+Entity réordonne réellement les nœuds avant le rendu et exige leur résolution
+aux nouveaux indices avant de poursuivre les gestes canvas et le reload.
 La création de déformation vide est remplacée par un quad quatre points valide,
 pondéré sur le nœud racine, compatible avec le preset tissu XPBD et créé par
 une commande undoable de la session ;

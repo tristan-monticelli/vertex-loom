@@ -292,6 +292,44 @@ TEST_CASE("editor context restores document workspace and stable selection") {
     CHECK(context.open_documents().size() == 2);
 }
 
+TEST_CASE("editor context preserves an ordered stable multi-selection") {
+    using fabric::core::ResourceId;
+    using fabric::editor::EditorContext;
+    using fabric::editor::EditorWorkspace;
+
+    EditorContext context;
+    REQUIRE(context.open_document(ResourceId{.value = "hero-entity"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.set_selection_set(
+        ResourceId{.value = "arm"},
+        {{.value = "body"}, {.value = "arm"}, {.value = "body"}}));
+
+    REQUIRE(context.active_document() != nullptr);
+    REQUIRE(context.active_document()->selection_id.has_value());
+    CHECK(context.active_document()->selection_id->value == "arm");
+    REQUIRE(context.active_document()->selection_ids.size() == 2U);
+    CHECK(context.active_document()->selection_ids[0].value == "arm");
+    CHECK(context.active_document()->selection_ids[1].value == "body");
+
+    REQUIRE(context.open_document(ResourceId{.value = "walk-animation"},
+                                  EditorWorkspace::animation));
+    REQUIRE(context.go_back());
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->selection_id->value == "arm");
+    REQUIRE(context.active_document()->selection_ids.size() == 2U);
+    CHECK(context.active_document()->selection_ids[0].value == "arm");
+    CHECK(context.active_document()->selection_ids[1].value == "body");
+
+    const auto reordered = context.resolve_selection(
+        {ResourceId{.value = "arm"}, ResourceId{.value = "head"},
+         ResourceId{.value = "body"}});
+    REQUIRE(reordered.primary_index.has_value());
+    CHECK(*reordered.primary_index == 0U);
+    REQUIRE(reordered.indices.size() == 2U);
+    CHECK(reordered.indices[0] == 0U);
+    CHECK(reordered.indices[1] == 2U);
+}
+
 TEST_CASE("editor context discards forward history after new navigation") {
     using fabric::core::ResourceId;
     using fabric::editor::EditorContext;
