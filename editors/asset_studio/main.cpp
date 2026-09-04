@@ -2642,9 +2642,10 @@ void write_entity_animation_workflow_probe(
     if (output) output << probe.dump(2) << '\n';
 }
 
-void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
-                          fabric::editor::BehaviorSession& behavior_session,
-                          CreationUiState& creation, std::string& status) {
+void draw_behavior_creation_prompt(
+    fabric::editor::ProjectSession& project_session,
+    fabric::editor::BehaviorSession& behavior_session,
+    CreationUiState& creation, std::string& status) {
     if (creation.request_behavior) {
         ImGui::OpenPopup("Create behavior");
         creation.request_behavior = false;
@@ -2679,7 +2680,11 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
+}
 
+void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
+                          fabric::editor::BehaviorSession& behavior_session,
+                          std::string& status) {
     const auto* selected = project_session.selected_resource();
     if (!selected || selected->kind != fabric::editor::StudioResourceKind::behavior)
         return;
@@ -2691,8 +2696,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         }
     }
 
-    ImGui::SetNextWindowSize({720.0F, 620.0F}, ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Behavior Graph")) { ImGui::End(); return; }
+    ImGui::SeparatorText("Behavior Graph");
     const auto& graph = *behavior_session.graph();
     ImGui::Text("%s", graph.document.name.c_str());
     ImGui::SameLine();
@@ -3056,7 +3060,6 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     for (const auto& error : behavior_session.errors())
         ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                            error.field.c_str(), error.message.c_str());
-    ImGui::End();
 }
 
 void draw_prompt_error(const fabric::editor::PromptValidation& validation,
@@ -4267,6 +4270,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     std::string& status) {
     active_picker_session = &session;
     active_picker_texture_cache = &texture_cache;
+    draw_behavior_creation_prompt(
+        session, behavior_session, creation, status);
     canvas.native_canvas = false;
     const auto canvas_tool_id = [&] {
         switch (canvas.tool) {
@@ -4284,7 +4289,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             .pan = {canvas.pan.x, canvas.pan.y},
             .playhead = animation_ui.scrub_time,
             .active_tool = canvas_tool_id(),
-            .active_panel = animation_graph_ui.open &&
+            .active_panel = session.selected_resource() != nullptr &&
+                    session.selected_resource()->kind ==
+                        fabric::editor::StudioResourceKind::behavior
+                ? "behavior-graph"
+                : animation_graph_ui.open &&
                     session.selected_resource() != nullptr &&
                     session.selected_resource()->kind ==
                         fabric::editor::StudioResourceKind::entity
@@ -4366,12 +4375,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::entity &&
         session.selected_entity();
-    const bool task_workspace = animation_workspace || animation_graph_workspace;
+    const bool behavior_workspace = session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::behavior;
+    const bool task_workspace = animation_workspace || animation_graph_workspace ||
+        behavior_workspace;
     float& timeline_height = layout.task_panel_height;
+    const float minimum_task_height = animation_graph_workspace ? 360.0F : 190.0F;
     timeline_height = std::clamp(
-        timeline_height, 190.0F, std::max(190.0F, content_height - 200.0F));
+        timeline_height, minimum_task_height,
+        std::max(minimum_task_height, content_height - 200.0F));
     constexpr float timeline_gap = 6.0F;
-    const float preview_height = task_workspace
+    const float preview_height = behavior_workspace
+        ? 0.0F
+        : task_workspace
         ? content_height - timeline_height - timeline_gap
         : content_height;
 
@@ -4447,6 +4464,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.guided_button = false;
                 creation.request_entity = true;
             }
+            ImGui::SeparatorText("Animate and add logic");
+            if (ImGui::MenuItem("Animation..."))
+                creation.request_animation = true;
+            if (ImGui::MenuItem("Behavior graph..."))
+                creation.request_behavior = true;
+            if (ImGui::MenuItem("Input bindings..."))
+                creation.request_input = true;
             ImGui::SeparatorText("Advanced");
             if (ImGui::BeginMenu("Technical resources")) {
                 if (ImGui::MenuItem("Vector artwork resource..."))
@@ -4457,17 +4481,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     creation.request_visual_component = true;
                 if (ImGui::MenuItem("Material / fill..."))
                     creation.request_material = true;
-                if (ImGui::MenuItem("Animation..."))
-                    creation.request_animation = true;
-                if (ImGui::MenuItem("Input bindings..."))
-                    creation.request_input = true;
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Expert entity tools")) {
                 if (ImGui::MenuItem("Entity transformation..."))
                     creation.request_transformation = true;
-                if (ImGui::MenuItem("Behavior graph..."))
-                    creation.request_behavior = true;
                 ImGui::TextDisabled("Physics and deformation stay available in the entity inspector.");
                 ImGui::EndMenu();
             }
@@ -4490,6 +4508,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     draw_existing_resource_popup(session, preview, status);
 
+    const bool visual_selected = session.selected_resource() != nullptr &&
+        (session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::textured_path ||
+         session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::visual_composition ||
+         session.selected_resource()->kind ==
+             fabric::editor::StudioResourceKind::visual_component);
+    if (!behavior_workspace) {
     ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({viewport->Size.x - left_width - right_width,
@@ -4542,13 +4568,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::entity &&
         session.selected_entity();
-    const bool visual_selected = session.selected_resource() != nullptr &&
-        (session.selected_resource()->kind ==
-             fabric::editor::StudioResourceKind::textured_path ||
-         session.selected_resource()->kind ==
-             fabric::editor::StudioResourceKind::visual_composition ||
-         session.selected_resource()->kind ==
-             fabric::editor::StudioResourceKind::visual_component);
     const bool open_gl_canvas = native_selected || visual_selected ||
         entity_selected ||
         (session.selected_resource() != nullptr &&
@@ -4759,24 +4778,36 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         right_width, -1.0F, 300.0F,
                         std::max(300.0F, viewport->Size.x - left_width - 320.0F));
     ImGui::End();
+    }
 
     if (task_workspace) {
         const float center_width = viewport->Size.x - left_width - right_width;
         ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
-                                 viewport->Pos.y + menu_height + preview_height +
-                                     timeline_gap});
-        ImGui::SetNextWindowSize({center_width, timeline_height});
+                                 viewport->Pos.y + menu_height +
+                                     (behavior_workspace
+                                          ? 0.0F
+                                          : preview_height + timeline_gap)});
+        ImGui::SetNextWindowSize(
+            {center_width,
+             behavior_workspace ? content_height : timeline_height});
         ImGui::Begin("Task workspace", nullptr,
                      fixed_panel_flags | ImGuiWindowFlags_NoTitleBar);
-        ImGui::InvisibleButton("##timeline-height-splitter", {-1.0F, 5.0F});
-        if (ImGui::IsItemActive()) {
-            timeline_height = std::clamp(
-                timeline_height - ImGui::GetIO().MouseDelta.y,
-                190.0F, std::max(190.0F, content_height - 200.0F));
+        if (!behavior_workspace) {
+            ImGui::InvisibleButton(
+                "##timeline-height-splitter", {-1.0F, 5.0F});
+            if (ImGui::IsItemActive()) {
+                timeline_height = std::clamp(
+                    timeline_height - ImGui::GetIO().MouseDelta.y,
+                    minimum_task_height,
+                    std::max(minimum_task_height,
+                             content_height - 200.0F));
+            }
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
         }
-        if (ImGui::IsItemHovered() || ImGui::IsItemActive())
-            ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-        if (animation_graph_workspace)
+        if (behavior_workspace)
+            draw_behavior_editor(session, behavior_session, status);
+        else if (animation_graph_workspace)
             draw_animation_graph_editor(session, animation_graph_ui, status);
         else
             draw_animation_timeline_dock(session, animation_ui, status);
@@ -11777,9 +11808,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             static_cast<void>(SDL_PushEvent(&button));
         }
         if (behavior_e2e &&
-            (behavior_ui_e2e_frame == 4U || behavior_ui_e2e_frame == 6U) &&
+            (behavior_ui_e2e_frame == 4U || behavior_ui_e2e_frame == 5U ||
+             behavior_ui_e2e_frame == 7U || behavior_ui_e2e_frame == 8U) &&
             ui_behavior_graph_connect_seen && ui_behavior_graph_target_seen) {
-            const ImVec2 target = behavior_ui_e2e_frame == 4U
+            const bool source = behavior_ui_e2e_frame <= 5U;
+            const ImVec2 target = source
                 ? ui_behavior_graph_connect_screen
                 : ui_behavior_graph_target_screen;
             SDL_Event motion{};
@@ -11788,15 +11821,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             motion.motion.x = static_cast<int>(std::lround(target.x));
             motion.motion.y = static_cast<int>(std::lround(target.y));
             static_cast<void>(SDL_PushEvent(&motion));
-            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
-                SDL_Event button{};
-                button.type = type;
-                button.button.button = SDL_BUTTON_LEFT;
-                button.button.windowID = SDL_GetWindowID(window);
-                button.button.x = motion.motion.x;
-                button.button.y = motion.motion.y;
-                static_cast<void>(SDL_PushEvent(&button));
-            }
+            SDL_Event button{};
+            button.type = behavior_ui_e2e_frame == 4U ||
+                    behavior_ui_e2e_frame == 7U
+                ? SDL_MOUSEBUTTONDOWN
+                : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.state = button.type == SDL_MOUSEBUTTONDOWN
+                ? SDL_PRESSED : SDL_RELEASED;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
         }
         if (entity_e2e && entity_gizmo_e2e_frame == 8U &&
             ui_animation_graph_link_seen)
@@ -11941,9 +11977,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         creation.guided_button = false;
                         creation.request_entity = true;
                     }
+                    if (ImGui::MenuItem("Animation..."))
+                        creation.request_animation = true;
+                    if (ImGui::MenuItem("Behavior graph..."))
+                        creation.request_behavior = true;
                     if (ImGui::BeginMenu("Advanced")) {
-                        if (ImGui::MenuItem("Behavior graph..."))
-                            creation.request_behavior = true;
                         if (ImGui::MenuItem("Entity transformation..."))
                             creation.request_transformation = true;
                         if (ImGui::MenuItem("Legacy visual preset..."))
@@ -12178,7 +12216,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        command_palette_rendered,
                        layout,
                        transition_guard, running, status);
-        draw_behavior_editor(session, behavior_session, creation, status);
         draw_transformation_editor(session, transformation_session, creation,
                                    status);
         const auto* active_resource = session.selected_resource();
@@ -12983,7 +13020,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (behavior_e2e) {
             ++behavior_ui_e2e_frame;
-            if (behavior_ui_e2e_frame == 9U) {
+            if (behavior_ui_e2e_frame == 10U) {
                 const bool saved = behavior_session.save();
                 fabric::editor::BehaviorSession reloaded;
                 const bool reopened = saved && reloaded.open(

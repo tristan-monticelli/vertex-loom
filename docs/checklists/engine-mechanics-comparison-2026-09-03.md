@@ -106,9 +106,10 @@ lignes et 786 appels ImGui. Les deux fichiers mélangent bootstrap, état UI,
 widgets, workspaces, orchestration des sessions et E2E. Ils dupliquent les
 pickers, filtres, aides techniques et raisons de désactivation. Asset Studio
 force trois panneaux par coordonnées ; Map Studio force une fenêtre plein
-écran puis compose trois enfants, tandis que Scene, Mechanics et Behavior Graph
-gardent des fenêtres et sélections séparées. Animation Graph occupe désormais
-le Task Workspace contextuel de l'Entity. Il n'existe ni
+écran puis compose trois enfants, tandis que Scene et Mechanics gardent des
+fenêtres et sélections séparées. Animation Graph occupe désormais le Task
+Workspace contextuel de l'Entity et Behavior Graph le Stage de son document.
+Il n'existe ni
 onglets de documents, ni historique retour/avant global, ni palette de
 commandes, ni état de sélection transversal unique.
 

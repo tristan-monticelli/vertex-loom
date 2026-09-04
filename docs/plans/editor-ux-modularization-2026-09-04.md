@@ -106,9 +106,10 @@ Progression : Resource Picker, Scene, Mechanic et le canvas Map sont sortis de
 partagés. Scene publie désormais sa campagne et la recharge avec le runtime du
 paquet. Dans Asset Studio, Animation Graph est accessible directement depuis
 l'Entity et remplace la timeline dans le Task Workspace contextuel au lieu de
-s'ouvrir dans une fenêtre sans historique commun. L'extraction de son code,
-des autres workspaces Asset Studio et du reste de l'inspecteur Map demeure
-ouverte.
+s'ouvrir dans une fenêtre sans historique commun. Behavior Graph utilise le
+Stage complet du document sélectionné et sa création est une action nominale
+aux côtés d'Animation et Input. L'extraction du code de ces workspaces, des
+autres workspaces Asset Studio et du reste de l'inspecteur Map demeure ouverte.
 
 ## Tranche 4 — authoring direct manquant
 
