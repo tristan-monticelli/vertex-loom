@@ -199,6 +199,14 @@ TEST_CASE("map session snaps placement on a configurable grid") {
     CHECK(session.map()->instances.front().properties.size() == 1);
     REQUIRE(session.undo());
     CHECK(session.map()->instances.front().properties.size() == 2);
+    REQUIRE(session.save());
+    fabric::editor::MapSession reopened;
+    REQUIRE(reopened.open(root, {.value = "session"}));
+    REQUIRE(reopened.map()->instances.front().properties.size() == 2);
+    const auto& persisted_animation = reopened.map()->instances.front().properties.back();
+    REQUIRE(persisted_animation.id == "animation");
+    CHECK(std::get<fabric::project::ResourceReference>(persisted_animation.value).expected_type ==
+          "animation");
     CHECK_FALSE(session.set_instance_property({.value = "hero"}, {"", false}));
     CHECK(fabric::editor::MapSession::snap_position({5.0F, 5.0F}, {.grid_size = 0.0F}) ==
           fabric::core::Vec2{5.0F, 5.0F});
