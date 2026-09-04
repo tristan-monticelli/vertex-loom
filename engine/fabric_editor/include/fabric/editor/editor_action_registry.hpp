@@ -27,6 +27,8 @@ inline constexpr std::string_view create_behavior_for_entity =
     "create_behavior_for_entity";
 inline constexpr std::string_view toggle_animation_graph =
     "toggle_animation_graph";
+inline constexpr std::string_view configure_path_follower =
+    "configure_path_follower";
 } // namespace editor_action_ids
 
 struct EditorActionAvailability {

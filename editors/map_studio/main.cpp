@@ -887,6 +887,7 @@ int run(const std::filesystem::path& project_root,
     std::vector<std::string> selected_instances = mechanic_e2e
         ? std::vector<std::string>{"rotating-platform-instance"}
         : std::vector<std::string>{};
+    bool focus_path_follower_panel = false;
     std::string active_layer_id = placement_e2e ? "instances" : "";
     std::string new_layer_id;
     std::string new_layer_name;
@@ -933,6 +934,22 @@ int run(const std::filesystem::path& project_root,
     bool placement_context_observed = false;
     fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::configure_path_follower},
+        .label = "Configure PathFollower",
+        .shortcut = "",
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = selected_instances.size() == 1U,
+                .disabled_reason = "Select one map instance before configuring its path follower.",
+            };
+        },
+        .execute = [&] {
+            focus_path_follower_panel = true;
+            status = "PathFollower inspector focused";
+            return true;
+        },
+    }));
     float preview_time = 0.0F;
     bool preview_playing = true;
     float& layers_pane_width = layout.primary_panel_width;
@@ -2413,6 +2430,10 @@ int run(const std::filesystem::path& project_root,
                 }
                 if (instance != map.instances.end()) {
                     ImGui::SeparatorText("Path follower");
+                    if (focus_path_follower_panel) {
+                        ImGui::SetScrollHereY(0.0F);
+                        focus_path_follower_panel = false;
+                    }
                     if (path_follower_bound_instance != instance->id) {
                         path_follower_bound_instance = instance->id;
                         if (instance->path_follower) {
