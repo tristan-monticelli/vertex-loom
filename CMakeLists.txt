@@ -314,7 +314,10 @@ if(FABRIC_BUILD_EDITORS)
             MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
             MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
     endif()
-    add_executable(map_studio editors/map_studio/main.cpp)
+    add_executable(map_studio
+        editors/map_studio/main.cpp
+        editors/map_studio/resource_picker.cpp
+    )
     target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(map_studio PRIVATE fabric_editor fabric_editor_ui nfd)
     if(APPLE)

@@ -17,6 +17,7 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/runtime/preview_runtime.hpp"
 #include "editor_widgets.hpp"
+#include "resource_picker.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -58,6 +59,7 @@ using fabric::editor_ui::draw_searchable_id_picker;
 using fabric::editor_ui::draw_technical_tooltip;
 using fabric::editor_ui::SearchableIdOption;
 using fabric::editor_ui::SearchableIdPickerOptions;
+using fabric::map_studio::draw_resource_picker;
 
 bool ui_map_workspace_seen = false;
 float ui_map_layers_x = 0.0F;
@@ -471,147 +473,6 @@ std::string property_value_text(const fabric::project::MapPropertyValue& value) 
             return std::to_string(item.x) + "," + std::to_string(item.y);
         else return item.id.value;
     }, value);
-}
-
-std::string_view resource_kind_label(
-    const fabric::editor::StudioResourceKind kind) noexcept {
-    using Kind = fabric::editor::StudioResourceKind;
-    switch (kind) {
-    case Kind::texture: return "texture";
-    case Kind::vector: return "vector";
-    case Kind::material: return "material";
-    case Kind::entity: return "entity";
-    case Kind::animation: return "animation";
-    case Kind::input: return "input";
-    case Kind::behavior: return "behavior";
-    case Kind::transformation: return "transformation";
-    case Kind::textured_path: return "textured path";
-    case Kind::visual_composition: return "visual composition";
-    case Kind::visual_component: return "visual component";
-    case Kind::map: return "map";
-    case Kind::scene: return "scene";
-    case Kind::mechanic: return "mechanic";
-    case Kind::replay: return "replay";
-    case Kind::audio: return "audio";
-    }
-    return "unknown";
-}
-
-void draw_resource_picker(const char* label,
-                          const std::filesystem::path& directory,
-                          const std::string_view suffix,
-                          std::string& selected_id,
-                          fabric::editor::ProjectSession* catalog = nullptr) {
-    std::error_code error;
-    if (!std::filesystem::exists(directory, error) || error) return;
-    ImGui::TextDisabled("%s", label);
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Clear")) selected_id.clear();
-    ImGui::PushID(label);
-    static std::unordered_map<std::string, std::string> filters;
-    auto& filter = filters[label];
-    ImGui::SetNextItemWidth(180.0F);
-    ImGui::InputText("Search##resource-picker-search", &filter);
-    std::vector<std::string> resource_ids;
-    for (std::filesystem::directory_iterator iterator{directory, error}, end;
-         !error && iterator != end; iterator.increment(error)) {
-        if (!iterator->is_regular_file(error)) continue;
-        auto filename = iterator->path().filename().string();
-        if (!filename.ends_with(suffix)) continue;
-        filename.resize(filename.size() - suffix.size());
-        if (!filter.empty()) {
-            auto haystack = filename;
-            auto needle = filter;
-            std::ranges::transform(haystack, haystack.begin(),
-                                   [](const unsigned char value) { return static_cast<char>(std::tolower(value)); });
-            std::ranges::transform(needle, needle.begin(),
-                                   [](const unsigned char value) { return static_cast<char>(std::tolower(value)); });
-            if (haystack.find(needle) == std::string::npos) continue;
-        }
-        resource_ids.push_back(std::move(filename));
-    }
-    std::ranges::sort(resource_ids);
-    if (ImGui::TreeNodeEx("Resources##resource-picker-tree",
-                          ImGuiTreeNodeFlags_DefaultOpen |
-                              ImGuiTreeNodeFlags_SpanAvailWidth)) {
-        for (const auto& resource_id : resource_ids) {
-            const auto item_label = resource_id + "##resource-picker-item-" +
-                resource_id;
-            if (ImGui::Selectable(item_label.c_str(), selected_id == resource_id))
-                selected_id = resource_id;
-            if (selected_id == resource_id)
-                ImGui::SetItemDefaultFocus();
-        }
-        if (resource_ids.empty())
-            ImGui::TextDisabled("No matching resource.");
-        ImGui::TreePop();
-    }
-    if (!selected_id.empty()) {
-        const auto selected_path = directory /
-            (selected_id + std::string{suffix});
-        if (std::filesystem::is_regular_file(selected_path, error)) {
-            const fabric::editor::StudioResource* catalog_resource = nullptr;
-            if (catalog != nullptr) {
-                const auto resource = std::ranges::find_if(
-                    catalog->resources(), [&](const auto& item) {
-                        return item.id.value == selected_id &&
-                            item.document_path ==
-                                selected_path.lexically_relative(
-                                    catalog->project_root());
-                    });
-                if (resource != catalog->resources().end())
-                    catalog_resource = &*resource;
-            }
-            const auto type = catalog_resource == nullptr
-                ? std::string{suffix}
-                : std::string{resource_kind_label(catalog_resource->kind)};
-            ImGui::TextDisabled("Type: %s", type.c_str());
-            ImGui::TextDisabled("Path: %s", selected_path.generic_string().c_str());
-            const auto size = std::filesystem::file_size(selected_path, error);
-            if (!error) {
-                ImGui::TextDisabled("Size: %llu bytes",
-                                   static_cast<unsigned long long>(size));
-            } else {
-                ImGui::TextDisabled("Size: n/a");
-            }
-            ImGui::TextDisabled("Thumbnail: n/a (document resource)");
-            ImGui::TextDisabled("Dimensions: %s",
-                               catalog_resource != nullptr &&
-                                       catalog_resource->width != 0U &&
-                                       catalog_resource->height != 0U
-                                   ? (std::to_string(catalog_resource->width) +
-                                      "x" +
-                                      std::to_string(catalog_resource->height)).c_str()
-                                   : "n/a");
-            ImGui::TextDisabled("Format: %s",
-                               catalog_resource != nullptr &&
-                                       !catalog_resource->format.empty()
-                                   ? catalog_resource->format.c_str()
-                                   : std::string{suffix}.c_str());
-            if (catalog_resource != nullptr && catalog != nullptr) {
-                const auto references = catalog->incoming_references(
-                    catalog_resource->kind, catalog_resource->id);
-                ImGui::TextDisabled(
-                    "Dependencies / incoming references: %s",
-                    references ? std::to_string(references->size()).c_str()
-                               : "unavailable");
-            } else {
-                ImGui::TextDisabled(
-                    "Dependencies / incoming references: unavailable");
-            }
-            if (ImGui::SmallButton("Open##resource-picker-open")) {
-                const auto absolute = std::filesystem::absolute(selected_path, error);
-                if (!error) {
-                    const auto url = "file://" + absolute.generic_string();
-                    SDL_OpenURL(url.c_str());
-                }
-            }
-        } else {
-            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
-                               "Missing resource: %s", selected_id.c_str());
-        }
-    }
-    ImGui::PopID();
 }
 
 bool draw_id_picker(const char* label,

@@ -176,6 +176,7 @@ flowchart LR
 | EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
 | DocumentTabs | onglets, retour/avant et activation de la session par ID stable | chargement ou mutation d'une ressource |
 | LayoutPreferences | mode compact/large et dimensions des panneaux dans le dossier utilisateur | ressource ou manifeste du projet |
+| Map Resource Picker Adapter | énumération des documents Map/Scene/Mechanic et délégation au picker partagé | mutation du document sélectionné |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
