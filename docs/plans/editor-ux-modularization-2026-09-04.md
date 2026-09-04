@@ -117,6 +117,11 @@ apparence, variante, ancre et overrides. Le type de drawable devient une action
 guidée toujours visible afin que le parcours créer un nœud → choisir son rendu
 ne dépende plus du mode avancé.
 
+Le raccord d'un Behavior devient lui aussi une propriété guidée toujours
+visible de l'Entity. Le mode avancé est réservé aux diagnostics XPBD, variantes,
+ancres et paramètres techniques ; il ne masque plus une étape nécessaire du
+parcours Entity → Logic.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

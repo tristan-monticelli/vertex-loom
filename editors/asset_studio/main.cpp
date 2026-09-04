@@ -115,6 +115,7 @@ ImVec2 ui_override_cancel_screen{};
 ImVec2 ui_override_confirm_screen{};
 bool ui_override_kind_seen = false;
 bool ui_override_guided_mode_seen = false;
+bool ui_override_behavior_picker_seen = false;
 bool ui_override_texture_seen = false;
 bool ui_override_cancel_seen = false;
 bool ui_override_confirm_seen = false;
@@ -2088,6 +2089,8 @@ void write_ui_override_probe(const std::filesystem::path& project_path) {
         {"confirm_applied", ui_override_confirm_applied},
         {"kind_widget_seen", ui_override_kind_seen},
         {"kind_widget_seen_in_guided_mode", ui_override_guided_mode_seen},
+        {"behavior_picker_seen_in_guided_mode",
+         ui_override_behavior_picker_seen},
         {"texture_item_seen", ui_override_texture_seen},
         {"cancel_button_seen", ui_override_cancel_seen},
         {"confirm_button_seen", ui_override_confirm_seen}};
@@ -5349,24 +5352,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         toggle_animation_graph));
             draw_disabled_reason(!graph_action_state.enabled,
                                  graph_action_state.disabled_reason);
-            if (entity_advanced_mode &&
-                ImGui::CollapsingHeader("Logic and animation graph")) {
-                std::string behavior_id = entity.behavior
-                    ? entity.behavior->id.value : std::string{};
-                if (draw_project_resource_picker(
-                        "Behavior", session.resources(),
-                        fabric::editor::StudioResourceKind::behavior,
-                        behavior_id, true)) {
-                    const auto reference = behavior_id.empty()
-                        ? std::optional<fabric::project::ResourceReference>{}
-                        : std::optional<fabric::project::ResourceReference>{
-                            fabric::project::ResourceReference{
-                                {.value = behavior_id}, "behavior"}};
-                    status = session.set_selected_entity_behavior(reference)
-                        ? "Entity behavior changed."
-                        : "Behavior attachment rejected; inspect diagnostics.";
-                }
+            ImGui::SeparatorText("Logic");
+            ImGui::TextDisabled(
+                "Optional behavior graph evaluated by this Entity.");
+            std::string behavior_id = entity.behavior
+                ? entity.behavior->id.value : std::string{};
+            if (draw_project_resource_picker(
+                    "Behavior", session.resources(),
+                    fabric::editor::StudioResourceKind::behavior,
+                    behavior_id, true)) {
+                const auto reference = behavior_id.empty()
+                    ? std::optional<fabric::project::ResourceReference>{}
+                    : std::optional<fabric::project::ResourceReference>{
+                        fabric::project::ResourceReference{
+                            {.value = behavior_id}, "behavior"}};
+                status = session.set_selected_entity_behavior(reference)
+                    ? "Entity behavior changed."
+                    : "Behavior attachment rejected; inspect diagnostics.";
             }
+            if (ui_override_probe_enabled && !entity_advanced_mode)
+                ui_override_behavior_picker_seen = true;
             const EntityHierarchyProbe hierarchy_probe{
                 .enabled = ui_drag_probe_enabled,
                 .target_mode = ui_drag_target_mode,
@@ -7172,6 +7177,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_override_confirm_applied = false;
         ui_override_kind_seen = false;
         ui_override_guided_mode_seen = false;
+        ui_override_behavior_picker_seen = false;
         ui_override_texture_seen = false;
         ui_override_cancel_seen = false;
         ui_override_confirm_seen = false;

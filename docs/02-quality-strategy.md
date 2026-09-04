@@ -293,6 +293,8 @@ geste canvas du parcours Entity→Animation qui réutilise le même transform.
 `EntityArtworkInspector` reste couvert par l'E2E overrides avec affichage réel :
 le sélecteur de drawable doit être présent en mode guidé, l'annulation conserve
 les overrides et la confirmation les supprime avant le changement de type.
+Le même E2E exige que le picker Behavior soit rendu avec le mode avancé fermé,
+afin que l'attachement Entity → Logic ne régresse pas vers un contrôle caché.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre
