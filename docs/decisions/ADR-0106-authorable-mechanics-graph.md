@@ -37,6 +37,14 @@ premier port d'entrée de même type et soumet la connexion à
 inspecteurs avancés. Sélection, layout et connexion en cours sont éphémères :
 `MechanicGraph v1` reste inchangé.
 
+Le workspace Mechanics expose aussi un canevas spatial dans les mêmes unités
+monde que la map. Les corps et capteurs y sont dessinés par leur rectangle ;
+les pivots et joints reliés par leur poignée. Un glisser déplace directement
+la propriété `position` du corps/pivot ou `center` du capteur au travers de
+`MechanicSession`, en une mutation validée et undoable. La sélection du canevas
+spatial et celle du graphe partagent l'identifiant stable du nœud. Cet état de
+vue reste éphémère et n'ajoute aucun champ à `MechanicGraph v1`.
+
 La première mécanique de référence est une plateforme tournante avec pivot,
 vitesse, direction, accélération, limites optionnelles, capteur de présence,
 activation événementielle, collision et transport du personnage.

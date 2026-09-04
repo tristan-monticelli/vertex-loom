@@ -113,6 +113,10 @@ Stage complet du document sélectionné et sa création est une action nominale
 aux côtés d'Animation et Input. Entity Transformation suit le même modèle de
 Stage et d'action nominale. L'extraction du code de ces workspaces, des autres
 workspaces Asset Studio et du reste de l'inspecteur Map demeure ouverte.
+Mechanics affiche désormais côte à côte le graphe logique et un canevas spatial
+en unités monde. La sélection y est partagée et les corps, pivots et capteurs
+se déplacent par glisser via `MechanicSession`; l'E2E prouve le glisser d'un
+capteur, sa sauvegarde, son rechargement et la simulation du graphe reconnecté.
 
 ## Tranche 4 — authoring direct manquant
 

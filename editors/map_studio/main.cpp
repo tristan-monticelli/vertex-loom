@@ -928,6 +928,27 @@ int run(const std::filesystem::path& project_root,
                 static_cast<void>(SDL_PushEvent(&button));
             }
         }
+        if (mechanic_e2e && mechanic_probe.spatial_handle_seen &&
+            mechanic_e2e_frame >= 6U && mechanic_e2e_frame <= 8U) {
+            ImVec2 target = mechanic_probe.spatial_handle_screen;
+            if (mechanic_e2e_frame >= 7U) target.x += 32.0F;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            if (mechanic_e2e_frame == 6U || mechanic_e2e_frame == 8U) {
+                SDL_Event button{};
+                button.type = mechanic_e2e_frame == 6U
+                    ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
         if (e2e_mode && !e2e_failed && !e2e_event_injected) {
             SDL_Event close_event{};
             if (*e2e_mode == CloseE2eMode::window) {
@@ -2621,13 +2642,38 @@ int run(const std::filesystem::path& project_root,
                                 "map-studio-mechanic-graph-e2e.ppm");
             mechanic_e2e_capture_written = true;
         }
-        if (mechanic_e2e && ++mechanic_e2e_frame == 8U) {
+        if (mechanic_e2e && ++mechanic_e2e_frame == 11U) {
             const bool saved = mechanic_session.save();
             fabric::editor::MechanicSession reloaded;
             const bool reopened = saved && session.map() && reloaded.open(
                 project_root, *session.map(), {.value = "rotating-platform"});
+            bool spatial_value_reloaded = false;
+            if (reopened) {
+                const auto node = std::ranges::find(
+                    reloaded.graph()->nodes, mechanic_probe.spatial_handle_node,
+                    &fabric::project::MechanicNodeDefinition::id);
+                if (node != reloaded.graph()->nodes.end()) {
+                    const auto property = std::ranges::find(
+                        node->properties, mechanic_probe.spatial_handle_property,
+                        &fabric::project::MechanicNodeProperty::id);
+                    if (property != node->properties.end()) {
+                        if (const auto* value = std::get_if<fabric::core::Vec2>(
+                                &property->value)) {
+                            spatial_value_reloaded =
+                                value->x > mechanic_probe.spatial_handle_original.x +
+                                    0.9F &&
+                                value->x < mechanic_probe.spatial_handle_original.x +
+                                    1.1F &&
+                                value->y == mechanic_probe.spatial_handle_original.y;
+                        }
+                    }
+                }
+            }
             mechanic_e2e_complete = mechanic_e2e_complete && reopened &&
                 mechanic_probe.canvas_seen && mechanic_probe.link_seen &&
+                mechanic_probe.spatial_canvas_seen &&
+                mechanic_probe.spatial_handle_seen &&
+                mechanic_probe.spatial_handle_moved && spatial_value_reloaded &&
                 mechanic_e2e_capture_written && reloaded.simulation().valid() &&
                 std::ranges::find(reloaded.graph()->connections,
                                   mechanic_probe.expected_connection) !=
@@ -2638,7 +2684,11 @@ int run(const std::filesystem::path& project_root,
                     std::to_string(mechanic_probe.canvas_seen) + "," +
                     std::to_string(mechanic_probe.source_clicked) + "," +
                     std::to_string(mechanic_probe.target_clicked) + "," +
-                    std::to_string(mechanic_probe.link_seen));
+                    std::to_string(mechanic_probe.link_seen) + "," +
+                    std::to_string(mechanic_probe.spatial_canvas_seen) + "," +
+                    std::to_string(mechanic_probe.spatial_handle_seen) + "," +
+                    std::to_string(mechanic_probe.spatial_handle_moved) + "," +
+                    std::to_string(spatial_value_reloaded));
             running = false;
         }
         if (scene_e2e || transformation_e2e) running = false;

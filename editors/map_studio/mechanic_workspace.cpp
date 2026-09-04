@@ -141,6 +141,185 @@ bool draw_mechanic_port_picker(
     return changed;
 }
 
+std::optional<fabric::core::Vec2> mechanic_vec2_property(
+    const fabric::project::MechanicNodeDefinition& node,
+    const std::string_view id) {
+    const auto property = std::ranges::find(
+        node.properties, id, &fabric::project::MechanicNodeProperty::id);
+    if (property == node.properties.end()) return std::nullopt;
+    if (const auto* value = std::get_if<fabric::core::Vec2>(&property->value))
+        return *value;
+    return std::nullopt;
+}
+
+bool draw_mechanic_spatial_canvas(
+    fabric::editor::MechanicSession& session,
+    MechanicWorkspaceState& state, std::string& status,
+    MechanicWorkspaceProbe* probe) {
+    if (!session.graph()) return false;
+    const auto& graph = *session.graph();
+    ImGui::SeparatorText("Spatial canvas");
+    ImGui::TextDisabled(
+        "Drag bodies, pivots and sensors in map units; joints follow their pivot.");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(110.0F);
+    ImGui::SliderFloat("Zoom##mechanic-spatial", &state.spatial_zoom,
+                       12.0F, 80.0F, "%.0f px/u");
+    const ImVec2 size{std::max(1.0F, ImGui::GetContentRegionAvail().x), 280.0F};
+    ImGui::InvisibleButton("Mechanic spatial canvas", size);
+    if (probe && probe->enabled) probe->spatial_canvas_seen = true;
+    const auto minimum = ImGui::GetItemRectMin();
+    const auto maximum = ImGui::GetItemRectMax();
+    const ImVec2 center{(minimum.x + maximum.x) * 0.5F,
+                        (minimum.y + maximum.y) * 0.5F};
+    const auto to_screen = [&](const fabric::core::Vec2 point) {
+        return ImVec2{center.x + point.x * state.spatial_zoom,
+                      center.y - point.y * state.spatial_zoom};
+    };
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(minimum, maximum, IM_COL32(18, 22, 28, 255), 4.0F);
+    draw->PushClipRect(minimum, maximum, true);
+    draw->AddLine({minimum.x, center.y}, {maximum.x, center.y},
+                  IM_COL32(100, 110, 125, 150));
+    draw->AddLine({center.x, minimum.y}, {center.x, maximum.y},
+                  IM_COL32(100, 110, 125, 150));
+
+    struct Handle {
+        std::string node;
+        std::string property;
+        fabric::core::Vec2 position{};
+        fabric::core::Vec2 size{};
+        bool rectangle{};
+        bool joint{};
+    };
+    std::vector<Handle> handles;
+    for (const auto& node : graph.nodes) {
+        if (node.type == "body" || node.type == "sensor") {
+            const bool sensor = node.type == "sensor";
+            handles.push_back({
+                node.id, sensor ? "center" : "position",
+                mechanic_vec2_property(node, sensor ? "center" : "position")
+                    .value_or(fabric::core::Vec2{}),
+                mechanic_vec2_property(node, "size")
+                    .value_or(fabric::core::Vec2{1.0F, 1.0F}),
+                true, false});
+        } else if (node.type == "pivot") {
+            handles.push_back({node.id, "position",
+                mechanic_vec2_property(node, "position")
+                    .value_or(fabric::core::Vec2{}), {}, false, false});
+        } else if (node.type == "joint") {
+            const auto connection = std::ranges::find_if(
+                graph.connections, [&](const auto& candidate) {
+                    return candidate.to_node == node.id &&
+                        candidate.to_port == "pivot";
+                });
+            if (connection == graph.connections.end()) continue;
+            const auto pivot = std::ranges::find(
+                graph.nodes, connection->from_node,
+                &fabric::project::MechanicNodeDefinition::id);
+            if (pivot != graph.nodes.end()) {
+                handles.push_back({node.id, {},
+                    mechanic_vec2_property(*pivot, "position")
+                        .value_or(fabric::core::Vec2{}), {}, false, true});
+            }
+        }
+    }
+
+    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    std::optional<std::size_t> hit;
+    int hit_priority = 3;
+    for (std::size_t cursor = 0; cursor < handles.size(); ++cursor) {
+        const auto& handle = handles[cursor];
+        const auto point = to_screen(handle.position);
+        const ImVec2 half{handle.size.x * state.spatial_zoom * 0.5F,
+                          handle.size.y * state.spatial_zoom * 0.5F};
+        const bool contains = handle.rectangle
+            ? mouse.x >= point.x - half.x && mouse.x <= point.x + half.x &&
+                mouse.y >= point.y - half.y && mouse.y <= point.y + half.y
+            : std::hypot(mouse.x - point.x, mouse.y - point.y) <= 11.0F;
+        const int priority = handle.joint ? 2 : handle.rectangle ? 1 : 0;
+        if (contains && priority < hit_priority) {
+            hit = cursor;
+            hit_priority = priority;
+        }
+    }
+    if (ImGui::IsItemHovered() &&
+        ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hit) {
+        const auto& handle = handles[*hit];
+        state.selected_node = handle.node;
+        if (!handle.property.empty()) {
+            state.spatial_drag_node = handle.node;
+            state.spatial_drag_property = handle.property;
+            state.spatial_drag_start_value = handle.position;
+            state.spatial_drag_start_mouse = mouse;
+        }
+    }
+
+    for (const auto& handle : handles) {
+        auto position = handle.position;
+        if (state.spatial_drag_node == handle.node &&
+            ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            position.x += (mouse.x - state.spatial_drag_start_mouse.x) /
+                state.spatial_zoom;
+            position.y -= (mouse.y - state.spatial_drag_start_mouse.y) /
+                state.spatial_zoom;
+        }
+        const auto point = to_screen(position);
+        if (probe && probe->enabled && !probe->spatial_handle_seen &&
+            handle.node == "presence" && handle.property == "center") {
+            probe->spatial_handle_screen = point;
+            probe->spatial_handle_original = handle.position;
+            probe->spatial_handle_node = handle.node;
+            probe->spatial_handle_property = handle.property;
+            probe->spatial_handle_seen = true;
+        }
+        const bool selected = state.selected_node == handle.node;
+        const ImU32 color = selected ? IM_COL32(255, 190, 80, 255)
+            : handle.joint ? IM_COL32(225, 110, 210, 255)
+                           : IM_COL32(95, 190, 245, 230);
+        if (handle.rectangle) {
+            const ImVec2 half{handle.size.x * state.spatial_zoom * 0.5F,
+                              handle.size.y * state.spatial_zoom * 0.5F};
+            draw->AddRect({point.x - half.x, point.y - half.y},
+                          {point.x + half.x, point.y + half.y}, color,
+                          3.0F, ImDrawFlags_None, selected ? 3.0F : 2.0F);
+        } else {
+            draw->AddCircle(point, handle.joint ? 10.0F : 7.0F,
+                            color, 20, selected ? 3.0F : 2.0F);
+            draw->AddLine({point.x - 12.0F, point.y},
+                          {point.x + 12.0F, point.y}, color, 1.5F);
+            draw->AddLine({point.x, point.y - 12.0F},
+                          {point.x, point.y + 12.0F}, color, 1.5F);
+        }
+        draw->AddText({point.x + 8.0F, point.y + 8.0F}, color,
+                      handle.node.c_str());
+    }
+    draw->PopClipRect();
+
+    if (!state.spatial_drag_node.empty() &&
+        ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
+        const fabric::core::Vec2 value{
+            state.spatial_drag_start_value.x +
+                (mouse.x - state.spatial_drag_start_mouse.x) /
+                    state.spatial_zoom,
+            state.spatial_drag_start_value.y -
+                (mouse.y - state.spatial_drag_start_mouse.y) /
+                    state.spatial_zoom};
+        const bool changed = value != state.spatial_drag_start_value &&
+            session.set_node_property(
+                {.value = state.spatial_drag_node},
+                state.spatial_drag_property, value);
+        status = changed ? "Mechanic handle moved"
+                         : "Mechanic handle unchanged or rejected";
+        if (probe && probe->enabled && changed)
+            probe->spatial_handle_moved = true;
+        state.spatial_drag_node.clear();
+        state.spatial_drag_property.clear();
+        return changed;
+    }
+    return false;
+}
+
 } // namespace
 
 void draw_mechanic_value_editor(
@@ -611,6 +790,10 @@ void draw_mechanic_workspace(fabric::editor::MechanicSession& session,
     }
 
     ImGui::NextColumn();
+    if (draw_mechanic_spatial_canvas(session, state, status, probe)) {
+        ImGui::Columns(1);
+        return;
+    }
     ImGui::SeparatorText("Inspector");
     const auto selected = std::find_if(graph.nodes.begin(), graph.nodes.end(),
         [&](const auto& node) { return node.id == state.selected_node; });

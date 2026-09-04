@@ -24,6 +24,11 @@ struct MechanicWorkspaceState {
     std::string to_port;
     std::string canvas_connection_source;
     bool pending_canvas_connection{};
+    std::string spatial_drag_node;
+    std::string spatial_drag_property;
+    core::Vec2 spatial_drag_start_value{};
+    ImVec2 spatial_drag_start_mouse{};
+    float spatial_zoom{32.0F};
     editor::RotatingPlatformPresetRequest platform;
     int platform_activation{};
     int platform_direction{};
@@ -35,6 +40,9 @@ struct MechanicWorkspaceState {
 struct MechanicWorkspaceProbe {
     bool enabled{};
     bool canvas_seen{};
+    bool spatial_canvas_seen{};
+    bool spatial_handle_seen{};
+    bool spatial_handle_moved{};
     bool link_seen{};
     bool source_seen{};
     bool target_seen{};
@@ -42,6 +50,10 @@ struct MechanicWorkspaceProbe {
     bool target_clicked{};
     ImVec2 source_screen{};
     ImVec2 target_screen{};
+    ImVec2 spatial_handle_screen{};
+    core::Vec2 spatial_handle_original{};
+    std::string spatial_handle_node;
+    std::string spatial_handle_property;
     project::MechanicConnection expected_connection;
 };
 

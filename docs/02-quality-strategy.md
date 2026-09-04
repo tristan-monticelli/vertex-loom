@@ -211,8 +211,10 @@ signal IA `attack`, attend une action et conserve le canevas final dans
 `asset-studio-behavior-graph-e2e.ppm`.
 Le test `map_studio_mechanic_e2e` retire la liaison `platform.body` vers
 `anchor.body` de la fixture, ouvre le canevas Mechanics et la recrée par clics
-sur `Connect from output` puis la carte cible. Il sauvegarde, recharge, exige
-une simulation compilée, avance un pas fixe et produit
+sur `Connect from output` puis la carte cible. Le même scénario glisse ensuite
+le capteur `presence` d'une unité monde dans le canevas spatial. Il sauvegarde,
+recharge, exige la connexion et la nouvelle position, compile la simulation,
+avance un pas fixe et produit
 `map-studio-mechanic-graph-e2e.ppm`. Le long formulaire de preset reste replié
 par défaut afin que le graphe soit visible sans scroll préalable.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
