@@ -56,6 +56,21 @@ TEST_CASE("map document round-trips and publishes atomically") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map instance path follower is optional and round-trips") {
+    auto source = map();
+    source.instances.front().path_follower = fabric::project::PathFollowerState{
+        .path = {{.value = "hero-path"}, "texturedPath"},
+        .progress = 0.25F,
+        .speed = 3.0F,
+        .loop = false,
+        .orient_to_path = true,
+        .rotation_offset_degrees = 15.0F};
+    const auto parsed = fabric::project::parse_map(
+        manifest(), fabric::project::serialize_map(source));
+    REQUIRE(parsed.ok());
+    REQUIRE(*parsed.asset == source);
+}
+
 TEST_CASE("map persists collision marker surfaces and derives eight positions") {
     auto source = map();
     fabric::project::CollisionMarkerConfig marker;

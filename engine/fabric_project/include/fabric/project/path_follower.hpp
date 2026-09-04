@@ -8,6 +8,7 @@
 namespace fabric::project {
 
 struct PathFollowerState {
+    ResourceReference path{{}, "texturedPath"};
     float progress{};
     float speed{};
     bool loop{true};

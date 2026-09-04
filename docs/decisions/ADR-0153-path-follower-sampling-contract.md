@@ -16,9 +16,10 @@ Map/Scene, pas de la géométrie visuelle.
 La brique accepte les segments ligne et cubique, échantillonne les courbes avec
 une résolution bornée et ne modifie jamais le `TexturedPath` source. Le rail de
 déplacement, la spline géométrique et la contrainte physique restent donc des
-contrats distincts. L'attachement persistant à `MapInstance` sera traité dans
-une tranche ultérieure avec migration additive et preview/runtime de bout en
-bout.
+contrats distincts. L'attachement persistant à `MapInstance` sera optionnel et
+additif : les cartes existantes resteront équivalentes. La prochaine tranche
+branchera ce champ à Map Studio et Preview Runtime ; la géométrie source ne sera
+jamais modifiée.
 
 ## Conséquences
 

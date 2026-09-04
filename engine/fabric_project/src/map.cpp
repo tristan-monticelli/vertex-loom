@@ -26,6 +26,14 @@ Json transform(core::Transform value) {
 Json ref(const ResourceReference& value) {
     return {{"id", value.id.value}, {"expectedType", value.expected_type}};
 }
+Json path_follower(const PathFollowerState& value) {
+    return {{"path", ref(value.path)},
+            {"progress", value.progress},
+            {"speed", value.speed},
+            {"loop", value.loop},
+            {"orientToPath", value.orient_to_path},
+            {"rotationOffsetDegrees", value.rotation_offset_degrees}};
+}
 bool text(const Json& object, const char* key, std::string& out,
           std::vector<Error>& errors) {
     const auto item = object.find(key);
@@ -340,6 +348,19 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
             error(report.errors, ErrorCode::resource_type_mismatch, "instances.entity", "invalid entity reference");
         if (instance.prefab && (instance.prefab->expected_type != "prefab" || !core::ResourceId::is_valid(instance.prefab->id.value)))
             error(report.errors, ErrorCode::resource_type_mismatch, "instances.prefab", "invalid prefab reference");
+        if (instance.path_follower) {
+            const auto& follower = *instance.path_follower;
+            if (follower.path.expected_type != "texturedPath" ||
+                !core::ResourceId::is_valid(follower.path.id.value))
+                error(report.errors, ErrorCode::resource_type_mismatch,
+                      "instances.pathFollower.path",
+                      "path follower must reference a valid textured path");
+            if (!std::isfinite(follower.progress) || follower.progress < 0.0F ||
+                follower.progress > 1.0F || !std::isfinite(follower.speed) ||
+                !std::isfinite(follower.rotation_offset_degrees))
+                error(report.errors, ErrorCode::invalid_asset,
+                      "instances.pathFollower", "progress and motion values must be finite");
+        }
         const auto& position = instance.transform.position;
         const auto& pivot = instance.transform.pivot;
         if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(instance.transform.rotation_degrees) ||
@@ -498,6 +519,7 @@ std::vector<ResourceReference> map_resource_references(const MapDocument& map) {
     for (const auto& instance : map.instances) {
         if (instance.entity) references.push_back(*instance.entity);
         if (instance.prefab) references.push_back(*instance.prefab);
+        if (instance.path_follower) references.push_back(instance.path_follower->path);
         for (const auto& property : instance.properties)
             if (const auto* value = std::get_if<ResourceReference>(&property.value)) references.push_back(*value);
     }
@@ -534,6 +556,7 @@ std::string serialize_map(const MapDocument& map) {
         Json value = {{"id", instance.id}, {"layer", instance.layer_id}, {"transform", transform(instance.transform)}, {"chunkX", instance.chunk_x}, {"chunkY", instance.chunk_y}, {"properties", properties(instance.properties)}};
         if (instance.entity) value["entity"] = ref(*instance.entity);
         if (instance.prefab) value["prefab"] = ref(*instance.prefab);
+        if (instance.path_follower) value["pathFollower"] = path_follower(*instance.path_follower);
         json["instances"].push_back(std::move(value));
     }
     for (const auto& collision : map.collisions) {
@@ -561,7 +584,7 @@ MapResult parse_map(const ProjectManifest& manifest, std::string_view serialized
     const auto prefabs = json.find("prefabs");
     if (prefabs == json.end() || !prefabs->is_array()) error(result.errors, ErrorCode::invalid_asset, "prefabs", "expected an array"); else for (const auto& value : *prefabs) { PrefabDefinition prefab; text(value, "id", prefab.id, result.errors); std::optional<ResourceReference> entity; ref_read(value, "entity", entity, result.errors); if (entity) prefab.entity = *entity; properties_read(value, "overrides", prefab.overrides, result.errors); ref_read(value, "mechanic", prefab.mechanic, result.errors); mechanic_overrides_read(value, prefab.mechanic_overrides, result.errors); map.prefabs.push_back(std::move(prefab)); }
     const auto instances = json.find("instances");
-    if (instances == json.end() || !instances->is_array()) error(result.errors, ErrorCode::invalid_asset, "instances", "expected an array"); else for (const auto& value : *instances) { MapInstance instance; text(value, "id", instance.id, result.errors); text(value, "layer", instance.layer_id, result.errors); transform_read(value, "transform", instance.transform, result.errors); std::int64_t chunk{}; integer(value, "chunkX", chunk, result.errors); instance.chunk_x = static_cast<std::int32_t>(chunk); integer(value, "chunkY", chunk, result.errors); instance.chunk_y = static_cast<std::int32_t>(chunk); ref_read(value, "entity", instance.entity, result.errors); ref_read(value, "prefab", instance.prefab, result.errors); properties_read(value, "properties", instance.properties, result.errors); map.instances.push_back(std::move(instance)); }
+    if (instances == json.end() || !instances->is_array()) error(result.errors, ErrorCode::invalid_asset, "instances", "expected an array"); else for (const auto& value : *instances) { MapInstance instance; text(value, "id", instance.id, result.errors); text(value, "layer", instance.layer_id, result.errors); transform_read(value, "transform", instance.transform, result.errors); std::int64_t chunk{}; integer(value, "chunkX", chunk, result.errors); instance.chunk_x = static_cast<std::int32_t>(chunk); integer(value, "chunkY", chunk, result.errors); instance.chunk_y = static_cast<std::int32_t>(chunk); ref_read(value, "entity", instance.entity, result.errors); ref_read(value, "prefab", instance.prefab, result.errors); const auto follower = value.find("pathFollower"); if (follower != value.end() && follower->is_object()) { PathFollowerState parsed; std::optional<ResourceReference> path; ref_read(*follower, "path", path, result.errors); if (path) parsed.path = *path; number(*follower, "progress", parsed.progress, result.errors); number(*follower, "speed", parsed.speed, result.errors); const auto loop = follower->find("loop"); if (loop != follower->end() && loop->is_boolean()) parsed.loop = loop->get<bool>(); else if (loop != follower->end()) error(result.errors, ErrorCode::invalid_asset, "pathFollower.loop", "expected boolean"); const auto orient = follower->find("orientToPath"); if (orient != follower->end() && orient->is_boolean()) parsed.orient_to_path = orient->get<bool>(); else if (orient != follower->end()) error(result.errors, ErrorCode::invalid_asset, "pathFollower.orientToPath", "expected boolean"); number(*follower, "rotationOffsetDegrees", parsed.rotation_offset_degrees, result.errors); instance.path_follower = std::move(parsed); } properties_read(value, "properties", instance.properties, result.errors); map.instances.push_back(std::move(instance)); }
     const auto collisions = json.find("collisions");
     if (collisions == json.end() || !collisions->is_array()) error(result.errors, ErrorCode::invalid_asset, "collisions", "expected an array"); else for (const auto& value : *collisions) { CollisionShape collision; std::string kind; text(value, "kind", kind, result.errors); if (kind == "circle") collision.kind = CollisionShapeKind::circle; else if (kind == "capsule") collision.kind = CollisionShapeKind::capsule; else if (kind == "polygon") collision.kind = CollisionShapeKind::polygon; else if (kind == "chain") collision.kind = CollisionShapeKind::chain; else error(result.errors, ErrorCode::invalid_asset, "kind", "unsupported collision kind"); text(value, "layer", collision.layer_id, result.errors); const auto sensor = value.find("sensor"); if (sensor == value.end() || !sensor->is_boolean()) error(result.errors, ErrorCode::invalid_asset, "sensor", "expected boolean"); else collision.sensor = sensor->get<bool>(); vec_read(value, "center", collision.center, result.errors); number(value, "radius", collision.radius, result.errors); number(value, "length", collision.length, result.errors); const auto points = value.find("points"); if (points == value.end() || !points->is_array()) error(result.errors, ErrorCode::invalid_asset, "points", "expected an array"); else for (const auto& point : *points) { core::Vec2 parsed{}; if (point.is_object() && number(point, "x", parsed.x, result.errors) && number(point, "y", parsed.y, result.errors)) collision.points.push_back(parsed); } const auto marker = value.find("markerOverride"); if (marker != value.end() && marker->is_object()) { collision.marker_override = CollisionMarkerConfig{}; collision_marker_read(*marker, *collision.marker_override, result.errors); } map.collisions.push_back(std::move(collision)); }
     const auto surfaces = json.find("collisionSurfaces");

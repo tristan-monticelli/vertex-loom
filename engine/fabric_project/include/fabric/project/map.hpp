@@ -4,6 +4,7 @@
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
 #include "fabric/project/mechanic_graph.hpp"
+#include "fabric/project/path_follower.hpp"
 #include "fabric/project/shader_profile.hpp"
 
 #include <cstdint>
@@ -58,6 +59,7 @@ struct MapInstance {
     std::int32_t chunk_x{};
     std::int32_t chunk_y{};
     std::vector<MapProperty> properties;
+    std::optional<PathFollowerState> path_follower;
     friend bool operator==(const MapInstance&, const MapInstance&) = default;
 };
 
