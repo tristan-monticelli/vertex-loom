@@ -108,6 +108,10 @@ extraite. Son module porte ajout, duplication, suppression, réorganisation,
 reparentage et drop d'artwork ; le bootstrap conserve provisoirement les
 actions de parcours et l'Inspector de propriétés détaillées.
 
+Progression suivante : les propriétés communes du nœud Entity — identité,
+verrouillage, visibilité, transform et parentage avancé — sont extraites dans
+`EntityNodeProperties`. Artwork et overrides forment la prochaine frontière.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

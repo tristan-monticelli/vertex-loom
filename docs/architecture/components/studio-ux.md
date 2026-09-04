@@ -165,6 +165,7 @@ flowchart LR
     Workspaces --> SharedWidgets
     Workspaces --> Visual[Visual et Entity]
     Visual --> EntityHierarchy[Entity Hierarchy Workspace]
+    Visual --> EntityProperties[Entity Node Properties]
     Workspaces --> Animation[Animation]
     Workspaces --> Logic[Logic]
     Workspaces --> Map[Map et Scene]
@@ -191,6 +192,7 @@ flowchart LR
 | Mechanic Workspace | graphe visuel, inspecteur, simulation et preset guidé via `MechanicSession` | boucle SDL, état E2E global ou sérialisation directe |
 | Map Canvas Workspace | preview réelle, sélection, gizmos, placement, snapping et overlays physiques via `MapSession` | menus, cycle de fenêtre ou mutation hors commande |
 | Entity Hierarchy Workspace | arbre parent/enfant, sélection groupée, drag/reparentage et commandes structurelles via `ProjectSession` | boucle SDL, formulaire Animation, propriétés détaillées du nœud ou sérialisation |
+| Entity Node Properties | nom, verrouillage, visibilité, transform, parent, pivot et ordre Z via `ProjectSession` | artwork, matériau, overrides, hiérarchie ou état global du shell |
 | Animation Timeline Command | déplacement atomique d'une ou plusieurs clés par delta temporel via `ProjectSession` | sélection UI, playhead ou copie persistante du clip |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, diagnostics/focus de champ, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |

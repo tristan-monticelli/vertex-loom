@@ -19,8 +19,9 @@
 #include "animation_publish_probe.hpp"
 #include "animation_timeline_workspace.hpp"
 #include "behavior_workspace.hpp"
-#include "entity_rig_inspector.hpp"
 #include "entity_hierarchy_workspace.hpp"
+#include "entity_node_properties.hpp"
+#include "entity_rig_inspector.hpp"
 #include "import_workflow.hpp"
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
@@ -5413,82 +5414,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
             }
-            bool locked = node.locked;
-            if (ImGui::Checkbox("Locked", &locked)) {
-                node.locked = locked;
-                commit_entity_node(node);
-            }
+            const fabric::asset_studio::EntityNodePropertiesProbe
+                properties_probe{
+                    .enabled = animation_graph_probe.enabled,
+                    .record_transform = [&] {
+                        ui_entity_transform_seen = true;
+                    },
+                };
+            fabric::asset_studio::draw_entity_node_properties(
+                session, canvas.selected_node, node, entity_advanced_mode,
+                status, &properties_probe);
             ImGui::BeginDisabled(node.locked);
-            bool visible = node.visible;
-            if (ImGui::Checkbox("Visible", &visible)) {
-                node.visible = visible;
-                commit_entity_node(node);
-            }
-            std::string node_name = node.name;
-            if (draw_resource_name_field("Node name", node_name, 360.0F)) {
-                node.name = std::move(node_name);
-                commit_entity_node(node);
-            }
-            ImGui::SeparatorText("Transform");
-            float position[]{node.transform.position.x, node.transform.position.y};
-            if (ImGui::InputFloat2("Position", position)) {
-                node.transform.position = {position[0], position[1]};
-                commit_entity_node(node);
-            }
-            if (animation_graph_probe.enabled)
-                ui_entity_transform_seen = true;
-            draw_technical_tooltip("Entity node translation in project world units.");
-            float rotation = node.transform.rotation_degrees;
-            if (ImGui::InputFloat("Rotation", &rotation, 1.0F, 10.0F,
-                                  "%.2f deg")) {
-                node.transform.rotation_degrees = rotation;
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node rotation around its pivot, in degrees.");
-            float scale[]{node.transform.scale.x, node.transform.scale.y};
-            if (ImGui::InputFloat2("Scale", scale)) {
-                node.transform.scale = {scale[0], scale[1]};
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node scale multiplier.");
-            if (entity_advanced_mode) {
-            ImGui::SeparatorText("Advanced node settings");
-            const auto parent_label = [&](const std::optional<std::string>& parent) {
-                if (!parent) return std::string{"None"};
-                for (const auto& candidate : entity.nodes) {
-                    if (candidate.id == *parent) return candidate.name;
-                }
-                return std::string{"Missing: "} + *parent;
-            };
-            if (ImGui::BeginCombo("Parent", parent_label(node.parent).c_str())) {
-                if (ImGui::Selectable("None", !node.parent.has_value())) {
-                    node.parent.reset();
-                    commit_entity_node(node);
-                }
-                for (const auto& candidate : entity.nodes) {
-                    if (candidate.id == node.id) continue;
-                    const bool selected_parent = node.parent.has_value() &&
-                        *node.parent == candidate.id;
-                    if (ImGui::Selectable(candidate.name.c_str(), selected_parent)) {
-                        node.parent = candidate.id;
-                        commit_entity_node(node);
-                    }
-                }
-                ImGui::EndCombo();
-            }
-            float pivot[]{node.transform.pivot.x, node.transform.pivot.y};
-            if (ImGui::InputFloat2("Entity pivot (world units)", pivot)) {
-                node.transform.pivot = {pivot[0], pivot[1]};
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node pivot in project world units.");
-            float z_order = node.z_order;
-            if (ImGui::InputFloat("Z order (world units)", &z_order, 0.1F, 1.0F, "%.2f")) {
-                node.z_order = z_order;
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Draw order; larger values render later.");
-            }
             ImGui::SeparatorText("Artwork");
             const auto drawable_label = std::string(
                 fabric::project::to_string(node.drawable.kind));

@@ -95,6 +95,11 @@ il reçoit l'état canvas et délègue toute mutation à `ProjectSession`. Les
 coordonnées et drapeaux du harnais graphique passent par un petit adaptateur de
 probe injecté, sans état de test global dans le composant.
 
+`EntityNodeProperties` constitue la seconde frontière. Il reçoit une copie de
+travail du nœud sélectionné, applique les contrôles communs et délègue chaque
+validation à `ProjectSession`. Artwork, matériaux et overrides restent une
+surface distincte afin que l'extraction ne recrée pas un inspecteur universel.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

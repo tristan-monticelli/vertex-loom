@@ -287,6 +287,9 @@ Le module `EntityHierarchyWorkspace` reste couvert par les gestes réels des E2E
 Entity : ajout et drop de nœud, sélection multiple, réorganisation stable,
 reparentage, suppression protégée et reload. Son adaptateur de probe ne peut
 observer que les rectangles et mutations produits par le module rendu.
+`EntityNodeProperties` reste couvert par l'E2E Entity, qui exige après reload
+nom, verrouillage, visibilité, position, échelle et parentage, ainsi que par le
+geste canvas du parcours Entity→Animation qui réutilise le même transform.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre
