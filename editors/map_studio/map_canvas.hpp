@@ -48,6 +48,16 @@ struct SelectionBoxState {
     ImVec2 current_mouse{};
 };
 
+struct MapPlacementProbe {
+    bool enabled{};
+    bool canvas_seen{};
+    bool canvas_hovered{};
+    ImVec2 canvas_center{};
+    bool placement_button_seen{};
+    ImVec2 placement_button_screen{};
+    std::size_t successful_placements{};
+};
+
 struct MapTexture {
     GLuint handle{};
     std::uint32_t width{};
@@ -85,12 +95,14 @@ void draw_map_canvas(
     const std::string& active_layer_id,
     SelectionBoxState& selection_box,
     bool& placement_mode,
+    bool keep_placement_active,
     std::string& placement_id,
     std::string& placement_resource_id,
     int& placement_kind,
     editor::MapSnapSettings& snapping,
     MapPreviewRenderer& preview_render_state,
     const physics::MechanicSimulation& mechanic_preview,
-    std::string& status);
+    std::string& status,
+    MapPlacementProbe* probe = nullptr);
 
 } // namespace fabric::map_studio

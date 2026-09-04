@@ -171,13 +171,15 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      const std::string& active_layer_id,
                      SelectionBoxState& selection_box,
                      bool& placement_mode,
+                     const bool keep_placement_active,
                      std::string& placement_id,
                      std::string& placement_resource_id,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
                      MapPreviewRenderer& preview_render_state,
                      const fabric::physics::MechanicSimulation& mechanic_preview,
-                     std::string& status) {
+                     std::string& status,
+                     MapPlacementProbe* probe) {
     if (!session.map()) return;
     const auto& map = *session.map();
     ImGui::SeparatorText("Canvas");
@@ -246,6 +248,21 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     const bool hovered = ImGui::IsItemHovered();
     const ImVec2 canvas_center{canvas_pos.x + canvas_size.x * 0.5F,
                                canvas_pos.y + canvas_size.y * 0.5F};
+    auto* draw = ImGui::GetWindowDrawList();
+    if (probe != nullptr && probe->enabled) {
+        probe->canvas_seen = true;
+        probe->canvas_hovered = hovered;
+        const auto clip_min = draw->GetClipRectMin();
+        const auto clip_max = draw->GetClipRectMax();
+        const ImVec2 visible_min{std::max(canvas_pos.x, clip_min.x),
+                                 std::max(canvas_pos.y, clip_min.y)};
+        const ImVec2 visible_max{
+            std::min(canvas_pos.x + canvas_size.x, clip_max.x),
+            std::min(canvas_pos.y + canvas_size.y, clip_max.y)};
+        probe->canvas_center = {
+            (visible_min.x + visible_max.x) * 0.5F,
+            (visible_min.y + visible_max.y) * 0.5F};
+    }
     auto world_to_screen = [&](const fabric::core::Vec2 point) {
         return ImVec2{canvas_center.x + pan.x + point.x * zoom,
                       canvas_center.y + pan.y - point.y * zoom};
@@ -275,7 +292,6 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                    ? point_gizmo.preview_point : point;
     };
 
-    auto* draw = ImGui::GetWindowDrawList();
     draw->AddRectFilled(canvas_pos,
                         {canvas_pos.x + canvas_size.x, canvas_pos.y + canvas_size.y},
                         IM_COL32(22, 25, 31, 255));
@@ -496,8 +512,15 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         draw->AddRect(minimum, maximum, IM_COL32(100, 190, 255, 220));
     }
 
+    const auto& io = ImGui::GetIO();
+    if (placement_mode && !io.WantTextInput &&
+        ImGui::IsKeyPressed(ImGuiKey_Escape, false)) {
+        placement_mode = false;
+        status = "Placement cancelled";
+        return;
+    }
+
     if (hovered) {
-        const auto& io = ImGui::GetIO();
         if (io.MouseWheel != 0.0F) {
             const auto before = screen_to_world(io.MousePos);
             zoom = std::clamp(zoom * std::pow(1.15F, io.MouseWheel), 0.1F, 32.0F);
@@ -569,7 +592,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         }
         if (placement_mode && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             fabric::project::MapInstance instance;
-            instance.id = placement_id;
+            const auto placed_id = placement_id;
+            instance.id = placed_id;
             instance.layer_id = active_layer_id;
             instance.transform.position = screen_to_world(io.MousePos);
             if (placement_kind == 0)
@@ -579,12 +603,17 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                 instance.prefab = fabric::project::ResourceReference{
                     {.value = placement_resource_id}, "prefab"};
             const auto placed = session.place_instance(std::move(instance), snapping);
-            status = placed ? "Instance placed" :
-                             "Placement rejected (id, resource, layer or lock)";
+            status = placed
+                ? (keep_placement_active
+                       ? "Instance placed; click again or press Escape"
+                       : "Instance placed")
+                : "Placement rejected (id, resource, layer or lock)";
             if (placed) {
-                placement_mode = false;
+                selected_instances = {placed_id};
                 placement_id.clear();
-                placement_resource_id.clear();
+                if (!keep_placement_active) placement_mode = false;
+                if (probe != nullptr && probe->enabled)
+                    ++probe->successful_placements;
             }
             return;
         }

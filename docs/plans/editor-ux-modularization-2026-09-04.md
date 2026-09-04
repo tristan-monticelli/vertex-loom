@@ -136,8 +136,10 @@ sauvegarde/reload et le test de session couvre undo/redo.
 
 ### Portée
 
-- Map : palette, duplication/multi-placement, collisions directes, bodies,
-  pivots, joints, sensors et liens sélectionnables sur le canvas.
+- Map : picker recherché, sélection multiple/rectangle, déplacement groupé,
+  duplication, points de collision et placement continu avec ID automatique
+  sont réalisés et prouvés par clics→reload ; joints et liens doivent ensuite
+  devenir sélectionnables sur le canvas Map.
 - Rig : création et cible IK de base réalisées ; création de bones, mesh,
   poids colorés et contraintes directes restent à faire sur le Stage.
 - Animation : courbes avancées et événements ; box-select, déplacement groupé

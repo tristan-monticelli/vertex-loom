@@ -78,6 +78,7 @@ using fabric::map_studio::collision_shape_text;
 using fabric::map_studio::CanvasGizmoState;
 using fabric::map_studio::CollisionPointGizmoState;
 using fabric::map_studio::MapPreviewRenderer;
+using fabric::map_studio::MapPlacementProbe;
 using fabric::map_studio::MapTexture;
 using fabric::map_studio::MechanicWorkspaceProbe;
 using fabric::map_studio::MechanicWorkspaceState;
@@ -473,11 +474,13 @@ int run(const std::filesystem::path& project_root,
         const bool scene_e2e = false,
         const bool transformation_e2e = false,
         const bool ui_accessibility_test = false,
-        const bool mechanic_e2e = false) {
+        const bool mechanic_e2e = false,
+        const bool placement_e2e = false) {
     const auto trace_session_id =
         fabric::core::make_trace_session_id("map-studio");
     const bool graphical_test = e2e_mode.has_value() || scene_e2e ||
-        transformation_e2e || ui_accessibility_test || mechanic_e2e;
+        transformation_e2e || ui_accessibility_test || mechanic_e2e ||
+        placement_e2e;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -504,7 +507,7 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
         (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test ||
-         mechanic_e2e
+         mechanic_e2e || placement_e2e
              ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
@@ -859,13 +862,15 @@ int run(const std::filesystem::path& project_root,
     int trigger_property_kind = 2;
     int trigger_resource_kind = 3;
     std::vector<std::string> selected_instances;
-    std::string active_layer_id;
+    std::string active_layer_id = placement_e2e ? "instances" : "";
     std::string new_layer_id;
     std::string new_layer_name;
     int new_layer_kind = 1;
     bool placement_mode = false;
+    bool keep_placement_active = true;
     std::string placement_id;
-    std::string placement_resource_id;
+    std::string placement_resource_id = placement_e2e
+        ? "textile-head-entity" : "";
     int placement_kind = 0;
     std::string selected_prefab;
     std::string new_prefab_id;
@@ -889,6 +894,9 @@ int run(const std::filesystem::path& project_root,
     CanvasGizmoState canvas_gizmo;
     CollisionPointGizmoState collision_point_gizmo;
     SelectionBoxState selection_box;
+    MapPlacementProbe placement_probe{.enabled = placement_e2e};
+    std::size_t placement_e2e_frame = 0U;
+    bool placement_context_observed = false;
     fabric::editor::MapSnapSettings canvas_snapping;
     TransformEditorState transform_editor;
     float preview_time = 0.0F;
@@ -917,6 +925,47 @@ int run(const std::filesystem::path& project_root,
     bool command_palette_rendered = false;
     bool running = true;
     while (running) {
+        if (placement_e2e) {
+            std::optional<ImVec2> target;
+            if (placement_e2e_frame == 2U &&
+                placement_probe.placement_button_seen) {
+                target = placement_probe.placement_button_screen;
+            } else if ((placement_e2e_frame == 6U ||
+                        placement_e2e_frame == 10U) &&
+                       placement_mode && placement_probe.canvas_seen) {
+                target = placement_probe.canvas_center;
+                target->x += placement_e2e_frame == 6U ? -72.0F : 72.0F;
+            }
+            if (target) {
+                SDL_Event motion{};
+                motion.type = SDL_MOUSEMOTION;
+                motion.motion.windowID = SDL_GetWindowID(window);
+                motion.motion.x = static_cast<int>(std::lround(target->x));
+                motion.motion.y = static_cast<int>(std::lround(target->y));
+                static_cast<void>(SDL_PushEvent(&motion));
+                for (const auto type : {SDL_MOUSEBUTTONDOWN,
+                                        SDL_MOUSEBUTTONUP}) {
+                    SDL_Event button{};
+                    button.type = type;
+                    button.button.button = SDL_BUTTON_LEFT;
+                    button.button.windowID = SDL_GetWindowID(window);
+                    button.button.x = motion.motion.x;
+                    button.button.y = motion.motion.y;
+                    static_cast<void>(SDL_PushEvent(&button));
+                }
+            }
+            if (placement_e2e_frame == 12U &&
+                placement_context_observed) {
+                for (const auto type : {SDL_KEYDOWN, SDL_KEYUP}) {
+                    SDL_Event key{};
+                    key.type = type;
+                    key.key.windowID = SDL_GetWindowID(window);
+                    key.key.keysym.sym = SDLK_ESCAPE;
+                    key.key.keysym.scancode = SDL_SCANCODE_ESCAPE;
+                    static_cast<void>(SDL_PushEvent(&key));
+                }
+            }
+        }
         if (mechanic_e2e &&
             (mechanic_e2e_frame == 2U || mechanic_e2e_frame == 4U) &&
             mechanic_probe.source_seen && mechanic_probe.target_seen) {
@@ -1540,10 +1589,23 @@ int run(const std::filesystem::path& project_root,
                                  active_layer_id.empty());
             if (ImGui::Button(placement_mode ? "Cancel placement" : "Place in canvas"))
                 placement_mode = !placement_mode;
+            if (placement_probe.enabled) {
+                placement_probe.placement_button_seen = true;
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                placement_probe.placement_button_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+            }
             ImGui::EndDisabled();
             draw_disabled_reason(placement_id.empty() || placement_resource_id.empty() ||
                                      active_layer_id.empty(),
                                  "Enter an instance id, choose a resource and select an active layer.");
+            ImGui::SameLine();
+            ImGui::Checkbox("Keep placing", &keep_placement_active);
+            draw_technical_tooltip(
+                "Keep this resource, layer and snapping active after each placement. "
+                "A unique instance id is generated for every click; Escape stops the tool.");
             ImGui::Checkbox("Play visual animation", &preview_playing);
             ImGui::SameLine();
             ImGui::SetNextItemWidth(180.0F);
@@ -1559,10 +1621,11 @@ int run(const std::filesystem::path& project_root,
                             canvas_grid_visible, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
                             selected_trigger_index, active_layer_id, selection_box,
-                            placement_mode,
+                            placement_mode, keep_placement_active,
                             placement_id, placement_resource_id, placement_kind,
                             canvas_snapping, preview_render_state,
-                            mechanic_session.simulation(), status);
+                            mechanic_session.simulation(), status,
+                            &placement_probe);
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             for (const auto& error : preview_render_state.errors)
@@ -2746,6 +2809,50 @@ int run(const std::filesystem::path& project_root,
             running = false;
         }
         if (scene_e2e || transformation_e2e) running = false;
+        if (placement_e2e && placement_probe.successful_placements == 2U &&
+            placement_mode && keep_placement_active &&
+            placement_resource_id == "textile-head-entity") {
+            placement_context_observed = true;
+        }
+        if (placement_e2e && placement_context_observed &&
+            placement_e2e_frame >= 14U && !placement_mode) {
+            const bool context_preserved = keep_placement_active &&
+                placement_resource_id == "textile-head-entity";
+            const bool saved = context_preserved && session.save();
+            fabric::editor::MapSession reloaded;
+            const bool reopened = saved && reloaded.open(project_root, map_id);
+            std::size_t authored_count = 0U;
+            if (reopened) {
+                authored_count = static_cast<std::size_t>(std::ranges::count_if(
+                    reloaded.map()->instances, [](const auto& instance) {
+                        return instance.entity &&
+                            instance.entity->id.value == "textile-head-entity" &&
+                            instance.id.starts_with("textile-head-entity-instance");
+                    }));
+            }
+            if (!context_preserved || !reopened || authored_count != 2U)
+                fail_e2e("continuous placement did not preserve context or reload two unique instances");
+            else
+                write_frame_capture(project_root, window,
+                                    "map-studio-continuous-placement-e2e.ppm");
+            running = false;
+        }
+        if (placement_e2e && ++placement_e2e_frame >= 30U && running) {
+            fail_e2e(
+                "continuous placement UI gestures timed out: canvas=" +
+                std::to_string(placement_probe.canvas_seen) +
+                ", hovered=" + std::to_string(placement_probe.canvas_hovered) +
+                ", button=" +
+                std::to_string(placement_probe.placement_button_seen) +
+                ", mode=" + std::to_string(placement_mode) +
+                ", placements=" +
+                std::to_string(placement_probe.successful_placements) +
+                ", target=" + std::to_string(placement_probe.canvas_center.x) +
+                "," + std::to_string(placement_probe.canvas_center.y) +
+                ", mouse=" + std::to_string(ImGui::GetIO().MousePos.x) +
+                "," + std::to_string(ImGui::GetIO().MousePos.y));
+            running = false;
+        }
         if (ui_accessibility_test) {
             write_ui_accessibility_probe(
                 project_root, window,
@@ -2794,11 +2901,14 @@ int main(int argc, char** argv) {
         std::string_view{argv[1]} == "--e2e-transformation";
     const bool mechanic_e2e = argc == 4 &&
         std::string_view{argv[1]} == "--e2e-mechanic";
+    const bool placement_e2e = argc == 4 &&
+        std::string_view{argv[1]} == "--e2e-placement";
     const bool ui_accessibility_test = argc == 3 &&
         std::string_view{argv[1]} == "--ui-accessibility-test";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
     if ((argc != 1 && argc != 3 && !e2e && !scene_e2e &&
-         !transformation_e2e && !mechanic_e2e && !ui_accessibility_test) ||
+         !transformation_e2e && !mechanic_e2e && !placement_e2e &&
+         !ui_accessibility_test) ||
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
@@ -2807,20 +2917,21 @@ int main(int argc, char** argv) {
                      "       map_studio --e2e-transformation "
                      "project-directory map-id\n"
                      "       map_studio --e2e-mechanic project-directory map-id\n"
+                     "       map_studio --e2e-placement project-directory map-id\n"
                      "       map_studio --ui-accessibility-test project-directory\n";
         return 64;
     }
     const std::filesystem::path project = e2e ? argv[3]
         : scene_e2e ? argv[2]
         : transformation_e2e ? argv[2]
-        : mechanic_e2e ? argv[2]
+        : mechanic_e2e || placement_e2e ? argv[2]
         : ui_accessibility_test ? argv[2]
         : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
         e2e ? argv[4]
-        : scene_e2e || transformation_e2e || mechanic_e2e ? argv[3]
+        : scene_e2e || transformation_e2e || mechanic_e2e || placement_e2e ? argv[3]
         : ui_accessibility_test ? "textile-head-preview"
         : argc == 3 ? argv[2] : ""};
     return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e,
-               ui_accessibility_test, mechanic_e2e);
+               ui_accessibility_test, mechanic_e2e, placement_e2e);
 }

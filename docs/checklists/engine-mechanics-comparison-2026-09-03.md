@@ -61,7 +61,7 @@ des listes et formulaires techniques, et plusieurs E2E contournent ces panneaux.
 | Éditer une machine à états | Canevas `Animation Graph`, choix de clip, ajout d'état sans ID, cartes, flèches et inspecteurs avancés | L3 | utilisable | Ajout et connexion sont prouvés par clics/reload ; erreurs locales, layout manuel et runtime publié restent à couvrir | P1 | Ajouter erreurs sur les arêtes, layout manuel et preuve Preview Runtime |
 | Construire un Behavior Graph | Palette recherchable, cartes/ports/flèches, connexion, trace colorée, breakpoint éphémère, pause et pas-à-pas | L3 | utilisable | Le parcours UI est prouvé ; layout manuel, erreurs locales sur arêtes et debug du runtime publié manquent | P1 | Ajouter layout, diagnostic d'arête et attachement au Preview Runtime |
 | Construire une mécanique | Graphe et canevas spatial côte à côte ; sélection commune ; corps, pivots et capteurs déplaçables ; E2E connexion+glisser→reload→pas fixe | L3 | partiel | Le placement de base est utilisable ; redimensionnement, rotation/joint, overlay sur la map et paquet publié manquent | P0 | Ajouter poignées de taille/rotation/joint puis preuve UI→package→runtime |
-| Construire une map | Panneaux layers/instances, canvas, inspecteur, collisions, triggers et scènes séparées | L2/L3 | partiel | Overrides et relations restent form-heavy ; pas de tilemap, terrain, brush ni navigation | P1 | Prioriser placement direct, duplication, palette, tilemap et diagnostics de collision avant nouveaux contrats |
+| Construire une map | Picker recherché, placement simple/continu, sélection simple/multiple/rectangle, déplacement groupé, duplication bouton/`Ctrl+D`/`Ctrl`+clic, snapping et poignées de polygone de collision ; deux placements continus sont prouvés par clics→reload | L3 | partiel | Overrides et relations restent form-heavy ; pas de tilemap, terrain, brush ni navigation | P1 | Prioriser ensuite tilemap, diagnostics locaux et édition directe des relations |
 | Prévisualiser et publier | Workspace Publish Map/Scene : fermeture visible, destination, validation, publication et smoke du paquet exact ; E2E depuis Mechanics | L3 | partiel | Le parcours Studio→paquet→PreviewRuntime est prouvé ; lancement du binaire release, signature et distribution manquent | P0 | Étendre le même artefact au `game_runtime` release et au gate de distribution |
 
 ### Pourquoi les E2E Entity et Animation ne suffisent pas
@@ -126,7 +126,7 @@ runtime. `N/A` conserve le périmètre spécialisé de Spine et Rive.
 | Composition Entity/prefab | drag, parentage, multi-sélection et gizmo prouvés | Fort | Fort | Fort | partiel | Fort | partiel | partiel | Parcours nominal utilisable ; variantes, overrides et réparation doivent rester contextuels |
 | Animation de propriétés | deux poses, auto-key, playhead, box-select, déplacement/scale multi-clés, courbes et événement | Fort | Fort | Fort | Fort | partiel | Fort | Fort | Bonne base ; la preuve publiée du flux auteur manque |
 | Machine d'états et logique | graphes Animation, Behavior et Mechanic visibles ; debug faible | Fort | Fort | Fort | partiel | Fort | N/A | Fort | Ajouter recherche contextuelle, erreurs sur liens, trace et breakpoints avant plus de nœuds |
-| Construction de niveau | placement, calques, snapping, collisions et triggers ; formulaire très dense | Fort | Fort | Fort | Fort | Fort | N/A | N/A | Écart majeur : pas de palette de peinture, tilemap, terrain, navigation ni édition directe des joints |
+| Construction de niveau | picker recherché, placement continu, multi-sélection, duplication, calques, snapping et points de collision directs ; overrides/triggers denses | Fort | Fort | Fort | Fort | Fort | N/A | N/A | Les bases objet ne sont plus l'écart ; restent tilemap/terrain/navigation et édition directe des joints |
 | Rig, IK, mesh et poids | contrats/solveurs et inspecteurs numériques | Fort | Fort | Fort | partiel | partiel | Fort | Fort | Le runtime précède fortement l'authoring ; workspace canvas dédié requis |
 | Preview, debug et publication | preview/package/tests disponibles mais parcours auteur publié incomplet | Fort | Fort | Fort | Fort | Fort | preview/export | preview/export | Unifier Play/Pause/Step, diagnostics cliquables et preuve UI→package→runtime |
 | Adaptation de l'espace | large/minimum testés ; positions forcées et préférences non persistées | Fort | Fort | Fort | Fort | Fort | Fort | Fort | Shell adaptatif et préférences locales nécessaires ; éviter la configurabilité illimitée au départ |
@@ -144,7 +144,7 @@ GM4/GM5/GM8/GM9, C6/C8/C10/C11, S4–S6 et R4–R6.
 | Projet → import → visuel → Entity | L3 | mêmes actions dans un navigateur partagé, retour/avant et reload sans perte de sélection |
 | Entity → enfant → clip → deux poses → événement | L3 | exécuter le résultat dans le paquet publié et étendre la preuve graphique aux gestes multi-clés |
 | Entity → Animation Graph → Behavior | L3 | conserver l'Entity et le nœud sélectionnés, montrer la trace et revenir à la propriété fautive |
-| Map → placement → collision/trigger → mécanique | L2/L3 | sélection unique entre canvas, inspecteur et graphe ; bodies/pivots/joints manipulables sur la map |
+| Map → placement → collision/trigger → mécanique | L3 pour le placement, L2/L3 ensuite | étendre le même E2E aux collisions/triggers, puis sélection unique entre canvas, inspecteur et graphe et joints manipulables sur la map |
 | Map → Scene → campagne → Publish | L2 | onglets/historique partagés, dépendances visibles, validation cliquable et runtime de release lancé |
 | Entity → Rig/IK/XPBD → Animation | L1/L2 | création de bones/mesh/poids/contraintes sur canvas, preview puis reload sans préparation API |
 | Erreur → diagnostic → réparation | L1/L2 | chaque erreur ouvre le document, sélectionne l'objet et focalise le champ ou handle concerné |
@@ -198,7 +198,7 @@ modifier aucun schéma persistant.
 | Physique | A21 — XPBD et substeps/interpolation | Solveur, overlay et tests ; la fixture graphique est injectée avant affichage | partiel | oui | oui | partiel | partiel | partiel | partiel | — | — | partiel | partiel | Diagnostic visible mais authoring direct non prouvé | P1 | Éditeur canvas de particules/contraintes et E2E sans préparation API | G5, U4, E4, S1, R1 |
 | Input | A22 — actions sémantiques, clavier/gamepad, remap | `input.hpp`, ADR-0055/0101/0119/0123, UI E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Touch/gestures non prouvés | P2 | Ajouter seulement avec cible plateforme | G1, U5, E5, C1 |
 | Comportement | A23 — BehaviorGraph générique signaux/actions | `behavior_graph.hpp` ; palette, connexion, breakpoint, évaluation, pause et trace sur cartes prouvés par E2E, puis reload | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | N/A | ✓ | Debug Studio utilisable ; runtime publié, layout manuel et diagnostics d'arête manquent | P1 | Relier la trace au Preview Runtime et ajouter erreurs locales sur arêtes | E10, C8, R5 |
-| Maps | A24 — map, layers, verrouillage, ordre, snapping et instances | `map.hpp`, panels Map Studio, contrats/tests | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Base utilisable, mais flux de production de masse et preuves UI→package incomplets | P1 | Test de tâche auteur et outils palette/duplication/multi-placement | G6, U6, E6, GM1, C3 |
+| Maps | A24 — map, layers, verrouillage, ordre, snapping et instances | `map.hpp` ; Map Studio fournit picker recherché, placement simple/continu, sélection multiple/rectangle, déplacement groupé, duplication bouton/`Ctrl+D`/`Ctrl`+clic et poignées de collision ; l'E2E clique deux positions, exige IDs/contexte, sauvegarde et recharge | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Les gestes objet de base sont L3 ; tilemap et le flux complet collision→mécanique→package restent incomplets | P1 | Étendre le scénario à collision/trigger/mécanique, puis introduire le tilemap sur cette grammaire | G6, U6, E6, GM1, C6, C12 |
 | Maps | A25 — tileset/tilemap/autotiling/terrain | Aucun type Studio ou schéma tile | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Création de grands niveaux répétitifs coûteuse | P1 | ADR tilemap après stabilisation du placement actuel | G6, U6, E6, C3 |
 | Physique | A26 — collisions éditables, triggers et payloads | ADR-0048/0077..0080/0113, Map Studio E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | bounding box | listeners | Formes/filtrage avancé limités | P2 | Ajouter catégories/masques seulement avec diagnostics | G5, U4, E4, GM2, C4 |
 | Mécaniques | A27 — nœuds body/pivot/joint/motor | `MechanicNodeKind`, compilateur/presets ; graphe et canevas spatial synchronisés ; corps/pivots déplaçables ; E2E reconnecte, recharge et simule | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Placement direct prouvé ; taille, rotation, poignée de joint et exécution du paquet publié restent absents | P0 | Ajouter poignées taille/rotation/joint puis preuve package→runtime | G5, U4, E4, GM2, C4 |
@@ -397,6 +397,25 @@ de qualité ou de format.
 | U17 | `EditorWindow` permet d'implémenter des fenêtres Unity spécialisées flottantes ou dockées comme onglets. | [Unity 6 — EditorWindow](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow.html) |
 | E19 | Unreal encapsule outils éditeur et runtime dans des modules, et ses plugins peuvent ajouter menus, commandes, sous-modes et types de fichiers. | [Unreal — Modules](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-modules), [Plugins](https://dev.epicgames.com/documentation/en-us/unreal-engine/plugins-in-unreal-engine) |
 | C11 | L'Addon SDK de Construct étend l'éditeur et le runtime avec plugins, behaviors, effets, thèmes et importeurs personnalisés. | [Construct — Addon SDK](https://www.construct.net/en/make-games/manuals/addon-sdk) |
+| C12 | Le Layout View conserve un outil d'édition direct, une couche active, la sélection multiple/rectangle et une Properties Bar synchronisée ; le Tilemap se peint directement dans cette même surface. | [Construct — Layout View](https://www.construct.net/en/make-games/manuals/construct-3/interface/layout-view) |
+
+### Registre d'inférences UX — vérifié le 4 septembre 2026
+
+- Les sources officielles décrivent des faits de produit, pas une mesure
+  comparative de « bonne UX ». Les verdicts du tableau sont donc des
+  **inférences** tirées de la convergence des parcours documentés.
+- G9, U15, E9, GM8, C6, S5 et R6 étayent l'inférence qu'une sélection nominale
+  doit rester visible et éditable entre hiérarchie, canvas et inspecteur.
+- E17/E18, G16, C10 et R6 étayent l'inférence qu'un outil spécialisé doit
+  remplacer ou compléter la surface centrale et son dock contextuel, sans
+  ouvrir un second parcours déconnecté.
+- C3/C12 et G17 étayent l'inférence qu'un geste de production répétitif doit
+  conserver son outil actif ; le choix exact d'un bouton `Placer en continu`
+  est une décision Vertex Loom, pas une fonction attribuée à tous les moteurs.
+- S6 montre un niveau de référence plus exigeant pour le rig : binding depuis
+  la sélection, couleurs de bones, box-select, édition directe/brush, auto,
+  smooth et test de déformation dans le même contexte. L'écart mesh/poids de
+  Vertex Loom est donc confirmé, pas seulement déduit d'une liste de fonctions.
 
 ## Conclusion et ordre de correction
 

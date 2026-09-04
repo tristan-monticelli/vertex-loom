@@ -228,6 +228,14 @@ exige une fermeture de dépendances visible, clique Publish, recharge le dossier
 produit avec `PreviewRuntime` pour un smoke d'une frame et capture
 `map-studio-publish-runtime-e2e.ppm`. Un test runtime séparé initialise SDL
 comme un hôte et vérifie que la destruction du smoke embarqué ne l'arrête pas.
+Le test `map_studio_placement_e2e` garde une ressource Entity et la couche
+active dans l'état du workspace, puis clique réellement `Place in canvas` et
+deux positions distinctes du canvas avec `Keep placing` actif. Il exige deux
+IDs générés distincts, le maintien de l'outil et de la ressource, quitte
+explicitement l'outil avec `Échap`, sauvegarde, recharge, valide le
+projet et capture
+`map-studio-continuous-placement-e2e.ppm`. Aucune instance n'est injectée par
+API avant ces gestes.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique
 `Create Entity from visual`, dépose `button-primary` comme enfant, déplace cet

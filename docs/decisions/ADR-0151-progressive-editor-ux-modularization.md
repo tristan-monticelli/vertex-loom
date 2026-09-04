@@ -106,3 +106,9 @@ temporairement avec le shell commun, mais une commande métier ne doit avoir
 qu’un seul propriétaire. Le séquencement, les preuves et l'ordre des commits
 sont décrits dans le
 [plan de refactoring UX](../plans/editor-ux-modularization-2026-09-04.md).
+
+Un outil canvas répétitif conserve son contexte tant que l'auteur ne le quitte
+pas explicitement : ressource, couche et snapping restent stables, tandis que
+les identifiants persistants sont régénérés à chaque création. Cette règle
+s'applique d'abord au placement Map et évite que la production d'une série
+d'instances repasse par le formulaire entre chaque clic.
