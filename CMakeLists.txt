@@ -912,6 +912,15 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-transformation-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_transformation_e2e.cmake
         )
+        add_test(
+            NAME map_studio_mechanic_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-mechanic-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_mechanic_e2e.cmake
+        )
         set_tests_properties(
             asset_studio_ui_registry_e2e
             asset_studio_ui_min_window_e2e
@@ -936,6 +945,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             map_studio_close_e2e
             map_studio_scene_e2e
             map_studio_transformation_e2e
+            map_studio_mechanic_e2e
             PROPERTIES
                 SKIP_REGULAR_EXPRESSION "SKIP:"
                 TIMEOUT 180

@@ -347,6 +347,9 @@ C4Component
   flèches. `Connect from output`, puis un clic sur une cible compatible, remplit
   les extrémités et passe par `MechanicSession`; les pickers ci-dessus restent
   l'inspecteur avancé et le layout ne devient pas une donnée persistante.
+  Son E2E dédié retire une liaison valide de la fixture, la recrée uniquement
+  par les coordonnées des widgets, puis exige reload, compilation, pas fixe et
+  capture du framebuffer avant de considérer ce parcours prouvé.
 - L’inspecteur d’animation permet d’insérer des clés `Vec2`, scalaires,
   couleurs, booléens ou références de ressources, puis réutilise le même
   historique et le même parseur strict pour les évaluer et les sauvegarder.

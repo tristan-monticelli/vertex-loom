@@ -51,6 +51,16 @@ float ui_map_layers_x = 0.0F;
 float ui_map_canvas_x = 0.0F;
 float ui_map_inspector_x = 0.0F;
 float ui_map_canvas_width = 0.0F;
+bool ui_mechanic_graph_probe_enabled = false;
+bool ui_mechanic_graph_canvas_seen = false;
+bool ui_mechanic_graph_link_seen = false;
+bool ui_mechanic_graph_source_seen = false;
+bool ui_mechanic_graph_target_seen = false;
+bool ui_mechanic_graph_source_clicked = false;
+bool ui_mechanic_graph_target_clicked = false;
+ImVec2 ui_mechanic_graph_source_screen{};
+ImVec2 ui_mechanic_graph_target_screen{};
+fabric::project::MechanicConnection ui_mechanic_expected_connection;
 
 std::vector<fabric::project::EntityTransformation> load_transformations(
     const std::filesystem::path& root,
@@ -192,6 +202,28 @@ void write_e2e_failure_artifacts(
                                                        row_size),
                     static_cast<std::streamsize>(row_size));
     }
+}
+
+void write_frame_capture(const std::filesystem::path& project_path,
+                         SDL_Window* window, const std::string_view filename) {
+    if (project_path.empty() || window == nullptr) return;
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    std::ofstream image(project_path / filename, std::ios::binary);
+    if (!image) return;
+    image << "P6\n" << width << ' ' << height << "\n255\n";
+    const auto row_size = static_cast<std::size_t>(width) * 3U;
+    for (int row = height - 1; row >= 0; --row)
+        image.write(reinterpret_cast<const char*>(
+                        pixels.data() + static_cast<std::size_t>(row) * row_size),
+                    static_cast<std::streamsize>(row_size));
 }
 
 float relative_luminance(const ImVec4 color) {
@@ -1321,7 +1353,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
     draw_disabled_reason(state.new_id.empty() || state.new_name.empty(),
                          "Enter both a mechanic id and a mechanic name.");
 
-    ImGui::SeparatorText("Rotating platform preset");
+    if (ImGui::CollapsingHeader("Create rotating platform preset")) {
     ImGui::SetNextItemWidth(150.0F);
     ImGui::InputText("Platform id", &state.platform.id.value);
     focus_first_field_error(session.errors(), "id", "platform-create");
@@ -1404,6 +1436,7 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                 : session.errors().front().message;
         }
     }
+    }
 
     if (!session.has_graph()) {
         for (const auto& error : session.errors())
@@ -1461,6 +1494,8 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         "Choose Connect from output, then click a compatible destination.");
     if (ImGui::BeginChild("Mechanic graph canvas", {0.0F, 260.0F},
                           ImGuiChildFlags_Borders)) {
+        if (ui_mechanic_graph_probe_enabled)
+            ui_mechanic_graph_canvas_seen = true;
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         constexpr float card_width = 174.0F;
         constexpr float card_height = 78.0F;
@@ -1480,6 +1515,9 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
         auto* draw = ImGui::GetWindowDrawList();
         const ImU32 line_color = ImGui::GetColorU32(ImGuiCol_PlotLines);
         for (const auto& connection : graph.connections) {
+            if (ui_mechanic_graph_probe_enabled &&
+                connection == ui_mechanic_expected_connection)
+                ui_mechanic_graph_link_seen = true;
             const auto source = std::ranges::find(
                 graph.nodes, connection.from_node,
                 &fabric::project::MechanicNodeDefinition::id);
@@ -1492,17 +1530,42 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                 std::distance(graph.nodes.begin(), source));
             const auto target_index = static_cast<std::size_t>(
                 std::distance(graph.nodes.begin(), target));
-            const ImVec2 start{origin.x + positions[source_index].x + card_width,
-                               origin.y + positions[source_index].y +
-                                   card_height * 0.5F};
-            const ImVec2 end{origin.x + positions[target_index].x,
-                             origin.y + positions[target_index].y +
-                                 card_height * 0.5F};
-            const float bend = std::max(36.0F, std::abs(end.x - start.x) * 0.4F);
-            draw->AddBezierCubic(start, {start.x + bend, start.y},
-                                 {end.x - bend, end.y}, end, line_color, 2.0F);
-            draw->AddTriangleFilled(end, {end.x - 8.0F, end.y - 5.0F},
-                                    {end.x - 8.0F, end.y + 5.0F}, line_color);
+            const bool same_column =
+                positions[source_index].x == positions[target_index].x;
+            if (same_column) {
+                const bool downward = positions[target_index].y >
+                    positions[source_index].y;
+                const ImVec2 start{
+                    origin.x + positions[source_index].x + card_width * 0.5F,
+                    origin.y + positions[source_index].y +
+                        (downward ? card_height : 0.0F)};
+                const ImVec2 end{
+                    origin.x + positions[target_index].x + card_width * 0.5F,
+                    origin.y + positions[target_index].y +
+                        (downward ? 0.0F : card_height)};
+                const float bend = std::max(28.0F, std::abs(end.y - start.y) * 0.4F);
+                const float direction = downward ? 1.0F : -1.0F;
+                draw->AddBezierCubic(start,
+                    {start.x, start.y + direction * bend},
+                    {end.x, end.y - direction * bend}, end, line_color, 2.0F);
+                draw->AddTriangleFilled(end,
+                    {end.x - 5.0F, end.y - direction * 9.0F},
+                    {end.x + 5.0F, end.y - direction * 9.0F}, line_color);
+            } else {
+                const ImVec2 start{
+                    origin.x + positions[source_index].x + card_width,
+                    origin.y + positions[source_index].y + card_height * 0.5F};
+                const ImVec2 end{
+                    origin.x + positions[target_index].x,
+                    origin.y + positions[target_index].y + card_height * 0.5F};
+                const float bend =
+                    std::max(36.0F, std::abs(end.x - start.x) * 0.4F);
+                draw->AddBezierCubic(start, {start.x + bend, start.y},
+                                     {end.x - bend, end.y}, end,
+                                     line_color, 2.0F);
+                draw->AddTriangleFilled(end, {end.x - 8.0F, end.y - 5.0F},
+                                        {end.x - 8.0F, end.y + 5.0F}, line_color);
+            }
         }
         for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
             const auto& node = graph.nodes[index];
@@ -1520,6 +1583,9 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
             if (output != node.ports.end()) label += "\nout: " + output->id;
             if (ImGui::Button(label.c_str(), {card_width, card_height})) {
                 state.selected_node = node.id;
+                if (ui_mechanic_graph_probe_enabled &&
+                    node.id == ui_mechanic_expected_connection.to_node)
+                    ui_mechanic_graph_target_clicked = true;
                 if (!state.canvas_connection_source.empty() &&
                     state.canvas_connection_source != node.id) {
                     const auto source = std::ranges::find(
@@ -1548,6 +1614,15 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
                     }
                 }
             }
+            if (ui_mechanic_graph_probe_enabled &&
+                node.id == ui_mechanic_expected_connection.to_node) {
+                ui_mechanic_graph_target_seen = true;
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_mechanic_graph_target_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+            }
             ImGui::BeginDisabled(output == node.ports.end());
             if (state.canvas_connection_source == node.id) {
                 if (ImGui::SmallButton("Cancel connection"))
@@ -1555,8 +1630,20 @@ void draw_mechanic_editor(fabric::editor::MechanicSession& session,
             } else if (ImGui::SmallButton("Connect from output")) {
                 state.canvas_connection_source = node.id;
                 state.selected_node = node.id;
+                if (ui_mechanic_graph_probe_enabled &&
+                    node.id == ui_mechanic_expected_connection.from_node)
+                    ui_mechanic_graph_source_clicked = true;
             }
             ImGui::EndDisabled();
+            if (ui_mechanic_graph_probe_enabled &&
+                node.id == ui_mechanic_expected_connection.from_node) {
+                ui_mechanic_graph_source_seen = true;
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_mechanic_graph_source_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+            }
             ImGui::PopID();
         }
     }
@@ -2564,11 +2651,13 @@ int run(const std::filesystem::path& project_root,
         const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
         const bool scene_e2e = false,
         const bool transformation_e2e = false,
-        const bool ui_accessibility_test = false) {
+        const bool ui_accessibility_test = false,
+        const bool mechanic_e2e = false) {
     const auto trace_session_id =
         fabric::core::make_trace_session_id("map-studio");
     const int graphical_failure =
-        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test)
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test ||
+         mechanic_e2e)
             ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
@@ -2594,7 +2683,8 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test ||
+         mechanic_e2e
              ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
@@ -2675,6 +2765,29 @@ int run(const std::filesystem::path& project_root,
         std::cerr << "Map Studio close E2E: " << message << '\n';
         e2e_failed = true;
     };
+    bool mechanic_e2e_complete = false;
+    std::size_t mechanic_e2e_frame = 0U;
+    bool mechanic_e2e_capture_written = false;
+    if (mechanic_e2e) {
+        ui_mechanic_graph_probe_enabled = true;
+        ui_mechanic_graph_canvas_seen = false;
+        ui_mechanic_graph_link_seen = false;
+        ui_mechanic_graph_source_seen = false;
+        ui_mechanic_graph_target_seen = false;
+        ui_mechanic_graph_source_clicked = false;
+        ui_mechanic_graph_target_clicked = false;
+        const bool opened = session.map() && mechanic_session.open(
+            project_root, *session.map(), {.value = "rotating-platform"});
+        if (opened && !mechanic_session.graph()->connections.empty()) {
+            ui_mechanic_expected_connection =
+                mechanic_session.graph()->connections.front();
+            mechanic_e2e_complete = mechanic_session.disconnect(0U) &&
+                mechanic_session.save();
+            mechanic_editor.open_id = "rotating-platform";
+        }
+        if (!mechanic_e2e_complete)
+            fail_e2e("mechanic fixture could not remove its first connection");
+    }
     bool scene_e2e_complete = false;
     if (scene_e2e) {
         if (!session.has_map()) {
@@ -2880,6 +2993,28 @@ int run(const std::filesystem::path& project_root,
     };
     bool running = true;
     while (running) {
+        if (mechanic_e2e &&
+            (mechanic_e2e_frame == 2U || mechanic_e2e_frame == 4U) &&
+            ui_mechanic_graph_source_seen && ui_mechanic_graph_target_seen) {
+            const ImVec2 target = mechanic_e2e_frame == 2U
+                ? ui_mechanic_graph_source_screen
+                : ui_mechanic_graph_target_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
+                SDL_Event button{};
+                button.type = type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
         if (e2e_mode && !e2e_failed && !e2e_event_injected) {
             SDL_Event close_event{};
             if (*e2e_mode == CloseE2eMode::window) {
@@ -4242,6 +4377,8 @@ int run(const std::filesystem::path& project_root,
                              resource_catalog);
         draw_scene_editor(scene_session, project_root, window, scene_editor,
                           status, package_errors, resource_catalog);
+        if (mechanic_e2e && mechanic_e2e_frame == 0U)
+            ImGui::SetWindowFocus("Mechanics");
 
         if (const auto ready = transition_guard.take_ready();
             ready == fabric::editor::SessionAction::quit) {
@@ -4376,6 +4513,32 @@ int run(const std::filesystem::path& project_root,
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (mechanic_e2e && ui_mechanic_graph_link_seen &&
+            !mechanic_e2e_capture_written) {
+            write_frame_capture(project_root, window,
+                                "map-studio-mechanic-graph-e2e.ppm");
+            mechanic_e2e_capture_written = true;
+        }
+        if (mechanic_e2e && ++mechanic_e2e_frame == 8U) {
+            const bool saved = mechanic_session.save();
+            fabric::editor::MechanicSession reloaded;
+            const bool reopened = saved && session.map() && reloaded.open(
+                project_root, *session.map(), {.value = "rotating-platform"});
+            mechanic_e2e_complete = mechanic_e2e_complete && reopened &&
+                ui_mechanic_graph_canvas_seen && ui_mechanic_graph_link_seen &&
+                mechanic_e2e_capture_written && reloaded.simulation().valid() &&
+                std::ranges::find(reloaded.graph()->connections,
+                                  ui_mechanic_expected_connection) !=
+                    reloaded.graph()->connections.end() &&
+                reloaded.step_once();
+            if (!mechanic_e2e_complete)
+                fail_e2e("mechanic canvas connection did not reload and simulate: " +
+                    std::to_string(ui_mechanic_graph_canvas_seen) + "," +
+                    std::to_string(ui_mechanic_graph_source_clicked) + "," +
+                    std::to_string(ui_mechanic_graph_target_clicked) + "," +
+                    std::to_string(ui_mechanic_graph_link_seen));
+            running = false;
+        }
         if (scene_e2e || transformation_e2e) running = false;
         if (ui_accessibility_test) {
             write_ui_accessibility_probe(
@@ -4388,7 +4551,8 @@ int run(const std::filesystem::path& project_root,
 
     const bool e2e_incomplete = e2e_failed ||
         (scene_e2e && !scene_e2e_complete) ||
-        (transformation_e2e && !transformation_e2e_complete);
+        (transformation_e2e && !transformation_e2e_complete) ||
+        (mechanic_e2e && !mechanic_e2e_complete);
     if (e2e_incomplete)
         write_e2e_failure_artifacts(project_root, window, status, session,
                                     package_errors);
@@ -4414,11 +4578,13 @@ int main(int argc, char** argv) {
         std::string_view{argv[1]} == "--e2e-scene";
     const bool transformation_e2e = argc == 4 &&
         std::string_view{argv[1]} == "--e2e-transformation";
+    const bool mechanic_e2e = argc == 4 &&
+        std::string_view{argv[1]} == "--e2e-mechanic";
     const bool ui_accessibility_test = argc == 3 &&
         std::string_view{argv[1]} == "--ui-accessibility-test";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
     if ((argc != 1 && argc != 3 && !e2e && !scene_e2e &&
-         !transformation_e2e && !ui_accessibility_test) ||
+         !transformation_e2e && !mechanic_e2e && !ui_accessibility_test) ||
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
@@ -4426,19 +4592,21 @@ int main(int argc, char** argv) {
                      "       map_studio --e2e-scene project-directory map-id\n"
                      "       map_studio --e2e-transformation "
                      "project-directory map-id\n"
+                     "       map_studio --e2e-mechanic project-directory map-id\n"
                      "       map_studio --ui-accessibility-test project-directory\n";
         return 64;
     }
     const std::filesystem::path project = e2e ? argv[3]
         : scene_e2e ? argv[2]
         : transformation_e2e ? argv[2]
+        : mechanic_e2e ? argv[2]
         : ui_accessibility_test ? argv[2]
         : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
         e2e ? argv[4]
-        : scene_e2e || transformation_e2e ? argv[3]
+        : scene_e2e || transformation_e2e || mechanic_e2e ? argv[3]
         : ui_accessibility_test ? "textile-head-preview"
         : argc == 3 ? argv[2] : ""};
     return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e,
-               ui_accessibility_test);
+               ui_accessibility_test, mechanic_e2e);
 }
