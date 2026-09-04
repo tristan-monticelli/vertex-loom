@@ -90,6 +90,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/map_chunk_index.cpp
     engine/fabric_project/src/mechanic_graph.cpp
     engine/fabric_project/src/mesh_deformation.cpp
+    engine/fabric_project/src/path_follower.cpp
     engine/fabric_project/src/material.cpp
     engine/fabric_project/src/migrations.cpp
     engine/fabric_project/src/project_creator.cpp
@@ -533,6 +534,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         fabric_project Catch2::Catch2WithMain)
     add_test(NAME fabric_animation_state_machine_tests
              COMMAND fabric_animation_state_machine_tests)
+
+    add_executable(fabric_path_follower_tests
+        tests/cpp/path_follower_tests.cpp
+    )
+    target_link_libraries(fabric_path_follower_tests PRIVATE
+        fabric_project Catch2::Catch2WithMain)
+    add_test(NAME fabric_path_follower_tests
+             COMMAND fabric_path_follower_tests)
 
     add_executable(fabric_animation_constraints_tests
         tests/cpp/animation_constraints_tests.cpp
