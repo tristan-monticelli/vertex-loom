@@ -142,6 +142,12 @@ transform non destructifs, puis valide exclusivement via `ProjectSession`.
 Le canvas de crop et la texture GPU restent dans le shell jusqu'à extraction
 séparée de leurs dépendances d'affichage.
 
+`RasterCropCanvas` constitue cette extraction d'affichage : il reçoit la
+texture GPU et `CanvasUiState`, garde les gestes zoom/pan et poignées dans cet
+état, et expose un adaptateur de probe optionnel pour les E2E. Les seules
+modifications persistantes restent les commandes `set_selected_texture_view`
+de `ProjectSession`.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

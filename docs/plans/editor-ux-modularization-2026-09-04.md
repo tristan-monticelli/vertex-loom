@@ -153,6 +153,10 @@ Son brouillon est détenu par le workspace et réinitialisé par ID de texture ;
 le canvas GPU reste dans le shell afin de ne pas coupler l'édition JSON aux
 coordonnées écran.
 
+La frontière suivante extrait le canvas GPU de crop avec un adaptateur de probe
+explicite. Le zoom, pan et drag restent dans `CanvasUiState`; le module ne
+connaît ni l'importateur ni le filesystem.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

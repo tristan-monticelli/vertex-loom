@@ -31,6 +31,7 @@
 #include "visual_composition_layer_panel.hpp"
 #include "textured_path_pen_panel.hpp"
 #include "raster_view_inspector.hpp"
+#include "raster_crop_canvas.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -100,6 +101,8 @@ using fabric::asset_studio::TexturedPathPenPanelState;
 using fabric::asset_studio::draw_textured_path_pen_panel;
 using fabric::asset_studio::RasterViewInspectorState;
 using fabric::asset_studio::draw_raster_view_inspector;
+using fabric::asset_studio::RasterCropCanvasProbe;
+using fabric::asset_studio::draw_raster_crop_canvas_panel;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -2747,7 +2750,8 @@ ImU32 color_to_u32(const fabric::core::Color& color) {
 }
 
 
-void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
+#if 0 // RasterCropCanvas owns this implementation; retained only for bisecting.
+void draw_raster_crop_canvas_legacy(fabric::editor::ProjectSession& session,
                              const AssetPreview& preview,
                              CanvasUiState& canvas, const ImVec2 available,
                              std::string& status) {
@@ -2893,6 +2897,7 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
             "Drag inside to move the crop. Drag a corner to resize it. The source image is never rewritten.");
     }
 }
+#endif
 
 void draw_workspace(fabric::editor::ProjectSession& session,
                     fabric::editor::EditorContext& editor_context,
@@ -3453,11 +3458,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
         ImGui::TextUnformatted("Raster crop · non-destructive source");
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 34.0F});
-        draw_raster_crop_canvas(
+        RasterCropCanvasProbe probe{
+            .enabled = ui_texture_probe_enabled,
+            .canvas_seen = &ui_texture_canvas_seen,
+            .crop_source = &ui_texture_crop_source,
+            .crop_target = &ui_texture_crop_target};
+        draw_raster_crop_canvas_panel(
             session, preview, canvas,
             {std::max(1.0F, available.x - 16.0F),
              std::max(1.0F, available.y - 42.0F)},
-            status);
+            status, &probe);
     } else if (preview.texture != 0U) {
         const float image_width = static_cast<float>(preview.width);
         const float image_height = static_cast<float>(preview.height);

@@ -315,6 +315,9 @@ style shader et l'animation de texture restent dans le shell.
 L'extraction de `RasterViewInspector` doit conserver le crop, pivot et
 transform non destructifs, le reset de la source complète et le round-trip ;
 le canvas GPU est vérifié séparément avec la fixture asymétrique.
+L'extraction du `RasterCropCanvas` doit conserver le zoom, le pan, les quatre
+poignées, le déplacement intérieur et les probes E2E réels sans écrire la
+source PNG.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre
