@@ -3352,6 +3352,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 return changed;
             };
         }
+        fabric::asset_studio::EntityParticleCommit particle_commit;
+        if (entity_selected) {
+            particle_commit = [&](const std::size_t index,
+                                  const fabric::core::Vec2 position) {
+                if (!session.selected_entity()->xpbd ||
+                    index >= session.selected_entity()->xpbd->particles.size())
+                    return false;
+                auto next = *session.selected_entity();
+                next.xpbd->particles[index].position = position;
+                return session.set_selected_entity_definition(std::move(next));
+            };
+        }
         fabric::asset_studio::draw_packet_preview_canvas(
             canvas, {std::max(1.0F, available.x - 16.0F),
                      std::max(1.0F, available.y - 42.0F)},
@@ -3360,7 +3372,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 : animation_ui.auto_key
                 ? "Animated entity · auto-key"
                 : "Animated entity · enable auto-key to edit",
-            &session, std::move(transform_commit));
+            &session, std::move(transform_commit), std::move(particle_commit));
     } else if (preview.texture != 0U && session.imported_texture() &&
                session.selected_resource() != nullptr &&
                session.selected_resource()->kind ==

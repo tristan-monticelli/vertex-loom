@@ -45,6 +45,11 @@ automatique du canevas est un état de présentation et ne modifie aucun contrat
 Les cartes peuvent aussi être déplacées directement dans le canevas ; leurs
 positions restent éphémères dans l'état du workspace et sont recalculées pour
 un nouvel Entity, sans migration du document persistant.
+
+Le canvas Entity expose aussi les particules XPBD dynamiques comme poignées
+éditables. Leur déplacement passe par la commande de session de l'Entity ; les
+particules fixes ne sont pas déplaçables et restent pilotées par leur contrainte
+de pin.
 La barre du canevas permet de choisir un clip puis `Ajouter un état depuis le
 clip` ; l'identifiant est dérivé du clip et rendu unique. L'utilisateur ne doit
 pas ouvrir l'onglet technique `States` ni saisir d'identifiant pour agrandir le

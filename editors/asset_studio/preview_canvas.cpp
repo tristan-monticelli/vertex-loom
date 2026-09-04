@@ -9,12 +9,16 @@ namespace fabric::asset_studio {
 void draw_packet_preview_canvas(
     CanvasUiState& canvas, const ImVec2 available, const std::string_view label,
     fabric::editor::ProjectSession* editable_session,
-    EntityTransformCommit transform_commit) {
+    EntityTransformCommit transform_commit,
+    EntityParticleCommit particle_commit) {
     ImGui::InvisibleButton("Entity canvas", available,
                            ImGuiButtonFlags_MouseButtonLeft |
                                ImGuiButtonFlags_MouseButtonMiddle);
     const ImVec2 origin = ImGui::GetItemRectMin();
     canvas.xpbd_overlay_visible = false;
+    if (!editable_session || !editable_session->selected_entity() ||
+        !editable_session->selected_entity()->xpbd)
+        canvas.xpbd_particle_dragging = false;
     canvas.ik_overlay_visible = false;
     canvas.native_canvas = true;
     canvas.native_origin = origin;
@@ -42,6 +46,8 @@ void draw_packet_preview_canvas(
                       center.y + canvas.pan.y - point.y * pixels_per_unit};
     };
     auto* draw_list = ImGui::GetWindowDrawList();
+    const bool canvas_hovered = ImGui::IsMouseHoveringRect(
+        origin, {origin.x + available.x, origin.y + available.y});
     if (canvas.grid_visible) {
         draw_list->AddLine(to_screen({0.0F, bounds.origin.y}),
                            to_screen({0.0F, bounds.origin.y + bounds.size.y}),
@@ -121,6 +127,46 @@ void draw_packet_preview_canvas(
                                IM_COL32(225, 230, 238, 230),
                                std::to_string(index).c_str());
         }
+        if (particle_commit && canvas_hovered &&
+            !canvas.xpbd_particle_dragging &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            std::optional<std::size_t> nearest;
+            float nearest_distance = 14.0F;
+            for (std::size_t index = 0; index < xpbd.particles.size(); ++index) {
+                if (xpbd.particles[index].inverse_mass == 0.0F) continue;
+                const auto point = to_screen(xpbd.particles[index].position);
+                const float distance = std::hypot(
+                    ImGui::GetIO().MousePos.x - point.x,
+                    ImGui::GetIO().MousePos.y - point.y);
+                if (distance <= nearest_distance) {
+                    nearest = index;
+                    nearest_distance = distance;
+                }
+            }
+            if (nearest) {
+                canvas.xpbd_particle_dragging = true;
+                canvas.xpbd_particle_index = *nearest;
+                canvas.xpbd_particle_start_mouse = ImGui::GetIO().MousePos;
+                canvas.xpbd_particle_start_position =
+                    xpbd.particles[*nearest].position;
+            }
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+            canvas.xpbd_particle_dragging = false;
+        if (canvas.xpbd_particle_dragging &&
+            canvas.xpbd_particle_index < xpbd.particles.size()) {
+            const ImVec2 delta{
+                ImGui::GetIO().MousePos.x - canvas.xpbd_particle_start_mouse.x,
+                ImGui::GetIO().MousePos.y - canvas.xpbd_particle_start_mouse.y};
+            const float scale = std::max(0.01F, pixels_per_unit);
+            const fabric::core::Vec2 position{
+                canvas.xpbd_particle_start_position.x + delta.x / scale,
+                canvas.xpbd_particle_start_position.y - delta.y / scale};
+            if (particle_commit(canvas.xpbd_particle_index, position))
+                ImGui::SetTooltip("Move particle %zu · %.2f, %.2f",
+                                  canvas.xpbd_particle_index,
+                                  delta.x / scale, -delta.y / scale);
+        }
     }
     const float world_half_width = available.x / (2.0F * pixels_per_unit);
     const float world_half_height = available.y / (2.0F * pixels_per_unit);
@@ -133,7 +179,7 @@ void draw_packet_preview_canvas(
                         canvas.zoom * 100.0F);
     if (editable_session && editable_session->selected_entity() &&
         canvas.selected_node < editable_session->selected_entity()->nodes.size()) {
-        const auto& entity = *editable_session->selected_entity();
+        const auto entity = *editable_session->selected_entity();
         const auto display_transform = [&](const std::size_t index)
             -> const fabric::core::Transform& {
             return canvas.entity_display_transforms.size() == entity.nodes.size()
@@ -189,9 +235,8 @@ void draw_packet_preview_canvas(
 
         std::optional<std::size_t> clicked_node;
         float clicked_distance = 15.0F;
-        const bool canvas_hovered = ImGui::IsMouseHoveringRect(
-            origin, {origin.x + available.x, origin.y + available.y});
-        if (canvas_hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        if (!canvas.xpbd_particle_dragging && canvas_hovered &&
+            ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             const auto primary = to_screen(
                 display_transform(canvas.selected_node).position);
             if (std::hypot(ImGui::GetIO().MousePos.x - primary.x,

@@ -62,6 +62,10 @@ struct CanvasUiState {
     ImVec2 entity_gizmo_start_mouse{};
     ImVec2 entity_gizmo_screen{};
     bool xpbd_overlay_visible{};
+    bool xpbd_particle_dragging{};
+    std::size_t xpbd_particle_index{};
+    ImVec2 xpbd_particle_start_mouse{};
+    fabric::core::Vec2 xpbd_particle_start_position{};
     bool ik_overlay_visible{};
     fabric::core::Transform entity_gizmo_start_transform;
     std::vector<std::pair<std::size_t, fabric::core::Transform>>

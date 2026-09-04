@@ -131,7 +131,10 @@ fenêtre au premier plan ne masque pas artificiellement l'interaction canvas.
 Le volet `Entity simulation` résume le système XPBD avec les erreurs max/RMS et
 l'énergie compliante définies par ADR-0139. Le canvas superpose particules et
 liaisons sans les confondre avec les contraintes d'animation de nœuds ; ces
-diagnostics ne sont jamais sauvegardés dans l'Entity.
+diagnostics ne sont jamais sauvegardés dans l'Entity. Une particule dynamique
+peut être déplacée directement à la souris ; la mutation passe par la session,
+tandis qu'une particule fixe reste protégée et se règle via sa contrainte de
+pin.
 
 Le panneau d'une ressource Audio maintient un brouillon stable du document :
 bus nommés, volume, boucle et spatialisation sont édités ensemble puis validés
