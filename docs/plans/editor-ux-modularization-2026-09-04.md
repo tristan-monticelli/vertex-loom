@@ -148,6 +148,11 @@ Path`. Elle conserve la sélection de commande dans le workspace, interdit les
 ajouts/suppressions invalides et laisse le style shader, l'animation de texture
 et le crop raster dans le shell jusqu'à extraction de leurs dépendances.
 
+La sous-frontière suivante extrait l'inspecteur `Raster View` non destructif.
+Son brouillon est détenu par le workspace et réinitialisé par ID de texture ;
+le canvas GPU reste dans le shell afin de ne pas coupler l'édition JSON aux
+coordonnées écran.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

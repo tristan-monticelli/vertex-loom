@@ -136,6 +136,12 @@ délègue l'édition des points, poignées, ajouts et suppressions à
 `ProjectSession`. Le style shader, le preview d'animation et le crop raster
 restent hors de ce module afin de conserver une frontière testable.
 
+`RasterViewInspector` retire l'état d'édition raster statique du shell. Il
+réinitialise son brouillon par identifiant de texture, expose le crop, pivot et
+transform non destructifs, puis valide exclusivement via `ProjectSession`.
+Le canvas de crop et la texture GPU restent dans le shell jusqu'à extraction
+séparée de leurs dépendances d'affichage.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

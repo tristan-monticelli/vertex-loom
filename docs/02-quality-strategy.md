@@ -312,6 +312,9 @@ L'extraction du panneau `TexturedPathPenPanel` doit conserver la sélection de
 commande, l'édition des points et poignées, l'ajout de segments et la
 suppression bornée, avec sauvegarde/rechargement par `ProjectSession` ; le
 style shader et l'animation de texture restent dans le shell.
+L'extraction de `RasterViewInspector` doit conserver le crop, pivot et
+transform non destructifs, le reset de la source complète et le round-trip ;
+le canvas GPU est vérifié séparément avec la fixture asymétrique.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre

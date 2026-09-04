@@ -200,6 +200,7 @@ flowchart LR
 | Visual Component Inspector | sélection stable des ancres/paramètres, apparence Beam et valeurs par défaut via `ProjectSession` | preview GPU, création de ressource, shell ou accès fichier |
 | Visual Composition Layer Panel | sélection stable des layers, ajout de ressource compatible et duplication via `ProjectSession` | crop raster, preview GPU, création de composition ou shell |
 | Textured Path Pen Panel | sélection de commande, points et poignées, ajout/suppression bornée via `ProjectSession` | style shader, animation de texture, preview GPU ou sérialisation |
+| Raster View Inspector | édition non destructive du crop, pivot et transform par document via `ProjectSession` | canvas GPU, pixels source, import ou sérialisation directe |
 | Animation Timeline Command | déplacement atomique d'une ou plusieurs clés par delta temporel via `ProjectSession` | sélection UI, playhead ou copie persistante du clip |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, diagnostics/focus de champ, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |

@@ -30,6 +30,7 @@
 #include "visual_component_inspector.hpp"
 #include "visual_composition_layer_panel.hpp"
 #include "textured_path_pen_panel.hpp"
+#include "raster_view_inspector.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -97,6 +98,8 @@ using fabric::asset_studio::draw_visual_component_inspector;
 using fabric::asset_studio::draw_visual_composition_layer_panel;
 using fabric::asset_studio::TexturedPathPenPanelState;
 using fabric::asset_studio::draw_textured_path_pen_panel;
+using fabric::asset_studio::RasterViewInspectorState;
+using fabric::asset_studio::draw_raster_view_inspector;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -2912,6 +2915,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     VisualComponentInspectorState& visual_component_ui,
                     VisualCompositionLayerPanelState& visual_composition_ui,
                     TexturedPathPenPanelState& textured_path_pen_ui,
+                    RasterViewInspectorState& raster_view_ui,
                     AnimationWorkspaceState& animation_ui,
                     AnimationTimelineProbe& animation_timeline_probe,
                     AnimationInspectorProbe& animation_inspector_probe,
@@ -4099,81 +4103,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
                 ImGui::SeparatorText("Raster view (non-destructive)");
-                static std::string raster_view_edit_id;
-                static fabric::project::RasterView raster_view_edit;
-                static std::optional<fabric::project::RasterView>
-                    raster_view_source;
                 const auto& texture = *session.imported_texture();
-                if (raster_view_edit_id != texture.asset.document.id.value ||
-                    (raster_view_source != texture.asset.view &&
-                     !ImGui::IsAnyItemActive())) {
-                    raster_view_edit_id = texture.asset.document.id.value;
-                    raster_view_edit.crop = texture.asset.view
-                        ? texture.asset.view->crop
-                        : fabric::core::Rect{
-                            {0.0F, 0.0F},
-                            {static_cast<float>(texture.asset.width),
-                             static_cast<float>(texture.asset.height)}};
-                    raster_view_edit.pivot = texture.asset.view
-                        ? texture.asset.view->pivot
-                        : fabric::core::Vec2{0.5F, 0.5F};
-                    raster_view_edit.transform = texture.asset.view
-                        ? texture.asset.view->transform
-                        : fabric::core::Transform{};
-                    raster_view_edit.filter = texture.asset.view
-                        ? texture.asset.view->filter
-                        : fabric::project::RasterFilter::linear;
-                    raster_view_source = texture.asset.view;
-                }
-                float crop_origin[2]{raster_view_edit.crop.origin.x,
-                                     raster_view_edit.crop.origin.y};
-                float crop_size[2]{raster_view_edit.crop.size.x,
-                                   raster_view_edit.crop.size.y};
-                float crop_pivot[2]{raster_view_edit.pivot.x,
-                                    raster_view_edit.pivot.y};
-                float view_position[2]{raster_view_edit.transform.position.x,
-                                       raster_view_edit.transform.position.y};
-                float view_scale[2]{raster_view_edit.transform.scale.x,
-                                    raster_view_edit.transform.scale.y};
-                float view_rotation = raster_view_edit.transform.rotation_degrees;
-                ImGui::InputFloat2("Crop origin (pixels)", crop_origin);
-                ImGui::SetItemTooltip("Top-left crop origin measured in source pixels.");
-                ImGui::InputFloat2("Crop size (pixels)", crop_size);
-                ImGui::SetItemTooltip("Crop width and height measured in source pixels.");
-                ImGui::InputFloat2("Pivot (normalized)", crop_pivot);
-                ImGui::SetItemTooltip("Normalized pivot used by the raster view transform.");
-                ImGui::InputFloat2("View position (world units)", view_position);
-                ImGui::SetItemTooltip("Raster view translation in project world units.");
-                ImGui::InputFloat("View rotation (degrees)", &view_rotation);
-                ImGui::SetItemTooltip("Raster view rotation around its normalized pivot.");
-                ImGui::InputFloat2("View scale (factor)", view_scale);
-                ImGui::SetItemTooltip("Raster view scale multiplier on each axis.");
-                if (ImGui::Button("Apply crop/view")) {
-                    raster_view_edit.crop.origin = {crop_origin[0], crop_origin[1]};
-                    raster_view_edit.crop.size = {crop_size[0], crop_size[1]};
-                    raster_view_edit.pivot = {crop_pivot[0], crop_pivot[1]};
-                    raster_view_edit.transform.position =
-                        {view_position[0], view_position[1]};
-                    raster_view_edit.transform.rotation_degrees = view_rotation;
-                    raster_view_edit.transform.scale =
-                        {view_scale[0], view_scale[1]};
-                    if (session.set_selected_texture_view(raster_view_edit)) {
-                        raster_view_source = raster_view_edit;
-                        status = "Raster view saved in the document.";
-                    } else {
-                        status = "Raster view rejected; inspect diagnostics.";
-                    }
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Reset full source")) {
-                    if (session.reset_selected_texture_view()) {
-                        raster_view_edit_id.clear();
-                        raster_view_source.reset();
-                        status = "Raster view reset to the full source.";
-                    } else {
-                        status = "Raster view reset failed; inspect diagnostics.";
-                    }
-                }
+                draw_raster_view_inspector(session, raster_view_ui, status);
                 const auto view = texture.asset.view
                     ? texture.asset.view->crop
                     : fabric::core::Rect{
@@ -6759,6 +6690,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     VisualComponentInspectorState visual_component_ui;
     VisualCompositionLayerPanelState visual_composition_ui;
     TexturedPathPenPanelState textured_path_pen_ui;
+    RasterViewInspectorState raster_view_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     EntityArtworkInspectorState entity_artwork_state;
@@ -8822,6 +8754,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        visual_component_ui,
                        visual_composition_ui,
                        textured_path_pen_ui,
+                       raster_view_ui,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,
