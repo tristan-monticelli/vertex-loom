@@ -1685,9 +1685,15 @@ TEST_CASE("preview runtime advances map path followers") {
     REQUIRE(fabric::project::publish_textured_path(root, manifest(), runtime_path()).ok());
     CHECK(fabric::project::sample_textured_path(runtime_path(), 0.5F).position.x == Catch::Approx(5.0F));
     REQUIRE(fabric::project::publish_map(root, manifest(), map_with_path_follower()).ok());
+    const auto package = root.string() + "-package";
+    REQUIRE(fabric::project::publish_map_package(
+        root, {.value = "preview"}, package).ok());
+    REQUIRE(std::filesystem::is_regular_file(
+        std::filesystem::path{package} /
+        "assets/paths/runtime-path.textured-path.json"));
 
     fabric::runtime::PreviewRuntime runtime;
-    const auto loaded = runtime.load({.project_root = root, .map_id = {.value = "preview"},
+    const auto loaded = runtime.load({.package_root = package,
                                       .mode = fabric::runtime::RuntimeMode::smoke_test,
                                       .frame_limit = 2U});
     if (!loaded) for (const auto& error : runtime.errors()) std::cerr << error << '\n';
@@ -1700,6 +1706,7 @@ TEST_CASE("preview runtime advances map path followers") {
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+    std::filesystem::remove_all(package, ignored);
 }
 
 TEST_CASE("published Preview Runtime evaluates one attached behavior for player AI and map") {
