@@ -29,6 +29,7 @@
 #include "vector_canvas.hpp"
 #include "visual_component_inspector.hpp"
 #include "visual_composition_layer_panel.hpp"
+#include "textured_path_pen_panel.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -94,6 +95,8 @@ using fabric::asset_studio::draw_behavior_workspace;
 using fabric::asset_studio::draw_entity_rig_inspector;
 using fabric::asset_studio::draw_visual_component_inspector;
 using fabric::asset_studio::draw_visual_composition_layer_panel;
+using fabric::asset_studio::TexturedPathPenPanelState;
+using fabric::asset_studio::draw_textured_path_pen_panel;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -2908,6 +2911,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         visual_preview,
                     VisualComponentInspectorState& visual_component_ui,
                     VisualCompositionLayerPanelState& visual_composition_ui,
+                    TexturedPathPenPanelState& textured_path_pen_ui,
                     AnimationWorkspaceState& animation_ui,
                     AnimationTimelineProbe& animation_timeline_probe,
                     AnimationInspectorProbe& animation_inspector_probe,
@@ -3734,92 +3738,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         visual_preview.bounds.size.y);
             if (session.selected_textured_path()) {
                 const auto path = *session.selected_textured_path();
-                static std::string selected_path_id;
-                static std::size_t selected_path_command{};
-                if (selected_path_id != path.document.id.value) {
-                    selected_path_id = path.document.id.value;
-                    selected_path_command = 0U;
-                }
-                ImGui::Text("%zu path command(s)", path.commands.size());
                 ImGui::Text("Texture %s", path.texture.id.value.c_str());
-                ImGui::SeparatorText("Pen and attachments");
-                for (std::size_t index = 0; index < path.commands.size();
-                     ++index) {
-                    const auto& command = path.commands[index];
-                    const char* kind = index == 0U ? "Start attachment" :
-                        command.kind ==
-                                fabric::project::TexturedPathCommandKind::line
-                            ? "Line point" : "Bezier point";
-                    ImGui::PushID(static_cast<int>(index));
-                    if (ImGui::Selectable(kind,
-                                          selected_path_command == index))
-                        selected_path_command = index;
-                    ImGui::PopID();
-                }
-                if (!path.commands.empty() &&
-                    selected_path_command < path.commands.size()) {
-                    auto command = path.commands[selected_path_command];
-                    bool command_changed = ImGui::DragFloat2(
-                        selected_path_command == 0U ? "Start (world units)" : "Endpoint (world units)",
-                        &command.point.x, 0.05F);
-                    draw_technical_tooltip("Position of the selected path command in world space.");
-                    if (command.kind ==
-                        fabric::project::TexturedPathCommandKind::cubic) {
-                        command_changed |= ImGui::DragFloat2(
-                            "Handle in (world units)", &command.control1.x, 0.05F);
-                        draw_technical_tooltip("Incoming cubic handle position.");
-                        command_changed |= ImGui::DragFloat2(
-                            "Handle out (world units)", &command.control2.x, 0.05F);
-                        draw_technical_tooltip("Outgoing cubic handle position.");
-                    }
-                    if (command_changed) {
-                        auto candidate = path;
-                        candidate.commands[selected_path_command] = command;
-                        (void)session.set_selected_textured_path(
-                            std::move(candidate));
-                    }
-                }
-                if (ImGui::Button("Pen: add line")) {
-                    auto candidate = path;
-                    const auto endpoint = candidate.commands.back().point;
-                    candidate.commands.push_back({
-                        .kind = fabric::project::TexturedPathCommandKind::line,
-                        .point = {endpoint.x + 1.0F, endpoint.y}});
-                    if (session.set_selected_textured_path(
-                            std::move(candidate)))
-                        selected_path_command =
-                            session.selected_textured_path()->commands.size() - 1U;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Pen: add Bezier")) {
-                    auto candidate = path;
-                    const auto endpoint = candidate.commands.back().point;
-                    candidate.commands.push_back({
-                        .kind = fabric::project::TexturedPathCommandKind::cubic,
-                        .point = {endpoint.x + 1.0F, endpoint.y},
-                        .control1 = {endpoint.x + 0.33F, endpoint.y},
-                        .control2 = {endpoint.x + 0.67F, endpoint.y}});
-                    if (session.set_selected_textured_path(
-                            std::move(candidate)))
-                        selected_path_command =
-                            session.selected_textured_path()->commands.size() - 1U;
-                }
-                ImGui::BeginDisabled(path.commands.size() <=
-                    (path.closed ? 3U : 2U));
-                if (ImGui::Button("Remove last point")) {
-                    auto candidate = path;
-                    candidate.commands.pop_back();
-                    if (session.set_selected_textured_path(
-                            std::move(candidate)))
-                        selected_path_command = std::min(
-                            selected_path_command,
-                            session.selected_textured_path()->commands.size() - 1U);
-                }
-                ImGui::EndDisabled();
-                draw_disabled_reason(path.commands.size() <=
-                                         (path.closed ? 3U : 2U),
-                                     "Keep the minimum number of points for this path.");
-
+                draw_textured_path_pen_panel(
+                    session, textured_path_pen_ui, status);
                 auto style = *session.selected_textured_path();
                 bool style_changed = false;
                 const bool is_beam = style.shader.classification ==
@@ -6837,6 +6758,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     EntityRigInspectorProbe entity_rig_probe;
     VisualComponentInspectorState visual_component_ui;
     VisualCompositionLayerPanelState visual_composition_ui;
+    TexturedPathPenPanelState textured_path_pen_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     EntityArtworkInspectorState entity_artwork_state;
@@ -8899,6 +8821,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        visual_preview,
                        visual_component_ui,
                        visual_composition_ui,
+                       textured_path_pen_ui,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,

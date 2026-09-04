@@ -308,6 +308,10 @@ L'extraction du panneau de layers Visual Composition doit conserver l'ajout,
 la duplication, la sélection par identifiant et les E2E de composition ; le
 crop raster reste couvert par le shell jusqu'à extraction de son callback de
 dimensions.
+L'extraction du panneau `TexturedPathPenPanel` doit conserver la sélection de
+commande, l'édition des points et poignées, l'ajout de segments et la
+suppression bornée, avec sauvegarde/rechargement par `ProjectSession` ; le
+style shader et l'animation de texture restent dans le shell.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre

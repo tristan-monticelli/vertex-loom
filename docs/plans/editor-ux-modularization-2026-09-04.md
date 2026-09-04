@@ -143,6 +143,11 @@ de `Visual Composition`. Le crop raster et l'inspecteur transformé restent dans
 le shell jusqu'à ce qu'un callback de dimensions et un état de layer complet
 puissent être testés sans accès fichier caché.
 
+La sous-frontière suivante extrait l'édition géométrique `Pen` de `Textured
+Path`. Elle conserve la sélection de commande dans le workspace, interdit les
+ajouts/suppressions invalides et laisse le style shader, l'animation de texture
+et le crop raster dans le shell jusqu'à extraction de leurs dépendances.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

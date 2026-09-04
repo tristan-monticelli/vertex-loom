@@ -129,6 +129,13 @@ raster ni le preview. Il possède la sélection de layer et le brouillon d'ajout
 (type et ressource), résout ces valeurs par identifiants au changement de
 document et délègue l'ajout/duplication à `ProjectSession`.
 
+`TexturedPathPenPanel` poursuit la même règle pour la géométrie d'un chemin.
+Il possède l'identifiant du document et l'index de commande sélectionné,
+protège les opérations contre un chemin vide ou le minimum de points, et
+délègue l'édition des points, poignées, ajouts et suppressions à
+`ProjectSession`. Le style shader, le preview d'animation et le crop raster
+restent hors de ce module afin de conserver une frontière testable.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,
