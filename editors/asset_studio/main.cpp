@@ -16,6 +16,7 @@
 #include "fabric/render/visual_composition_renderer.hpp"
 #include "animation_graph_workspace.hpp"
 #include "animation_inspector.hpp"
+#include "animation_publish_probe.hpp"
 #include "animation_timeline_workspace.hpp"
 #include "behavior_workspace.hpp"
 #include "entity_rig_inspector.hpp"
@@ -2101,7 +2102,8 @@ void write_entity_animation_workflow_probe(
     const bool entity_created, const bool animation_created,
     const bool key_persisted, const bool key_corrected,
     const bool marker_persisted, const bool child_composed,
-    const bool animation_targets_child) {
+    const bool animation_targets_child,
+    const fabric::asset_studio::AnimationPublishProof& published) {
     if (project_path.empty()) return;
     const nlohmann::json probe = {
         {"schema", "asset-studio-entity-animation-workflow-v1"},
@@ -2125,6 +2127,15 @@ void write_entity_animation_workflow_probe(
         {"key_persisted_after_reload", key_persisted},
         {"key_corrected_after_reload", key_corrected},
         {"event_persisted_after_reload", marker_persisted},
+        {"runtime_map_published", published.map_published},
+        {"runtime_package_published", published.package_published},
+        {"runtime_package_contains_animation",
+         published.package_contains_animation},
+        {"runtime_package_loaded", published.runtime_loaded},
+        {"runtime_package_ran", published.runtime_ran},
+        {"runtime_animation_evaluated", published.animation_evaluated},
+        {"runtime_target_node_evaluated", published.target_node_evaluated},
+        {"runtime_event_evaluated", published.marker_evaluated},
     };
     std::ofstream output(
         project_path / "asset-studio-entity-animation-workflow.json");
@@ -10548,6 +10559,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                 std::abs(marker.time - *corrected_key_time) <
                                     0.001F;
                         });
+                fabric::asset_studio::AnimationPublishProof published;
+                if (marker_persisted && reloaded.manifest()) {
+                    published =
+                        fabric::asset_studio::prove_published_animation_workflow(
+                            initial_project, *reloaded.manifest(),
+                            workflow_entity_id, workflow_animation_id,
+                            child_id, *corrected_key_time);
+                }
                 entity_animation_workflow_complete =
                     ui_entity_from_visual_seen && ui_entity_animate_seen &&
                     ui_animation_create_seen && animation_inspector_probe.workflow_position_key_seen &&
@@ -10557,18 +10576,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     ui_drag_probe_applied && child_composed &&
                     animation_targets_child && entity_created &&
                     animation_created && key_persisted &&
-                    key_corrected && marker_persisted;
+                    key_corrected && marker_persisted && published.ok();
                 write_entity_animation_workflow_probe(
                     initial_project, animation_timeline_probe,
                     animation_inspector_probe,
                     entity_created, animation_created,
                     key_persisted, key_corrected, marker_persisted,
-                    child_composed, animation_targets_child);
+                    child_composed, animation_targets_child, published);
                 write_frame_capture(
                     initial_project, window,
                     "asset-studio-entity-animation-workflow.ppm");
                 if (!entity_animation_workflow_complete)
-                    std::cerr << "Asset Studio Entity to Animation workflow E2E failed\n";
+                    std::cerr
+                        << "Asset Studio Entity to Animation workflow E2E failed: "
+                        << "map=" << published.map_published
+                        << ", package=" << published.package_published
+                        << ", contains-animation="
+                        << published.package_contains_animation
+                        << ", loaded=" << published.runtime_loaded
+                        << ", ran=" << published.runtime_ran
+                        << ", evaluated=" << published.animation_evaluated
+                        << ", target=" << published.target_node_evaluated
+                        << ", marker=" << published.marker_evaluated << '\n';
                 running = false;
             }
         }

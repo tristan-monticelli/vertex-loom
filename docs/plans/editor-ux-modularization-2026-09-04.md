@@ -146,6 +146,12 @@ au module extrait.
 Le preset XPBD quatre points rejoint cette section nominale et la même frontière
 de session. Le parcours Entity doit le créer par clic, au lieu d'injecter sa
 fixture avant le premier frame, puis exiger overlay, validation et reload.
+Le parcours graphique Entity→Animation est prolongé par une preuve de paquet :
+après création, composition, deux poses, correction de clé et événement, un
+module E2E publie une map hôte, recharge le paquet exact avec PreviewRuntime et
+exige l'évaluation du nœud ciblé ainsi que le marqueur. Le placement Map par
+geste reste à fusionner dans ce scénario transversal avant de clore toute la
+tranche.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne

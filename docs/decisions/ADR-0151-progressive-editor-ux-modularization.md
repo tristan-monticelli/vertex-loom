@@ -107,6 +107,12 @@ qu’un seul propriétaire. Le séquencement, les preuves et l'ordre des commits
 sont décrits dans le
 [plan de refactoring UX](../plans/editor-ux-modularization-2026-09-04.md).
 
+Le harnais du parcours Entity→Animation délègue sa preuve publiée à un module
+sans UI. Après les gestes et le reload, ce module crée uniquement la map hôte
+du test, ferme un paquet déterministe, charge ce paquet avec `PreviewRuntime`
+et vérifie l'évaluation du nœud animé et de son événement. Il ne crée ni ne
+modifie l'Entity ou l'Animation auditées.
+
 Un outil canvas répétitif conserve son contexte tant que l'auteur ne le quitte
 pas explicitement : ressource, couche et snapping restent stables, tandis que
 les identifiants persistants sont régénérés à chaque création. Cette règle

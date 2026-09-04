@@ -291,6 +291,7 @@ if(FABRIC_BUILD_EDITORS)
 
     add_executable(asset_studio
         editors/asset_studio/main.cpp
+        editors/asset_studio/animation_publish_probe.cpp
         editors/asset_studio/animation_graph_workspace.cpp
         editors/asset_studio/animation_inspector.cpp
         editors/asset_studio/animation_timeline_workspace.cpp

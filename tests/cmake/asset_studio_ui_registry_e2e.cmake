@@ -196,7 +196,15 @@ if(DEFINED WORKFLOW_ARTIFACT)
             "\"event_button_seen\": true"
             "\"key_persisted_after_reload\": true"
             "\"key_corrected_after_reload\": true"
-            "\"event_persisted_after_reload\": true")
+            "\"event_persisted_after_reload\": true"
+            "\"runtime_map_published\": true"
+            "\"runtime_package_published\": true"
+            "\"runtime_package_contains_animation\": true"
+            "\"runtime_package_loaded\": true"
+            "\"runtime_package_ran\": true"
+            "\"runtime_animation_evaluated\": true"
+            "\"runtime_target_node_evaluated\": true"
+            "\"runtime_event_evaluated\": true")
         string(FIND "${WORKFLOW_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)
             message(FATAL_ERROR "Entity to Animation workflow probe is missing ${REQUIRED_RESULT}")

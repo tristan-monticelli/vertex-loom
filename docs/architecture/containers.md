@@ -166,3 +166,8 @@ Le module Rig/Physics reçoit une sonde d'interaction uniquement pour les E2E.
 Les actions nominales de maillage et de tissu XPBD appellent `ProjectSession` ;
 la sonde observe les boutons et leurs résultats sans posséder ni modifier
 l'`EntityDefinition`.
+
+Le module de preuve publiée Animation reçoit les identifiants produits par le
+parcours graphique, publie une map hôte de test et son paquet, puis interroge
+`PreviewRuntime` sur le nœud et le marqueur exacts. Il ne possède aucun état
+d'éditeur et ne remplace pas les gestes d'authoring.
