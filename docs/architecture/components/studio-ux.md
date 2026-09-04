@@ -55,10 +55,15 @@ la totalité du futur document.
 | Animation | Entity, nœud, clip et playhead | pose évaluée et gizmos auto-key | propriété ou clé sélectionnée | transport, pistes, clés, marqueurs et courbes |
 
 Le Resource Explorer fournit `Créer une Entity depuis la sélection`. Le
-workspace Entity fournit `Animer…`. Une propriété animable fournit une icône de
+workspace Entity fournit `Animate selected node…` en conservant le nœud par son
+nom visible. L'Inspector nominal présente d'abord hiérarchie, visibilité,
+transform et artwork ; parentage, pivot, ordre Z, overrides et systèmes de
+simulation restent dans des sections avancées fermées. Le workspace Animation
+garde visibles le choix du nœud, le playhead, l'auto-key et les quatre clés de
+transform. Une propriété animable fournit une icône de
 clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
 tangentes, composition additive et segment A→B sont avancés, jamais requis pour
-la première animation. Voir ADR-0147.
+la première animation. Voir ADR-0147 et ADR-0150.
 
 La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
 vectoriels ou composants. `Create Entity from N visuals` publie alors la racine
@@ -77,7 +82,8 @@ ne convertit les ressources sources. Le dock rend les pistes et clés sur un axe
 temps manipulable et réutilise les commandes undoables de `ProjectSession`.
 La lecture, le scrub et le déplacement des clés restent des états d'interface ;
 seule une commande de clé validée modifie le document.
-La preuve E2E Animation doit activer une commande de clé rapide dans l'interface,
+La preuve E2E Animation doit choisir le nœud par son libellé visible puis activer
+une commande de clé rapide dans l'interface,
 sauvegarder, recharger et vérifier la piste typée correspondante avant de
 capturer le workspace avec un contexte OpenGL réel.
 
