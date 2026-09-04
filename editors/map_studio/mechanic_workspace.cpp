@@ -221,6 +221,7 @@ bool draw_mechanic_spatial_canvas(
 
     struct Handle {
         std::string node;
+        std::string mutation_node;
         std::string property;
         fabric::core::Vec2 position{};
         fabric::core::Vec2 size{};
@@ -234,7 +235,7 @@ bool draw_mechanic_spatial_canvas(
         if (node.type == "body" || node.type == "sensor") {
             const bool sensor = node.type == "sensor";
             handles.push_back({
-                node.id, sensor ? "center" : "position",
+                node.id, node.id, sensor ? "center" : "position",
                 mechanic_vec2_property(node, sensor ? "center" : "position")
                     .value_or(fabric::core::Vec2{}),
                 mechanic_vec2_property(node, "size")
@@ -243,7 +244,7 @@ bool draw_mechanic_spatial_canvas(
                        : mechanic_float_property(node, "rotation").value_or(0.0F),
                 true, false, !sensor});
         } else if (node.type == "pivot") {
-            handles.push_back({node.id, "position",
+            handles.push_back({node.id, node.id, "position",
                 mechanic_vec2_property(node, "position")
                     .value_or(fabric::core::Vec2{}), {}, 0.0F,
                 false, false, false});
@@ -258,7 +259,7 @@ bool draw_mechanic_spatial_canvas(
                 graph.nodes, connection->from_node,
                 &fabric::project::MechanicNodeDefinition::id);
             if (pivot != graph.nodes.end()) {
-                handles.push_back({node.id, {},
+                handles.push_back({node.id, pivot->id, "position",
                     mechanic_vec2_property(*pivot, "position")
                         .value_or(fabric::core::Vec2{}), {}, 0.0F,
                     false, true, false});
@@ -297,20 +298,25 @@ bool draw_mechanic_spatial_canvas(
         }
     }
     int hit_priority = 3;
-    for (std::size_t cursor = 0; !hit && cursor < handles.size(); ++cursor) {
-        const auto& handle = handles[cursor];
-        const auto point = to_screen(handle.position);
-        const auto local_mouse = rotate_mechanic_vector(
-            subtract_mechanic_vectors(to_world(mouse), handle.position),
-            -handle.rotation);
-        const bool contains = handle.rectangle
-            ? std::abs(local_mouse.x) <= handle.size.x * 0.5F &&
-                std::abs(local_mouse.y) <= handle.size.y * 0.5F
-            : std::hypot(mouse.x - point.x, mouse.y - point.y) <= 11.0F;
-        const int priority = handle.joint ? 2 : handle.rectangle ? 1 : 0;
-        if (contains && priority < hit_priority) {
-            hit = cursor;
-            hit_priority = priority;
+    if (!hit) {
+        for (std::size_t cursor = 0; cursor < handles.size(); ++cursor) {
+            const auto& handle = handles[cursor];
+            const auto point = to_screen(handle.position);
+            const auto local_mouse = rotate_mechanic_vector(
+                subtract_mechanic_vectors(to_world(mouse), handle.position),
+                -handle.rotation);
+            const float distance =
+                std::hypot(mouse.x - point.x, mouse.y - point.y);
+            const bool contains = handle.rectangle
+                ? std::abs(local_mouse.x) <= handle.size.x * 0.5F &&
+                    std::abs(local_mouse.y) <= handle.size.y * 0.5F
+                : handle.joint ? distance >= 7.0F && distance <= 14.0F
+                               : distance < 7.0F;
+            const int priority = handle.joint ? 0 : handle.rectangle ? 2 : 1;
+            if (contains && priority < hit_priority) {
+                hit = cursor;
+                hit_priority = priority;
+            }
         }
     }
     if (ImGui::IsItemHovered() &&
@@ -318,7 +324,8 @@ bool draw_mechanic_spatial_canvas(
         const auto& handle = handles[*hit];
         state.selected_node = handle.node;
         if (!handle.property.empty()) {
-            state.spatial_drag_node = handle.node;
+            state.spatial_drag_handle_node = handle.node;
+            state.spatial_drag_node = handle.mutation_node;
             state.spatial_drag_kind = hit_kind;
             state.spatial_drag_property = hit_kind == MechanicSpatialDragKind::resize
                 ? "size"
@@ -335,7 +342,8 @@ bool draw_mechanic_spatial_canvas(
         auto position = handle.position;
         auto handle_size = handle.size;
         auto rotation = handle.rotation;
-        if (state.spatial_drag_node == handle.node &&
+        if ((state.spatial_drag_handle_node == handle.node ||
+             state.spatial_drag_node == handle.node) &&
             ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
             if (state.spatial_drag_kind == MechanicSpatialDragKind::move) {
                 position.x += (mouse.x - state.spatial_drag_start_mouse.x) /
@@ -369,6 +377,16 @@ bool draw_mechanic_spatial_canvas(
                 position, rotate_mechanic_vector(
                     {handle_size.x * 0.25F, 0.0F}, rotation)));
             probe->body_handle_seen = true;
+        }
+        if (probe && probe->enabled && handle.joint &&
+            handle.node == "hinge") {
+            probe->joint_handle_screen = {point.x + 10.0F, point.y};
+            if (!probe->joint_handle_seen) {
+                probe->joint_handle_original = handle.position;
+                probe->joint_handle_node = handle.node;
+                probe->joint_mutation_node = handle.mutation_node;
+            }
+            probe->joint_handle_seen = true;
         }
         const bool selected = state.selected_node == handle.node;
         const ImU32 color = selected ? IM_COL32(255, 190, 80, 255)
@@ -470,12 +488,16 @@ bool draw_mechanic_spatial_canvas(
             if (probe && probe->enabled && changed) {
                 if (state.spatial_drag_kind == MechanicSpatialDragKind::resize)
                     probe->resize_handle_moved = true;
+                else if (state.spatial_drag_handle_node ==
+                         probe->joint_handle_node)
+                    probe->joint_handle_moved = true;
                 else
                     probe->spatial_handle_moved = true;
             }
         }
         status = changed ? "Mechanic transform changed"
                          : "Mechanic transform unchanged or rejected";
+        state.spatial_drag_handle_node.clear();
         state.spatial_drag_node.clear();
         state.spatial_drag_property.clear();
         state.spatial_drag_kind = MechanicSpatialDragKind::none;

@@ -20,6 +20,12 @@ une poignée circulaire de rotation, prolongée depuis son axe local vertical.
 Les capteurs peuvent être déplacés et redimensionnés mais ne reçoivent pas une
 rotation que leur contrat ne possède pas.
 
+Un joint relié à un pivot expose une couronne autour de celui-ci. Le centre
+sélectionne le pivot ; la couronne sélectionne le joint et son glisser déplace
+la propriété `position` du pivot relié. Cette indirection est explicite dans
+l'état éphémère du widget : le joint reste sélectionné tandis que la commande
+cible le pivot, unique propriétaire de l'ancrage spatial dans le contrat.
+
 Le glisser fournit un aperçu continu sans muter le document. Au relâchement,
 une seule commande `MechanicSession::set_node_property` écrit `position`,
 `center`, `size` ou `rotation`; validation, undo/redo et dirty state restent
@@ -45,6 +51,7 @@ d'undo et reconstruirait la simulation pendant le glisser.
 - Le parcours nominal placement → taille → rotation reste dans le canevas.
 - Les anciennes mécaniques restent compatibles sans migration.
 - Une forme tournée est dessinée et testée dans ses axes réels.
-- La manipulation directe des joints demeure un chantier séparé.
+- Un joint privé de liaison pivot reste visible dans le graphe, sans couronne
+  spatiale puisqu'il ne possède aucun ancrage à projeter.
 - La preuve d'acceptation sauvegarde et recharge les valeurs produites par de
   vrais gestes UI avant de publier et lancer le paquet.

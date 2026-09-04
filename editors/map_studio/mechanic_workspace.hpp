@@ -31,6 +31,7 @@ struct MechanicWorkspaceState {
     std::string to_port;
     std::string canvas_connection_source;
     bool pending_canvas_connection{};
+    std::string spatial_drag_handle_node;
     std::string spatial_drag_node;
     std::string spatial_drag_property;
     MechanicSpatialDragKind spatial_drag_kind{MechanicSpatialDragKind::none};
@@ -58,6 +59,8 @@ struct MechanicWorkspaceProbe {
     bool resize_handle_moved{};
     bool rotation_handle_seen{};
     bool rotation_handle_moved{};
+    bool joint_handle_seen{};
+    bool joint_handle_moved{};
     bool link_seen{};
     bool source_seen{};
     bool target_seen{};
@@ -74,6 +77,10 @@ struct MechanicWorkspaceProbe {
     core::Vec2 resize_handle_original{};
     ImVec2 rotation_handle_screen{};
     float rotation_handle_original{};
+    ImVec2 joint_handle_screen{};
+    core::Vec2 joint_handle_original{};
+    std::string joint_handle_node;
+    std::string joint_mutation_node;
     project::MechanicConnection expected_connection;
 };
 

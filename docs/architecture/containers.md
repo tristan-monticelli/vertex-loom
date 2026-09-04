@@ -123,6 +123,9 @@ capteurs en poignées de déplacement, de taille et, pour les corps, de rotation
 Le glisser reste un aperçu d'interface ; son relâchement envoie une unique
 mutation typée à `MechanicSession`, sans accès direct du widget au JSON ou au
 monde Box2D.
+La couronne d'un joint relié conserve la sélection du joint mais route sa
+translation vers la position de son pivot, propriétaire contractuel de
+l'ancrage.
 
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview

@@ -119,8 +119,9 @@ se déplacent par glisser via `MechanicSession`; l'E2E prouve le glisser d'un
 capteur, sa sauvegarde, son rechargement et la simulation du graphe reconnecté.
 La forme sélectionnée expose aussi sa taille directement sur le canevas et un
 corps sa rotation ; l'E2E glisse ces deux poignées, recharge leurs valeurs puis
-poursuit jusqu'au paquet exécuté. La manipulation directe des joints reste
-ouverte.
+poursuit jusqu'au paquet exécuté. La couronne d'un joint complète le même
+parcours en déplaçant son pivot relié sans quitter le canevas ; ce geste et son
+round-trip sont désormais inclus dans l'E2E Mechanics.
 Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,
