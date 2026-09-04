@@ -79,6 +79,12 @@ d'actions ; les layouts auto/compact/large sont bornés et persistés hors du
 projet. Les E2E minimum, accessibilité, Entity→Animation, Map et Scene passent
 avec affichage réel.
 
+Le registre porte désormais aussi l'intention métier contextuelle
+`animate_selection`. Le bouton Entity et la palette invoquent cette même
+action ; l'E2E Entity→Animation exige que son invocation enregistrée déclenche
+le parcours de création pour le nœud sélectionné. Les autres commandes métier
+seront migrées par parcours, sans multiplier de nouvelles branches directes.
+
 ## Tranche 3 — migration des workspaces de production
 
 ### Portée

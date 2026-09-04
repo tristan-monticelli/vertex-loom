@@ -139,6 +139,7 @@ bool ui_entity_animation_workflow_probe_enabled = false;
 bool ui_entity_from_visual_seen = false;
 bool ui_entity_animate_seen = false;
 bool ui_entity_animate_clicked = false;
+bool ui_entity_animate_action_invoked = false;
 bool ui_animation_create_seen = false;
 ImVec2 ui_entity_from_visual_screen{};
 ImVec2 ui_entity_animate_screen{};
@@ -2114,6 +2115,8 @@ void write_entity_animation_workflow_probe(
         {"animation_targets_child", animation_targets_child},
         {"animate_selected_button_seen", ui_entity_animate_seen},
         {"animate_selected_button_clicked", ui_entity_animate_clicked},
+        {"animate_selection_action_invoked",
+         ui_entity_animate_action_invoked},
         {"animation_create_button_seen", ui_animation_create_seen},
         {"animation_created_by_click", animation_created},
         {"quick_key_button_seen", inspector_probe.quick_key_seen},
@@ -5334,8 +5337,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     diagnostics.rms_constraint_error,
                                     diagnostics.compliant_energy);
             }
+            const auto animate_availability = actions.availability(
+                fabric::editor::editor_action_ids::animate_selection);
+            ImGui::BeginDisabled(!animate_availability.enabled);
             const bool animate_selected_clicked = ImGui::Button(
                 "Animate selected node...", {-1.0F, 0.0F});
+            ImGui::EndDisabled();
             if (ui_entity_animation_workflow_probe_enabled) {
                 const auto minimum = ImGui::GetItemRectMin();
                 const auto maximum = ImGui::GetItemRectMax();
@@ -5347,13 +5354,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (animate_selected_clicked) {
                 if (ui_entity_animation_workflow_probe_enabled)
                     ui_entity_animate_clicked = true;
-                if (!entity.nodes.empty())
-                    animation_ui.node_id =
-                        entity.nodes[std::min(canvas.selected_node,
-                                              entity.nodes.size() - 1U)].id;
-                creation.request_animation = true;
-                status = "Create an animation for the selected node.";
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::animate_selection));
             }
+            draw_disabled_reason(!animate_availability.enabled,
+                                 animate_availability.disabled_reason);
             if (animation_graph_probe.enabled)
                 ui_entity_animate_action_seen = true;
             if (ImGui::Button(
@@ -7989,6 +7994,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_entity_from_visual_seen = false;
         ui_entity_animate_seen = false;
         ui_entity_animate_clicked = false;
+        ui_entity_animate_action_invoked = false;
         ui_animation_create_seen = false;
         animation_inspector_probe.quick_key_seen = false;
         animation_inspector_probe.workflow_position_key_seen = false;
@@ -8618,6 +8624,34 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             const bool redone = session.redo();
             if (redone) status = "Change redone.";
             return redone;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{
+            fabric::editor::editor_action_ids::animate_selection},
+        .label = "Animate selected node...",
+        .availability = [&] {
+            const auto* resource = session.selected_resource();
+            const auto& entity = session.selected_entity();
+            const bool selected_node = resource != nullptr &&
+                resource->kind == fabric::editor::StudioResourceKind::entity &&
+                entity && canvas.selected_node < entity->nodes.size();
+            return fabric::editor::EditorActionAvailability{
+                .enabled = selected_node,
+                .disabled_reason =
+                    "Select an Entity node before creating an animation.",
+            };
+        },
+        .execute = [&] {
+            const auto& entity = session.selected_entity();
+            if (!entity || canvas.selected_node >= entity->nodes.size())
+                return false;
+            animation_ui.node_id = entity->nodes[canvas.selected_node].id;
+            creation.request_animation = true;
+            status = "Create an animation for the selected node.";
+            if (ui_entity_animation_workflow_probe_enabled)
+                ui_entity_animate_action_invoked = true;
+            return true;
         },
     }));
     bool command_palette_open = ui_accessibility_test;
@@ -10622,6 +10656,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 }
                 entity_animation_workflow_complete =
                     ui_entity_from_visual_seen && ui_entity_animate_seen &&
+                    ui_entity_animate_clicked &&
+                    ui_entity_animate_action_invoked &&
                     ui_animation_create_seen && animation_inspector_probe.workflow_position_key_seen &&
                     animation_inspector_probe.auto_key_seen && animation_inspector_probe.playhead_seen &&
                     animation_timeline_probe.play_seen && animation_timeline_probe.playback_advanced &&

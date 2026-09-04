@@ -184,6 +184,8 @@ if(DEFINED WORKFLOW_ARTIFACT)
             "\"child_composed_after_reload\": true"
             "\"animation_targets_child\": true"
             "\"animate_selected_button_seen\": true"
+            "\"animate_selected_button_clicked\": true"
+            "\"animate_selection_action_invoked\": true"
             "\"animation_create_button_seen\": true"
             "\"animation_created_by_click\": true"
             "\"quick_key_button_seen\": true"

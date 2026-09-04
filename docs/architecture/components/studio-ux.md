@@ -56,7 +56,10 @@ la totalité du futur document.
 
 Le Resource Explorer fournit `Créer une Entity depuis la sélection`. Le
 workspace Entity fournit `Animate selected node…` en conservant le nœud par son
-nom visible. L'Inspector nominal présente d'abord hiérarchie, visibilité,
+nom visible. Cette intention est une action contextuelle unique : le bouton et
+la palette invoquent `animate_selection`, dont le registre calcule la
+disponibilité et la raison de blocage depuis l'Entity et le nœud courants.
+L'Inspector nominal présente d'abord hiérarchie, visibilité,
 transform et artwork ; parentage, pivot, ordre Z, overrides et systèmes de
 simulation restent dans des sections avancées fermées. Le workspace Animation
 garde visibles le choix du nœud, le playhead, l'auto-key et les quatre clés de
@@ -166,6 +169,8 @@ flowchart LR
     Selection --> Stage[Stage ou graphe]
     Selection --> Inspector[Inspector]
     Selection --> TaskDock[Timeline, trace ou palette]
+    SharedWidgets --> Actions
+    Workspaces --> Actions
     Actions --> Sessions[Sessions métier existantes]
     Sessions --> Storage[Validation et stockage atomique]
 ```

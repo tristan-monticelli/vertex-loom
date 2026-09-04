@@ -59,6 +59,14 @@ du document. Les IDs techniques restent disponibles dans un inspecteur avancé,
 mais ne sont pas demandés dans un parcours nominal lorsque le système peut les
 générer ou les résoudre.
 
+Une intention métier visible sur plusieurs surfaces possède une seule action
+dans le registre. Le bouton contextuel, la palette et un éventuel raccourci
+invoquent son identifiant ; sa disponibilité et sa raison de blocage sont
+calculées au moment de l'invocation. La création d'une Animation depuis le
+nœud Entity sélectionné est la première action métier portée sur ce contrat :
+elle résout la sélection courante, ouvre le parcours de création existant et
+ne duplique aucune mutation de session.
+
 `EditorContext` conserve pour chaque document l'identifiant de sélection
 primaire et, lorsqu'elle existe, la sélection multiple ordonnée. Les indices de
 tableau utilisés par un widget ne sont qu'une projection recalculée depuis ces
@@ -102,6 +110,9 @@ La migration suit quatre tranches vérifiables :
 - Une sélection Entity multiple survit à la réorganisation des nœuds et au
   retour historique ; arbre, canvas et inspecteur résolvent le même nœud
   primaire par identifiant.
+- `Animate selected node…` est découvrable dans la palette, partage son
+  invocation avec le bouton et expose une raison de blocage sans Entity ou
+  nœud sélectionné.
 - Les parcours graphiques actuels restent verts pendant chaque tranche ; un
   nouveau E2E transversal prouve navigation, modification, reload, package et
   runtime publié avec affichage réel.
