@@ -13,6 +13,7 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/runtime/preview_runtime.hpp"
+#include "../shared/editor_widgets.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -45,6 +46,10 @@
 #include <vector>
 
 namespace {
+
+using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_resource_name_field;
+using fabric::editor_ui::draw_technical_tooltip;
 
 bool ui_map_workspace_seen = false;
 float ui_map_layers_x = 0.0F;
@@ -144,23 +149,6 @@ void focus_first_field_error(
     ImGui::SetKeyboardFocusHere(-1);
     ImGui::SetScrollHereY(0.0F);
     focused_error = key;
-}
-
-void draw_disabled_reason(const bool disabled, const std::string_view reason) {
-    if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        return;
-    ImGui::SetTooltip("%s", std::string(reason).c_str());
-}
-
-void draw_technical_tooltip(const std::string_view text) {
-    ImGui::SetItemTooltip("%s", std::string(text).c_str());
-}
-
-bool draw_resource_name_field(const char* label, std::string& name,
-                              const float width = 260.0F,
-                              const ImGuiInputTextFlags flags = 0) {
-    ImGui::SetNextItemWidth(width);
-    return ImGui::InputText(label, &name, flags);
 }
 
 void write_e2e_failure_artifacts(

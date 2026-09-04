@@ -14,6 +14,7 @@
 #include "import_workflow.hpp"
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
+#include "../shared/editor_widgets.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -58,6 +59,9 @@ using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
 using fabric::asset_studio::draw_packet_preview_canvas;
+using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_resource_name_field;
+using fabric::editor_ui::draw_technical_tooltip;
 
 fabric::editor::ProjectSession* active_picker_session = nullptr;
 std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
@@ -199,31 +203,15 @@ std::string input_binding_label(const fabric::project::InputBinding& binding) {
     return "Gamepad button " + std::to_string(binding.code);
 }
 
-void draw_disabled_reason(const bool disabled, const std::string_view reason) {
-    if (!disabled || !ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-        return;
-    ImGui::SetTooltip("%s", std::string(reason).c_str());
-}
-
 void same_line_if_room(const float minimum_width = 96.0F) {
     if (ImGui::GetContentRegionAvail().x >= minimum_width)
         ImGui::SameLine();
-}
-
-bool draw_resource_name_field(const char* label, std::string& name,
-                              const float width = 560.0F) {
-    ImGui::SetNextItemWidth(width);
-    return ImGui::InputText(label, &name);
 }
 
 void draw_resource_identity_fields(std::string& name, std::string& id) {
     static_cast<void>(draw_resource_name_field("Name##resource-name", name));
     ImGui::SetNextItemWidth(360.0F);
     ImGui::InputText("Resource id##resource-id", &id);
-}
-
-void draw_technical_tooltip(const std::string_view text) {
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", std::string(text).c_str());
 }
 
 bool draw_surface_effect_stack(

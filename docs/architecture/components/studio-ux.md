@@ -149,10 +149,12 @@ flowchart LR
     Shell --> Browser[Resource Browser]
     Shell --> Tabs[Documents et historique]
     Shell --> Context[EditorContext]
+    Shell --> SharedWidgets[Widgets ImGui partagés]
     Context --> Selection[Sélection logique]
     Context --> Actions[Registre d'actions]
     Context --> Diagnostics[Diagnostics contextualisés]
     Shell --> Workspaces[Registre de workspaces]
+    Workspaces --> SharedWidgets
     Workspaces --> Visual[Visual et Entity]
     Workspaces --> Animation[Animation]
     Workspaces --> Logic[Logic]
@@ -172,6 +174,7 @@ flowchart LR
 | Editor Shell | fenêtre, menus, onglets, navigation, layout local | document métier ou sérialisation |
 | EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
+| Widgets ImGui partagés | champs communs, tooltips et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
 | Inspector | propriétés de la sélection et sections progressives | sélection indépendante du canvas |
 | Task Dock | timeline, palette, trace, diagnostics ou simulation contextuelle | navigation globale du projet |
