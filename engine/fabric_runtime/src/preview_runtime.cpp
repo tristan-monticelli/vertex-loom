@@ -1740,7 +1740,9 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         .instance = component_instance,
                         .entity = resolved_entity,
                         .node_index = node_index,
-                        .instance_transform = instance.transform,
+                        .instance_transform = instance.path_follower
+                            ? impl_->entity_simulations.at(instance.id).instance_transform
+                            : instance.transform,
                         .instance_id = instance.id,
                         .node_id = node.id});
                 auto visual = render::resolve_visual_component(
