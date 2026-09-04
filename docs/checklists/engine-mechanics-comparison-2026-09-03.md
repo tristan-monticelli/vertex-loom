@@ -2,7 +2,8 @@
 
 ## Portée et méthode
 
-Audit statique du dépôt au 3 septembre 2026, complété par les tests nommés
+Audit statique du dépôt au 3 septembre 2026, contre-audité le 4 septembre 2026,
+complété par les tests nommés
 ci-dessous et par les documentations officielles du registre de sources.
 `Implémenté` exige un contrat, un parcours d'authoring, une preview et une preuve
 runtime publié. `Partiel` signifie qu'au moins une de ces surfaces manque.
@@ -18,45 +19,74 @@ Les cinq concepts suivants ne sont pas interchangeables :
 - contrainte physique : relation résolue entre corps par la simulation ;
 - animation guidée par chemin : animation d'une transform ou de bones sur une courbe.
 
-### Méthode UX ajoutée après revue
+## Contre-audit UX et niveau de preuve — 2026-09-04
 
-La présence d'un champ ou d'une commande ne suffit pas à déclarer une capacité
-utilisable. L'audit mesure aussi le parcours de production : point d'entrée,
-conservation de la sélection, nombre de décisions avant le premier résultat,
-édition directe sur canvas, visibilité de la hiérarchie et du temps, feedback,
-undo et retour au document. Un parcours est `implémenté` seulement si son
-workspace permet de créer, observer et corriger le résultat sans reconstruire
-manuellement des identifiants ou changer de contexte sans indication.
+La première version du rapport confondait parfois trois faits différents : un
+contrat sérialisable, un panneau qui affiche ce contrat et un parcours qu'un
+utilisateur peut accomplir de bout en bout. La présence d'une capture PPM ne
+prouve pas que les données visibles ont été créées par l'interface.
 
-L'audit initial révélait deux parcours distincts mais mal raccordés. Les
-workspaces Entity et Animation ferment désormais ces ruptures avec des actions
-contextuelles, une manipulation directe et une preuve graphique sauvegardée.
+Le niveau de preuve utilisé désormais est :
 
-| Tâche observée | Parcours Vertex Loom au 2026-09-03 | Coût/rupture | Référence UX convergente | État UX | Cible vérifiable | Priorité |
+- `L4` : action réelle dans l'UI, sauvegarde/rechargement, résultat visuel et
+  runtime publié vérifiés ;
+- `L3` : action réelle dans l'UI et sauvegarde vérifiées, sans parité publiée
+  complète ;
+- `L2` : panneau rendu, mais document préparé ou modifié par API interne ;
+- `L1` : contrat, sérialisation ou runtime seulement ;
+- `L0` : absent.
+
+`Implémenté` exige `L4`. `Partiel` couvre `L2` ou `L3`. `Contrat seulement`
+correspond à `L1`. Cette règle corrige les conclusions trop favorables du
+3 septembre sans nier les capacités du runtime.
+
+### Verdict d'utilisabilité
+
+Le moteur sait réellement charger, valider, sauvegarder, prévisualiser et
+exécuter son modèle 2D : textures/SVG, vectoriels, matériaux, chemins texturés,
+compositions, entités, animations, input, behaviors, maps, scènes, mécaniques,
+audio, replay et sauvegarde. Ses points les plus solides sont les contrats
+typés, la sérialisation, le runtime déterministe, le rendu 2D et les tests
+unitaires/intégration. Son principal déficit n'est donc pas l'absence de code
+bas niveau, mais l'authoring : les capacités avancées sont souvent exposées par
+des listes et formulaires techniques, et plusieurs E2E contournent ces panneaux.
+
+| Tâche utilisateur | Ce qui existe réellement | Niveau | Verdict | Rupture principale | Priorité | Correction recommandée |
 | --- | --- | --- | --- | --- | --- | --- |
-| Créer une Entity depuis un visuel | Cmd/Ctrl-sélection de plusieurs textures, vectoriels ou composants puis `Create Entity from N visuals` ; tous les nœuds sont publiés en une commande | Aucun identifiant n'est ressaisi et le résultat devient immédiatement la ressource active | Godot/Unity/Construct créent ou composent depuis hiérarchie, projet ou canvas ; GameMaker accepte le drag d'asset | implémenté | Maintenir le test de composition multi-visuels | P2 |
-| Construire la hiérarchie | Arbre récursif persistant, sélection canvas/arbre/inspecteur synchronisée, Cmd/Ctrl multi-sélection, drag de reparentage, ordre et déplacement groupé atomique | Une cible primaire reste explicite ; les nœuds verrouillés sont exclus du déplacement groupé | Scene/Hierarchy/Outliner/Project bars rendent parent, sélection et drop persistants | implémenté | Maintenir l'E2E graphique de déplacement groupé et le rejet des cycles | P2 |
-| Créer une animation d'Entity | Depuis l'Entity, `Animate selected node...` conserve cible et nœud par leur nom visible ; le clip créé ouvre immédiatement canvas + dock Timeline | Le menu technique reste disponible pour les clips génériques, sans pénaliser le parcours contextuel | Godot ouvre l'Animation Panel depuis l'AnimationPlayer ; Rive/Spine passent en mode Animate ; Unity ouvre Animation sur l'objet sélectionné | implémenté | Conserver cette transition et le picker nominal de nœud dans l'E2E Entity→Animation | P2 |
-| Poser la première clé | Boutons `Key Position/Rotation/Scale/Pivot` sur le nœud actif ; la valeur courante et le playhead créent la piste typée sans saisir de binding | Le formulaire de binding reste disponible comme outil avancé, pas comme passage obligé | Godot/Unreal ajoutent piste et clé depuis l'icône de la propriété ; Unity/GameMaker enregistrent les changements au playhead | implémenté | Maintenir le keying contextuel et sa sauvegarde E2E | P2 |
-| Créer un mouvement A→B | Activer auto-key, déplacer le playhead puis le gizmo du canvas ; les poses successives fusionnent en une étape undo pendant le drag | La pose évaluée et le gizmo partagent le même évaluateur ; le formulaire A→B reste un raccourci avancé | Les éditeurs de référence font avancer le playhead, modifier l'objet, enregistrer la nouvelle pose | implémenté | Maintenir le drag auto-key réel et l'undo fusionné | P2 |
-| Lire et corriger une animation | Dock Timeline redimensionnable : transport, playhead, zoom, pistes typées, marqueurs, sélection additive/rectangle, drag des clés et vue courbe interpolation/easing | La courbe échantillonne l'évaluateur commun et ne duplique pas la sémantique runtime | Tous les outils d'animation comparés exposent pistes + playhead + clés dans une timeline dédiée | implémenté | Maintenir la capture graphique avec courbe et sélection | P2 |
-| Éditer la machine à états | Panneau dédié `Animation Graph` : états liés à des clips existants, transitions/conditions/priorités/exit time et preview déterministe à paramètres éphémères | Le graphe est séparé de l'inspecteur Entity et le projet E2E sauvegarde, recharge, valide puis affiche deux états et une transition | Godot, Unreal et Rive séparent graph/state machine de la timeline | implémenté | Conserver la simulation non persistante et l'E2E avec affichage réel | P2 |
-| Se repérer et cadrer la preview | Coquille stable Project gauche, Viewer central, Inspector droit ; Fit, zoom, grille et fond explicites | Le même cadrage sert raster, vectoriel, Entity, Animation et composition ; probe réel normal et 900 × 600 | Les éditeurs Godot, Unity, Unreal, GameMaker et Construct gardent hiérarchie/projet, vue et propriétés dans des zones stables | implémenté | Maintenir ordre des zones, centre ≥ 320 px et commandes du Viewer dans les probes | P2 |
+| Créer une ressource visuelle | Menus nominaux Beam, Button, Artwork et Entity vide ; import PNG/SVG ; création technique de plusieurs autres types | L3 | utilisable | Map, Scene, Mechanic, Replay et Audio n'ont pas le même point d'entrée dans Asset Studio | P1 | Unifier `Créer…` avec catégories, recherche, description et ouverture du bon workspace |
+| Composer une Entity | Création depuis un visuel prouvée par clic, arbre récursif, sélection, multi-sélection, reparentage et gizmo | L3 | partiel | Le nouveau flux prouve le premier nœud ; la hiérarchie complexe, la réparation et les overrides restent répartis entre plusieurs E2E | P0 | Étendre le même flux à ajout visuel→parentage→transform→save/reload sans préparation API |
+| Configurer rig, IK et déformation | Sections numériques dans l'inspecteur, contrats et solveurs testés | L1/L2 | technique | Pas de création visuelle de bones, handles IK, mesh ni peinture de poids comparable à Spine/Rive | P1 | Workspace Rig avec outils canvas, hiérarchie de bones, édition de mesh et poids visualisés |
+| Configurer XPBD | Listes/formulaires, overlay et solveur déterministe | L1/L2 | technique | La fixture XPBD est injectée par code avant capture ; pas de pose directe de particules/contraintes | P1 | Mode Physics sur canvas, liens manipulables, presets guidés et diagnostics locaux |
+| Créer un clip d'animation | Entity→nouveau clip→première clé→reload est désormais prouvé par clics UI ; timeline, auto-key et courbe existent | L3 | partiel | Deuxième pose, lecture, correction de clé, événement et runtime publié ne sont pas encore dans ce flux transversal | P0 | Étendre l'E2E à deux clés→lecture→édition→save/reload→runtime |
+| Éditer une machine à états | Fenêtre `Animation Graph` avec onglets, listes et formulaires de transitions | L2 | partiel | Ce n'est pas un graphe visuel ; les deux états et la transition de l'E2E sont injectés par API | P0 | Canvas de nœuds, connexions directes, sélection synchronisée, simulation et erreurs sur les arêtes |
+| Construire un Behavior Graph | Fenêtre avec type/ID de nœud et champs `From node/port`→`To node/port` | L1/L2 | technique | Aucun graphe visuel, ports, drag de connexion, recherche d'action ni breakpoint | P0 | Éditeur nodal visuel inspiré de Blueprint/Construct, IDs masqués, validation immédiate |
+| Construire une mécanique | Fenêtre Map Studio avec listes et formulaires body/pivot/joint/motor/sensor/constraint/event | L1/L2 | technique | Nom « graphe » sans canvas de graphe ; connexions et références reposent sur des IDs/handles | P0 | Manipulation sur le canvas de map et graphe secondaire pour événements/signaux |
+| Construire une map | Panneaux layers/instances, canvas, inspecteur, collisions, triggers et scènes séparées | L2/L3 | partiel | Overrides et relations restent form-heavy ; pas de tilemap, terrain, brush ni navigation | P1 | Prioriser placement direct, duplication, palette, tilemap et diagnostics de collision avant nouveaux contrats |
+| Prévisualiser et publier | PreviewRuntime, validation et package existent avec tests | L1/L2 | partiel | Plusieurs preuves vérifient le chargement interne, pas un scénario auteur complet jusqu'au binaire publié ; gate licences/signature ouverte | P0 | Une fixture asymétrique créée par UI, empaquetée puis exécutée dans le runtime de release |
 
-### Architecture de panneaux cible
+### Pourquoi les E2E Entity et Animation ne suffisent pas
 
-| Zone persistante | Entity workspace | Animation workspace |
-| --- | --- | --- |
-| Explorateur gauche | Assets filtrables et drag source | Clips de l'Entity et ressources compatibles |
-| Arbre gauche/centre | Nœuds, parenté, ordre, visibilité, lock | Même arbre en lecture/sélection ; pistes sous chaque nœud |
-| Canvas central | Sélection directe, déplacement, rotation, scale, drop | Preview au playhead, gizmos enregistrables, onion skin optionnel |
-| Inspecteur droit | Propriétés du nœud sélectionné ; clé à côté des propriétés animables | Valeur de la clé/piste sélectionnée, interpolation et easing |
-| Dock bas | Diagnostics et dépendances sur demande | Transport, playhead, dope sheet, marqueurs et courbes |
+Dans `editors/asset_studio/main.cpp`, `--e2e-entity` appelle directement
+`set_selected_entity_node`, `add_selected_entity_node`,
+`set_selected_entity_definition` et injecte la machine à états ainsi que XPBD
+avant d'afficher l'interface. `--e2e-animation` appelle directement
+`create_animation` et `set_selected_animation_segment` avant d'activer le
+gizmo. Les wrappers CMake contrôlent le code retour, l'existence d'une capture
+et la validité du projet ; ils ne prouvent pas l'origine UI des mutations.
 
-Les modales ne doivent plus porter la composition. Elles restent limitées au nom,
-au choix d'un template ou à une confirmation destructive. Les réglages de
-binding brut, tangentes, composition additive et création A→B restent
-disponibles dans un volet `Avancé`, sans bloquer le parcours direct.
+### Architecture de panneaux à atteindre
+
+| Zone persistante | Entity | Animation | Behavior/Mécaniques |
+| --- | --- | --- | --- |
+| Explorateur gauche | Assets filtrables et drag source | Clips de l'Entity | Palette de nœuds/actions searchable |
+| Hiérarchie | Nœuds, parenté, ordre, visibilité, lock | Même arbre avec pistes | Arbre logique et erreurs |
+| Canvas central | Drop, sélection et gizmos | Pose évaluée et gizmos keyables | Nœuds, ports, liens et groupes manipulables |
+| Inspecteur droit | Propriétés nominales ; avancé replié | Valeur, interpolation, easing | Propriétés du nœud/lien sélectionné, sans ID brut |
+| Dock bas | Diagnostics/dépendances | Transport, dope sheet, marqueurs, courbes | Trace, breakpoints, événements et simulation |
+
+Les fenêtres modales doivent rester limitées au nom, au template et aux
+confirmations. La composition, le rig, les graphes et les relations doivent
+rester visibles pendant l'édition et conserver sélection, zoom et contexte.
 
 ## Tableau maître
 
@@ -76,34 +106,45 @@ disponibles dans un volet `Avancé`, sans bloquer le parcours direct.
 | Déplacement | A12 — rail de déplacement d'instance | Aucun contrat de rail cinématique ; ne pas confondre avec A09/A10 | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Impossible d'authorer une plateforme ou caméra sur rail | P1 | Ajouter un composant générique PathFollower séparé du rendu | G2, U2, E2, C2, S2 |
 | Animation | A13 — animation guidée par chemin | Aucun binding distance/tangente sur spline | non | non | non | absent | ✓ | ✓ | ✓ | partiel | partiel | ✓ | partiel | Courbes visuelles inutilisables comme trajectoires animées | P1 | ADR dédiée, binding `progress`, orientation optionnelle | G2, U2, E2, S2 |
 | Composition | A14 — compositions, composants, paramètres, variantes, ancres | `visual_composition.hpp`, `visual_component.hpp`, ADR-0104/0105 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | Pas de bibliothèque de variantes visuelle avancée | P2 | Conserver le résolveur commun et améliorer seulement l'UX | G1, U1, E1, R1 |
-| Entités | A15 — entité/prefab, arbre et overrides d'instance | `entity.hpp`, arbre récursif, multi-sélection et réparation de drawable typée, `map.hpp`, ADR-0071/0075/0089/0147 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Composition, hiérarchie, overrides et références manquantes disposent d'un parcours direct ; les contrats restent partagés avec le runtime | P2 | Maintenir validation de cycle, réparation typée et atomicité des groupes | G1, U1, E1, G8, U8, C6 |
+| Entités | A15 — entité/prefab, arbre et overrides d'instance | `entity.hpp`; création du premier nœud depuis un visuel prouvée par clic ; hiérarchie avancée encore fragmentée | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Contrat/runtime solides, mais création complète de hiérarchie et overrides dans un seul flux non prouvée | P0 | Étendre l'E2E UI au drop, parentage, transform et overrides | G1, U1, E1, G8, U8, C6 |
 | Entités | A16 — transformation atomique A→B avec transfert d'état | `entity_transformation.hpp`, ADR-0115, tests runtime | oui | oui | oui | implémenté | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Capacité spécialisée différenciante | P2 | Garder politiques versionnées et replay déterministe | G1, U1, E1 |
-| Animation | A17 — clips, clés, interpolation, easing, segments, événements | `animation.hpp` v4, cues Audio typées résolues, timeline, tests contrat/runtime et E2E graphique, ADR-0039..0043/0121/0125/0126 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Clés, courbes et marqueurs audio conservent un contrat commun Studio→runtime ; v3 migre sans son implicite | P2 | Maintenir résolution des événements Audio, fermeture de paquet et compatibilité v3 | G3, U3, E3, GM1, S1, R1, G8, U8, E8, GM4, S4, R4 |
-| Animation | A18 — machine à états d'animation | Panneau `Animation Graph`, `animation_state_machine.hpp`, E2E Entity avec affichage réel + save/reload/validation, ADR-0039/0042/0045 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | partiel | ✓ | États, transitions typées et preview déterministe couverts ; `previewEntity` est une référence Studio souple pour éviter le cycle inverse | P2 | Maintenir la preuve E2E et les dépendances de clés comme références fortes | G3, U3, E3, R1 |
-| UX Entity | A39 — composition contextuelle, arbre et édition directe | Création multi-visuels ou Entity vide nommée, arbre récursif, transform nominal, action `Animate selected node...`, reparentage et déplacement groupé canvas vérifiés en OpenGL réel ; ADR-0130/0147/0150 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | partiel | partiel | Le parcours nominal ne passe plus par la modale de composition et masque IDs, parentage, XPBD/IK et overrides ; les commandes restent undoables et validées atomiquement | P2 | Maintenir capture Entity, save/reload, action d'animation et sélection primaire explicite | G8, U8, E8, GM4, C6, S4, R4 |
-| UX Animation | A40 — workspace timeline, création de piste et keying contextuel | Key rapide, auto-key par gizmo sur pose évaluée, undo fusionné, sélection rectangle et courbes interpolation/easing ; E2E OpenGL avec save/reload ; ADR-0041/0147 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | Le parcours nominal se fait depuis le nœud, le playhead et le canvas ; les bindings bruts restent avancés | P2 | Maintenir le scénario E2E réel et l'évaluateur unique de courbe | G8, U8, E8, GM4, C6, S4, R4 |
+| Animation | A17 — clips, clés, interpolation, easing, segments, événements | `animation.hpp` v4, timeline et tests contrat/runtime ; l'E2E crée clip et segment par API avant l'interaction | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Timeline réelle, mais création/édition complète par le panneau non prouvée | P0 | Scénario UI complet avec deux clés, correction, événement, save/reload et runtime | G3, U3, E3, GM1, S1, R1, G8, U8, E8, GM4, S4, R4 |
+| Animation | A18 — machine à états d'animation | `animation_state_machine.hpp`; fenêtre à onglets/formulaires ; états/transitions E2E injectés par API | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | partiel | ✓ | Pas de graphe visuel ni création E2E par UI | P0 | Remplacer l'éditeur de listes par un canvas nodal et tester les connexions UI | G3, U3, E3, R1, R5 |
+| UX Entity | A39 — composition contextuelle, arbre et édition directe | Flux réel visuel→Entity→Animation sans préparation de document ; arbre/gizmo couverts séparément | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | partiel | partiel | Le chemin nominal initial est prouvé ; composition multi-nœuds et corrections restent fragmentées | P0 | Unifier drop, parentage et transform dans le scénario transversal | G9, U8, E9, GM4, C6, S4, R4 |
+| UX Animation | A40 — workspace timeline, création de piste et keying contextuel | Le flux transversal crée clip et première clé par clic ; l'ancien A→B reste préparé par API | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | partiel | ✓ | ✓ | Première animation utilisable ; édition complète et runtime publié non prouvés | P0 | Ajouter playhead, seconde pose, lecture, correction et preuve publiée au même E2E | G8, U8, E8, GM4, C7, S4, R4 |
 | UX Studio | A41 — coquille de panneaux et viewer pilotable | Project gauche, Viewer central, Inspector droit, Timeline basse ; Fit/zoom/grille/fond et probes graphiques normal/minimum ; ADR-0148 | oui | oui | N/A | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | La structure et le cadrage ne changent plus selon le type de ressource ; l'état du Viewer reste volontairement local au Studio | P2 | Maintenir le probe 900 × 600 et appliquer la même grammaire au shell Map Studio | G8, U8, E8, GM4, C6, S4, R4 |
-| UX Map | A42 — hiérarchie, canvas et inspecteur de map | Layers/instances gauche, placement et canvas central, collisions/events/triggers droit ; accueil sans ID technique ; ADR-0149 | oui | oui | N/A | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Le canvas n'est plus enfoui dans un formulaire latéral et les trois contextes restent visibles | P2 | Maintenir capture réelle, largeur centrale minimale et navigation clavier | G8, U8, E8, GM4, C6 |
-| Rig | A19 — bones, skinning pondéré et déformation mesh | `entity.hpp`, ADR-0046/0097, tests déformation | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Outils de peinture de poids moins complets | P1 | Ajouter métriques et édition visuelle des poids | G4, U3, E3, S1, R1 |
-| Rig | A20 — IK FABRIK et ordre des contraintes | ADR-0043/0044/0096, tests contraintes | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Bibliothèque de contraintes réduite | P2 | Étendre seulement sur cas utilisateur mesuré | G4, U3, E3, S2, R1 |
-| Physique | A21 — XPBD et substeps/interpolation | Overlay canvas des particules et cinq familles, résumé erreur max/RMS/énergie, preset corde/tissu, `xpbd_tests`, E2E Entity réel, ADR-0098/0100/0139 | oui | oui | oui | implémenté | partiel | partiel | partiel | — | — | partiel | partiel | Contrat, solveur, interpolation et diagnostic d'auteur sont reliés ; les contraintes dures restent volontairement hors énergie compliante | P2 | Maintenir la fixture visuelle et les métriques déterministes sans les persister | G5, U4, E4, S1, R1 |
+| UX Map | A42 — hiérarchie, canvas et inspecteur de map | Layers/instances, canvas et inspecteur existent ; mécaniques/scènes restent des fenêtres de formulaires | partiel | oui | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Placement utilisable, mais composition complexe form-heavy et sans tilemap/navigation | P1 | Test de tâche réelle puis palette, duplication, tilemap et édition directe des relations | G8, U8, E8, GM4, C6 |
+| Rig | A19 — bones, skinning pondéré et déformation mesh | `entity.hpp`, sérialisation, runtime et tests déformation ; inspecteur numérique | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Aucun rig canvas ni peinture de poids comparable à Spine/Rive | P1 | Workspace Rig visuel avec mesh, bones, poids et preview de déformation | G4, U3, E3, S1, R1 |
+| Rig | A20 — IK FABRIK et ordre des contraintes | ADR-0043/0044/0096, contrats et tests solveur ; édition par formulaires | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | ✓ | ✓ | Handles, chaîne et cible IK ne sont pas éditables directement sur le canvas | P1 | Gizmos de chaîne/cible, ordre visible et test UI→runtime | G4, U3, E3, S2, R1 |
+| Physique | A21 — XPBD et substeps/interpolation | Solveur, overlay et tests ; la fixture graphique est injectée avant affichage | partiel | oui | oui | partiel | partiel | partiel | partiel | — | — | partiel | partiel | Diagnostic visible mais authoring direct non prouvé | P1 | Éditeur canvas de particules/contraintes et E2E sans préparation API | G5, U4, E4, S1, R1 |
 | Input | A22 — actions sémantiques, clavier/gamepad, remap | `input.hpp`, ADR-0055/0101/0119/0123, UI E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Touch/gestures non prouvés | P2 | Ajouter seulement avec cible plateforme | G1, U5, E5, C1 |
-| Comportement | A23 — BehaviorGraph générique signaux/actions | `behavior_graph.hpp`, ADR-0114, scenario E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | ✓ | N/A | ✓ | Debug pas-à-pas non prouvé | P1 | Ajouter trace de ports et breakpoint non persistant | G1, U1, E1, C1, R1 |
-| Maps | A24 — map, layers, verrouillage, ordre, snapping et instances | `map.hpp`, ADR-0047/0070..0083/0134 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Peinture de masse moins productive | P2 | Mesurer avant d'ajouter brush/multi-placement | G6, U6, E6, GM1, C3 |
+| Comportement | A23 — BehaviorGraph générique signaux/actions | `behavior_graph.hpp`, runtime et fenêtre de listes/formulaires ; scénario créé via `BehaviorSession` | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | ✓ | N/A | ✓ | « Graph » sans canvas, ports ni connexions directes ; IDs manuels | P0 | Éditeur nodal avec palette, ports typés, recherche, trace et breakpoints | E10, C8, R5 |
+| Maps | A24 — map, layers, verrouillage, ordre, snapping et instances | `map.hpp`, panels Map Studio, contrats/tests | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Base utilisable, mais flux de production de masse et preuves UI→package incomplets | P1 | Test de tâche auteur et outils palette/duplication/multi-placement | G6, U6, E6, GM1, C3 |
 | Maps | A25 — tileset/tilemap/autotiling/terrain | Aucun type Studio ou schéma tile | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Création de grands niveaux répétitifs coûteuse | P1 | ADR tilemap après stabilisation du placement actuel | G6, U6, E6, C3 |
 | Physique | A26 — collisions éditables, triggers et payloads | ADR-0048/0077..0080/0113, Map Studio E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | bounding box | listeners | Formes/filtrage avancé limités | P2 | Ajouter catégories/masques seulement avec diagnostics | G5, U4, E4, GM2, C4 |
-| Mécaniques | A27 — nœuds body/pivot/joint/motor | `MechanicNodeKind`, `mechanic_graph.cpp`, presets | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Variétés de joints limitées au schéma actuel | P2 | Ajouter un type uniquement avec preset et runtime | G5, U4, E4, GM2, C4 |
-| Mécaniques | A28 — nœuds sensor/constraint/event | mêmes contrats, compilateur Box2D, debug log | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | contraintes | listeners | Éditeur de graphe moins observable | P1 | Afficher handles résolus et dernier événement | G5, U4, E4, S2, R2 |
-| Scènes | A29 — scène, campagnes, transitions et map montée | `scene.hpp`, ADR-0054/0111/0112, scene E2E | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Transitions visuelles avancées absentes | P2 | Garder contrat générique avant effets dédiés | G1, U1, E1 |
+| Mécaniques | A27 — nœuds body/pivot/joint/motor | `MechanicNodeKind`, compilateur/presets ; fenêtre avec listes et champs d'IDs | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Runtime réel, mais aucune construction graphique des corps, pivots et joints | P0 | Édition directe dans Map Studio, handles visibles et liens par drag | G5, U4, E4, GM2, C4 |
+| Mécaniques | A28 — nœuds sensor/constraint/event | contrats, compilateur Box2D et log ; connexions par champs | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | contraintes | listeners | Observabilité et câblage trop techniques | P0 | Graphe d'événements, handles résolus, dernier signal et erreurs sur connexion | G5, U4, E4, S2, R2 |
+| Scènes | A29 — scène, campagnes, transitions et map montée | `scene.hpp`, runtime/tests ; Scene Studio séparé à base de formulaires | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Pas de vue de campagne ni transition manipulable ; création dispersée entre Studios | P1 | Workspace scènes/campagne avec aperçu de transition et navigation explicite | G1, U1, E1 |
 | Caméra | A30 — Camera2D follow, limites et réglages runtime | ADR-0064/0122, runtime tests | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Blend multi-caméra absent | P2 | Ajouter seulement si scènes le demandent | G1, U1, E1 |
-| Audio | A31 — événements audio, volume, loop et mixer PCM | `AudioDocument v2`, panneau Audio atomique, `audio_mixer_tests`, Preview Runtime, smoke périphérique macOS réel du 4 septembre 2026 ; ADR-0062/0121 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | timeline | audio events | Bus, panoramique, atténuation et boucle sont reliés ; formats compressés et rééchantillonnage restent volontairement hors contrat | P2 | Maintenir le test mixer déterministe et exécuter le smoke périphérique caché sur chaque plateforme de release | G1, U1, E1, GM3 |
-| Replay | A32 — capture/relecture déterministe | `replay.hpp`, ADR-0057/0058, runtime tests | oui | oui | oui | implémenté | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Vérification longue durée non prouvée | P2 | Ajouter checksum d'état sur session longue | G1, U1, E1 |
+| Audio | A31 — événements audio, volume, loop et mixer PCM | `AudioDocument v2`, inspecteur d'une ressource existante, mixer/tests et smoke périphérique | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | timeline | audio events | Pas de création/import audio unifié, waveform, bus visuel ni formats compressés | P1 | Import audio nominal, audition, waveform, bus et preuve UI→package | G1, U1, E1, GM3 |
+| Replay | A32 — capture/relecture déterministe | `replay.hpp`, ADR-0057/0058 et tests runtime ; aucun parcours d'auteur identifié | non | oui | oui | contrat seulement | partiel | partiel | partiel | partiel | partiel | N/A | N/A | Fonction runtime sans outil Studio de capture, inspection ou comparaison | P1 | Panneau Replay avec enregistrer, lire, checksum et divergence par frame | G1, U1, E1 |
 | Sauvegarde | A33 — progression et reprise | `progress_save.hpp`, ADR-0060/0061 | partiel | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | UX de slots non prouvée | P2 | Ajouter parcours utilisateur si plusieurs slots deviennent requis | G1, U1, E1, C1 |
 | Performance | A34 — batching, culling, benchmark 60 FPS | Build Release natif Apple M1 Pro : renderer 795,993, runtime dense 125,812 et fixture textile 251,251 FPS p95 sur 600 frames ; rapport versionné, ADR-0066..0068 | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | métriques | métriques | Gate locale macOS prouvée sans skip ; Windows/Linux restent exigés séparément par la matrice de release | P2 | Conserver seuil 60 FPS, rapports natifs et refus des skips sur chaque plateforme | G1, U1, E1, S1 |
-| Validation | A35 — validation unifiée, erreurs de champ, recovery | validateur CLI, ADR-0008/0020/0085, recovery smoke | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Certains éditeurs restent moins guidés | P2 | Étendre focus/réparation aux types restants | G1, U1, E1 |
-| Publication | A36 — paquet map/campagne portable, dépendances, version runtime | `map_package.cpp`, ADR-0103/0141, package tests | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | ✓ | ✓ | export runtime | export `.riv` | Signature/contenu public encore gated | P0 | Fermer licences, signature et runner GPU avant tag | G7, U7, E7, C5, S3, R3 |
-| Observabilité | A37 — logs JSONL, overlay, diagnostics render/physics | `TraceContext` session/ressource propagé Map Studio→PreviewRuntime et runtime publié, tests JSONL/runtime, ADR-0010/0145, benchmark | oui | oui | oui | implémenté | ✓ | ✓ | ✓ | partiel | partiel | métriques | listeners | Chargement, échec et résumé runtime partagent désormais la corrélation locale, sans télémétrie réseau | P2 | Maintenir `sessionId` sur une session entière et `resourceId` à chaque changement de map/scène | G1, U1, E1 |
+| Validation | A35 — validation unifiée, erreurs de champ, recovery | validateur CLI, diagnostics et recovery smoke | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | CLI solide ; focus, réparation contextuelle et messages de plusieurs panneaux restent incomplets | P1 | Associer chaque erreur au panneau/champ/action de réparation | G1, U1, E1 |
+| Publication | A36 — paquet map/campagne portable, dépendances, version runtime | `map_package.cpp`, fermeture transitive et tests package | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | export runtime | export `.riv` | Flux auteur→build publié non prouvé et gate licences/signature encore ouverte | P0 | E2E release réel et approbations de redistribution avant tag | G7, U7, E7, C5, S3, R3 |
+| Observabilité | A37 — logs JSONL, overlay, diagnostics render/physics | `TraceContext`, logs et tests ; pas de profiler intégré ni navigation complète log→objet | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | métriques | listeners | Corrélation locale utile, diagnostic auteur inférieur aux profilers/remote debuggers des moteurs généralistes | P1 | Vue profiler frame, filtres, sélection de ressource et export de trace | G10, U10, E11 |
 | Sécurité | A38 — validation imports, chemins relatifs, licences/SBOM | tests traversée, ADR-0144/0146 | oui | oui | oui | partiel | ✓ | ✓ | ✓ | partiel | partiel | export | export | Trois preuves de redistribution restent bloquantes | P0 | Ne pas publier avant statut `approved` réel | G7, U7, E7 |
+| Programmation | A43 — scripting utilisateur et API gameplay | Aucun langage, fichier script, VM ou API de plugin chargé par le projet ; BehaviorGraph est fermé sur ses types compilés | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Tout nouveau comportement exige une modification et recompilation du moteur | P0 | Définir d'abord sandbox, déterminisme, version d'API et debug ; ne pas détourner les IDs de BehaviorGraph | G1, U1, E10, C8 |
+| Extension | A44 — plugins éditeur, importeurs et outils personnalisés | Aucun contrat d'extension ou registre de plugin public recensé | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Le Studio ne peut pas être adapté à un pipeline projet sans fork | P1 | ADR d'extensions versionnées, permissions, isolation et compatibilité de schéma | G1, U1, E1, GM5, C1 |
+| Navigation | A45 — navmesh/grille, pathfinding et agents | Aucun type navigation, bake, query ou agent runtime recensé | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Pas d'IA de déplacement ni validation de zones accessibles | P1 | Introduire navigation 2D indépendante de TexturedPath et du rail cinématique | G11, U11, E12, C2 |
+| VFX | A46 — particules et éditeur d'effets | XPBD simule une déformation physique, pas un système de particules VFX ; aucun emitter/renderer VFX | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Fumée, impacts, pluie et effets de masse nécessitent des entités manuelles | P1 | Contrat emitter 2D borné, preview déterministe et budget overdraw | G12, U12, E13, GM5, C9 |
+| UI jeu | A47 — widgets, layout, texte, focus et accessibilité | Les panneaux ImGui sont des outils Studio ; aucun document UI de jeu, layout responsive ou navigation focus runtime | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Menus, HUD et accessibilité ne sont pas authorables dans le produit | P0 | Définir arbre UI runtime, layout, texte, focus/input et preview multi-résolutions | G13, U9, E14, C1 |
+| Internationalisation | A48 — polices, fallback, localisation et pseudo-locales | Aucun catalogue, locale, shaping/fallback ou import de police projet recensé | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Texte localisé et scripts complexes non pris en charge | P1 | Contrat texte/font/locales, fallback déterministe et pseudo-localisation en Studio | G15, U14, E16 |
+| Réseau | A49 — multiplayer, réplication et transport | Aucun protocole, session, réplication ou test réseau recensé | non | non | non | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | N/A | Moteur limité aux expériences locales | P2 | Ne planifier qu'après besoin produit ; séparer transport, autorité et déterminisme | G14, U13, E15, GM6 |
+| Debug | A50 — debugger gameplay, breakpoints et inspection live | Logs/overlays existent, mais aucun breakpoint Behavior/animation, pause-step ou inspection de monde live | non | partiel | partiel | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Les erreurs de logique imposent lecture de logs et reproduction manuelle | P0 | Breakpoints non persistants, step frame/event et lien trace→nœud→ressource | G10, U10, E11, GM7, C8 |
+| Collaboration | A51 — source control, diff/merge sémantique et verrouillage | JSON textuel diffable et écritures atomiques ; aucune intégration VCS ni merge sémantique | non | N/A | N/A | partiel | ✓ | ✓ | ✓ | partiel | partiel | N/A | N/A | Conflits sur gros documents et assets binaires non assistés | P2 | Garder les formats stables puis ajouter diff sémantique avant intégration VCS | G1, U1, E1 |
+| Plateformes | A52 — matrice d'export et certification | CMake/builds natifs et package interne ; preuve release complète limitée au macOS local documenté | partiel | partiel | partiel | non prouvé | ✓ | ✓ | ✓ | ✓ | ✓ | runtimes ciblés | runtimes ciblés | Portabilité de code ne vaut pas validation Windows/Linux/mobile/web/console | P0 | Matrice CI réelle par cible, smoke GPU/audio/input et artefacts signés | G7, U7, E7, C5, S3, R3 |
+| 3D | A53 — scène, rendu, animation et physique 3D | Périmètre architectural explicitement 2D ; aucun contrat 3D | non | non | non | absent | ✓ | ✓ | ✓ | partiel | — | N/A | N/A | Pas un défaut pour le périmètre 2D actuel ; bloque seulement un futur produit 3D | P2 | Conserver hors périmètre tant qu'un besoin produit ne justifie pas un second moteur | G1, U1, E1 |
 
 ## Couverture exhaustive interne
 
@@ -155,6 +196,9 @@ projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
   input bindings, replay/progress → A22/A24/A26/A29/A30/A31/A32/A33.
 - Pipeline : create/import, inspect, save/reload/recovery, preview, validate,
   package, published runtime, benchmark/logging → A01/A03/A35/A36/A34/A37.
+- Capacités transverses comparées : scripting/extensions → A43/A44 ; navigation
+  → A45 ; VFX → A46 ; UI/localisation → A47/A48 ; réseau → A49 ; debug → A50 ;
+  collaboration → A51 ; plateformes/3D → A52/A53.
 
 ### Groupes d'ADR
 
@@ -170,7 +214,7 @@ projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
 
 ## Registre affirmation → source officielle
 
-Consulté le 3 septembre 2026. Les capacités cochées signifient que la
+Consulté les 3 et 4 septembre 2026. Les capacités cochées signifient que la
 documentation officielle décrit une capacité comparable, pas une équivalence
 de qualité ou de format.
 
@@ -218,13 +262,54 @@ de qualité ou de format.
 | C6 | Le Layout View autorise sélection, hiérarchie, drop et édition synchronisée dans la Properties Bar ; ses capacités d'animation restent plus spécialisées. | [Construct 3 — Layout View](https://www.construct.net/en/make-games/manuals/construct-3/interface/layout-view), [Interface](https://www.construct.net/en/make-games/manuals/construct-3/overview/the-interface) |
 | S4 | Spine garde l'animation active, la hiérarchie et les clés visibles dans Tree, Graph ou Dopesheet en mode Animate. | [Spine — Keys and timeline](https://esotericsoftware.com/spine-keys) |
 | R4 | Rive réserve en mode Animate une timeline avec liste des animations, playhead, durée, snap, pistes filtrables et contrôles de lecture. | [Rive — Timeline](https://rive.app/docs/editor/animate-mode/timeline) |
+| G9 | L'Inspector de Godot suit la sélection du Scene dock, filtre les propriétés, accepte le drag de ressources et expose le retour à la valeur par défaut. | [Godot — Inspector Dock](https://docs.godotengine.org/en/stable/tutorials/editor/inspector_dock.html) |
+| G10 | Le profiler Godot mesure le temps par frame et catégorie depuis le debugger. | [Godot — Profiler](https://docs.godotengine.org/en/stable/tutorials/scripting/debug/the_profiler.html) |
+| G11 | La navigation 2D Godot fournit maps, régions, liens, obstacles et agents. | [Godot — Navigation 2D](https://docs.godotengine.org/en/stable/tutorials/navigation/navigation_introduction_2d.html) |
+| G12 | Godot fournit des systèmes de particules 2D CPU et GPU. | [Godot — Particle systems 2D](https://docs.godotengine.org/en/stable/tutorials/2d/particle_systems_2d.html) |
+| G13 | Les nœuds Control de Godot composent l'UI jeu avec ancres, containers, focus et thèmes. | [Godot — GUI](https://docs.godotengine.org/en/stable/tutorials/ui/index.html) |
+| G14 | L'API multijoueur haut niveau Godot gère peers, RPC et autorité. | [Godot — High-level multiplayer](https://docs.godotengine.org/en/stable/tutorials/networking/high_level_multiplayer.html) |
+| G15 | Godot documente traductions, locales et internationalisation. | [Godot — Internationalizing games](https://docs.godotengine.org/en/stable/tutorials/i18n/internationalizing_games.html) |
+| U9 | UI Toolkit sert à créer des interfaces runtime et éditeur avec documents, styles et contrôles. | [Unity 6 — UI Toolkit](https://docs.unity3d.com/6000.0/Documentation/Manual/UIElements.html) |
+| U10 | Unity Profiler collecte et analyse les performances de l'éditeur et des players connectés. | [Unity 6 — Profiler](https://docs.unity3d.com/6000.0/Documentation/Manual/Profiler.html) |
+| U11 | Le package AI Navigation fournit navmeshes, obstacles dynamiques et liens. | [Unity — AI Navigation](https://docs.unity3d.com/Packages/com.unity.ai.navigation@2.0/manual/index.html) |
+| U12 | Le Particle System Unity expose modules et rendu d'effets. | [Unity 6 — Particle systems](https://docs.unity3d.com/6000.0/Documentation/Manual/ParticleSystems.html) |
+| U13 | Unity documente ses services et packages multijoueurs. | [Unity — Multiplayer](https://docs.unity.com/ugs/en-us/manual/mps-sdk/manual) |
+| U14 | Le package Localization gère chaînes, assets, locales et pseudo-localisation. | [Unity — Localization](https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/index.html) |
+| E9 | L'interface Unreal synchronise World Outliner, viewport et Details panel. | [Unreal — Editor interface](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-editor-interface) |
+| E10 | Blueprint est le système de scripting visuel nodal d'Unreal. | [Unreal — Blueprints Visual Scripting](https://dev.epicgames.com/documentation/en-us/unreal-engine/blueprints-visual-scripting-in-unreal-engine) |
+| E11 | Unreal fournit Insights et des outils de profilage CPU, GPU et mémoire. | [Unreal — Introduction to performance profiling](https://dev.epicgames.com/documentation/en-us/unreal-engine/introduction-to-performance-profiling-and-configuration-in-unreal-engine) |
+| E12 | Le Navigation System Unreal génère un Navigation Mesh pour le pathfinding des agents. | [Unreal — Navigation System](https://dev.epicgames.com/documentation/en-us/unreal-engine/navigation-system-in-unreal-engine) |
+| E13 | Niagara est le système de création et de rendu VFX d'Unreal. | [Unreal — Niagara overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/overview-of-niagara-effects-for-unreal-engine) |
+| E14 | UMG fournit widgets et UI runtime avec designer visuel. | [Unreal — UMG UI Designer](https://dev.epicgames.com/documentation/en-us/unreal-engine/umg-ui-designer-for-unreal-engine) |
+| E15 | Unreal documente réplication, RPC et modèle client-serveur. | [Unreal — Networking overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/networking-overview-for-unreal-engine) |
+| E16 | Unreal fournit un pipeline de localisation de texte et ressources. | [Unreal — Localization overview](https://dev.epicgames.com/documentation/en-us/unreal-engine/localization-overview-for-unreal-engine) |
+| GM5 | GameMaker fournit des éditeurs dédiés notamment aux objets, paths, rooms, sequences, shaders, sons, sprites, tile sets, particules et courbes. | [GameMaker — Asset Editors](https://manual.gamemaker.io/monthly/en/The_Asset_Editors/The_Asset_Editors.htm) |
+| GM6 | GameMaker expose sockets et fonctions réseau asynchrones. | [GameMaker — Networking](https://manual.gamemaker.io/monthly/en/GameMaker_Language/GML_Reference/Networking/Networking.htm) |
+| GM7 | Le debugger GameMaker fournit breakpoints, pas-à-pas et inspection. | [GameMaker — Debugging](https://manual.gamemaker.io/monthly/en/IDE_Tools/Debugging.htm) |
+| C7 | La Timeline Construct expose animations, pistes, clés, lecture, scrub et auto-key depuis Layout/Properties. | [Construct — Timeline Bar](https://www.construct.net/en/make-games/manuals/construct-3/interface/bars/timeline-bar) |
+| C8 | Event Sheet édite visuellement conditions/actions et fournit recherche et breakpoints. | [Construct — Event Sheet View](https://www.construct.net/en/make-games/manuals/construct-3/interface/event-sheet-view) |
+| C9 | L'objet Particles Construct émet et paramètre des particules 2D. | [Construct — Particles](https://www.construct.net/en/make-games/manuals/construct-3/plugin-reference/particles) |
+| R5 | En mode State Machine, Rive remplace la timeline par un graphe visuel d'états et transitions. | [Rive — State Machine](https://rive.app/docs/editor/state-machine/state-machine) |
 
 ## Conclusion et ordre de correction
 
 La régression A07 a été corrigée et vérifiée sur affichage réel : les nouveaux
 Beam et Button préservent la source sans effet ; la recoloration reste
-explicite. A39 et A40 sont fermés par des parcours directs et des scénarios E2E
-avec affichage réel, sauvegarde et rechargement. Le gate P0 juridique A38 reste
-externe : aucune approbation de redistribution ne peut être fabriquée. Les
-capacités absentes — rail cinématique, animation par chemin et tilemap —
-nécessitent des ADR séparées ; cet audit ne les implémente pas implicitement.
+explicite. En revanche, A15/A17/A18/A23/A27/A28/A39/A40 ne peuvent pas être
+considérés comme terminés côté utilisateur : leurs contrats et runtimes sont
+plus avancés que leurs parcours Studio et que leur niveau de preuve.
+
+Ordre de correction recommandé :
+
+1. `P0 — rendre le cœur utilisable` : Entity de zéro à sauvegarde, Animation de
+   zéro à lecture, graphes visuels Animation/Behavior/Mechanic, debug pas-à-pas
+   et E2E UI→Preview→package→runtime sans préparation API.
+2. `P1 — rendre la production efficace` : rig/IK/XPBD sur canvas, Map palette et
+   tilemap, import/édition Audio, navigation, VFX, UI de jeu et localisation.
+3. `P2 — élargir seulement sur besoin produit` : réseau, collaboration intégrée,
+   3D et familles supplémentaires de contraintes/effets.
+
+Le gate juridique A38 et la matrice de plateformes A52 restent bloquants avant
+une publication publique. Les capacités absentes ne doivent pas être ajoutées
+avant les refactors UX P0 : accumuler de nouveaux contrats augmenterait encore
+l'écart entre ce que le moteur sait exécuter et ce qu'un utilisateur sait créer.
