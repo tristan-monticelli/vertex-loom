@@ -42,6 +42,9 @@ une flèche. `Relier depuis cet état`, puis la sélection d'une carte cible, cr
 une transition valide avec un identifiant généré. Les onglets de formulaire
 restent disponibles pour les conditions, priorités et temps de sortie. Le layout
 automatique du canevas est un état de présentation et ne modifie aucun contrat.
+Les cartes peuvent aussi être déplacées directement dans le canevas ; leurs
+positions restent éphémères dans l'état du workspace et sont recalculées pour
+un nouvel Entity, sans migration du document persistant.
 La barre du canevas permet de choisir un clip puis `Ajouter un état depuis le
 clip` ; l'identifiant est dérivé du clip et rendu unique. L'utilisateur ne doit
 pas ouvrir l'onglet technique `States` ni saisir d'identifiant pour agrandir le

@@ -6,6 +6,7 @@
 
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace fabric::asset_studio {
@@ -20,6 +21,7 @@ struct AnimationGraphWorkspaceState {
     std::string new_state_clip_id;
     float normalized_time{};
     std::vector<project::AnimationParameter> parameters;
+    std::unordered_map<std::string, ImVec2> layout_positions;
 };
 
 struct AnimationGraphWorkspaceProbe {

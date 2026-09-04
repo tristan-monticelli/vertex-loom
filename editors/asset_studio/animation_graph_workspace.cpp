@@ -61,6 +61,7 @@ void draw_animation_graph_workspace(
         ui.new_state_clip_id.clear();
         ui.normalized_time = 0.0F;
         ui.parameters.clear();
+        ui.layout_positions.clear();
     }
     ImGui::SeparatorText("Animation Graph");
     const auto commit_machine =
@@ -171,8 +172,13 @@ void draw_animation_graph_workspace(
              ++index) {
             const auto column = static_cast<int>(index) % columns;
             const auto row = static_cast<int>(index) / columns;
-            positions.push_back({18.0F + static_cast<float>(column) * cell_width,
-                                 16.0F + static_cast<float>(row) * cell_height});
+            const ImVec2 automatic_position{
+                18.0F + static_cast<float>(column) * cell_width,
+                16.0F + static_cast<float>(row) * cell_height};
+            const auto [entry, inserted] = ui.layout_positions.emplace(
+                machine_snapshot.states[index].id, automatic_position);
+            if (inserted) entry->second = automatic_position;
+            positions.push_back(entry->second);
         }
 
         auto* draw = ImGui::GetWindowDrawList();
@@ -228,6 +234,16 @@ void draw_animation_graph_workspace(
                     ui.connection_source != state.id)
                     pending_connection =
                         std::pair{ui.connection_source, state.id};
+            }
+            if (ImGui::IsItemActive() &&
+                ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+                auto& position = ui.layout_positions[state.id];
+                position.x = std::clamp(
+                    position.x + ImGui::GetIO().MouseDelta.x,
+                    0.0F, std::max(0.0F, available_width - card_width));
+                position.y = std::max(0.0F, position.y +
+                    ImGui::GetIO().MouseDelta.y);
+                positions[index] = position;
             }
             if ((probe != nullptr && probe->enabled) && index == 1U) {
                 probe->target_seen = true;
