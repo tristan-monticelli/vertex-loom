@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fabric/editor/autosave_scheduler.hpp"
+#include "fabric/editor/animation_timeline.hpp"
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/project/animation.hpp"
 #include "fabric/project/audio.hpp"
@@ -263,6 +264,10 @@ public:
         AutosaveScheduler::Clock::time_point now = AutosaveScheduler::Clock::now());
     [[nodiscard]] bool move_selected_animation_key(
         project::PropertyBinding binding, std::size_t key_index, float time,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool move_selected_animation_keys(
+        std::span<const AnimationKeySelection> selection, float time_delta,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_animation_track_curve(

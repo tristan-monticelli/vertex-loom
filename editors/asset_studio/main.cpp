@@ -934,7 +934,11 @@ void draw_animation_timeline_dock(
         ui.playing = false;
         if (hovered_key) {
             const bool additive = ImGui::GetIO().KeyCtrl || ImGui::GetIO().KeySuper;
-            if (!additive) ui.selected_keys.clear();
+            const bool was_selected = std::ranges::any_of(
+                ui.selected_keys, [&](const auto& value) {
+                    return same_animation_key(value, *hovered_key);
+                });
+            if (!additive && !was_selected) ui.selected_keys.clear();
             const auto selected = std::ranges::find_if(
                 ui.selected_keys, [&](const auto& value) {
                     return same_animation_key(value, *hovered_key);
@@ -1011,13 +1015,28 @@ void draw_animation_timeline_dock(
         if (std::abs(ui.dragging_key_time - ui.dragging_key_original_time) <
             0.0001F) {
             ui.scrub_time = ui.dragging_key_time;
-        } else if (session.move_selected_animation_key(
-                       moving.binding, moving.index, ui.dragging_key_time)) {
-            ui.scrub_time = ui.dragging_key_time;
-            ui.selected_keys.clear();
-            status = "Animation key moved.";
         } else {
-            status = "Key move rejected; inspect diagnostics.";
+            const float delta = ui.dragging_key_time -
+                ui.dragging_key_original_time;
+            std::vector<fabric::editor::AnimationKeySelection> selection;
+            selection.reserve(ui.selected_keys.size());
+            for (const auto& selected : ui.selected_keys) {
+                selection.push_back({selected.binding, selected.index});
+            }
+            if (selection.empty()) {
+                selection.push_back({moving.binding, moving.index});
+            }
+            if (session.move_selected_animation_keys(selection, delta)) {
+                ui.scrub_time = ui.dragging_key_time;
+                const auto moved_count = selection.size();
+                ui.selected_keys.clear();
+                status = moved_count == 1U
+                    ? "Animation key moved."
+                    : std::to_string(moved_count) +
+                        " animation keys moved together.";
+            } else {
+                status = "Key move rejected; keep the group inside the clip.";
+            }
         }
         ui.dragging_key.reset();
     }

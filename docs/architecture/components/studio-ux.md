@@ -180,6 +180,7 @@ flowchart LR
 | Scene Workspace | composition de scène, transitions, validation et publication via `SceneSession` | boucle SDL, navigation globale ou seconde copie du document |
 | Mechanic Workspace | graphe visuel, inspecteur, simulation et preset guidé via `MechanicSession` | boucle SDL, état E2E global ou sérialisation directe |
 | Map Canvas Workspace | preview réelle, sélection, gizmos, placement, snapping et overlays physiques via `MapSession` | menus, cycle de fenêtre ou mutation hors commande |
+| Animation Timeline Command | déplacement atomique d'une ou plusieurs clés par delta temporel via `ProjectSession` | sélection UI, playhead ou copie persistante du clip |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, diagnostics/focus de champ, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |

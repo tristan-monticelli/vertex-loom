@@ -3551,6 +3551,23 @@ bool ProjectSession::move_selected_animation_key(
     return true;
 }
 
+bool ProjectSession::move_selected_animation_keys(
+    const std::span<const AnimationKeySelection> selection,
+    const float time_delta,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.move_keys(selection, time_delta)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys.time",
+                    "the selected keys cannot be moved together"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_animation_track_curve(
     project::PropertyBinding binding,
     const project::AnimationInterpolation interpolation,

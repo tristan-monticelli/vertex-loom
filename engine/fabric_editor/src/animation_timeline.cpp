@@ -1,6 +1,7 @@
 #include "fabric/editor/animation_timeline.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <utility>
 
@@ -207,6 +208,45 @@ bool AnimationTimeline::move_key(const project::PropertyBinding& binding,
                      });
     auto before = clip_;
     return commit(commands_, clip_, std::move(before), std::move(next), true);
+}
+
+bool AnimationTimeline::move_keys(
+    const std::span<const AnimationKeySelection> selection,
+    const float time_delta) {
+    if (selection.empty() || !std::isfinite(time_delta)) return false;
+    auto next = clip_;
+    std::vector<AnimationKeySelection> applied;
+    std::vector<project::PropertyBinding> touched_tracks;
+    applied.reserve(selection.size());
+    touched_tracks.reserve(selection.size());
+    for (const auto& selected : selection) {
+        if (std::ranges::find(applied, selected) != applied.end()) return false;
+        auto* track = find_track(next, selected.binding);
+        if (track == nullptr || selected.key_index >= track->keys.size()) {
+            return false;
+        }
+        const float moved_time =
+            track->keys[selected.key_index].time + time_delta;
+        if (!std::isfinite(moved_time) || moved_time < 0.0F ||
+            moved_time > next.duration) {
+            return false;
+        }
+        track->keys[selected.key_index].time = moved_time;
+        applied.push_back(selected);
+        if (std::ranges::find(touched_tracks, selected.binding) ==
+            touched_tracks.end()) {
+            touched_tracks.push_back(selected.binding);
+        }
+    }
+    for (const auto& binding : touched_tracks) {
+        auto* track = find_track(next, binding);
+        std::stable_sort(track->keys.begin(), track->keys.end(),
+                         [](const auto& left, const auto& right) {
+                             return left.time < right.time;
+                         });
+    }
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
 bool AnimationTimeline::set_track_curve(

@@ -17,6 +17,11 @@ Le collage aligne la clé la plus ancienne sur le temps demandé, conserve les
 `CommandStack`, dirty state et autosave. Les temps peuvent être arrondis à un
 intervalle positif configurable avant l’écriture.
 
+Le déplacement d'un groupe applique un delta temporel commun à toutes les clés
+sélectionnées dans une seule commande. L'opération est refusée en entier si une
+référence est périmée, dupliquée ou si une clé sortirait de la durée du clip ;
+undo/redo ne peut donc jamais laisser un groupe partiellement déplacé.
+
 Les bindings visuels de base restent explicites dans le clip : `material/color`
 et `material/opacity` sont conservés, tandis que l’éditeur expose aussi
 `fill/color` et `imageFill/opacity` pour cibler directement les paquets de

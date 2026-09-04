@@ -14,6 +14,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -1669,6 +1670,23 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_animation()->tracks.front().keys.back().time ==
           2.0F);
     REQUIRE(session.redo(start));
+    const std::array multi_key_selection{
+        fabric::editor::AnimationKeySelection{position_binding, 0U},
+        fabric::editor::AnimationKeySelection{position_binding, 1U}};
+    REQUIRE(session.move_selected_animation_keys(
+        multi_key_selection, 0.25F, start));
+    CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.25F);
+    CHECK(session.selected_animation()->tracks.front().keys[1].time == 1.5F);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.0F);
+    CHECK(session.selected_animation()->tracks.front().keys[1].time == 1.25F);
+    REQUIRE(session.redo(start));
+    const std::array duplicate_selection{
+        fabric::editor::AnimationKeySelection{position_binding, 0U},
+        fabric::editor::AnimationKeySelection{position_binding, 0U}};
+    CHECK_FALSE(session.move_selected_animation_keys(
+        duplicate_selection, 0.1F, start));
+    CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.25F);
     REQUIRE(session.remove_selected_animation_key(
         position_binding,
         1U, start));

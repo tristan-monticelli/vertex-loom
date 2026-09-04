@@ -6,10 +6,18 @@
 
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <vector>
 
 namespace fabric::editor {
+
+struct AnimationKeySelection {
+    project::PropertyBinding binding;
+    std::size_t key_index{};
+
+    bool operator==(const AnimationKeySelection&) const = default;
+};
 
 class AnimationTimeline {
 public:
@@ -49,6 +57,9 @@ public:
                                        project::AnimationEasing::linear);
     [[nodiscard]] bool move_key(const project::PropertyBinding& binding,
                                 std::size_t key_index, float time);
+    [[nodiscard]] bool move_keys(
+        std::span<const AnimationKeySelection> selection,
+        float time_delta);
     [[nodiscard]] bool set_track_curve(
         const project::PropertyBinding& binding,
         project::AnimationInterpolation interpolation,
