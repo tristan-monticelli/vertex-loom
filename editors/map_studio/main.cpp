@@ -2595,11 +2595,10 @@ int run(const std::filesystem::path& project_root,
                                     0.0F, 0.0F, 1.0F, 1.0F,
                                     fabric::project::AnimationInterpolation::linear);
                             const auto saved = track && resource_catalog.save();
-                            const auto attached = saved && session.set_instance_property(
+                            const auto attached = saved && session.set_instance_animation(
                                 selected_id,
-                                {.id = "animation",
-                                 .value = fabric::project::ResourceReference{
-                                     {.value = animation_id.value}, "animation"}});
+                                fabric::project::ResourceReference{
+                                    {.value = animation_id.value}, "animation"});
                             status = attached
                                 ? "Path animation created and attached"
                                 : "Path animation could not be attached; inspect diagnostics";
