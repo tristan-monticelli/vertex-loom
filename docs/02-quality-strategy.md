@@ -206,8 +206,9 @@ pas cette recette.
 Le test `asset_studio_behavior_e2e` crée seulement la source IA, ouvre la
 ressource Behavior, recherche puis ajoute `Emit event` depuis la palette, et
 clique `Connect from output` puis la carte cible. Il sauvegarde et recharge,
-exige la connexion `monster-ai-to-emit-event`, exécute le
-signal IA `attack`, attend une action et conserve le canevas final dans
+exige la connexion `monster-ai-to-emit-event`, pose un breakpoint par clic,
+exécute le signal IA `attack` depuis la barre de debug, attend une action, la
+pause et le surlignage de trace, puis conserve le canevas final dans
 `asset-studio-behavior-graph-e2e.ppm`.
 Le test `map_studio_mechanic_e2e` retire la liaison `platform.body` vers
 `anchor.body` de la fixture, ouvre le canevas Mechanics et la recrée par clics

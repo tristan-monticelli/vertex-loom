@@ -117,6 +117,10 @@ Mechanics affiche désormais côte à côte le graphe logique et un canevas spat
 en unités monde. La sélection y est partagée et les corps, pivots et capteurs
 se déplacent par glisser via `MechanicSession`; l'E2E prouve le glisser d'un
 capteur, sa sauvegarde, son rechargement et la simulation du graphe reconnecté.
+Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
+surligne les cartes visitées et fournit breakpoints éphémères, pause,
+pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,
+breakpoint et évaluation uniquement par clics avant reload.
 
 ## Tranche 4 — authoring direct manquant
 

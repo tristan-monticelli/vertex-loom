@@ -46,6 +46,14 @@ Une palette recherchable expose les types de nœuds au-dessus du canevas. Un
 clic crée le type choisi avec un identifiant lisible dérivé du type et rendu
 unique ; le champ d'identifiant libre n'appartient plus au parcours nominal.
 
+Le débogage d'auteur reste un état de workspace non persisté. Les identifiants
+de nœuds portant un breakpoint, le curseur de trace et l'état pause ne modifient
+pas `BehaviorGraph v1`. Après une évaluation manuelle, les cartes visitées sont
+surlignées et le premier breakpoint rencontré met le workspace en pause. Le
+pas-à-pas parcourt alors les entrées de trace existantes et sélectionne leur
+nœud ; continuer réarme l'évaluation suivante. La trace bornée de l'évaluateur
+reste la source unique de cet affichage.
+
 ## Conséquences
 
 - Une action identique peut provenir du joueur, d'une IA ou d'une map.
@@ -55,6 +63,7 @@ unique ; le champ d'identifiant libre n'appartient plus au parcours nominal.
 - Le graphe est fermé transitivement dans les paquets avec l'entité.
 - Les temporisations et cooldowns ne sont jamais persistés dans le document
   d'auteur ; replay et pas fixe fournissent leur déterminisme.
+- Les breakpoints sont locaux au Studio et ne changent ni paquet ni runtime.
 - Une migration future doit augmenter `schemaVersion`; les champs inconnus ou
   versions non supportées sont refusés.
 - Un scénario E2E doit partir d'un seul nœud, ajouter la cible depuis la palette,

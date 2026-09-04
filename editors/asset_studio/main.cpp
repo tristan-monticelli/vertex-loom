@@ -149,9 +149,17 @@ bool ui_behavior_graph_connect_seen = false;
 bool ui_behavior_graph_target_seen = false;
 bool ui_behavior_graph_connect_clicked = false;
 bool ui_behavior_graph_target_clicked = false;
+bool ui_behavior_graph_breakpoint_seen = false;
+bool ui_behavior_graph_breakpoint_clicked = false;
+bool ui_behavior_graph_evaluate_seen = false;
+bool ui_behavior_graph_evaluate_clicked = false;
+bool ui_behavior_graph_trace_highlight_seen = false;
+bool ui_behavior_graph_paused_seen = false;
 ImVec2 ui_behavior_graph_connect_screen{};
 ImVec2 ui_behavior_graph_target_screen{};
 ImVec2 ui_behavior_graph_add_screen{};
+ImVec2 ui_behavior_graph_breakpoint_screen{};
+ImVec2 ui_behavior_graph_evaluate_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_animation_workflow_probe_enabled = false;
@@ -2759,6 +2767,22 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         "transform_entity"};
     static std::string canvas_connection_source;
     static std::string node_search;
+    static std::string debug_document_id;
+    static std::vector<std::string> breakpoints;
+    static std::vector<std::string> traced_nodes;
+    static bool debug_paused = false;
+    static std::size_t trace_cursor = 0U;
+    static int signal_source = 0;
+    static std::string semantic_id{"action"};
+    static constexpr const char* source_labels[] = {
+        "Action", "AI", "Map event", "Trigger", "Timer", "Property"};
+    if (debug_document_id != graph.document.id.value) {
+        debug_document_id = graph.document.id.value;
+        breakpoints.clear();
+        traced_nodes.clear();
+        debug_paused = false;
+        trace_cursor = 0U;
+    }
     if (ui_behavior_graph_probe_enabled && node_search.empty())
         node_search = "emit_event";
     ImGui::SetNextItemWidth(220.0F);
@@ -2811,6 +2835,76 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     }
     if (!any_matching_type)
         ImGui::TextDisabled("No matching behavior node type.");
+    ImGui::SeparatorText("Debug current signal");
+    if (ui_behavior_graph_probe_enabled) {
+        signal_source = 1;
+        semantic_id = "attack";
+    }
+    ImGui::SetNextItemWidth(130.0F);
+    ImGui::Combo("Source##behavior-debug", &signal_source, source_labels, 6);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(180.0F);
+    ImGui::InputText("Signal##behavior-debug", &semantic_id);
+    ImGui::SameLine();
+    ImGui::BeginDisabled(debug_paused);
+    if (ImGui::Button("Evaluate fixed step")) {
+        const auto actions = behavior_session.preview(
+            {static_cast<fabric::runtime::BehaviorSignalSource>(signal_source),
+             semantic_id, {}}, 1.0F / 60.0F);
+        traced_nodes.clear();
+        for (const auto& entry : behavior_session.trace())
+            if (std::ranges::find(traced_nodes, entry.node_id) ==
+                traced_nodes.end())
+                traced_nodes.push_back(entry.node_id);
+        const auto breakpoint = std::ranges::find_first_of(
+            traced_nodes, breakpoints);
+        debug_paused = breakpoint != traced_nodes.end();
+        trace_cursor = 0U;
+        status = debug_paused
+            ? "Behavior paused on breakpoint " + *breakpoint + "."
+            : "Behavior preview produced " + std::to_string(actions.size()) +
+                  " action(s).";
+        if (ui_behavior_graph_probe_enabled)
+            ui_behavior_graph_evaluate_clicked = true;
+    }
+    ImGui::EndDisabled();
+    if (ui_behavior_graph_probe_enabled) {
+        const auto minimum = ImGui::GetItemRectMin();
+        const auto maximum = ImGui::GetItemRectMax();
+        ui_behavior_graph_evaluate_screen = {
+            (minimum.x + maximum.x) * 0.5F,
+            (minimum.y + maximum.y) * 0.5F};
+        ui_behavior_graph_evaluate_seen = true;
+    }
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!debug_paused || behavior_session.trace().empty());
+    if (ui_behavior_graph_probe_enabled && debug_paused)
+        ui_behavior_graph_paused_seen = true;
+    if (ImGui::Button("Step trace")) {
+        const auto& trace = behavior_session.trace();
+        const auto node = std::ranges::find(
+            graph.nodes, trace[trace_cursor].node_id,
+            &fabric::project::BehaviorNodeDefinition::id);
+        if (node != graph.nodes.end())
+            selected_node = static_cast<int>(std::distance(graph.nodes.begin(), node));
+        status = "Trace: " + trace[trace_cursor].message;
+        trace_cursor = std::min(trace_cursor + 1U, trace.size() - 1U);
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!debug_paused);
+    if (ImGui::Button("Continue")) {
+        debug_paused = false;
+        status = "Behavior debugger continued.";
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Reset debug")) {
+        behavior_session.reset_preview();
+        traced_nodes.clear();
+        debug_paused = false;
+        trace_cursor = 0U;
+    }
     ImGui::SeparatorText("Behavior canvas");
     ImGui::TextDisabled(
         "Choose Connect from output, then click a compatible destination.");
@@ -2887,6 +2981,15 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                 label += "\nin: " + input->id;
             if (output != node.ports.end())
                 label += "\nout: " + output->id;
+            const bool traced =
+                std::ranges::find(traced_nodes, node.id) != traced_nodes.end();
+            const bool breakpoint =
+                std::ranges::find(breakpoints, node.id) != breakpoints.end();
+            if (traced) {
+                ImGui::PushStyleColor(ImGuiCol_Button, {0.18F, 0.52F, 0.28F, 1.0F});
+                ImGui::PushStyleColor(ImGuiCol_ButtonHovered,
+                                      {0.24F, 0.66F, 0.36F, 1.0F});
+            }
             if (ImGui::Button(label.c_str(), {card_width, card_height})) {
                 selected_node = static_cast<int>(index);
                 if (ui_behavior_graph_probe_enabled && index == 1U)
@@ -2917,6 +3020,11 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                     }
                 }
             }
+            if (traced) {
+                ImGui::PopStyleColor(2);
+                if (ui_behavior_graph_probe_enabled)
+                    ui_behavior_graph_trace_highlight_seen = true;
+            }
             if (ui_behavior_graph_probe_enabled && index == 1U) {
                 ui_behavior_graph_target_seen = true;
                 const auto minimum = ImGui::GetItemRectMin();
@@ -2943,6 +3051,25 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                 ui_behavior_graph_connect_screen = {
                     (minimum.x + maximum.x) * 0.5F,
                     (minimum.y + maximum.y) * 0.5F};
+            }
+            ImGui::SameLine();
+            const std::string breakpoint_label = breakpoint
+                ? "Breakpoint on" : "Add breakpoint";
+            if (ImGui::SmallButton(breakpoint_label.c_str())) {
+                if (breakpoint)
+                    std::erase(breakpoints, node.id);
+                else
+                    breakpoints.push_back(node.id);
+                if (ui_behavior_graph_probe_enabled && index == 0U)
+                    ui_behavior_graph_breakpoint_clicked = true;
+            }
+            if (ui_behavior_graph_probe_enabled && index == 0U) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_behavior_graph_breakpoint_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+                ui_behavior_graph_breakpoint_seen = true;
             }
             ImGui::PopID();
         }
@@ -3073,20 +3200,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     if (remove_connection)
         static_cast<void>(behavior_session.disconnect({.value = *remove_connection}));
 
-    static int signal_source = 0;
-    static std::string semantic_id{"action"};
-    static constexpr const char* source_labels[] = {"Action", "AI", "Map event", "Trigger", "Timer", "Property"};
-    ImGui::SeparatorText("Step preview");
-    ImGui::Combo("Signal source", &signal_source, source_labels, 6);
-    ImGui::InputText("Semantic id", &semantic_id);
-    if (ImGui::Button("Evaluate one fixed step")) {
-        const auto actions = behavior_session.preview(
-            {static_cast<fabric::runtime::BehaviorSignalSource>(signal_source), semantic_id, {}},
-            1.0F / 60.0F);
-        status = "Behavior preview produced " + std::to_string(actions.size()) + " action(s).";
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Reset preview")) behavior_session.reset_preview();
+    ImGui::SeparatorText("Trace");
     if (ImGui::BeginChild("Behavior trace", {0.0F, 100.0F}, true))
         for (const auto& entry : behavior_session.trace())
             ImGui::Text("%s — %s", entry.node_id.c_str(), entry.message.c_str());
@@ -10727,6 +10841,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_behavior_graph_target_seen = false;
         ui_behavior_graph_connect_clicked = false;
         ui_behavior_graph_target_clicked = false;
+        ui_behavior_graph_breakpoint_seen = false;
+        ui_behavior_graph_breakpoint_clicked = false;
+        ui_behavior_graph_evaluate_seen = false;
+        ui_behavior_graph_evaluate_clicked = false;
+        ui_behavior_graph_trace_highlight_seen = false;
+        ui_behavior_graph_paused_seen = false;
         fabric::editor::CreateInputPrompt input_prompt;
         input_prompt.name = "Player and Monster Controls";
         input_prompt.actions = {
@@ -11886,6 +12006,43 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             button.button.y = motion.motion.y;
             static_cast<void>(SDL_PushEvent(&button));
         }
+        if (behavior_e2e && behavior_ui_e2e_frame >= 10U &&
+            behavior_ui_e2e_frame <= 11U &&
+            ui_behavior_graph_breakpoint_seen) {
+            const ImVec2 target = ui_behavior_graph_breakpoint_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = behavior_ui_e2e_frame == 10U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
+        if (behavior_e2e && behavior_ui_e2e_frame >= 13U &&
+            behavior_ui_e2e_frame <= 14U && ui_behavior_graph_evaluate_seen) {
+            const ImVec2 target = ui_behavior_graph_evaluate_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = behavior_ui_e2e_frame == 13U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
         if (entity_e2e && entity_gizmo_e2e_frame == 8U &&
             ui_animation_graph_link_seen)
             animation_graph_ui.open = false;
@@ -12395,7 +12552,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        if (behavior_e2e && ui_behavior_graph_link_seen &&
+        if (behavior_e2e && ui_behavior_graph_trace_highlight_seen &&
             !behavior_graph_e2e_capture_written) {
             write_frame_capture(initial_project, window,
                                 "asset-studio-behavior-graph-e2e.ppm");
@@ -13070,7 +13227,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (behavior_e2e) {
             ++behavior_ui_e2e_frame;
-            if (behavior_ui_e2e_frame == 10U) {
+            if (behavior_ui_e2e_frame == 17U) {
                 const bool saved = behavior_session.save();
                 fabric::editor::BehaviorSession reloaded;
                 const bool reopened = saved && reloaded.open(
@@ -13084,6 +13241,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     ui_behavior_graph_add_clicked &&
                     ui_behavior_graph_canvas_seen &&
                     ui_behavior_graph_link_seen &&
+                    ui_behavior_graph_breakpoint_seen &&
+                    ui_behavior_graph_breakpoint_clicked &&
+                    ui_behavior_graph_evaluate_seen &&
+                    ui_behavior_graph_evaluate_clicked &&
+                    ui_behavior_graph_trace_highlight_seen &&
+                    ui_behavior_graph_paused_seen &&
+                    behavior_graph_e2e_capture_written &&
                     reloaded.graph()->nodes.size() == 2U &&
                     reloaded.graph()->connections.size() == 1U &&
                     reloaded.graph()->connections.front().id ==
@@ -13098,7 +13262,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                               << ", target-seen=" << ui_behavior_graph_target_seen
                               << ", target-clicked="
                               << ui_behavior_graph_target_clicked
-                              << ", link=" << ui_behavior_graph_link_seen << '\n';
+                              << ", link=" << ui_behavior_graph_link_seen
+                              << ", breakpoint="
+                              << ui_behavior_graph_breakpoint_clicked
+                              << ", evaluate="
+                              << ui_behavior_graph_evaluate_clicked
+                              << ", trace="
+                              << ui_behavior_graph_trace_highlight_seen
+                              << ", paused="
+                              << ui_behavior_graph_paused_seen << '\n';
                 running = false;
             }
         } else if (transformation_e2e || entity_e2e || texture_e2e || vector_e2e)
