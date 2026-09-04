@@ -19,6 +19,9 @@ elseif(NOT STUDIO_RESULT EQUAL 0)
     message(FATAL_ERROR
         "Asset Studio Behavior E2E failed (${STUDIO_RESULT})\n${STUDIO_OUTPUT}\n${STUDIO_ERROR}")
 endif()
+if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-behavior-graph-e2e.ppm")
+    message(FATAL_ERROR "Behavior Graph E2E did not produce a visual capture")
+endif()
 
 set(BEHAVIOR
     "${TEST_ROOT}/project/assets/behaviors/behavior-studio-e2e.behavior.json")

@@ -116,6 +116,15 @@ bool ui_animation_graph_connect_seen = false;
 bool ui_animation_graph_target_seen = false;
 ImVec2 ui_animation_graph_connect_screen{};
 ImVec2 ui_animation_graph_target_screen{};
+bool ui_behavior_graph_probe_enabled = false;
+bool ui_behavior_graph_canvas_seen = false;
+bool ui_behavior_graph_link_seen = false;
+bool ui_behavior_graph_connect_seen = false;
+bool ui_behavior_graph_target_seen = false;
+bool ui_behavior_graph_connect_clicked = false;
+bool ui_behavior_graph_target_clicked = false;
+ImVec2 ui_behavior_graph_connect_screen{};
+ImVec2 ui_behavior_graph_target_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_animation_workflow_probe_enabled = false;
@@ -2622,6 +2631,162 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         "delay", "cooldown", "state", "transition", "set_property",
         "emit_event", "play_animation", "move", "activate_mechanic",
         "transform_entity"};
+    static std::string canvas_connection_source;
+    ImGui::SeparatorText("Behavior canvas");
+    ImGui::TextDisabled(
+        "Choose Connect from output, then click a compatible destination.");
+    if (ImGui::BeginChild("Behavior graph canvas", {0.0F, 250.0F},
+                          ImGuiChildFlags_Borders)) {
+        if (ui_behavior_graph_probe_enabled)
+            ui_behavior_graph_canvas_seen = true;
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        constexpr float card_width = 190.0F;
+        constexpr float card_height = 78.0F;
+        constexpr float cell_width = 220.0F;
+        constexpr float cell_height = 126.0F;
+        const int columns = std::max(1, static_cast<int>(
+            ImGui::GetContentRegionAvail().x / cell_width));
+        std::vector<ImVec2> positions;
+        positions.reserve(graph.nodes.size());
+        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+            const auto column = static_cast<int>(index) % columns;
+            const auto row = static_cast<int>(index) / columns;
+            positions.push_back({16.0F + static_cast<float>(column) * cell_width,
+                                 16.0F + static_cast<float>(row) * cell_height});
+        }
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImU32 connection_color = ImGui::GetColorU32(ImGuiCol_PlotLines);
+        for (const auto& connection : graph.connections) {
+            const auto source = std::ranges::find(
+                graph.nodes, connection.from_node,
+                &fabric::project::BehaviorNodeDefinition::id);
+            const auto destination = std::ranges::find(
+                graph.nodes, connection.to_node,
+                &fabric::project::BehaviorNodeDefinition::id);
+            if (source == graph.nodes.end() || destination == graph.nodes.end())
+                continue;
+            const auto source_index = static_cast<std::size_t>(
+                std::distance(graph.nodes.begin(), source));
+            const auto destination_index = static_cast<std::size_t>(
+                std::distance(graph.nodes.begin(), destination));
+            const ImVec2 start{origin.x + positions[source_index].x + card_width,
+                               origin.y + positions[source_index].y +
+                                   card_height * 0.5F};
+            const ImVec2 end{origin.x + positions[destination_index].x,
+                             origin.y + positions[destination_index].y +
+                                 card_height * 0.5F};
+            const float bend = std::max(40.0F, std::abs(end.x - start.x) * 0.4F);
+            draw->AddBezierCubic(start, {start.x + bend, start.y},
+                                 {end.x - bend, end.y}, end,
+                                 connection_color, 2.0F);
+            draw->AddTriangleFilled(end, {end.x - 9.0F, end.y - 5.0F},
+                                    {end.x - 9.0F, end.y + 5.0F},
+                                    connection_color);
+            if (ui_behavior_graph_probe_enabled)
+                ui_behavior_graph_link_seen = true;
+        }
+        struct PendingBehaviorConnection {
+            std::string from_node;
+            std::string from_port;
+            std::string to_node;
+            std::string to_port;
+        };
+        std::optional<PendingBehaviorConnection> pending_connection;
+        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
+            const auto& node = graph.nodes[index];
+            const auto output = std::ranges::find(
+                node.ports, fabric::project::BehaviorPortDirection::output,
+                &fabric::project::BehaviorPortDefinition::direction);
+            const auto input = std::ranges::find(
+                node.ports, fabric::project::BehaviorPortDirection::input,
+                &fabric::project::BehaviorPortDefinition::direction);
+            ImGui::SetCursorScreenPos(
+                {origin.x + positions[index].x, origin.y + positions[index].y});
+            ImGui::PushID(node.id.c_str());
+            std::string label = node.type + "\n" + node.id;
+            if (input != node.ports.end())
+                label += "\nin: " + input->id;
+            if (output != node.ports.end())
+                label += "\nout: " + output->id;
+            if (ImGui::Button(label.c_str(), {card_width, card_height})) {
+                selected_node = static_cast<int>(index);
+                if (ui_behavior_graph_probe_enabled && index == 1U)
+                    ui_behavior_graph_target_clicked = true;
+                if (!canvas_connection_source.empty() &&
+                    canvas_connection_source != node.id) {
+                    const auto source = std::ranges::find(
+                        graph.nodes, canvas_connection_source,
+                        &fabric::project::BehaviorNodeDefinition::id);
+                    if (source != graph.nodes.end()) {
+                        const auto source_port = std::ranges::find(
+                            source->ports,
+                            fabric::project::BehaviorPortDirection::output,
+                            &fabric::project::BehaviorPortDefinition::direction);
+                        const auto input = std::ranges::find_if(
+                            node.ports, [&](const auto& port) {
+                                return source_port != source->ports.end() &&
+                                    port.direction ==
+                                        fabric::project::BehaviorPortDirection::input &&
+                                    port.type == source_port->type;
+                            });
+                        if (source_port != source->ports.end() &&
+                            input != node.ports.end())
+                            pending_connection = {source->id, source_port->id,
+                                                  node.id, input->id};
+                        else
+                            status = "No compatible input on destination node.";
+                    }
+                }
+            }
+            if (ui_behavior_graph_probe_enabled && index == 1U) {
+                ui_behavior_graph_target_seen = true;
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_behavior_graph_target_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+            }
+            ImGui::BeginDisabled(output == node.ports.end());
+            if (canvas_connection_source == node.id) {
+                if (ImGui::SmallButton("Cancel connection"))
+                    canvas_connection_source.clear();
+            } else if (ImGui::SmallButton("Connect from output")) {
+                canvas_connection_source = node.id;
+                selected_node = static_cast<int>(index);
+                if (ui_behavior_graph_probe_enabled && index == 0U)
+                    ui_behavior_graph_connect_clicked = true;
+            }
+            ImGui::EndDisabled();
+            if (ui_behavior_graph_probe_enabled && index == 0U) {
+                ui_behavior_graph_connect_seen = true;
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_behavior_graph_connect_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+            }
+            ImGui::PopID();
+        }
+        if (pending_connection) {
+            std::string id = pending_connection->from_node + "-to-" +
+                pending_connection->to_node;
+            const std::string base = id;
+            std::size_t suffix = 2U;
+            while (std::ranges::any_of(graph.connections,
+                                        [&](const auto& candidate) {
+                return candidate.id == id;
+            })) id = base + "-" + std::to_string(suffix++);
+            if (behavior_session.connect({id, pending_connection->from_node,
+                    pending_connection->from_port, pending_connection->to_node,
+                    pending_connection->to_port})) {
+                canvas_connection_source.clear();
+                status = "Behavior nodes connected.";
+            } else {
+                status = "Connection rejected; inspect Behavior diagnostics.";
+            }
+        }
+    }
+    ImGui::EndChild();
     ImGui::SeparatorText("Nodes");
     ImGui::SetNextItemWidth(190.0F);
     ImGui::Combo("Type", &node_type, node_types,
@@ -10189,6 +10354,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
     bool behavior_e2e_complete = false;
     if (behavior_e2e && session.has_project()) {
+        ui_behavior_graph_probe_enabled = true;
+        ui_behavior_graph_canvas_seen = false;
+        ui_behavior_graph_link_seen = false;
+        ui_behavior_graph_connect_seen = false;
+        ui_behavior_graph_target_seen = false;
+        ui_behavior_graph_connect_clicked = false;
+        ui_behavior_graph_target_clicked = false;
         fabric::editor::CreateInputPrompt input_prompt;
         input_prompt.name = "Player and Monster Controls";
         input_prompt.actions = {
@@ -10224,18 +10396,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             behavior_session.set_node_property(
                 {.value = "monster-ai"}, "semantic_id", std::string{"attack"}) &&
             behavior_session.add_node("emit_event", "emit-attack") &&
-            behavior_session.connect({.id = "attack-flow",
-                .from_node = "monster-ai", .from_port = "out",
-                .to_node = "emit-attack", .to_port = "in"}) &&
             behavior_session.save();
-        const auto actions = authored ? behavior_session.preview(
-            {fabric::runtime::BehaviorSignalSource::ai_decision, "attack", {}},
-            1.0F / 60.0F) : std::vector<fabric::runtime::BehaviorAction>{};
         fabric::editor::BehaviorSession reloaded;
         const bool reloaded_ok = authored &&
             reloaded.open(initial_project, {.value = "behavior-studio-e2e"}) &&
             reloaded.graph()->nodes.size() == 2U &&
-            reloaded.graph()->connections.size() == 1U;
+            reloaded.graph()->connections.empty();
         const auto entity_resource = std::ranges::find_if(
             session.resources(), [](const auto& resource) {
                 return resource.kind == fabric::editor::StudioResourceKind::entity;
@@ -10246,8 +10412,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 fabric::project::ResourceReference{
                     {.value = "behavior-studio-e2e"}, "behavior"}) &&
             session.save();
+        const bool behavior_selected = attached && session.refresh_resources() &&
+            session.select_resource(fabric::editor::StudioResourceKind::behavior,
+                                    {.value = "behavior-studio-e2e"});
         behavior_e2e_complete = input_authored && reloaded_ok && attached &&
-            actions.size() == 1U;
+            behavior_selected;
         if (!behavior_e2e_complete)
             std::cerr << "Asset Studio Behavior E2E failed\n";
     }
@@ -10585,8 +10754,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_button_frame = 0U;
     bool entity_e2e_capture_written = false;
     bool animation_graph_e2e_capture_written = false;
+    bool behavior_graph_e2e_capture_written = false;
     bool animation_e2e_capture_written = false;
     std::size_t animation_ui_e2e_frame = 0U;
+    std::size_t behavior_ui_e2e_frame = 0U;
     std::size_t entity_animation_workflow_frame = 0U;
     std::string workflow_entity_id;
     std::string workflow_animation_id;
@@ -11042,6 +11213,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             const ImVec2 target = entity_gizmo_e2e_frame == 1U
                 ? ui_animation_graph_connect_screen
                 : ui_animation_graph_target_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
+                SDL_Event button{};
+                button.type = type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
+        if (behavior_e2e &&
+            (behavior_ui_e2e_frame == 1U || behavior_ui_e2e_frame == 3U) &&
+            ui_behavior_graph_connect_seen && ui_behavior_graph_target_seen) {
+            const ImVec2 target = behavior_ui_e2e_frame == 1U
+                ? ui_behavior_graph_connect_screen
+                : ui_behavior_graph_target_screen;
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
@@ -11523,6 +11716,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (behavior_e2e && ui_behavior_graph_link_seen &&
+            !behavior_graph_e2e_capture_written) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-behavior-graph-e2e.ppm");
+            behavior_graph_e2e_capture_written = true;
+        }
         if (entity_e2e && ui_animation_graph_link_seen &&
             !animation_graph_e2e_capture_written) {
             write_frame_capture(initial_project, window,
@@ -12062,8 +12261,37 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 running = false;
             }
         }
-        if (behavior_e2e || transformation_e2e || entity_e2e ||
-            texture_e2e || vector_e2e)
+        if (behavior_e2e) {
+            ++behavior_ui_e2e_frame;
+            if (behavior_ui_e2e_frame == 6U) {
+                const bool saved = behavior_session.save();
+                fabric::editor::BehaviorSession reloaded;
+                const bool reopened = saved && reloaded.open(
+                    initial_project, {.value = "behavior-studio-e2e"});
+                const auto actions = reopened ? reloaded.preview(
+                    {fabric::runtime::BehaviorSignalSource::ai_decision,
+                     "attack", {}}, 1.0F / 60.0F)
+                    : std::vector<fabric::runtime::BehaviorAction>{};
+                behavior_e2e_complete = behavior_e2e_complete && reopened &&
+                    ui_behavior_graph_canvas_seen &&
+                    ui_behavior_graph_link_seen &&
+                    reloaded.graph()->connections.size() == 1U &&
+                    reloaded.graph()->connections.front().id ==
+                        "monster-ai-to-emit-attack" &&
+                    actions.size() == 1U;
+                if (!behavior_e2e_complete)
+                    std::cerr << "Asset Studio Behavior Graph UI E2E failed: "
+                              << "canvas=" << ui_behavior_graph_canvas_seen
+                              << ", source-seen=" << ui_behavior_graph_connect_seen
+                              << ", source-clicked="
+                              << ui_behavior_graph_connect_clicked
+                              << ", target-seen=" << ui_behavior_graph_target_seen
+                              << ", target-clicked="
+                              << ui_behavior_graph_target_clicked
+                              << ", link=" << ui_behavior_graph_link_seen << '\n';
+                running = false;
+            }
+        } else if (transformation_e2e || entity_e2e || texture_e2e || vector_e2e)
             running = running && entity_gizmo_e2e_active;
     }
 

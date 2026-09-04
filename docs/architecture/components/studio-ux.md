@@ -120,6 +120,13 @@ bus nommés, volume, boucle et spatialisation sont édités ensemble puis valid�
 atomiquement. Le choix `master` reste toujours disponible et un bus supprimé
 réaffecte ses événements à `master`, ce qui évite les références cassées.
 
+`Behavior Graph` suit la même grammaire visuelle qu'Animation Graph : cartes,
+ports et flèches occupent le parcours nominal ; propriétés typées, IDs et
+connexion manuelle restent sous le canevas comme inspecteurs avancés. Une
+connexion rapide part d'un port de sortie et choisit automatiquement le premier
+port d'entrée compatible de la cible. L'identifiant unique est généré par
+l'interface, tandis que `BehaviorSession` conserve validation, undo et dirty.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

@@ -34,6 +34,14 @@ d'actions typées et une trace bornée. Il ne contient aucune branche `player` o
 `monster`. Les cycles de flux sont interdits en v1 ; les transitions d'état
 utilisent le stockage explicite de l'évaluateur.
 
+Asset Studio présente ce contrat sous forme de canevas. Chaque carte affiche le
+type du nœud et ses ports ; les connexions sont des flèches. L'utilisateur
+choisit un port de sortie puis une carte cible compatible : l'interface résout
+le port d'entrée, génère l'identifiant de connexion et soumet la commande à la
+validation existante. Les listes de propriétés et le formulaire de connexion
+restent des inspecteurs avancés. Le layout du canevas est éphémère et ne change
+pas `BehaviorGraph v1`.
+
 ## Conséquences
 
 - Une action identique peut provenir du joueur, d'une IA ou d'une map.
@@ -45,3 +53,7 @@ utilisent le stockage explicite de l'évaluateur.
   d'auteur ; replay et pas fixe fournissent leur déterminisme.
 - Une migration future doit augmenter `schemaVersion`; les champs inconnus ou
   versions non supportées sont refusés.
+- Un scénario E2E doit partir de nœuds non reliés, utiliser les coordonnées des
+  widgets du canevas, sauvegarder/recharger, puis exécuter le signal attendu.
+  Une connexion injectée par `BehaviorSession` avant affichage ne prouve pas le
+  parcours d'auteur.

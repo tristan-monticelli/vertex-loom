@@ -202,6 +202,11 @@ Animation Graph. Après sauvegarde/rechargement, il exige la transition
 `idle-to-active` et produit `asset-studio-animation-graph-e2e.ppm` avec les
 deux cartes et leur flèche. Une transition injectée par la session avant
 l'affichage ne satisfait pas cette recette.
+Le test `asset_studio_behavior_e2e` crée deux nœuds sans connexion, ouvre la
+ressource Behavior, clique `Connect from output` puis la carte cible, sauvegarde
+et recharge. Il exige la connexion `monster-ai-to-emit-attack`, exécute le
+signal IA `attack`, attend une action et conserve le canevas final dans
+`asset-studio-behavior-graph-e2e.ppm`.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique successivement
 `Create Entity from visual`, `Animate selected node...`, `Create animation` et
