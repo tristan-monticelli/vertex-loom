@@ -230,6 +230,11 @@ nouvelles position, taille, rotation et position de pivot, compile la
 simulation, avance un pas fixe et produit
 `map-studio-mechanic-graph-e2e.ppm`. Le long formulaire de preset reste replié
 par défaut afin que le graphe soit visible sans scroll préalable.
+Le scénario revient ensuite par l'historique sur la même instance Map et exige
+que l'identité conservée par `MechanicSession` autorise son overlay physique ;
+`map-studio-mechanic-map-overlay-e2e.ppm` prouve ce rendu avant la publication.
+Une autre sélection ou une preview de prefab sans instance ne satisfait pas la
+condition d'affichage.
 Le scénario continue ensuite dans le workspace `Publish` : il clique Validate,
 exige une fermeture de dépendances visible, clique Publish, recharge le dossier
 produit avec `PreviewRuntime` pour un smoke d'une frame et capture

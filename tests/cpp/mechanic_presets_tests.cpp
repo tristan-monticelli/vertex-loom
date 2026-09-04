@@ -435,6 +435,13 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
         .position = {-1.0F, 2.81F}, .size = {0.6F, 1.0F}}));
     REQUIRE(prefab_preview.step_once());
     CHECK(prefab_preview.simulation().activation_states().front().active);
+    REQUIRE(prefab_preview.preview_instance_id().has_value());
+    CHECK(prefab_preview.preview_instance_id()->value ==
+          "rotating-platform-instance");
+    REQUIRE(prefab_preview.open_prefab(
+        fixture, *loaded_map.asset,
+        {.value = "rotating-platform-prefab"}));
+    CHECK_FALSE(prefab_preview.preview_instance_id().has_value());
     fabric::editor::MapSession prefab_editor;
     REQUIRE(prefab_editor.open(
         regenerated, {.value = "platform-preview"}));

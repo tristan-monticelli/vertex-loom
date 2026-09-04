@@ -687,6 +687,7 @@ int run(const std::filesystem::path& project_root,
     std::optional<ImVec2> mechanic_rotation_drag_origin;
     std::optional<ImVec2> mechanic_joint_drag_origin;
     bool mechanic_e2e_capture_written = false;
+    bool mechanic_map_overlay_capture_written = false;
     bool publish_e2e_capture_written = false;
     if (mechanic_e2e) {
         mechanic_probe.enabled = true;
@@ -913,7 +914,7 @@ int run(const std::filesystem::path& project_root,
     CanvasGizmoState canvas_gizmo;
     CollisionPointGizmoState collision_point_gizmo;
     SelectionBoxState selection_box;
-    MapPlacementProbe placement_probe{.enabled = placement_e2e};
+    MapPlacementProbe placement_probe{.enabled = placement_e2e || mechanic_e2e};
     std::size_t placement_e2e_frame = 0U;
     bool placement_context_observed = false;
     fabric::editor::MapSnapSettings canvas_snapping;
@@ -1733,7 +1734,8 @@ int run(const std::filesystem::path& project_root,
                             placement_mode, keep_placement_active,
                             placement_id, placement_resource_id, placement_kind,
                             canvas_snapping, preview_render_state,
-                            mechanic_session.simulation(), status,
+                            mechanic_session.simulation(),
+                            mechanic_session.preview_instance_id(), status,
                             &placement_probe);
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
@@ -2862,6 +2864,16 @@ int run(const std::filesystem::path& project_root,
                                 "map-studio-mechanic-graph-e2e.ppm");
             mechanic_e2e_capture_written = true;
         }
+        if (mechanic_e2e && mechanic_authoring_verified &&
+            active_workspace == ActiveWorkspace::map &&
+            placement_probe.mechanic_overlay_seen &&
+            !mechanic_map_overlay_capture_written) {
+            write_frame_capture(project_root, window,
+                                "map-studio-mechanic-map-overlay-e2e.ppm");
+            mechanic_map_overlay_capture_written = true;
+            publish_e2e_frame = 0U;
+            active_workspace = ActiveWorkspace::publish;
+        }
         if (mechanic_e2e && publish_probe.runtime_verified &&
             !publish_e2e_capture_written) {
             write_frame_capture(project_root, window,
@@ -3017,7 +3029,8 @@ int run(const std::filesystem::path& project_root,
                     mechanic_editor.selected_node);
             if (mechanic_e2e_complete) {
                 mechanic_authoring_verified = true;
-                active_workspace = ActiveWorkspace::publish;
+                mechanic_e2e_complete = editor_context.go_back();
+                active_workspace = ActiveWorkspace::map;
             } else {
                 running = false;
             }
@@ -3030,6 +3043,7 @@ int run(const std::filesystem::path& project_root,
                 publish_probe.validate_seen && publish_probe.validate_clicked &&
                 publish_probe.publish_seen && publish_probe.publish_clicked &&
                 publish_probe.dependency_seen && publish_probe.runtime_verified &&
+                mechanic_map_overlay_capture_written &&
                 publish_e2e_capture_written &&
                 std::filesystem::is_regular_file(
                     destination /

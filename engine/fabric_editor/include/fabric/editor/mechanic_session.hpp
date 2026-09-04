@@ -75,6 +75,10 @@ public:
         const core::ResourceId& prefab_id) const noexcept {
         return preview_prefab_id_ && *preview_prefab_id_ == prefab_id;
     }
+    [[nodiscard]] const std::optional<core::ResourceId>&
+    preview_instance_id() const noexcept {
+        return preview_instance_id_;
+    }
     [[nodiscard]] bool dirty() const noexcept { return commands_.dirty(); }
     [[nodiscard]] bool can_undo() const noexcept { return commands_.can_undo(); }
     [[nodiscard]] bool can_redo() const noexcept { return commands_.can_redo(); }
@@ -104,6 +108,7 @@ private:
     std::vector<project::MechanicParameterOverride> parameter_overrides_;
     std::optional<core::Transform> instance_transform_;
     std::optional<core::ResourceId> preview_prefab_id_;
+    std::optional<core::ResourceId> preview_instance_id_;
     std::optional<project::MechanicGraph> recovery_graph_;
     CommandStack commands_;
     AutosaveScheduler autosave_;

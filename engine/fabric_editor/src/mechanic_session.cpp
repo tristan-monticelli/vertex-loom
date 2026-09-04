@@ -104,6 +104,7 @@ bool MechanicSession::create(const std::filesystem::path& project_root,
     parameter_overrides_.clear();
     instance_transform_.reset();
     preview_prefab_id_.reset();
+    preview_instance_id_.reset();
     document_path_ = path;
     recovery_graph_.reset();
     commands_.clear();
@@ -130,6 +131,7 @@ bool MechanicSession::open(const std::filesystem::path& project_root,
     parameter_overrides_.clear();
     instance_transform_.reset();
     preview_prefab_id_.reset();
+    preview_instance_id_.reset();
     document_path_ = project::mechanic_graph_document_path(*manifest_, graph_id);
     recovery_graph_.reset();
     commands_.clear();
@@ -159,6 +161,7 @@ bool MechanicSession::open_prefab(
     if (!open(project_root, map, prefab->mechanic->id)) return false;
     parameter_overrides_ = prefab->mechanic_overrides;
     preview_prefab_id_ = prefab_id;
+    preview_instance_id_.reset();
     rebuild_preview();
     return preview_errors_.empty();
 }
@@ -171,6 +174,7 @@ bool MechanicSession::open_prefab_instance(
     if (instance == map.instances.end() || !instance->prefab) return false;
     if (!open_prefab(project_root, map, instance->prefab->id)) return false;
     instance_transform_ = instance->transform;
+    preview_instance_id_ = instance_id;
     rebuild_preview();
     return preview_errors_.empty();
 }

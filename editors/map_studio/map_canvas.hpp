@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -52,6 +53,7 @@ struct MapPlacementProbe {
     bool enabled{};
     bool canvas_seen{};
     bool canvas_hovered{};
+    bool mechanic_overlay_seen{};
     ImVec2 canvas_center{};
     bool placement_button_seen{};
     ImVec2 placement_button_screen{};
@@ -102,6 +104,7 @@ void draw_map_canvas(
     editor::MapSnapSettings& snapping,
     MapPreviewRenderer& preview_render_state,
     const physics::MechanicSimulation& mechanic_preview,
+    const std::optional<core::ResourceId>& mechanic_preview_instance,
     std::string& status,
     MapPlacementProbe* probe = nullptr);
 

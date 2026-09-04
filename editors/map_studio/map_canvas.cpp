@@ -178,6 +178,8 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      fabric::editor::MapSnapSettings& snapping,
                      MapPreviewRenderer& preview_render_state,
                      const fabric::physics::MechanicSimulation& mechanic_preview,
+                     const std::optional<fabric::core::ResourceId>&
+                         mechanic_preview_instance,
                      std::string& status,
                      MapPlacementProbe* probe) {
     if (!session.map()) return;
@@ -357,7 +359,12 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         draw->AddQuadFilled(points[0], points[1], points[2], points[3], fill);
         draw->AddQuad(points[0], points[1], points[2], points[3], outline, 2.0F);
     };
-    if (mechanic_preview.valid()) {
+    const bool show_mechanic_preview = mechanic_preview.valid() &&
+        selected_instances.size() == 1U && mechanic_preview_instance &&
+        mechanic_preview_instance->value == selected_instances.front();
+    if (show_mechanic_preview) {
+        if (probe != nullptr && probe->enabled)
+            probe->mechanic_overlay_seen = true;
         for (const auto& body : mechanic_preview.body_states())
             draw_mechanic_box(body.position, body.size, body.rotation_degrees,
                               IM_COL32(75, 165, 180, 42),

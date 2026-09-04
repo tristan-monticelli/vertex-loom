@@ -127,6 +127,10 @@ l'action contextuelle ouvre directement sa preview Mechanics avec overrides,
 ajoute le document à l'historique et préserve la sélection Map pour le retour.
 Deux captures E2E distinctes prouvent l'action visible puis le document logique
 résolu sans recherche de prefab.
+`MechanicSession` conserve désormais l'identité de l'instance ouverte. Le
+retour historique sur Map exige cette même sélection avant d'afficher l'overlay
+et produit une troisième capture dédiée. Les poignées de cet overlay restent à
+router vers les commandes Mechanics.
 Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,

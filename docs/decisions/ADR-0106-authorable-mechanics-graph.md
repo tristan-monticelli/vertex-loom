@@ -87,6 +87,12 @@ compilateur que Map Studio, puis avance la simulation au pas fixe `1/60 s`.
 Un échec de chargement, compilation ou création Box2D refuse la map avant la
 création de la fenêtre.
 
+Une preview ouverte depuis une instance conserve aussi l'identifiant stable de
+cette instance dans `MechanicSession`. Le canvas Map ne projette la simulation
+que lorsque cette identité correspond à son unique sélection ; ouvrir le graphe
+brut ou sélectionner une autre instance ne réutilise jamais un overlay devenu
+ambigu.
+
 Dans le contrat v1, un corps dont `visual_entity` référence l'entité du prefab
 pilote les paquets visuels de cette instance. Le runtime applique aux paquets
 la translation et la rotation relatives entre la pose physique initiale et la

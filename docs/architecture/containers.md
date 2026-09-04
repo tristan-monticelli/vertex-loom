@@ -132,6 +132,10 @@ instance → prefab → mécanique, demande à `MechanicSession` d'ouvrir la pre
 de cette instance, puis navigue vers le document logique dans `EditorContext`.
 La map et sa sélection restent dans l'historique ; aucun workspace ne duplique
 le chargement des overrides ou du transform d'instance.
+`MechanicSession` conserve l'identifiant de l'instance avec la simulation ; le
+canvas Map compare cette identité à sa sélection unique avant de dessiner
+l'overlay. Une preview de graphe ou de prefab non liée à une instance ne peut
+donc pas contaminer visuellement la map active.
 
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview
