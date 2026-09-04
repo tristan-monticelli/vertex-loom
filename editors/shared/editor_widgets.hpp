@@ -1,5 +1,7 @@
 #pragma once
 
+#include "fabric/editor/editor_context.hpp"
+
 #include <imgui.h>
 #include <imgui_stdlib.h>
 
@@ -135,6 +137,79 @@ inline bool draw_searchable_id_picker(
                             std::string(settings.no_matches_label).c_str());
     }
     ImGui::EndCombo();
+    return changed;
+}
+
+inline const char* workspace_label(
+    const editor::EditorWorkspace workspace) noexcept {
+    switch (workspace) {
+    case editor::EditorWorkspace::visual: return "Visual";
+    case editor::EditorWorkspace::entity: return "Entity";
+    case editor::EditorWorkspace::animation: return "Animation";
+    case editor::EditorWorkspace::logic: return "Logic";
+    case editor::EditorWorkspace::map: return "Map";
+    case editor::EditorWorkspace::scene: return "Scene";
+    case editor::EditorWorkspace::rig_physics: return "Rig / Physics";
+    case editor::EditorWorkspace::publish: return "Publish";
+    }
+    return "Document";
+}
+
+template <typename LabelFor, typename Activate>
+bool draw_document_navigation(editor::EditorContext& context,
+                              LabelFor&& label_for,
+                              Activate&& activate) {
+    bool changed = false;
+    ImGui::BeginDisabled(!context.can_go_back());
+    if (ImGui::ArrowButton("##document-back", ImGuiDir_Left) &&
+        context.go_back() && context.active_document() != nullptr) {
+        changed = activate(*context.active_document());
+    }
+    ImGui::EndDisabled();
+    draw_disabled_reason(!context.can_go_back(),
+                         "No previous document in navigation history.");
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!context.can_go_forward());
+    if (ImGui::ArrowButton("##document-forward", ImGuiDir_Right) &&
+        context.go_forward() && context.active_document() != nullptr) {
+        changed = activate(*context.active_document()) || changed;
+    }
+    ImGui::EndDisabled();
+    draw_disabled_reason(!context.can_go_forward(),
+                         "No next document in navigation history.");
+    ImGui::SameLine();
+    const auto* active = context.active_document();
+    ImGui::TextDisabled("%s", active == nullptr
+        ? "No document" : workspace_label(active->workspace));
+
+    if (ImGui::BeginTabBar(
+            "##document-tabs",
+            ImGuiTabBarFlags_Reorderable |
+                ImGuiTabBarFlags_FittingPolicyScroll)) {
+        for (const auto& document : context.open_documents()) {
+            const bool is_active = active != nullptr &&
+                active->id == document.id;
+            const auto visible_label = label_for(document.id);
+            const std::string tab_label =
+                (visible_label.empty() ? document.id.value : visible_label) +
+                "##document-" + document.id.value;
+            const auto flags = is_active ? ImGuiTabItemFlags_SetSelected
+                                         : ImGuiTabItemFlags_None;
+            const bool tab_visible =
+                ImGui::BeginTabItem(tab_label.c_str(), nullptr, flags);
+            const bool tab_clicked = ImGui::IsItemClicked();
+            if (tab_clicked && !is_active &&
+                context.navigate(document.id, document.workspace,
+                                 document.selection_id)) {
+                changed = activate(*context.active_document()) || changed;
+                active = context.active_document();
+            }
+            if (tab_visible) {
+                ImGui::EndTabItem();
+            }
+        }
+        ImGui::EndTabBar();
+    }
     return changed;
 }
 

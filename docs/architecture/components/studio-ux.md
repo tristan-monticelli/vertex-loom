@@ -173,6 +173,7 @@ flowchart LR
 | --- | --- | --- |
 | Editor Shell | fenêtre, menus, onglets, navigation, layout local | document métier ou sérialisation |
 | EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
+| DocumentTabs | onglets, retour/avant et activation de la session par ID stable | chargement ou mutation d'une ressource |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |

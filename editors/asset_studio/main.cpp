@@ -4,6 +4,7 @@
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/behavior_session.hpp"
 #include "fabric/editor/session_transition.hpp"
+#include "fabric/editor/studio_workspace.hpp"
 #include "fabric/editor/transformation_session.hpp"
 #include "fabric/editor/visual_presets.hpp"
 #include "fabric/render/opengl_vector_renderer.hpp"
@@ -62,6 +63,7 @@ using fabric::asset_studio::draw_native_vector_canvas;
 using fabric::asset_studio::draw_packet_preview_canvas;
 using fabric::editor_ui::contains_ascii_insensitive;
 using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_document_navigation;
 using fabric::editor_ui::draw_resource_name_field;
 using fabric::editor_ui::draw_searchable_id_picker;
 using fabric::editor_ui::draw_technical_tooltip;
@@ -4215,6 +4217,7 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
 }
 
 void draw_workspace(fabric::editor::ProjectSession& session,
+                    fabric::editor::EditorContext& editor_context,
                     fabric::editor::BehaviorSession& behavior_session,
                     fabric::editor::TransformationSession& transformation_session,
                     SDL_Window* window,
@@ -4244,6 +4247,79 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     active_picker_session = &session;
     active_picker_texture_cache = &texture_cache;
     canvas.native_canvas = false;
+    const auto canvas_tool_id = [&] {
+        switch (canvas.tool) {
+        case CanvasUiState::Tool::move: return std::string{"move"};
+        case CanvasUiState::Tool::rotate: return std::string{"rotate"};
+        case CanvasUiState::Tool::scale: return std::string{"scale"};
+        case CanvasUiState::Tool::pivot: return std::string{"pivot"};
+        case CanvasUiState::Tool::pen: return std::string{"pen"};
+        }
+        return std::string{"move"};
+    };
+    const auto current_view = [&] {
+        return fabric::editor::EditorViewState{
+            .zoom = canvas.zoom,
+            .pan = {canvas.pan.x, canvas.pan.y},
+            .playhead = animation_ui.scrub_time,
+            .active_tool = canvas_tool_id(),
+            .active_panel = session.selected_resource() != nullptr &&
+                    session.selected_resource()->kind ==
+                        fabric::editor::StudioResourceKind::animation
+                ? "timeline"
+                : "inspector",
+        };
+    };
+    const auto restore_document_state = [&] {
+        const auto* document = editor_context.active_document();
+        if (document == nullptr) return;
+        canvas.zoom = document->view.zoom;
+        canvas.pan = {document->view.pan.x, document->view.pan.y};
+        animation_ui.scrub_time = document->view.playhead;
+        if (document->view.active_tool == "rotate")
+            canvas.tool = CanvasUiState::Tool::rotate;
+        else if (document->view.active_tool == "scale")
+            canvas.tool = CanvasUiState::Tool::scale;
+        else if (document->view.active_tool == "pivot")
+            canvas.tool = CanvasUiState::Tool::pivot;
+        else if (document->view.active_tool == "pen")
+            canvas.tool = CanvasUiState::Tool::pen;
+        else
+            canvas.tool = CanvasUiState::Tool::move;
+
+        if (!document->selection_id.has_value()) return;
+        if (session.selected_entity()) {
+            const auto node = std::ranges::find(
+                session.selected_entity()->nodes,
+                document->selection_id->value,
+                &fabric::project::EntityNode::id);
+            if (node != session.selected_entity()->nodes.end()) {
+                const auto index = static_cast<std::size_t>(std::distance(
+                    session.selected_entity()->nodes.begin(), node));
+                canvas.selected_entity_nodes = {index};
+                canvas.selected_node = index;
+            }
+        } else if (session.selected_animation()) {
+            animation_ui.node_id = document->selection_id->value;
+        }
+    };
+    if (editor_context.active_document() != nullptr) {
+        static_cast<void>(editor_context.set_view(current_view()));
+    }
+    const auto* selected_resource = session.selected_resource();
+    if (selected_resource != nullptr &&
+        (editor_context.active_document() == nullptr ||
+         editor_context.active_document()->id != selected_resource->id)) {
+        const bool first_document = editor_context.open_documents().empty();
+        static_cast<void>(editor_context.open_document(
+            selected_resource->id,
+            fabric::editor::workspace_for(selected_resource->kind)));
+        if (first_document) {
+            static_cast<void>(editor_context.set_view(current_view()));
+        } else {
+            restore_document_state();
+        }
+    }
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
@@ -4278,6 +4354,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
+    if (!editor_context.open_documents().empty()) {
+        static_cast<void>(draw_document_navigation(
+            editor_context,
+            [&](const fabric::core::ResourceId& id) {
+                const auto resource = std::ranges::find(
+                    session.resources(), id, &fabric::editor::StudioResource::id);
+                return resource == session.resources().end()
+                    ? id.value
+                    : resource->name;
+            },
+            [&](const fabric::editor::EditorDocumentState& document) {
+                const auto resource = std::ranges::find(
+                    session.resources(), document.id,
+                    &fabric::editor::StudioResource::id);
+                if (resource == session.resources().end() ||
+                    !select_and_preview_resource(
+                        session, *resource, preview, status, "Opened: ")) {
+                    return false;
+                }
+                restore_document_state();
+                return true;
+            }));
+        ImGui::Separator();
+    }
     draw_project_tree(session, creation, preview, status);
     if (!session.has_project()) {
         ImGui::Spacing();
@@ -4651,6 +4751,27 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
         draw_animation_timeline_dock(session, animation_ui, status);
         ImGui::End();
+    }
+
+    if (editor_context.active_document() != nullptr &&
+        session.selected_resource() != nullptr &&
+        editor_context.active_document()->id ==
+            session.selected_resource()->id) {
+        static_cast<void>(editor_context.set_view(current_view()));
+        std::optional<fabric::core::ResourceId> stable_selection;
+        if (session.selected_entity() &&
+            !canvas.selected_entity_nodes.empty() &&
+            canvas.selected_entity_nodes.front() <
+                session.selected_entity()->nodes.size()) {
+            stable_selection = fabric::core::ResourceId{
+                .value = session.selected_entity()
+                    ->nodes[canvas.selected_entity_nodes.front()].id};
+        } else if (session.selected_animation() &&
+                   fabric::core::ResourceId::is_valid(animation_ui.node_id)) {
+            stable_selection = fabric::core::ResourceId{
+                .value = animation_ui.node_id};
+        }
+        static_cast<void>(editor_context.set_selection(stable_selection));
     }
 
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
@@ -10239,6 +10360,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
 
     fabric::editor::ProjectSession session;
+    fabric::editor::EditorContext editor_context;
     fabric::editor::BehaviorSession behavior_session;
     fabric::editor::TransformationSession transformation_session;
     fabric::render::OpenGLVectorRenderer native_renderer;
@@ -11848,7 +11970,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             canvas.entity_world_bounds = visual_preview.bounds;
         }
 
-        draw_workspace(session, behavior_session, transformation_session,
+        draw_workspace(session, editor_context, behavior_session,
+                       transformation_session,
                        window, path_buffer, creation, imports, preview,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
