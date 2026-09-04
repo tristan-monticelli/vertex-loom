@@ -3394,7 +3394,7 @@ bool draw_transfer_mode(const char* label, fabric::project::TransferMode& value,
     return changed;
 }
 
-void draw_transformation_editor(
+void draw_transformation_creation_prompt(
     fabric::editor::ProjectSession& project_session,
     fabric::editor::TransformationSession& transformation_session,
     CreationUiState& creation, std::string& status) {
@@ -3450,7 +3450,13 @@ void draw_transformation_editor(
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
+}
 
+void draw_transformation_editor(
+    fabric::editor::ProjectSession& project_session,
+    fabric::editor::TransformationSession& transformation_session,
+    std::string& status) {
+    using Kind = fabric::editor::StudioResourceKind;
     const auto* selected = project_session.selected_resource();
     if (!selected || selected->kind != Kind::transformation) return;
     if (!transformation_session.has_transformation() ||
@@ -3462,8 +3468,7 @@ void draw_transformation_editor(
         }
     }
 
-    ImGui::SetNextWindowSize({650.0F, 720.0F}, ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Entity Transformation")) { ImGui::End(); return; }
+    ImGui::SeparatorText("Entity Transformation");
     const auto& current = *transformation_session.transformation();
     ImGui::Text("%s", current.document.name.c_str());
     ImGui::SameLine(); ImGui::TextDisabled("%s", current.document.id.value.c_str());
@@ -3588,7 +3593,6 @@ void draw_transformation_editor(
     for (const auto& issue : transformation_session.errors())
         ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                            issue.field.c_str(), issue.message.c_str());
-    ImGui::End();
 }
 
 const char* animation_condition_label(
@@ -4272,6 +4276,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     active_picker_texture_cache = &texture_cache;
     draw_behavior_creation_prompt(
         session, behavior_session, creation, status);
+    draw_transformation_creation_prompt(
+        session, transformation_session, creation, status);
     canvas.native_canvas = false;
     const auto canvas_tool_id = [&] {
         switch (canvas.tool) {
@@ -4290,6 +4296,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             .playhead = animation_ui.scrub_time,
             .active_tool = canvas_tool_id(),
             .active_panel = session.selected_resource() != nullptr &&
+                    session.selected_resource()->kind ==
+                        fabric::editor::StudioResourceKind::transformation
+                ? "transformation"
+                : session.selected_resource() != nullptr &&
                     session.selected_resource()->kind ==
                         fabric::editor::StudioResourceKind::behavior
                 ? "behavior-graph"
@@ -4378,15 +4388,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const bool behavior_workspace = session.selected_resource() != nullptr &&
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::behavior;
+    const bool transformation_workspace =
+        session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::transformation;
+    const bool stage_workspace = behavior_workspace || transformation_workspace;
     const bool task_workspace = animation_workspace || animation_graph_workspace ||
-        behavior_workspace;
+        stage_workspace;
     float& timeline_height = layout.task_panel_height;
     const float minimum_task_height = animation_graph_workspace ? 360.0F : 190.0F;
     timeline_height = std::clamp(
         timeline_height, minimum_task_height,
         std::max(minimum_task_height, content_height - 200.0F));
     constexpr float timeline_gap = 6.0F;
-    const float preview_height = behavior_workspace
+    const float preview_height = stage_workspace
         ? 0.0F
         : task_workspace
         ? content_height - timeline_height - timeline_gap
@@ -4469,6 +4484,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 creation.request_animation = true;
             if (ImGui::MenuItem("Behavior graph..."))
                 creation.request_behavior = true;
+            if (ImGui::MenuItem("Entity transformation..."))
+                creation.request_transformation = true;
             if (ImGui::MenuItem("Input bindings..."))
                 creation.request_input = true;
             ImGui::SeparatorText("Advanced");
@@ -4484,8 +4501,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Expert entity tools")) {
-                if (ImGui::MenuItem("Entity transformation..."))
-                    creation.request_transformation = true;
                 ImGui::TextDisabled("Physics and deformation stay available in the entity inspector.");
                 ImGui::EndMenu();
             }
@@ -4515,7 +4530,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
              fabric::editor::StudioResourceKind::visual_composition ||
          session.selected_resource()->kind ==
              fabric::editor::StudioResourceKind::visual_component);
-    if (!behavior_workspace) {
+    if (!stage_workspace) {
     ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({viewport->Size.x - left_width - right_width,
@@ -4784,15 +4799,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const float center_width = viewport->Size.x - left_width - right_width;
         ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
                                  viewport->Pos.y + menu_height +
-                                     (behavior_workspace
+                                     (stage_workspace
                                           ? 0.0F
                                           : preview_height + timeline_gap)});
         ImGui::SetNextWindowSize(
             {center_width,
-             behavior_workspace ? content_height : timeline_height});
+             stage_workspace ? content_height : timeline_height});
         ImGui::Begin("Task workspace", nullptr,
                      fixed_panel_flags | ImGuiWindowFlags_NoTitleBar);
-        if (!behavior_workspace) {
+        if (!stage_workspace) {
             ImGui::InvisibleButton(
                 "##timeline-height-splitter", {-1.0F, 5.0F});
             if (ImGui::IsItemActive()) {
@@ -4807,6 +4822,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         if (behavior_workspace)
             draw_behavior_editor(session, behavior_session, status);
+        else if (transformation_workspace)
+            draw_transformation_editor(
+                session, transformation_session, status);
         else if (animation_graph_workspace)
             draw_animation_graph_editor(session, animation_graph_ui, status);
         else
@@ -11981,9 +11999,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         creation.request_animation = true;
                     if (ImGui::MenuItem("Behavior graph..."))
                         creation.request_behavior = true;
+                    if (ImGui::MenuItem("Entity transformation..."))
+                        creation.request_transformation = true;
                     if (ImGui::BeginMenu("Advanced")) {
-                        if (ImGui::MenuItem("Entity transformation..."))
-                            creation.request_transformation = true;
                         if (ImGui::MenuItem("Legacy visual preset..."))
                             creation.request_visual_preset = true;
                         if (ImGui::MenuItem("Visual composition..."))
@@ -12216,8 +12234,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        command_palette_rendered,
                        layout,
                        transition_guard, running, status);
-        draw_transformation_editor(session, transformation_session, creation,
-                                   status);
         const auto* active_resource = session.selected_resource();
         if (behavior_session.dirty() && behavior_session.graph() &&
             (!active_resource ||
