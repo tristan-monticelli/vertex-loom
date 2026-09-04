@@ -89,6 +89,12 @@ La migration suit quatre tranches vérifiables :
 4. ajouter les workspaces directs Rig/Physics et Publish seulement sur cette
    base, puis retirer les anciens chemins lorsqu’ils ne sont plus appelés.
 
+La migration Entity commence par `EntityHierarchyWorkspace`. Ce composant
+possède uniquement l'arbre, la sélection groupée et les gestes structurels ;
+il reçoit l'état canvas et délègue toute mutation à `ProjectSession`. Les
+coordonnées et drapeaux du harnais graphique passent par un petit adaptateur de
+probe injecté, sans état de test global dans le composant.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

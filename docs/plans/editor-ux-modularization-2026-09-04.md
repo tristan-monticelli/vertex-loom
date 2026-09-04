@@ -103,6 +103,11 @@ d'une Entity sélectionnée.
 - Conserver les sessions métier comme seuls propriétaires des mutations,
   undo/redo, dirty, autosave et recovery.
 
+Progression : la hiérarchie Entity est la première sous-surface Visual/Entity
+extraite. Son module porte ajout, duplication, suppression, réorganisation,
+reparentage et drop d'artwork ; le bootstrap conserve provisoirement les
+actions de parcours et l'Inspector de propriétés détaillées.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

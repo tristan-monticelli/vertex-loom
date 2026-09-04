@@ -283,6 +283,10 @@ enfant, deux clés Position, le temps corrigé et le marqueur au même temps. So
 artefact JSON distingue chaque widget vu, chaque création par clic, l'avancée
 effective de la lecture et les données persistées ; une capture PPM conserve le
 workspace final.
+Le module `EntityHierarchyWorkspace` reste couvert par les gestes réels des E2E
+Entity : ajout et drop de nœud, sélection multiple, réorganisation stable,
+reparentage, suppression protégée et reload. Son adaptateur de probe ne peut
+observer que les rectangles et mutations produits par le module rendu.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre
