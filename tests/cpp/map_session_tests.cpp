@@ -259,6 +259,34 @@ TEST_CASE("map session edits layer state and prefab overrides undoably") {
     std::filesystem::remove_all(root, ignored);
 }
 
+TEST_CASE("map session configures and removes a path follower undoably") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-map-path-session-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    fabric::editor::MapSession session;
+    auto source = map();
+    source.instances = {instance("hero", 0.0F)};
+    REQUIRE(session.create(root, source));
+    fabric::project::PathFollowerState follower{
+        .path = {{.value = "path"}, "texturedPath"},
+        .progress = 0.25F,
+        .speed = 3.0F,
+        .loop = false,
+        .orient_to_path = true,
+        .rotation_offset_degrees = 10.0F};
+    REQUIRE(session.set_instance_path_follower({.value = "hero"}, follower));
+    REQUIRE(session.map()->instances.front().path_follower == follower);
+    REQUIRE(session.undo());
+    CHECK_FALSE(session.map()->instances.front().path_follower.has_value());
+    REQUIRE(session.redo());
+    CHECK(session.map()->instances.front().path_follower == follower);
+    REQUIRE(session.set_instance_path_follower({.value = "hero"}, std::nullopt));
+    CHECK_FALSE(session.map()->instances.front().path_follower.has_value());
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
 TEST_CASE("map session translates a selection atomically and respects layer locks") {
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-map-selection-" + std::to_string(
