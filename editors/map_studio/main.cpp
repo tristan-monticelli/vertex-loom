@@ -921,6 +921,7 @@ int run(const std::filesystem::path& project_root,
     bool path_follower_orient = true;
     float path_follower_rotation_offset = 0.0F;
     std::string path_follower_bound_instance;
+    bool path_follower_reference_valid = false;
     std::string transformation_preview_id;
     std::string transformation_preview_result;
     ImVec2 canvas_pan{0.0F, 0.0F};
@@ -977,14 +978,7 @@ int run(const std::filesystem::path& project_root,
                 return fabric::editor::EditorActionAvailability{
                     .enabled = false,
                     .disabled_reason = "Configure a valid PathFollower before creating its animation."};
-            if (!session.manifest())
-                return fabric::editor::EditorActionAvailability{
-                    .enabled = false,
-                    .disabled_reason = "The project manifest is not available."};
-            const auto path_document = fabric::project::textured_path_document_path(
-                *session.manifest(), instance->path_follower->path.id);
-            if (!fabric::project::load_textured_path(
-                    session.project_root(), *session.manifest(), path_document).ok())
+            if (!path_follower_reference_valid)
                 return fabric::editor::EditorActionAvailability{
                     .enabled = false,
                     .disabled_reason = "The configured PathFollower resource is missing or invalid."};
@@ -2525,6 +2519,7 @@ int run(const std::filesystem::path& project_root,
                             ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                                 "Path is missing or invalid; choose another asset.");
                     }
+                    path_follower_reference_valid = path_reference_valid;
                     ImGui::BeginDisabled(!path_reference_valid);
                     if (ImGui::Button("Apply path follower")) {
                         fabric::project::PathFollowerState follower{
