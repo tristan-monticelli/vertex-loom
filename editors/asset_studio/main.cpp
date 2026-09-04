@@ -59,9 +59,13 @@ using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
 using fabric::asset_studio::draw_packet_preview_canvas;
+using fabric::editor_ui::contains_ascii_insensitive;
 using fabric::editor_ui::draw_disabled_reason;
 using fabric::editor_ui::draw_resource_name_field;
+using fabric::editor_ui::draw_searchable_id_picker;
 using fabric::editor_ui::draw_technical_tooltip;
+using fabric::editor_ui::SearchableIdOption;
+using fabric::editor_ui::SearchableIdPickerOptions;
 
 fabric::editor::ProjectSession* active_picker_session = nullptr;
 std::unordered_map<std::string, AssetPreview>* active_picker_texture_cache = nullptr;
@@ -2612,9 +2616,6 @@ void write_entity_animation_workflow_probe(
     if (output) output << probe.dump(2) << '\n';
 }
 
-bool text_contains_ascii_insensitive(std::string_view text,
-                                     std::string_view query);
-
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                           fabric::editor::BehaviorSession& behavior_session,
                           CreationUiState& creation, std::string& status) {
@@ -2707,8 +2708,8 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         if (!display_type.empty())
             display_type.front() = static_cast<char>(
                 std::toupper(static_cast<unsigned char>(display_type.front())));
-        if (!text_contains_ascii_insensitive(type, node_search) &&
-            !text_contains_ascii_insensitive(display_type, node_search))
+        if (!contains_ascii_insensitive(type, node_search) &&
+            !contains_ascii_insensitive(display_type, node_search))
             continue;
         any_matching_type = true;
         ImGui::PushID(type);
@@ -3078,26 +3079,6 @@ void draw_prompt_summary(const fabric::editor::PromptValidation& validation) {
     }
 }
 
-bool text_contains_ascii_insensitive(const std::string_view text,
-                                     const std::string_view query) {
-    if (query.empty()) return true;
-    const auto fold = [](const char value) {
-        return value >= 'A' && value <= 'Z'
-            ? static_cast<char>(value - 'A' + 'a') : value;
-    };
-    for (std::size_t start = 0; start + query.size() <= text.size(); ++start) {
-        bool matches = true;
-        for (std::size_t offset = 0; offset < query.size(); ++offset) {
-            if (fold(text[start + offset]) != fold(query[offset])) {
-                matches = false;
-                break;
-            }
-        }
-        if (matches) return true;
-    }
-    return false;
-}
-
 bool draw_project_resource_picker(
     const char* label,
     const std::span<const fabric::editor::StudioResource> resources,
@@ -3109,46 +3090,26 @@ bool draw_project_resource_picker(
             return resource.kind == expected_kind &&
                 resource.id.value == selected_id;
         });
-    const std::string preview = selected != resources.end()
-        ? selected->name
-        : selected_id.empty() ? std::string{"Choose a project resource..."}
-                              : std::string{"Missing: "} + selected_id;
-    bool changed = false;
-    ImGui::SetNextItemWidth(
-        std::max(120.0F, ImGui::GetContentRegionAvail().x * 0.62F));
-    if (ImGui::BeginCombo(label, preview.c_str())) {
-        static std::unordered_map<ImGuiID, std::string> filters;
-        auto& filter = filters[ImGui::GetID(label)];
-        ImGui::SetNextItemWidth(-1.0F);
-        ImGui::InputTextWithHint("##resource-search", "Search by name or id...",
-                                 &filter);
-        if (optional && ImGui::Selectable("Clear selection", selected_id.empty())) {
-            selected_id.clear();
-            changed = true;
+    std::vector<SearchableIdOption> options;
+    for (const auto& resource : resources) {
+        if (resource.kind == expected_kind) {
+            options.push_back({
+                .id = resource.id.value,
+                .label = resource.name,
+                .detail = resource.id.value,
+            });
         }
-        if (optional) ImGui::Separator();
-        bool found = false;
-        for (const auto& resource : resources) {
-            if (resource.kind != expected_kind ||
-                (!text_contains_ascii_insensitive(resource.name, filter) &&
-                 !text_contains_ascii_insensitive(resource.id.value, filter))) {
-                continue;
-            }
-            found = true;
-            const bool is_selected = resource.id.value == selected_id;
-            const std::string item_label = resource.name + "##resource-" +
-                resource.id.value;
-            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
-                selected_id = resource.id.value;
-                changed = true;
-            }
-            if (is_selected) ImGui::SetItemDefaultFocus();
-            ImGui::SameLine();
-            ImGui::TextDisabled("%s", resource.id.value.c_str());
-        }
-        if (!found) ImGui::TextDisabled("No matching project resource.");
-        ImGui::EndCombo();
     }
+    const bool changed = draw_searchable_id_picker(
+        label, options, selected_id,
+        SearchableIdPickerOptions{
+            .width = std::max(
+                120.0F, ImGui::GetContentRegionAvail().x * 0.62F),
+            .allow_clear = optional,
+            .empty_label = "Choose a project resource...",
+            .search_hint = "Search by name or id...",
+            .no_matches_label = "No matching project resource.",
+        });
     if (show_details && selected != resources.end()) {
         if (selected->kind == fabric::editor::StudioResourceKind::texture &&
             active_picker_session != nullptr && active_picker_texture_cache != nullptr) {
@@ -3224,8 +3185,8 @@ bool draw_entity_node_picker(
         ImGui::InputTextWithHint("##entity-node-search", "Search by name or id...",
                                  &filter);
         for (const auto& node : nodes) {
-            if (!text_contains_ascii_insensitive(node.name, filter) &&
-                !text_contains_ascii_insensitive(node.id, filter))
+            if (!contains_ascii_insensitive(node.name, filter) &&
+                !contains_ascii_insensitive(node.id, filter))
                 continue;
             const bool is_selected = node.id == selected_id;
             const std::string item_label = node.name + "##entity-node-option-" +
@@ -3265,8 +3226,8 @@ bool draw_behavior_node_picker(
                                  &filter);
         bool found = false;
         for (const auto& node : nodes) {
-            if (!text_contains_ascii_insensitive(node.id, filter) &&
-                !text_contains_ascii_insensitive(node.type, filter))
+            if (!contains_ascii_insensitive(node.id, filter) &&
+                !contains_ascii_insensitive(node.type, filter))
                 continue;
             found = true;
             const bool is_selected = node.id == selected_id;

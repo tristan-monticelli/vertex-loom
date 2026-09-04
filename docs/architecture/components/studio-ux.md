@@ -174,7 +174,7 @@ flowchart LR
 | Editor Shell | fenêtre, menus, onglets, navigation, layout local | document métier ou sérialisation |
 | EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
-| Widgets ImGui partagés | champs communs, tooltips et explication des actions bloquées | état métier ou sélection locale |
+| Widgets ImGui partagés | champs communs, tooltips, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
 | Inspector | propriétés de la sélection et sections progressives | sélection indépendante du canvas |
 | Task Dock | timeline, palette, trace, diagnostics ou simulation contextuelle | navigation globale du projet |

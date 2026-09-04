@@ -49,7 +49,10 @@ namespace {
 
 using fabric::editor_ui::draw_disabled_reason;
 using fabric::editor_ui::draw_resource_name_field;
+using fabric::editor_ui::draw_searchable_id_picker;
 using fabric::editor_ui::draw_technical_tooltip;
+using fabric::editor_ui::SearchableIdOption;
+using fabric::editor_ui::SearchableIdPickerOptions;
 
 bool ui_map_workspace_seen = false;
 float ui_map_layers_x = 0.0F;
@@ -607,38 +610,19 @@ bool draw_id_picker(const char* label,
                     const std::span<const std::string> values,
                     std::string& selected_id,
                     const char* empty_label) {
-    const auto selected = std::ranges::find(values, selected_id);
-    const std::string preview = selected != values.end()
-        ? *selected
-        : selected_id.empty() ? std::string{empty_label}
-                              : std::string{"Missing: "} + selected_id;
-    bool changed = false;
-    ImGui::SetNextItemWidth(220.0F);
-    if (ImGui::BeginCombo(label, preview.c_str())) {
-        static std::unordered_map<ImGuiID, std::string> filters;
-        auto& filter = filters[ImGui::GetID(label)];
-        ImGui::SetNextItemWidth(-1.0F);
-        ImGui::InputTextWithHint("##id-picker-search", "Search identifier...", &filter);
-        for (const auto& value : values) {
-            auto haystack = value;
-            auto needle = filter;
-            std::ranges::transform(haystack, haystack.begin(), [](const unsigned char character) {
-                return static_cast<char>(std::tolower(character));
-            });
-            std::ranges::transform(needle, needle.begin(), [](const unsigned char character) {
-                return static_cast<char>(std::tolower(character));
-            });
-            if (!needle.empty() && haystack.find(needle) == std::string::npos) continue;
-            if (ImGui::Selectable(value.c_str(), value == selected_id)) {
-                selected_id = value;
-                changed = true;
-            }
-        }
-        if (selected == values.end() && !selected_id.empty())
-            ImGui::TextDisabled("Missing identifier: %s", selected_id.c_str());
-        ImGui::EndCombo();
+    std::vector<SearchableIdOption> options;
+    options.reserve(values.size());
+    for (const auto& value : values) {
+        options.push_back({.id = value, .label = value});
     }
-    return changed;
+    return draw_searchable_id_picker(
+        label, options, selected_id,
+        SearchableIdPickerOptions{
+            .width = 220.0F,
+            .empty_label = empty_label,
+            .search_hint = "Search identifier...",
+            .no_matches_label = "No matching identifier.",
+        });
 }
 
 bool draw_typed_resource_id_picker(
