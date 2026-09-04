@@ -910,6 +910,7 @@ int run(const std::filesystem::path& project_root,
     std::string mechanic_override_value;
     std::string instance_property_id;
     std::string instance_property_value;
+    std::string instance_property_filter;
     int instance_property_kind = 2;
     int instance_resource_kind = 3;
     std::string path_follower_id;
@@ -2561,9 +2562,17 @@ int run(const std::filesystem::path& project_root,
                         "Save the map before running the isolated runtime preview.");
                 if (!transformation_preview_result.empty())
                     ImGui::TextWrapped("%s", transformation_preview_result.c_str());
-                for (const auto& property : session.effective_instance_properties(selected_id))
+                ImGui::SetNextItemWidth(220.0F);
+                ImGui::InputTextWithHint("##instance-property-filter",
+                                         "Search instance properties",
+                                         &instance_property_filter);
+                for (const auto& property : session.effective_instance_properties(selected_id)) {
+                    if (!instance_property_filter.empty() &&
+                        property.id.find(instance_property_filter) == std::string::npos)
+                        continue;
                     ImGui::BulletText("%s = %s", property.id.c_str(),
                                       property_value_text(property.value).c_str());
+                }
                 ImGui::SetNextItemWidth(180.0F);
                 ImGui::InputText("Instance property id", &instance_property_id);
                 ImGui::SetNextItemWidth(180.0F);
