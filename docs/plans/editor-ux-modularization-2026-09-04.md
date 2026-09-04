@@ -104,8 +104,11 @@ avec affichage réel.
 Progression : Resource Picker, Scene, Mechanic et le canvas Map sont sortis de
 `map_studio/main.cpp`. Les diagnostics de champ et pickers simples sont
 partagés. Scene publie désormais sa campagne et la recharge avec le runtime du
-paquet. La migration des workspaces Asset Studio et du reste de l'inspecteur
-Map demeure ouverte.
+paquet. Dans Asset Studio, Animation Graph est accessible directement depuis
+l'Entity et remplace la timeline dans le Task Workspace contextuel au lieu de
+s'ouvrir dans une fenêtre sans historique commun. L'extraction de son code,
+des autres workspaces Asset Studio et du reste de l'inspecteur Map demeure
+ouverte.
 
 ## Tranche 4 — authoring direct manquant
 

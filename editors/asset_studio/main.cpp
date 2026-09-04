@@ -3614,11 +3614,7 @@ void draw_animation_graph_editor(
         ui.open = false;
         return;
     }
-    ImGui::SetNextWindowSize({760.0F, 720.0F}, ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Animation Graph", &ui.open)) {
-        ImGui::End();
-        return;
-    }
+    ImGui::SeparatorText("Animation Graph");
     const auto commit_machine =
         [&](std::optional<fabric::project::AnimationStateMachine> machine,
             const char* success) {
@@ -3648,7 +3644,6 @@ void draw_animation_graph_editor(
         ImGui::EndDisabled();
         draw_disabled_reason(first_animation == session.resources().end(),
                              "Create an Animation clip before creating a graph.");
-        ImGui::End();
         return;
     }
 
@@ -4080,7 +4075,6 @@ void draw_animation_graph_editor(
         if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
-    ImGui::End();
 }
 
 ImU32 color_to_u32(const fabric::core::Color& color) {
@@ -4290,11 +4284,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             .pan = {canvas.pan.x, canvas.pan.y},
             .playhead = animation_ui.scrub_time,
             .active_tool = canvas_tool_id(),
-            .active_panel = session.selected_resource() != nullptr &&
+            .active_panel = animation_graph_ui.open &&
+                    session.selected_resource() != nullptr &&
                     session.selected_resource()->kind ==
-                        fabric::editor::StudioResourceKind::animation
-                ? "timeline"
-                : "inspector",
+                        fabric::editor::StudioResourceKind::entity
+                ? "animation-graph"
+                : session.selected_resource() != nullptr &&
+                        session.selected_resource()->kind ==
+                            fabric::editor::StudioResourceKind::animation
+                    ? "timeline"
+                    : "inspector",
         };
     };
     const auto restore_document_state = [&] {
@@ -4362,11 +4361,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::animation &&
         session.selected_animation();
+    const bool animation_graph_workspace = animation_graph_ui.open &&
+        session.selected_resource() != nullptr &&
+        session.selected_resource()->kind ==
+            fabric::editor::StudioResourceKind::entity &&
+        session.selected_entity();
+    const bool task_workspace = animation_workspace || animation_graph_workspace;
     float& timeline_height = layout.task_panel_height;
     timeline_height = std::clamp(
         timeline_height, 190.0F, std::max(190.0F, content_height - 200.0F));
     constexpr float timeline_gap = 6.0F;
-    const float preview_height = animation_workspace
+    const float preview_height = task_workspace
         ? content_height - timeline_height - timeline_gap
         : content_height;
 
@@ -4755,13 +4760,13 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         std::max(300.0F, viewport->Size.x - left_width - 320.0F));
     ImGui::End();
 
-    if (animation_workspace) {
+    if (task_workspace) {
         const float center_width = viewport->Size.x - left_width - right_width;
         ImGui::SetNextWindowPos({viewport->Pos.x + left_width,
                                  viewport->Pos.y + menu_height + preview_height +
                                      timeline_gap});
         ImGui::SetNextWindowSize({center_width, timeline_height});
-        ImGui::Begin("Timeline workspace", nullptr,
+        ImGui::Begin("Task workspace", nullptr,
                      fixed_panel_flags | ImGuiWindowFlags_NoTitleBar);
         ImGui::InvisibleButton("##timeline-height-splitter", {-1.0F, 5.0F});
         if (ImGui::IsItemActive()) {
@@ -4771,7 +4776,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         if (ImGui::IsItemHovered() || ImGui::IsItemActive())
             ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeNS);
-        draw_animation_timeline_dock(session, animation_ui, status);
+        if (animation_graph_workspace)
+            draw_animation_graph_editor(session, animation_graph_ui, status);
+        else
+            draw_animation_timeline_dock(session, animation_ui, status);
         ImGui::End();
     }
 
@@ -6933,14 +6941,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             if (ui_animation_graph_probe_enabled)
                 ui_entity_animate_action_seen = true;
+            if (ImGui::Button(
+                    animation_graph_ui.open
+                        ? "Close Animation Graph"
+                        : "Open Animation Graph",
+                    {-1.0F, 0.0F})) {
+                animation_graph_ui.open = !animation_graph_ui.open;
+                if (animation_graph_ui.open && entity.animation_state_machine)
+                    animation_graph_ui.current_state =
+                        entity.animation_state_machine->initial_state;
+            }
             if (entity_advanced_mode &&
                 ImGui::CollapsingHeader("Logic and animation graph")) {
-                if (ImGui::Button("Open Animation Graph")) {
-                    animation_graph_ui.open = true;
-                    if (entity.animation_state_machine)
-                        animation_graph_ui.current_state =
-                            entity.animation_state_machine->initial_state;
-                }
                 std::string behavior_id = entity.behavior
                     ? entity.behavior->id.value : std::string{};
                 if (draw_project_resource_picker(
@@ -12169,8 +12181,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         draw_behavior_editor(session, behavior_session, creation, status);
         draw_transformation_editor(session, transformation_session, creation,
                                    status);
-        draw_animation_graph_editor(session, animation_graph_ui, status);
-
         const auto* active_resource = session.selected_resource();
         if (behavior_session.dirty() && behavior_session.graph() &&
             (!active_resource ||
