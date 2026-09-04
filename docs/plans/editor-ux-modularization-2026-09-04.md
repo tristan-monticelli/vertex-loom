@@ -127,6 +127,11 @@ intentions Animate/Open Graph et raccord Behavior ne sont plus orchestrés dans
 le bootstrap. Hiérarchie, propriétés, artwork et Rig restent des modules
 frères, sans inspecteur Entity universel.
 
+Le cas vide de Logic est résolu dans le même contexte : `Create and attach
+Behavior...` prépare, crée, attache puis ouvre le graphe sans trajet par le menu
+global. Cette intention est enregistrée afin que bouton et palette restent
+équivalents.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

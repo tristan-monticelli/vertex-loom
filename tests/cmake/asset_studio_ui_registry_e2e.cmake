@@ -99,7 +99,11 @@ if(DEFINED OVERRIDE_ARTIFACT)
             "\"cancel_preserved_override\": true"
             "\"confirm_applied\": true"
             "\"kind_widget_seen_in_guided_mode\": true"
-            "\"behavior_picker_seen_in_guided_mode\": true")
+            "\"behavior_picker_seen_in_guided_mode\": true"
+            "\"create_behavior_button_seen\": true"
+            "\"create_behavior_action_invoked\": true"
+            "\"create_behavior_modal_seen\": true"
+            "\"behavior_created_attached_and_opened\": true")
         string(FIND "${OVERRIDE_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)
             message(FATAL_ERROR "Asset Studio override probe is missing ${REQUIRED_RESULT}")

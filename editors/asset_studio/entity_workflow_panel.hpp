@@ -20,6 +20,7 @@ struct EntityWorkflowProbe {
     std::function<void()> record_animate_click;
     std::function<void()> record_animate_action;
     std::function<void(bool)> record_behavior_picker;
+    std::function<void(float, float)> record_create_behavior_widget;
 };
 
 using EntityWorkflowResourcePicker = bool (*)(

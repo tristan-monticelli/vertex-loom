@@ -298,6 +298,9 @@ afin que l'attachement Entity → Logic ne régresse pas vers un contrôle cach�
 `EntityWorkflowPanel` réutilise les E2E Entity→Animation et overrides : les
 probes sont injectés par le shell, tandis que le module possède l'état de mode
 et invoque les mêmes actions du registre que la palette.
+L'E2E Entity guidé poursuit le parcours jusqu'à `Create and attach Behavior` :
+il exige le bouton, l'invocation de l'action, la création du document,
+l'attachement persistant à l'Entity d'origine et l'ouverture du Behavior.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre

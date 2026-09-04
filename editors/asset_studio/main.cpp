@@ -119,6 +119,15 @@ ImVec2 ui_override_confirm_screen{};
 bool ui_override_kind_seen = false;
 bool ui_override_guided_mode_seen = false;
 bool ui_override_behavior_picker_seen = false;
+bool ui_override_create_behavior_seen = false;
+bool ui_override_create_behavior_action_invoked = false;
+bool ui_override_create_behavior_attached = false;
+std::string ui_override_created_behavior_id;
+ImVec2 ui_override_create_behavior_screen{};
+bool ui_override_behavior_modal_create_seen = false;
+ImVec2 ui_override_behavior_modal_create_screen{};
+std::size_t ui_override_behavior_modal_click_phase = 0U;
+bool ui_override_behavior_modal_hovered = false;
 bool ui_override_texture_seen = false;
 bool ui_override_cancel_seen = false;
 bool ui_override_confirm_seen = false;
@@ -484,6 +493,7 @@ struct CreationUiState {
     fabric::editor::VisualPresetRequest visual_preset;
     std::optional<fabric::editor::CreateVectorArtworkPrompt> prepared_artwork;
     std::optional<fabric::editor::CreateEntityPrompt> prepared_entity;
+    std::optional<fabric::core::ResourceId> behavior_target_entity;
     bool request_project{};
     bool request_artwork{};
     bool request_material{};
@@ -2094,6 +2104,13 @@ void write_ui_override_probe(const std::filesystem::path& project_path) {
         {"kind_widget_seen_in_guided_mode", ui_override_guided_mode_seen},
         {"behavior_picker_seen_in_guided_mode",
          ui_override_behavior_picker_seen},
+        {"create_behavior_button_seen", ui_override_create_behavior_seen},
+        {"create_behavior_action_invoked",
+         ui_override_create_behavior_action_invoked},
+        {"create_behavior_modal_seen",
+         ui_override_behavior_modal_create_seen},
+        {"behavior_created_attached_and_opened",
+         ui_override_create_behavior_attached},
         {"texture_item_seen", ui_override_texture_seen},
         {"cancel_button_seen", ui_override_cancel_seen},
         {"confirm_button_seen", ui_override_confirm_seen}};
@@ -2197,6 +2214,42 @@ void write_entity_animation_workflow_probe(
     if (output) output << probe.dump(2) << '\n';
 }
 
+bool create_behavior_resource(
+    fabric::editor::ProjectSession& project_session,
+    fabric::editor::BehaviorSession& behavior_session,
+    CreationUiState& creation, std::string& status) {
+    fabric::project::BehaviorGraph graph;
+    graph.document.id = {.value = creation.behavior.id};
+    graph.document.name = creation.behavior.name;
+    const auto target_entity = creation.behavior_target_entity;
+    bool completed = behavior_session.create(
+        project_session.project_root(), graph) &&
+        project_session.refresh_resources();
+    if (completed && target_entity) {
+        completed = project_session.select_resource(
+            fabric::editor::StudioResourceKind::entity, *target_entity) &&
+            project_session.set_selected_entity_behavior(
+                fabric::project::ResourceReference{
+                    graph.document.id, "behavior"}) &&
+            project_session.save();
+    }
+    completed = completed && project_session.select_resource(
+        fabric::editor::StudioResourceKind::behavior, graph.document.id);
+    if (completed) {
+        status = target_entity
+            ? "Behavior created, attached and opened."
+            : "Behavior created and saved.";
+        if (target_entity && ui_override_probe_enabled)
+            ui_override_created_behavior_id = graph.document.id.value;
+        creation.behavior_target_entity.reset();
+        return true;
+    }
+    status = target_entity
+        ? "Behavior created but could not be attached; inspect diagnostics."
+        : "Behavior creation failed; inspect diagnostics.";
+    return false;
+}
+
 void draw_behavior_creation_prompt(
     fabric::editor::ProjectSession& project_session,
     fabric::editor::BehaviorSession& behavior_session,
@@ -2213,24 +2266,30 @@ void draw_behavior_creation_prompt(
         const bool valid = !creation.behavior.name.empty() &&
             fabric::core::ResourceId::is_valid(creation.behavior.id);
         ImGui::BeginDisabled(!valid);
-        if (ImGui::Button("Create")) {
-            fabric::project::BehaviorGraph graph;
-            graph.document.id = {.value = creation.behavior.id};
-            graph.document.name = creation.behavior.name;
-            if (behavior_session.create(project_session.project_root(), graph) &&
-                project_session.refresh_resources() &&
-                project_session.select_resource(
-                    fabric::editor::StudioResourceKind::behavior,
-                    graph.document.id)) {
-                status = "Behavior created and saved.";
+        const bool create_clicked = ImGui::Button("Create");
+        if (creation.behavior_target_entity && ui_override_probe_enabled) {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_override_behavior_modal_create_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_override_behavior_modal_create_seen = true;
+            ui_override_behavior_modal_hovered = ImGui::IsItemHovered();
+        }
+        if (create_clicked) {
+            if (create_behavior_resource(
+                    project_session, behavior_session, creation, status)) {
                 ImGui::CloseCurrentPopup();
-            } else status = "Behavior creation failed; inspect diagnostics.";
+            }
         }
         ImGui::EndDisabled();
         draw_disabled_reason(!valid,
                              "Enter a non-empty name and a valid resource ID.");
         ImGui::SameLine();
-        if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+        if (ImGui::Button("Cancel")) {
+            creation.behavior_target_entity.reset();
+            ImGui::CloseCurrentPopup();
+        }
         ImGui::EndPopup();
     }
 }
@@ -5319,6 +5378,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     if (ui_override_probe_enabled)
                         ui_override_behavior_picker_seen = guided;
                 },
+                .record_create_behavior_widget =
+                    [&](const float x, const float y) {
+                        ui_override_create_behavior_screen = {x, y};
+                        ui_override_create_behavior_seen = true;
+                    },
             };
             fabric::asset_studio::draw_entity_workflow_panel(
                 session, actions, entity_workflow_state,
@@ -7134,6 +7198,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_override_kind_seen = false;
         ui_override_guided_mode_seen = false;
         ui_override_behavior_picker_seen = false;
+        ui_override_create_behavior_seen = false;
+        ui_override_create_behavior_action_invoked = false;
+        ui_override_create_behavior_attached = false;
+        ui_override_created_behavior_id.clear();
+        ui_override_behavior_modal_create_seen = false;
+        ui_override_behavior_modal_click_phase = 0U;
+        ui_override_behavior_modal_hovered = false;
         ui_override_texture_seen = false;
         ui_override_cancel_seen = false;
         ui_override_confirm_seen = false;
@@ -7873,6 +7944,49 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }));
     static_cast<void>(actions.register_action({
         .id = std::string{
+            fabric::editor::editor_action_ids::create_behavior_for_entity},
+        .label = "Create and attach Behavior...",
+        .availability = [&] {
+            const auto* resource = session.selected_resource();
+            const bool entity_selected = resource != nullptr &&
+                resource->kind == fabric::editor::StudioResourceKind::entity &&
+                session.selected_entity().has_value();
+            return fabric::editor::EditorActionAvailability{
+                .enabled = entity_selected,
+                .disabled_reason =
+                    "Select an Entity before creating its Behavior.",
+            };
+        },
+        .execute = [&] {
+            const auto& entity = session.selected_entity();
+            if (!entity) return false;
+            creation.behavior_target_entity = entity->document.id;
+            creation.behavior.name = entity->document.name + " Behavior";
+            const auto base = fabric::editor::generated_resource_id(
+                                  creation.behavior.name, "behavior")
+                                  .value;
+            auto candidate = base;
+            for (std::size_t suffix = 2U;
+                 std::ranges::any_of(session.resources(),
+                     [&](const auto& resource) {
+                         return resource.id.value == candidate;
+                     }); ++suffix) {
+                const auto suffix_text = "-" + std::to_string(suffix);
+                candidate = base.substr(0U, 128U - suffix_text.size());
+                while (!candidate.empty() && candidate.back() == '-')
+                    candidate.pop_back();
+                candidate += suffix_text;
+            }
+            creation.behavior.id = std::move(candidate);
+            creation.request_behavior = true;
+            status = "Create and attach a Behavior to this Entity.";
+            if (ui_override_probe_enabled)
+                ui_override_create_behavior_action_invoked = true;
+            return true;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{
             fabric::editor::editor_action_ids::animate_selection},
         .label = "Animate selected node...",
         .availability = [&] {
@@ -8251,6 +8365,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 push_button(ui_override_confirm_screen, SDL_MOUSEBUTTONDOWN);
             else if (ui_override_frame == 8U && ui_override_confirm_seen)
                 push_button(ui_override_confirm_screen, SDL_MOUSEBUTTONUP);
+            else if (ui_override_frame == 9U && ui_override_cancel_seen)
+                push_button(ui_override_cancel_screen, SDL_MOUSEBUTTONDOWN);
+            else if (ui_override_frame == 10U && ui_override_cancel_seen)
+                push_button(ui_override_cancel_screen, SDL_MOUSEBUTTONUP);
+            else if (ui_override_frame == 12U &&
+                     ui_override_create_behavior_seen)
+                push_button(ui_override_create_behavior_screen,
+                            SDL_MOUSEBUTTONDOWN);
+            else if (ui_override_frame == 13U &&
+                     ui_override_create_behavior_seen)
+                push_button(ui_override_create_behavior_screen,
+                            SDL_MOUSEBUTTONUP);
         }
         if (ui_drag_test && ui_drag_source_seen && ui_drag_target_seen) {
             const auto push_motion = [&](const ImVec2 point, const Uint32 state) {
@@ -8812,6 +8938,22 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL2_NewFrame();
+        if (ui_override_test && ui_override_frame >= 15U &&
+            ui_override_behavior_modal_create_seen &&
+            ui_override_behavior_modal_click_phase < 3U) {
+            auto& input = ImGui::GetIO();
+            input.AddMousePosEvent(
+                ui_override_behavior_modal_create_screen.x,
+                ui_override_behavior_modal_create_screen.y);
+            if (ui_override_behavior_modal_click_phase == 0U) {
+                ui_override_behavior_modal_click_phase = 1U;
+            } else if (ui_override_behavior_modal_hovered) {
+                input.AddMouseButtonEvent(
+                    ImGuiMouseButton_Left,
+                    ui_override_behavior_modal_click_phase == 1U);
+                ++ui_override_behavior_modal_click_phase;
+            }
+        }
         ImGui::NewFrame();
 
         if (ImGui::BeginMainMenuBar()) {
@@ -9352,13 +9494,31 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 node.drawable.component_instance.reset();
                 static_cast<void>(session.set_selected_entity_node(0U, std::move(node)));
             }
-            if (ui_override_frame >= 9U) {
+            if (ui_override_frame == 9U) {
                 if (session.selected_entity() && !session.selected_entity()->nodes.empty()) {
                     const auto& node = session.selected_entity()->nodes.front();
                     ui_override_confirm_applied =
                         node.drawable.kind == fabric::project::EntityDrawableKind::texture &&
                         !node.drawable.component_instance;
                 }
+            }
+            if (!ui_override_created_behavior_id.empty() ||
+                ui_override_frame >= 120U) {
+                fabric::editor::ProjectSession reloaded;
+                const auto behavior_opened = session.selected_resource() &&
+                    session.selected_resource()->kind ==
+                        fabric::editor::StudioResourceKind::behavior &&
+                    session.selected_resource()->id.value ==
+                        ui_override_created_behavior_id;
+                const auto entity_reloaded = reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::entity,
+                        {.value = "textile-head-entity"});
+                ui_override_create_behavior_attached = behavior_opened &&
+                    entity_reloaded && reloaded.selected_entity() &&
+                    reloaded.selected_entity()->behavior &&
+                    reloaded.selected_entity()->behavior->id.value ==
+                        ui_override_created_behavior_id;
                 write_ui_override_probe(initial_project);
                 running = false;
             }

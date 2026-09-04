@@ -113,6 +113,11 @@ Entity → Animation/Logic. Il invoque les actions enregistrées au lieu de
 dupliquer leurs mutations, et délègue le raccord Behavior à `ProjectSession`.
 Le shell ne conserve que les adaptateurs de probe nécessaires aux E2E.
 
+L'intention `create_behavior_for_entity` complète ce parcours. Elle mémorise
+l'Entity cible, prépare un identifiant disponible, ouvre la création Behavior,
+puis attache la ressource validée avant d'ouvrir son graphe. Bouton et palette
+invoquent la même action ; une création manuelle reste indépendante.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

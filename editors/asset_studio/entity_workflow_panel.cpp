@@ -71,6 +71,26 @@ void draw_entity_workflow_panel(
 
     ImGui::SeparatorText("Logic");
     ImGui::TextDisabled("Optional behavior graph evaluated by this Entity.");
+    const auto create_behavior = actions.availability(
+        editor::editor_action_ids::create_behavior_for_entity);
+    ImGui::BeginDisabled(!create_behavior.enabled);
+    const bool create_behavior_clicked = ImGui::Button(
+        "Create and attach Behavior...", {-1.0F, 0.0F});
+    ImGui::EndDisabled();
+    if (probe && probe->enabled && probe->record_create_behavior_widget) {
+        const auto minimum = ImGui::GetItemRectMin();
+        const auto maximum = ImGui::GetItemRectMax();
+        probe->record_create_behavior_widget(
+            (minimum.x + maximum.x) * 0.5F,
+            (minimum.y + maximum.y) * 0.5F);
+    }
+    if (create_behavior_clicked) {
+        static_cast<void>(actions.invoke(
+            editor::editor_action_ids::create_behavior_for_entity));
+    }
+    editor_ui::draw_disabled_reason(!create_behavior.enabled,
+                                    create_behavior.disabled_reason);
+
     std::string behavior_id = entity.behavior
         ? entity.behavior->id.value : std::string{};
     if (resource_picker("Behavior", session.resources(),
