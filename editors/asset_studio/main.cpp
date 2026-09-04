@@ -7557,6 +7557,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     break;
                 }
             }
+            if (ImGui::CollapsingHeader("Advanced key authoring")) {
             ImGui::SeparatorText("Set key");
             const std::vector<fabric::project::EntityNode>* target_nodes = nullptr;
             const fabric::project::EntityNode* selected_node = nullptr;
@@ -8256,6 +8257,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::PopID();
                 }
+            }
             }
         }
     } else {
