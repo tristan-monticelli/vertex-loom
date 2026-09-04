@@ -34,4 +34,5 @@ Save/Discard/Cancel. Une scène peut être validée et publiée directement comm
 - Undo, redo, dirty, autosave, récupération et sauvegarde atomique couvrent le
   même document consommé par Preview Runtime.
 - Les tests headless couvrent chaque mutation et le round-trip ; le harnais
-  graphique ouvre et modifie une scène réelle avant publication.
+  graphique ouvre et modifie une scène réelle, publie sa campagne puis la
+  recharge avec `SceneRuntimeSession` depuis le paquet produit.

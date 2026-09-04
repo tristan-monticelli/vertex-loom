@@ -16,6 +16,7 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/runtime/preview_runtime.hpp"
+#include "fabric/runtime/scene_session.hpp"
 #include "editor_widgets.hpp"
 #include "map_canvas.hpp"
 #include "mechanic_workspace.hpp"
@@ -712,9 +713,18 @@ int run(const std::filesystem::path& project_root,
                 : fabric::project::ScenePackagePublishResult{};
             fabric::editor::SceneSession reloaded;
             fabric::editor::MapSession reloaded_map;
+            fabric::runtime::SceneRuntimeSession published_runtime;
+            const bool runtime_loaded = published.ok() &&
+                published_runtime.load_package(destination);
             if (!authored || !published.ok() ||
                 !reloaded.open(project_root, scene.document.id) ||
                 !reloaded_map.open(project_root, map_id) ||
+                !runtime_loaded || !published_runtime.scene() ||
+                !published_runtime.map() ||
+                published_runtime.scene()->document.id != scene.document.id ||
+                published_runtime.map()->document.id != scene.document.id ||
+                published_runtime.map()->collisions.size() != 1U ||
+                published_runtime.map()->triggers.size() != 1U ||
                 reloaded_map.map()->triggers.size() != 1U ||
                 reloaded_map.map()->triggers.front().properties.size() != 1U ||
                 reloaded.scene()->maps.size() != 1U ||
@@ -722,10 +732,15 @@ int run(const std::filesystem::path& project_root,
                 !std::filesystem::is_regular_file(
                     destination /
                     fabric::project::scene_package_manifest_filename)) {
-                fail_e2e("scene authoring, reload or publication failed");
+                std::string detail =
+                    "scene authoring, reload, publication or runtime load failed";
+                for (const auto& error : published_runtime.errors()) {
+                    detail += " | runtime: " + error;
+                }
+                fail_e2e(detail);
             } else {
                 scene_e2e_complete = true;
-                status = "Scene E2E authored and published";
+                status = "Scene E2E authored, published and loaded by runtime";
             }
         }
     }

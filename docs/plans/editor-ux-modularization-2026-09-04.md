@@ -1,6 +1,6 @@
 # Plan de refactoring UX des Studios — 2026-09-04
 
-Statut : tranche 1 réalisée le 4 septembre 2026 ; tranche 2 non démarrée.
+Statut : tranches 1 et 2 réalisées le 4 septembre 2026 ; tranche 3 en cours.
 
 ## Résultat attendu
 
@@ -73,6 +73,12 @@ Transformation, Scene et Mechanic, passent sans test ignoré.
 - Changer une collection ne redirige jamais une sélection vers un autre index.
 - Test 960 × 640 : le Stage garde sa taille minimale et les panneaux se replient.
 
+Preuves réalisées : onglets et historique restaurent l'état de vue par
+document ; menus, raccourcis, boutons et palette partagent le registre
+d'actions ; les layouts auto/compact/large sont bornés et persistés hors du
+projet. Les E2E minimum, accessibilité, Entity→Animation, Map et Scene passent
+avec affichage réel.
+
 ## Tranche 3 — migration des workspaces de production
 
 ### Portée
@@ -94,6 +100,12 @@ Transformation, Scene et Mechanic, passent sans test ignoré.
 - Fermer un document sale offre toujours Save, Discard et Cancel sans perdre
   les autres documents.
 - Les deux `main.cpp` ne contiennent plus d'éditeur de ressource complet.
+
+Progression : Resource Picker, Scene, Mechanic et le canvas Map sont sortis de
+`map_studio/main.cpp`. Les diagnostics de champ et pickers simples sont
+partagés. Scene publie désormais sa campagne et la recharge avec le runtime du
+paquet. La migration des workspaces Asset Studio et du reste de l'inspecteur
+Map demeure ouverte.
 
 ## Tranche 4 — authoring direct manquant
 
