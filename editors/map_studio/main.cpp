@@ -1,6 +1,7 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/editor_action_registry.hpp"
+#include "fabric/editor/editor_layout_preferences.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/editor/project_session.hpp"
@@ -2634,10 +2635,9 @@ int run(const std::filesystem::path& project_root,
         const bool mechanic_e2e = false) {
     const auto trace_session_id =
         fabric::core::make_trace_session_id("map-studio");
-    const int graphical_failure =
-        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test ||
-         mechanic_e2e)
-            ? 77 : 1;
+    const bool graphical_test = e2e_mode.has_value() || scene_e2e ||
+        transformation_e2e || ui_accessibility_test || mechanic_e2e;
+    const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -2700,6 +2700,23 @@ int run(const std::filesystem::path& project_root,
 
     fabric::editor::MapSession session;
     fabric::editor::EditorContext editor_context;
+    fabric::editor::EditorLayoutPreferences layout{
+        .primary_panel_width = 260.0F,
+        .secondary_panel_width = 340.0F,
+    };
+    std::filesystem::path layout_preferences_path;
+    if (!graphical_test) {
+        if (char* preference_root =
+                SDL_GetPrefPath("Vertex Loom", "Map Studio")) {
+            layout_preferences_path =
+                std::filesystem::path{preference_root} / "layout.json";
+            SDL_free(preference_root);
+            if (const auto stored = fabric::editor::load_layout_preferences(
+                    layout_preferences_path)) {
+                layout = *stored;
+            }
+        }
+    }
     fabric::editor::ProjectSession resource_catalog;
     fabric::editor::MechanicSession mechanic_session;
     fabric::editor::SceneSession scene_session;
@@ -3015,8 +3032,8 @@ int run(const std::filesystem::path& project_root,
     TransformEditorState transform_editor;
     float preview_time = 0.0F;
     bool preview_playing = true;
-    float layers_pane_width = 260.0F;
-    float selection_pane_width = 340.0F;
+    float& layers_pane_width = layout.primary_panel_width;
+    float& selection_pane_width = layout.secondary_panel_width;
     fabric::render::MapPreviewResult map_preview;
     MapPreviewRenderer preview_render_state{
         .renderer = &map_renderer,
@@ -3206,6 +3223,40 @@ int run(const std::filesystem::path& project_root,
                 ImGui::TextUnformatted("F: frame selection · Home: frame map");
                 ImGui::TextUnformatted("Ctrl+D: duplicate · arrows: nudge · Delete: remove");
                 ImGui::TextUnformatted("Ctrl+S: save · Ctrl+Z/Y: undo/redo · Ctrl+Q: quit");
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("View")) {
+                if (ImGui::MenuItem(
+                        "Automatic layout", nullptr,
+                        layout.mode ==
+                            fabric::editor::EditorLayoutMode::automatic)) {
+                    layout = {
+                        .mode = fabric::editor::EditorLayoutMode::automatic,
+                        .primary_panel_width = 260.0F,
+                        .secondary_panel_width = 340.0F,
+                    };
+                }
+                if (ImGui::MenuItem(
+                        "Compact layout", nullptr,
+                        layout.mode ==
+                            fabric::editor::EditorLayoutMode::compact)) {
+                    layout = {
+                        .mode = fabric::editor::EditorLayoutMode::compact,
+                        .primary_panel_width = 220.0F,
+                        .secondary_panel_width = 300.0F,
+                        .task_panel_height = 190.0F,
+                    };
+                }
+                if (ImGui::MenuItem(
+                        "Wide layout", nullptr,
+                        layout.mode == fabric::editor::EditorLayoutMode::wide)) {
+                    layout = {
+                        .mode = fabric::editor::EditorLayoutMode::wide,
+                        .primary_panel_width = 310.0F,
+                        .secondary_panel_width = 390.0F,
+                        .task_panel_height = 300.0F,
+                    };
+                }
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -4743,6 +4794,13 @@ int run(const std::filesystem::path& project_root,
     if (e2e_incomplete)
         write_e2e_failure_artifacts(project_root, window, status, session,
                                     package_errors);
+    if (!layout_preferences_path.empty()) {
+        std::string preference_error;
+        if (!fabric::editor::save_layout_preferences(
+                layout_preferences_path, layout, &preference_error)) {
+            std::clog << preference_error << '\n';
+        }
+    }
     for (const auto& [_, texture] : map_textures) {
         if (texture.handle != 0U) glDeleteTextures(1, &texture.handle);
     }

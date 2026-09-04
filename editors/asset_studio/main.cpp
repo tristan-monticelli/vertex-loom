@@ -1,6 +1,7 @@
 #include "fabric/editor/canvas_interaction.hpp"
 #include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/editor_action_registry.hpp"
+#include "fabric/editor/editor_layout_preferences.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/behavior_session.hpp"
 #include "fabric/editor/session_transition.hpp"
@@ -4247,6 +4248,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     fabric::editor::EditorActionRegistry& actions,
                     bool& command_palette_open,
                     bool& command_palette_rendered,
+                    fabric::editor::EditorLayoutPreferences& layout,
                     fabric::editor::SessionTransitionGuard& transition_guard,
                     bool& running,
                     std::string& status) {
@@ -4329,17 +4331,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
-    static float left_width = 280.0F;
-    static float right_width = 340.0F;
+    float& left_width = layout.primary_panel_width;
+    float& right_width = layout.secondary_panel_width;
     static bool entity_advanced_mode = false;
-    const float initial_left_width = std::clamp(viewport->Size.x * 0.22F, 240.0F, 330.0F);
-    const float initial_right_width = std::clamp(viewport->Size.x * 0.26F, 330.0F, 380.0F);
-    static bool panel_widths_initialized = false;
-    if (!panel_widths_initialized) {
-        left_width = initial_left_width;
-        right_width = initial_right_width;
-        panel_widths_initialized = true;
-    }
     left_width = std::clamp(left_width, 240.0F,
                             std::max(240.0F, viewport->Size.x - right_width - 320.0F));
     right_width = std::clamp(right_width, 300.0F,
@@ -4349,7 +4343,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         session.selected_resource()->kind ==
             fabric::editor::StudioResourceKind::animation &&
         session.selected_animation();
-    static float timeline_height = 260.0F;
+    float& timeline_height = layout.task_panel_height;
     timeline_height = std::clamp(
         timeline_height, 190.0F, std::max(190.0F, content_height - 200.0F));
     constexpr float timeline_gap = 6.0F;
@@ -10370,6 +10364,20 @@ int run_asset_studio(const std::filesystem::path& initial_project,
 
     fabric::editor::ProjectSession session;
     fabric::editor::EditorContext editor_context;
+    fabric::editor::EditorLayoutPreferences layout;
+    std::filesystem::path layout_preferences_path;
+    if (!graphical_test) {
+        if (char* preference_root =
+                SDL_GetPrefPath("Vertex Loom", "Asset Studio")) {
+            layout_preferences_path =
+                std::filesystem::path{preference_root} / "layout.json";
+            SDL_free(preference_root);
+            if (const auto stored = fabric::editor::load_layout_preferences(
+                    layout_preferences_path)) {
+                layout = *stored;
+            }
+        }
+    }
     fabric::editor::BehaviorSession behavior_session;
     fabric::editor::TransformationSession transformation_session;
     fabric::render::OpenGLVectorRenderer native_renderer;
@@ -11879,6 +11887,44 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     command_palette_open = true;
                 ImGui::EndMenu();
             }
+            if (ImGui::BeginMenu("View")) {
+                if (ImGui::MenuItem(
+                        "Automatic layout", nullptr,
+                        layout.mode ==
+                            fabric::editor::EditorLayoutMode::automatic)) {
+                    layout.mode =
+                        fabric::editor::EditorLayoutMode::automatic;
+                    layout.primary_panel_width = std::clamp(
+                        ImGui::GetMainViewport()->Size.x * 0.22F,
+                        240.0F, 330.0F);
+                    layout.secondary_panel_width = std::clamp(
+                        ImGui::GetMainViewport()->Size.x * 0.26F,
+                        300.0F, 380.0F);
+                    layout.task_panel_height = 260.0F;
+                }
+                if (ImGui::MenuItem(
+                        "Compact layout", nullptr,
+                        layout.mode ==
+                            fabric::editor::EditorLayoutMode::compact)) {
+                    layout = {
+                        .mode = fabric::editor::EditorLayoutMode::compact,
+                        .primary_panel_width = 240.0F,
+                        .secondary_panel_width = 300.0F,
+                        .task_panel_height = 190.0F,
+                    };
+                }
+                if (ImGui::MenuItem(
+                        "Wide layout", nullptr,
+                        layout.mode == fabric::editor::EditorLayoutMode::wide)) {
+                    layout = {
+                        .mode = fabric::editor::EditorLayoutMode::wide,
+                        .primary_panel_width = 310.0F,
+                        .secondary_panel_width = 380.0F,
+                        .task_panel_height = 300.0F,
+                    };
+                }
+                ImGui::EndMenu();
+            }
             ImGui::TextDisabled("Native vector resource workspace");
             ImGui::EndMainMenuBar();
         }
@@ -12015,6 +12061,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        request_open, request_png, request_svg,
                        actions, command_palette_open,
                        command_palette_rendered,
+                       layout,
                        transition_guard, running, status);
         draw_behavior_editor(session, behavior_session, creation, status);
         draw_transformation_editor(session, transformation_session, creation,
@@ -12812,6 +12859,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         (vector_canvas_e2e && !vector_canvas_e2e_complete);
     if (e2e_failed)
         write_e2e_failure_artifacts(initial_project, window, status, session);
+
+    if (!layout_preferences_path.empty()) {
+        std::string preference_error;
+        if (!fabric::editor::save_layout_preferences(
+                layout_preferences_path, layout, &preference_error)) {
+            std::clog << preference_error << '\n';
+        }
+    }
 
     if (preview.texture != 0U) {
         glDeleteTextures(1, &preview.texture);
