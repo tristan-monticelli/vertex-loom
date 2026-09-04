@@ -283,6 +283,11 @@ if(FABRIC_BUILD_EDITORS)
     target_compile_features(fabric_imgui PUBLIC cxx_std_20)
     target_link_libraries(fabric_imgui PUBLIC SDL2::SDL2-static OpenGL::GL)
 
+    add_library(fabric_editor_ui INTERFACE)
+    target_include_directories(fabric_editor_ui INTERFACE
+        ${CMAKE_CURRENT_SOURCE_DIR}/editors/shared)
+    target_link_libraries(fabric_editor_ui INTERFACE fabric_imgui)
+
     add_executable(asset_studio
         editors/asset_studio/main.cpp
         editors/asset_studio/vector_canvas.cpp
@@ -296,7 +301,7 @@ if(FABRIC_BUILD_EDITORS)
     endif()
     target_link_libraries(asset_studio PRIVATE
         fabric_editor
-        fabric_imgui
+        fabric_editor_ui
         fabric_render
         nfd
     )
@@ -310,7 +315,7 @@ if(FABRIC_BUILD_EDITORS)
     endif()
     add_executable(map_studio editors/map_studio/main.cpp)
     target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
-    target_link_libraries(map_studio PRIVATE fabric_editor fabric_imgui nfd)
+    target_link_libraries(map_studio PRIVATE fabric_editor fabric_editor_ui nfd)
     if(APPLE)
         set_target_properties(map_studio PROPERTIES
             MACOSX_BUNDLE TRUE

@@ -14,7 +14,7 @@
 #include "import_workflow.hpp"
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
-#include "../shared/editor_widgets.hpp"
+#include "editor_widgets.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>

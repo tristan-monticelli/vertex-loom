@@ -13,7 +13,7 @@
 #include "fabric/render/opengl_vector_renderer.hpp"
 #include "fabric/render/raster_image.hpp"
 #include "fabric/runtime/preview_runtime.hpp"
-#include "../shared/editor_widgets.hpp"
+#include "editor_widgets.hpp"
 
 #include <SDL.h>
 #include <SDL_opengl.h>
