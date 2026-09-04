@@ -331,6 +331,35 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                       y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
     }
     }
+    if (selected_instances.size() == 1U && session.manifest()) {
+        const auto selected = std::ranges::find(map.instances,
+            selected_instances.front(), &fabric::project::MapInstance::id);
+        if (selected != map.instances.end() && selected->path_follower) {
+            const auto path = fabric::project::load_textured_path(
+                session.project_root(), *session.manifest(),
+                fabric::project::textured_path_document_path(
+                    *session.manifest(), selected->path_follower->path.id));
+            if (path.ok()) {
+                constexpr std::size_t samples = 48U;
+                ImVec2 previous{};
+                for (std::size_t index = 0; index <= samples; ++index) {
+                    const auto sample = fabric::project::sample_textured_path(
+                        *path.asset, static_cast<float>(index) /
+                            static_cast<float>(samples));
+                    const auto point = world_to_screen(sample.position);
+                    if (index != 0U)
+                        draw->AddLine(previous, point, IM_COL32(90, 190, 255, 230), 3.0F);
+                    previous = point;
+                }
+                const auto progress = fabric::project::sample_textured_path(
+                    *path.asset, selected->path_follower->progress);
+                draw->AddCircleFilled(world_to_screen(progress.position), 6.0F,
+                                      IM_COL32(255, 220, 90, 255));
+                draw->AddText(world_to_screen(progress.position),
+                              IM_COL32(255, 240, 160, 255), "PathFollower");
+            }
+        }
+    }
     const auto framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
     preview_render_state.viewport = {
         .width = std::max(1, static_cast<std::int32_t>(
