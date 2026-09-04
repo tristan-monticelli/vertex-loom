@@ -13,6 +13,10 @@ matériau ; elles sont déclarées par le registre et ciblées par
 
 ## Conséquences
 
-Les futurs widgets peuvent alimenter automatiquement leur liste de pistes à
-partir des composants disponibles. La lecture/écriture effective des propriétés
-et la prévisualisation multi-propriétés restent des étapes ultérieures.
+Les widgets alimentent automatiquement leur liste de pistes à partir des
+composants disponibles. Le nœud racine expose notamment le binding
+`pathFollower.progress`, réservé aux instances de map qui possèdent un
+PathFollower ; le Preview Runtime l'évalue sans modifier la géométrie du chemin.
+La lecture/écriture effective des propriétés et la prévisualisation
+multi-propriétés restent des étapes ultérieures pour les composants qui ne sont
+pas encore rendus par le runtime.

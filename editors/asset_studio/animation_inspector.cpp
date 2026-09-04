@@ -401,6 +401,11 @@ void draw_animation_inspector(
                                     "Transform / Rotation", PropertyKind::angle, "°");
                 add_entity_property("transform", "pivot", "Transform / Pivot",
                                     PropertyKind::vec2, "px");
+                if (selected_node->id == "root") {
+                    add_entity_property("pathFollower", "progress",
+                                        "Path follower / Progress",
+                                        PropertyKind::scalar, "%");
+                }
                 if (selected_node->drawable.material) {
                     add_entity_property("material", "color", "Material / Color",
                                         PropertyKind::color);
