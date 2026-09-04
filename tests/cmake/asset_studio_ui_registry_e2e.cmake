@@ -179,6 +179,9 @@ if(DEFINED WORKFLOW_ARTIFACT)
     foreach(REQUIRED_RESULT
             "\"entity_from_visual_button_seen\": true"
             "\"entity_created_by_click\": true"
+            "\"child_added_by_drag\": true"
+            "\"child_composed_after_reload\": true"
+            "\"animation_targets_child\": true"
             "\"animate_selected_button_seen\": true"
             "\"animation_create_button_seen\": true"
             "\"animation_created_by_click\": true"

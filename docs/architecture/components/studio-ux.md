@@ -93,6 +93,9 @@ modifiable dans la modale courte avant validation.
 Le scénario continue dans le workspace Animation en cliquant `Key Position`,
 `Auto-key`, le playhead puis en déplaçant le gizmo. Les deux poses persistées
 doivent provenir de ces gestes et non d'un segment A→B préparé par la session.
+Avant ce passage, il dépose un second visuel comme enfant de la racine. Le nœud
+créé reste sélectionné et devient la cible du clip et du gizmo, ce qui couvre
+composition, parentage et correction sans sélection technique intermédiaire.
 Il poursuit par lecture/pause, drag du second losange et
 `Add event at playhead`. Le marqueur reçoit un nom unique automatiquement ; le
 volet avancé ne sert que pour son identité, son temps exact ou son cue audio.

@@ -214,13 +214,15 @@ une simulation compilée, avance un pas fixe et produit
 `map-studio-mechanic-graph-e2e.ppm`. Le long formulaire de preset reste replié
 par défaut afin que le graphe soit visible sans scroll préalable.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
-Entity ou Animation. Il part du composant visuel `beam`, clique successivement
-`Create Entity from visual`, `Animate selected node...`, `Create animation` et
-`Key Position`, active `Auto-key`, déplace le playhead à travers son contrôle et
-fait glisser le gizmo pour créer la seconde pose. Il lance puis suspend la
+Entity ou Animation. Il part du composant visuel `beam`, clique
+`Create Entity from visual`, dépose `button-primary` comme enfant, déplace cet
+enfant au gizmo, puis clique `Animate selected node...`, `Create animation` et
+`Key Position`. Il active `Auto-key`, déplace le playhead à travers son contrôle
+et fait glisser le gizmo pour créer la seconde pose. Il lance puis suspend la
 lecture, déplace le second losange sur la Timeline et ajoute un événement au
 playhead par l'action rapide. Après sauvegarde/rechargement, il exige la cible
-Entity, deux clés Position, le temps corrigé et le marqueur au même temps. Son
+Entity, l'enfant avec son parent/drawable/transform, le binding du clip vers cet
+enfant, deux clés Position, le temps corrigé et le marqueur au même temps. Son
 artefact JSON distingue chaque widget vu, chaque création par clic, l'avancée
 effective de la lecture et les données persistées ; une capture PPM conserve le
 workspace final.

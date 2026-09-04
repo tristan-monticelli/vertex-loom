@@ -1877,7 +1877,10 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 }
                 select_and_preview_resource(session, resource, preview, status);
             }
-            if (ui_drag_probe_enabled && resource.id.value == "beam-border") {
+            if ((ui_drag_probe_enabled && !ui_entity_animation_workflow_probe_enabled &&
+                 resource.id.value == "beam-border") ||
+                (ui_entity_animation_workflow_probe_enabled &&
+                 resource.id.value == "button-primary")) {
                 const auto minimum = ImGui::GetItemRectMin();
                 const auto maximum = ImGui::GetItemRectMax();
                 ui_drag_source_screen = {(minimum.x + maximum.x) * 0.5F,
@@ -2583,12 +2586,16 @@ void write_entity_animation_workflow_probe(
     const std::filesystem::path& project_path,
     const bool entity_created, const bool animation_created,
     const bool key_persisted, const bool key_corrected,
-    const bool marker_persisted) {
+    const bool marker_persisted, const bool child_composed,
+    const bool animation_targets_child) {
     if (project_path.empty()) return;
     const nlohmann::json probe = {
         {"schema", "asset-studio-entity-animation-workflow-v1"},
         {"entity_from_visual_button_seen", ui_entity_from_visual_seen},
         {"entity_created_by_click", entity_created},
+        {"child_added_by_drag", ui_drag_probe_applied},
+        {"child_composed_after_reload", child_composed},
+        {"animation_targets_child", animation_targets_child},
         {"animate_selected_button_seen", ui_entity_animate_seen},
         {"animate_selected_button_clicked", ui_entity_animate_clicked},
         {"animation_create_button_seen", ui_animation_create_seen},
@@ -6703,7 +6710,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const auto added_ok = session.add_selected_entity_node(
                         std::move(added));
                     if (added_ok) {
-                        canvas.selected_node = entity.nodes.size() - 1U;
+                        canvas.selected_node = entity.nodes.size();
                         canvas.selected_entity_nodes = {canvas.selected_node};
                     }
                     return added_ok;
@@ -10333,6 +10340,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_animation_marker_seen = false;
         ui_animation_second_key_seen = false;
         ui_animation_second_key_original_time.reset();
+        ui_drag_probe_enabled = true;
+        ui_drag_probe_applied = false;
+        ui_drag_source_seen = false;
+        ui_drag_target_seen = false;
+        ui_drag_target_mode = 2;
         ui_animation_probe_enabled = true;
         static_cast<void>(session.select_resource(
             fabric::editor::StudioResourceKind::visual_component,
@@ -10834,12 +10846,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     };
     while (running) {
         const auto push_workflow_mouse = [&](const ImVec2 position,
-                                             const std::optional<Uint32> type) {
+                                             const std::optional<Uint32> type,
+                                             const Uint32 state = 0U) {
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
             motion.motion.x = static_cast<int>(std::lround(position.x));
             motion.motion.y = static_cast<int>(std::lround(position.y));
+            motion.motion.state = state;
             static_cast<void>(SDL_PushEvent(&motion));
             if (type) {
                 SDL_Event button{};
@@ -10863,99 +10877,126 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 push_workflow_mouse(ui_entity_from_visual_screen, type);
             } else if (entity_animation_workflow_frame >= 5U &&
                        entity_animation_workflow_frame <= 7U &&
-                       ui_entity_animate_seen) {
-                const auto type = entity_animation_workflow_frame == 6U
+                       ui_drag_source_seen && ui_drag_target_seen) {
+                const bool over_target = entity_animation_workflow_frame >= 6U;
+                const auto position = over_target
+                    ? ui_drag_target_screen : ui_drag_source_screen;
+                const auto type = entity_animation_workflow_frame == 5U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 7U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_entity_animate_screen, type);
+                push_workflow_mouse(
+                    position, type,
+                    entity_animation_workflow_frame == 6U
+                        ? SDL_BUTTON_LMASK : 0U);
             } else if (entity_animation_workflow_frame >= 9U &&
-                       entity_animation_workflow_frame <= 11U &&
-                       ui_animation_create_seen) {
+                       entity_animation_workflow_frame <= 12U) {
+                const auto target = canvas.entity_gizmo_screen;
+                const bool moved = entity_animation_workflow_frame >= 11U;
+                const ImVec2 position{
+                    target.x + (moved ? 32.0F : 0.0F), target.y};
                 const auto type = entity_animation_workflow_frame == 10U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 11U
+                    : entity_animation_workflow_frame == 12U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(position, type);
+            } else if (entity_animation_workflow_frame >= 14U &&
+                       entity_animation_workflow_frame <= 16U &&
+                       ui_entity_animate_seen) {
+                const auto type = entity_animation_workflow_frame == 15U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 16U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_entity_animate_screen, type);
+            } else if (entity_animation_workflow_frame >= 18U &&
+                       entity_animation_workflow_frame <= 20U &&
+                       ui_animation_create_seen) {
+                const auto type = entity_animation_workflow_frame == 19U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 20U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(ui_animation_create_screen, type);
-            } else if (entity_animation_workflow_frame >= 13U &&
-                       entity_animation_workflow_frame <= 15U &&
+            } else if (entity_animation_workflow_frame >= 22U &&
+                       entity_animation_workflow_frame <= 24U &&
                        ui_workflow_position_key_seen) {
-                const auto type = entity_animation_workflow_frame == 14U
+                const auto type = entity_animation_workflow_frame == 23U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 15U
+                    : entity_animation_workflow_frame == 24U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(ui_workflow_position_key_screen, type);
-            } else if (entity_animation_workflow_frame >= 17U &&
-                       entity_animation_workflow_frame <= 19U &&
+            } else if (entity_animation_workflow_frame >= 26U &&
+                       entity_animation_workflow_frame <= 28U &&
                        ui_animation_auto_key_seen) {
-                const auto type = entity_animation_workflow_frame == 18U
-                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 19U
-                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
-                    : std::nullopt;
-                push_workflow_mouse(ui_animation_auto_key_screen, type);
-            } else if (entity_animation_workflow_frame >= 21U &&
-                       entity_animation_workflow_frame <= 23U &&
-                       ui_animation_playhead_seen) {
-                const auto type = entity_animation_workflow_frame == 22U
-                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 23U
-                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
-                    : std::nullopt;
-                push_workflow_mouse(ui_animation_playhead_target_screen, type);
-            } else if (entity_animation_workflow_frame >= 25U &&
-                       entity_animation_workflow_frame <= 28U) {
-                const auto target = canvas.entity_gizmo_screen;
-                const bool moved = entity_animation_workflow_frame >= 27U;
-                const ImVec2 position{
-                    target.x + (moved ? 48.0F : 0.0F), target.y};
-                const auto type = entity_animation_workflow_frame == 26U
+                const auto type = entity_animation_workflow_frame == 27U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 28U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(position, type);
+                push_workflow_mouse(ui_animation_auto_key_screen, type);
             } else if (entity_animation_workflow_frame >= 30U &&
                        entity_animation_workflow_frame <= 32U &&
-                       ui_animation_play_seen) {
+                       ui_animation_playhead_seen) {
                 const auto type = entity_animation_workflow_frame == 31U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 32U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_animation_play_screen, type);
-            } else if (entity_animation_workflow_frame >= 37U &&
-                       entity_animation_workflow_frame <= 39U &&
-                       ui_animation_play_seen) {
-                const auto type = entity_animation_workflow_frame == 38U
+                push_workflow_mouse(ui_animation_playhead_target_screen, type);
+            } else if (entity_animation_workflow_frame >= 34U &&
+                       entity_animation_workflow_frame <= 37U) {
+                const auto target = canvas.entity_gizmo_screen;
+                const bool moved = entity_animation_workflow_frame >= 36U;
+                const ImVec2 position{
+                    target.x + (moved ? 48.0F : 0.0F), target.y};
+                const auto type = entity_animation_workflow_frame == 35U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 39U
+                    : entity_animation_workflow_frame == 37U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(position, type);
+            } else if (entity_animation_workflow_frame >= 39U &&
+                       entity_animation_workflow_frame <= 41U &&
+                       ui_animation_play_seen) {
+                const auto type = entity_animation_workflow_frame == 40U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 41U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(ui_animation_play_screen, type);
-            } else if (entity_animation_workflow_frame >= 41U &&
-                       entity_animation_workflow_frame <= 44U &&
+            } else if (entity_animation_workflow_frame >= 46U &&
+                       entity_animation_workflow_frame <= 48U &&
+                       ui_animation_play_seen) {
+                const auto type = entity_animation_workflow_frame == 47U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 48U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_play_screen, type);
+            } else if (entity_animation_workflow_frame >= 50U &&
+                       entity_animation_workflow_frame <= 53U &&
                        ui_animation_second_key_seen) {
-                const bool moved = entity_animation_workflow_frame >= 43U;
+                const bool moved = entity_animation_workflow_frame >= 52U;
                 const ImVec2 position{
                     ui_animation_second_key_screen.x -
                         (moved ? 32.0F : 0.0F),
                     ui_animation_second_key_screen.y};
-                const auto type = entity_animation_workflow_frame == 42U
+                const auto type = entity_animation_workflow_frame == 51U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 44U
+                    : entity_animation_workflow_frame == 53U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(position, type);
-            } else if (entity_animation_workflow_frame >= 46U &&
-                       entity_animation_workflow_frame <= 48U &&
+            } else if (entity_animation_workflow_frame >= 55U &&
+                       entity_animation_workflow_frame <= 57U &&
                        ui_animation_marker_seen) {
-                const auto type = entity_animation_workflow_frame == 47U
+                const auto type = entity_animation_workflow_frame == 56U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
-                    : entity_animation_workflow_frame == 48U
+                    : entity_animation_workflow_frame == 57U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(ui_animation_marker_screen, type);
@@ -12308,7 +12349,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 workflow_animation_id = session.selected_resource()->id.value;
             }
             ++entity_animation_workflow_frame;
-            if (entity_animation_workflow_frame >= 52U) {
+            if (entity_animation_workflow_frame >= 61U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool entity_created = saved &&
@@ -12324,6 +12365,19 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     reloaded.selected_entity()->nodes.front().drawable.resource &&
                     reloaded.selected_entity()->nodes.front().drawable.resource
                             ->id.value == "beam";
+                const bool child_composed = entity_created &&
+                    reloaded.selected_entity()->nodes.size() >= 2U &&
+                    reloaded.selected_entity()->nodes.back().parent == "root" &&
+                    reloaded.selected_entity()->nodes.back().drawable.kind ==
+                        fabric::project::EntityDrawableKind::texture &&
+                    reloaded.selected_entity()->nodes.back().drawable.resource &&
+                    reloaded.selected_entity()->nodes.back().drawable.resource
+                            ->id.value == "button-primary" &&
+                    std::abs(reloaded.selected_entity()->nodes.back()
+                                 .transform.position.x) > 0.01F;
+                const std::string child_id = child_composed
+                    ? reloaded.selected_entity()->nodes.back().id
+                    : std::string{};
                 const bool animation_created = entity_created &&
                     !workflow_animation_id.empty() &&
                     reloaded.select_resource(
@@ -12346,6 +12400,15 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                     track.keys, [](const auto& key) {
                                         return key.time > 0.5F;
                                     });
+                        });
+                const bool animation_targets_child = animation_created &&
+                    !child_id.empty() &&
+                    std::ranges::any_of(
+                        reloaded.selected_animation()->tracks,
+                        [&](const auto& track) {
+                            return track.binding.node_id == child_id &&
+                                track.binding.component_id == "transform" &&
+                                track.binding.property_id == "position";
                         });
                 std::optional<float> corrected_key_time;
                 if (animation_created) {
@@ -12380,11 +12443,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     ui_animation_auto_key_seen && ui_animation_playhead_seen &&
                     ui_animation_play_seen && ui_animation_playback_advanced &&
                     ui_animation_second_key_seen && ui_animation_marker_seen &&
-                    entity_created && animation_created && key_persisted &&
+                    ui_drag_probe_applied && child_composed &&
+                    animation_targets_child && entity_created &&
+                    animation_created && key_persisted &&
                     key_corrected && marker_persisted;
                 write_entity_animation_workflow_probe(
                     initial_project, entity_created, animation_created,
-                    key_persisted, key_corrected, marker_persisted);
+                    key_persisted, key_corrected, marker_persisted,
+                    child_composed, animation_targets_child);
                 write_frame_capture(
                     initial_project, window,
                     "asset-studio-entity-animation-workflow.ppm");

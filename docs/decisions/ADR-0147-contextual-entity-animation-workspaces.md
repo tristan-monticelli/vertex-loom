@@ -25,6 +25,9 @@ Asset Studio adopte deux workspaces liés par la sélection courante :
 Une Entity peut être créée depuis un ou plusieurs visuels sélectionnés. Les
 nœuds correspondants existent dès l'ouverture du workspace. Le drag and drop
 vise l'arbre et le canvas, avec parent et position de destination visibles.
+Lorsqu'un visuel est déposé comme enfant, le nouveau nœud devient immédiatement
+la sélection primaire : son inspecteur, son gizmo et l'action `Animer…` doivent
+donc agir sur cet enfant sans clic de réparation ni retour implicite à la racine.
 
 `Animer…` depuis une Entity crée ou ouvre un clip ciblé sans perdre la sélection
 du nœud. Chaque propriété animable porte une commande de clé. Cette commande
@@ -64,6 +67,9 @@ ne contiennent plus l'arbre, les blocs ou les pistes.
 - Depuis un visuel sélectionné, une Entity visible et éditable est obtenue sans
   re-sélectionner la ressource ni saisir un identifiant technique.
 - Canvas, arbre et inspecteur désignent toujours le même nœud.
+- Un visuel déposé comme enfant reste sélectionné, peut être déplacé au gizmo et
+  devient la cible du clip créé ensuite ; parent, drawable et transform
+  persistent après rechargement.
 - Depuis une Entity et son nœud, `Animer…` ouvre le clip ciblé et garde ce nœud.
 - Une clé de transform est créée depuis sa propriété en une action ; la piste
   apparaît immédiatement à la position du playhead.
