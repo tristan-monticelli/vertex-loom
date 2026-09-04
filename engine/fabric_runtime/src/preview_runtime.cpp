@@ -87,6 +87,7 @@ struct PreviewRuntime::Impl {
         std::vector<project::FabrikChainDefinition> ik_chains;
         std::vector<project::DeformationPose> poses;
         core::Transform instance_transform;
+        core::Transform initial_instance_transform;
         float layer_depth{};
         std::optional<BehaviorEvaluator> behavior;
         std::map<std::string, project::BehaviorValue> behavior_properties;
@@ -135,6 +136,8 @@ struct PreviewRuntime::Impl {
     std::unordered_map<std::string, project::AnimationClip> animation_clips;
     std::unordered_map<std::string, std::string> animation_instances;
     std::unordered_map<std::string, project::AnimationStateMachine> animation_state_machines;
+    std::unordered_map<std::string, project::TexturedPath> textured_paths;
+    std::unordered_map<std::string, project::PathFollowerState> path_followers;
     std::unordered_map<std::string, std::vector<project::AnimationParameter>> animation_parameters;
     mutable bool evaluation_cache_valid{};
     mutable float evaluation_cache_time{};
@@ -1056,6 +1059,8 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->animation_clips.clear();
     impl_->animation_instances.clear();
     impl_->animation_state_machines.clear();
+    impl_->textured_paths.clear();
+    impl_->path_followers.clear();
     impl_->animation_parameters.clear();
     impl_->evaluation_cache_valid = false;
     impl_->animation_evaluation_cache.clear();
@@ -1374,6 +1379,20 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
         return false;
     }
     for (const auto& instance : map_->instances) {
+        if (instance.path_follower) {
+            const auto& follower = *instance.path_follower;
+            const auto path = project::load_textured_path(
+                options_.project_root, *manifest_,
+                project::textured_path_document_path(
+                    *manifest_, follower.path.id));
+            if (!path.ok()) {
+                append_errors(errors_, path.errors);
+                return false;
+            }
+            impl_->textured_paths.emplace(follower.path.id.value,
+                                          std::move(*path.asset));
+            impl_->path_followers.emplace(instance.id, follower);
+        }
         if (!instance.prefab) continue;
         const auto prefab = std::ranges::find(
             map_->prefabs, instance.prefab->id.value,
@@ -1579,6 +1598,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             .constraints = resolved_entity.constraints,
             .ik_chains = resolved_entity.ik_chains,
             .instance_transform = instance.transform,
+            .initial_instance_transform = instance.transform,
             .layer_depth = layer_depth};
         if (resolved_entity.behavior) {
             auto behavior = project::load_behavior_graph(
@@ -1604,6 +1624,21 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
             simulation.poses.push_back({.node_id = node.id,
                                         .transform = node.transform});
         impl_->entity_simulations.emplace(instance.id, std::move(simulation));
+        if (instance.path_follower) {
+            const auto path = impl_->textured_paths.find(
+                instance.path_follower->path.id.value);
+            if (path != impl_->textured_paths.end()) {
+                auto& follower_simulation = impl_->entity_simulations.at(instance.id);
+                const auto sample = project::sample_textured_path(
+                    path->second, instance.path_follower->progress);
+                follower_simulation.instance_transform.position = sample.position;
+                if (instance.path_follower->orient_to_path)
+                    follower_simulation.instance_transform.rotation_degrees =
+                        std::atan2(sample.tangent.y, sample.tangent.x) *
+                            57.29577951308232F +
+                        instance.path_follower->rotation_offset_degrees;
+            }
+        }
         for (std::size_t node_index = 0; node_index < resolved_entity.nodes.size(); ++node_index) {
             const auto& node = resolved_entity.nodes[node_index];
             if (!node.visible) continue;
@@ -1667,7 +1702,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         packet.fill_color.reset();
                         generate_planar_uvs(packet);
                     }
-                    transform_packet(packet, resolved_entity, node_index, instance.transform);
+                    const auto render_transform = instance.path_follower
+                        ? impl_->entity_simulations.at(instance.id).instance_transform
+                        : instance.transform;
+                    transform_packet(packet, resolved_entity, node_index, render_transform);
                     packet.node_id = instance.id + ":" + node.id + ":" + packet.node_id;
                     impl_->packet_base_transforms.emplace(
                         packet.node_id, Impl::PacketBaseTransform{
@@ -1676,7 +1714,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                             .scale = node.transform.scale,
                             .world_origin = apply_node_transform(
                                 {0.0F, 0.0F}, resolved_entity, node_index,
-                                instance.transform)});
+                                render_transform)});
                     impl_->packet_sort_keys.emplace(
                         packet.node_id, Impl::PacketSortKey{layer_depth, node.z_order});
                     impl_->packets.push_back(std::move(packet));
@@ -2120,6 +2158,23 @@ bool PreviewRuntime::run() {
                 stats_.mechanic_steps +=
                     mechanic.simulation.step_count() - previous_steps;
             }
+            for (auto& [instance_id, follower] : impl_->path_followers) {
+                const auto path = impl_->textured_paths.find(follower.path.id.value);
+                const auto simulation = impl_->entity_simulations.find(instance_id);
+                if (path == impl_->textured_paths.end() ||
+                    simulation == impl_->entity_simulations.end())
+                    continue;
+                follower.progress = project::advance_path_follower(
+                    path->second, follower.progress, follower.speed,
+                    static_cast<float>(fixed_time_step), follower.loop);
+                const auto sample = project::sample_textured_path(
+                    path->second, follower.progress);
+                simulation->second.instance_transform.position = sample.position;
+                if (follower.orient_to_path)
+                    simulation->second.instance_transform.rotation_degrees =
+                        std::atan2(sample.tangent.y, sample.tangent.x) *
+                            57.29577951308232F + follower.rotation_offset_degrees;
+            }
             for (auto& [instance_id, simulation] : impl_->entity_simulations) {
                 if (!simulation.xpbd) continue;
                 simulation.previous_xpbd_positions.clear();
@@ -2326,7 +2381,8 @@ bool PreviewRuntime::run() {
                 !simulation->second.constraints.empty() ||
                 !simulation->second.ik_chains.empty() ||
                 impl_->animation_instances.contains(instance_id) ||
-                impl_->animation_state_machines.contains(instance_id);
+                impl_->animation_state_machines.contains(instance_id) ||
+                impl_->path_followers.contains(instance_id);
             if (!dynamic_instance) return packet;
             if (simulation->second.mesh &&
                 deformation_topology_matches(*simulation->second.mesh, packet)) {
@@ -2433,9 +2489,10 @@ bool PreviewRuntime::run() {
                 rotation_degrees = resolved_node->transform.rotation_degrees;
                 scale = resolved_node->transform.scale;
             }
+            const bool path_following = impl_->path_followers.contains(instance_id);
             if (!position && !rotation_degrees && !scale && !color && !opacity &&
                 !image_position && !image_scale && !image_rotation_degrees &&
-                !image_pivot)
+                !image_pivot && !path_following)
                 return packet;
             if (color && packet.fill_color) {
                 if (color_composition == project::AnimationComposition::additive) {
@@ -2466,7 +2523,8 @@ bool PreviewRuntime::run() {
                     packet.image_fill->transform.rotation_degrees = *image_rotation_degrees;
                 if (image_pivot) packet.image_fill->transform.pivot = *image_pivot;
             }
-            if (!position && !rotation_degrees && !scale) return packet;
+            if (!position && !rotation_degrees && !scale && !path_following)
+                return packet;
             const auto& base = base_transform->second;
             const auto target_position = position.value_or(base.local_position);
             const auto target_rotation = rotation_degrees.value_or(base.rotation_degrees);
@@ -2475,13 +2533,25 @@ bool PreviewRuntime::run() {
                 ? target_scale.x / base.scale.x : 1.0F;
             const auto scale_y = std::abs(base.scale.y) > 1.0e-6F
                 ? target_scale.y / base.scale.y : 1.0F;
-            const auto radians = (target_rotation - base.rotation_degrees) *
+            const auto path_position_delta = path_following
+                ? core::Vec2{
+                    simulation->second.instance_transform.position.x -
+                        simulation->second.initial_instance_transform.position.x,
+                    simulation->second.instance_transform.position.y -
+                        simulation->second.initial_instance_transform.position.y}
+                : core::Vec2{};
+            const auto path_rotation_delta = path_following
+                ? simulation->second.instance_transform.rotation_degrees -
+                    simulation->second.initial_instance_transform.rotation_degrees
+                : 0.0F;
+            const auto radians = (target_rotation - base.rotation_degrees +
+                                  path_rotation_delta) *
                 0.017453292519943295F;
             const auto cosine = std::cos(radians);
             const auto sine = std::sin(radians);
             const core::Vec2 position_delta{
-                target_position.x - base.local_position.x,
-                target_position.y - base.local_position.y};
+                target_position.x - base.local_position.x + path_position_delta.x,
+                target_position.y - base.local_position.y + path_position_delta.y};
             const auto animate_point = [&](core::Vec2& point) {
                 point.x -= base.world_origin.x;
                 point.y -= base.world_origin.y;

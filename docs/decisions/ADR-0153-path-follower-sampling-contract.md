@@ -18,8 +18,9 @@ une résolution bornée et ne modifie jamais le `TexturedPath` source. Le rail d
 déplacement, la spline géométrique et la contrainte physique restent donc des
 contrats distincts. L'attachement persistant à `MapInstance` sera optionnel et
 additif : les cartes existantes resteront équivalentes. La prochaine tranche
-branchera ce champ à Map Studio et Preview Runtime ; la géométrie source ne sera
-jamais modifiée.
+branche ce champ au Preview Runtime (pas fixe, position et orientation) ; la
+prochaine tranche l'exposera dans Map Studio avec aperçu et validation avant
+publication. La géométrie source ne sera jamais modifiée.
 
 ## Conséquences
 

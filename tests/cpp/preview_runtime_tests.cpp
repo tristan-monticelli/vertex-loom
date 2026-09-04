@@ -521,6 +521,32 @@ fabric::project::MapDocument map_with_entity() {
     return result;
 }
 
+fabric::project::MapDocument map_with_path_follower() {
+    auto result = map();
+    result.instances.push_back({
+        .id = "path-actor",
+        .entity = fabric::project::ResourceReference{{.value = "runtime-entity"}, "entity"},
+        .layer_id = "instances",
+        .path_follower = fabric::project::PathFollowerState{
+            .path = fabric::project::ResourceReference{{.value = "runtime-path"}, "texturedPath"},
+            .progress = 0.5F,
+            .speed = 0.0F,
+            .loop = false,
+            .orient_to_path = true}});
+    return result;
+}
+
+fabric::project::TexturedPath runtime_path() {
+    return {.document = {.schema_version = 1,
+                         .type = "texturedPath",
+                         .id = {.value = "runtime-path"},
+                         .name = "Runtime Path"},
+            .commands = {{fabric::project::TexturedPathCommandKind::move, {0.0F, 0.0F}},
+                         {fabric::project::TexturedPathCommandKind::line, {10.0F, 0.0F}}},
+            .width = 1.0F,
+            .texture = fabric::project::ResourceReference{{.value = "runtime-texture"}, "texture"}};
+}
+
 fabric::project::EntityDefinition ordered_entity() {
     auto result = entity();
     result.nodes.front().z_order = 10.0F;
@@ -1122,8 +1148,10 @@ TEST_CASE("preview runtime loads and evaluates project animations") {
         root, manifest(), transform_animation()).ok());
 
     fabric::runtime::PreviewRuntime runtime;
-    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
-                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    const auto loaded = runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                                      .mode = fabric::runtime::RuntimeMode::smoke_test});
+    if (!loaded) for (const auto& error : runtime.errors()) std::cerr << error << '\n';
+    REQUIRE(loaded);
     REQUIRE(runtime.animation_count() == 1U);
     const auto evaluated = runtime.evaluate_animation(
         {.value = "runtime-animation"}, 0.5F);
@@ -1633,6 +1661,42 @@ TEST_CASE("preview runtime resolves native vector entity drawables") {
     REQUIRE(runtime.run());
     REQUIRE(runtime.stats().visible_instances == 1);
     CHECK(runtime.stats().culled_packets >= 1U);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("preview runtime advances map path followers") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-path-follower-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+    const auto source = std::filesystem::path{"tests/fixtures/valid-project/assets/textures/beam-thread.png"};
+    REQUIRE(fabric::project::publish_texture_asset(
+        root, manifest(), {.document = {.schema_version = 1,
+                                        .type = "texture",
+                                        .id = {.value = "runtime-texture"},
+                                        .name = "Runtime Texture"},
+                             .source = "assets/textures/runtime-texture.png",
+                             .width = 2048,
+                             .height = 2048}, source).ok());
+    REQUIRE(fabric::project::publish_textured_path(root, manifest(), runtime_path()).ok());
+    CHECK(fabric::project::sample_textured_path(runtime_path(), 0.5F).position.x == Catch::Approx(5.0F));
+    REQUIRE(fabric::project::publish_map(root, manifest(), map_with_path_follower()).ok());
+
+    fabric::runtime::PreviewRuntime runtime;
+    const auto loaded = runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                                      .mode = fabric::runtime::RuntimeMode::smoke_test,
+                                      .frame_limit = 2U});
+    if (!loaded) for (const auto& error : runtime.errors()) std::cerr << error << '\n';
+    REQUIRE(loaded);
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    const auto& point = runtime.last_frame_packets().front().fill_vertices.front();
+    CHECK(point.x == Catch::Approx(4.0F).margin(0.05F));
+    CHECK(point.y == Catch::Approx(-1.0F).margin(0.05F));
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
