@@ -53,6 +53,9 @@ surlignées et le premier breakpoint rencontré met le workspace en pause. Le
 pas-à-pas parcourt alors les entrées de trace existantes et sélectionne leur
 nœud ; continuer réarme l'évaluation suivante. La trace bornée de l'évaluateur
 reste la source unique de cet affichage.
+La sélection du workspace est elle aussi conservée par identifiant de nœud et
+résolue à chaque frame ; duplication, suppression et undo ne peuvent donc pas
+faire dériver l'inspecteur vers un autre index.
 
 ## Conséquences
 

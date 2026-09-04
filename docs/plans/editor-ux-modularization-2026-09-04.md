@@ -121,6 +121,8 @@ Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,
 breakpoint et évaluation uniquement par clics avant reload.
+Sa sélection n'est plus un index statique : elle suit l'identifiant du nœud et
+reste cohérente après duplication, suppression ou reconstruction du graphe.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne

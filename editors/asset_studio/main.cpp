@@ -2756,7 +2756,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     ImGui::EndDisabled();
     draw_disabled_reason(!behavior_session.can_redo(), "No behavior edit to redo.");
 
-    static int selected_node = -1;
+    static std::string selected_node_id;
     static int node_type = 0;
     static std::string new_node_id{"node"};
     static constexpr const char* node_types[] = {
@@ -2811,8 +2811,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                 return node.id == id;
             })) id = base + "-" + std::to_string(suffix++);
             if (behavior_session.add_node(type, id)) {
-                selected_node = static_cast<int>(
-                    behavior_session.graph()->nodes.size() - 1U);
+                selected_node_id = id;
                 status = "Behavior node added from palette.";
                 if (ui_behavior_graph_probe_enabled &&
                     std::string_view{type} == "emit_event")
@@ -2852,6 +2851,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
             {static_cast<fabric::runtime::BehaviorSignalSource>(signal_source),
              semantic_id, {}}, 1.0F / 60.0F);
         traced_nodes.clear();
+        selected_node_id.clear();
         for (const auto& entry : behavior_session.trace())
             if (std::ranges::find(traced_nodes, entry.node_id) ==
                 traced_nodes.end())
@@ -2886,7 +2886,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
             graph.nodes, trace[trace_cursor].node_id,
             &fabric::project::BehaviorNodeDefinition::id);
         if (node != graph.nodes.end())
-            selected_node = static_cast<int>(std::distance(graph.nodes.begin(), node));
+            selected_node_id = node->id;
         status = "Trace: " + trace[trace_cursor].message;
         trace_cursor = std::min(trace_cursor + 1U, trace.size() - 1U);
     }
@@ -2991,7 +2991,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                                       {0.24F, 0.66F, 0.36F, 1.0F});
             }
             if (ImGui::Button(label.c_str(), {card_width, card_height})) {
-                selected_node = static_cast<int>(index);
+                selected_node_id = node.id;
                 if (ui_behavior_graph_probe_enabled && index == 1U)
                     ui_behavior_graph_target_clicked = true;
                 if (!canvas_connection_source.empty() &&
@@ -3039,7 +3039,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                     canvas_connection_source.clear();
             } else if (ImGui::SmallButton("Connect from output")) {
                 canvas_connection_source = node.id;
-                selected_node = static_cast<int>(index);
+                selected_node_id = node.id;
                 if (ui_behavior_graph_probe_enabled && index == 0U)
                     ui_behavior_graph_connect_clicked = true;
             }
@@ -3104,8 +3104,7 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         ImGui::SameLine();
         if (ImGui::Button("Add node with custom id")) {
             if (behavior_session.add_node(node_types[node_type], new_node_id)) {
-                selected_node = static_cast<int>(
-                    behavior_session.graph()->nodes.size() - 1U);
+                selected_node_id = new_node_id;
                 status = "Behavior node added.";
             } else {
                 status = "Node rejected; inspect Behavior diagnostics.";
@@ -3116,16 +3115,18 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         for (std::size_t index = 0; index < behavior_session.graph()->nodes.size(); ++index) {
             const auto& node = behavior_session.graph()->nodes[index];
             const std::string label = node.id + "  [" + node.type + "]##behavior-node";
-            if (ImGui::Selectable(label.c_str(), selected_node == static_cast<int>(index)))
-                selected_node = static_cast<int>(index);
+            if (ImGui::Selectable(label.c_str(), selected_node_id == node.id))
+                selected_node_id = node.id;
         }
     }
     ImGui::EndChild();
     ImGui::SameLine();
     if (ImGui::BeginChild("Behavior node inspector", {0.0F, 230.0F}, true)) {
-        if (selected_node >= 0 &&
-            selected_node < static_cast<int>(behavior_session.graph()->nodes.size())) {
-            const auto node = behavior_session.graph()->nodes[static_cast<std::size_t>(selected_node)];
+        const auto selected_node = std::ranges::find(
+            behavior_session.graph()->nodes, selected_node_id,
+            &fabric::project::BehaviorNodeDefinition::id);
+        if (selected_node != behavior_session.graph()->nodes.end()) {
+            const auto node = *selected_node;
             ImGui::Text("%s", node.type.c_str());
             for (const auto& property : node.properties) {
                 ImGui::PushID(property.id.c_str());
@@ -3160,12 +3161,13 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
             if (ImGui::Button("Duplicate node")) {
                 const auto copy_id = node.id + "-copy";
                 if (behavior_session.duplicate_node({.value = node.id}, copy_id))
-                    selected_node = static_cast<int>(behavior_session.graph()->nodes.size() - 1U);
+                    selected_node_id = copy_id;
             }
             ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Button, {0.55F, 0.16F, 0.16F, 1.0F});
             if (ImGui::Button("Delete node")) {
-                if (behavior_session.remove_node({.value = node.id})) selected_node = -1;
+                if (behavior_session.remove_node({.value = node.id}))
+                    selected_node_id.clear();
             }
             ImGui::PopStyleColor();
         } else ImGui::TextDisabled("Select a node to edit all typed properties.");
