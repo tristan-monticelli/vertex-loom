@@ -24,6 +24,10 @@ Les pistes `transform.position`, `transform.rotationDegrees`, `transform.scale`,
 `material.color` et `material.opacity` sont appliquées aux draw packets du nœud
 ciblé. Les couleurs et opacités remplacent les valeurs rendues ; les autres
 propriétés restent évaluables headless mais ne modifient pas encore les packets.
+Le binding `pathFollower.progress` est également accepté pour le nœud racine :
+il échantillonne le rail attaché à la même instance et compose sa transformation
+avec le déplacement de base. Map Studio peut créer ce clip depuis l'inspecteur
+PathFollower et l'attacher avec une référence `animation` ordinaire.
 
 ## Conséquences
 

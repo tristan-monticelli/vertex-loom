@@ -2500,6 +2500,53 @@ int run(const std::filesystem::path& project_root,
                     draw_disabled_reason(!path_reference_valid,
                         path_enabled ? "The selected path document is missing or invalid."
                                      : "Choose a textured path before applying the follower.");
+                    ImGui::SeparatorText("Animation");
+                    ImGui::TextWrapped(
+                        "Create a clip that drives this instance from the current path progress.");
+                    const bool can_create_path_animation = path_reference_valid &&
+                        selected_entity.has_value();
+                    ImGui::BeginDisabled(!can_create_path_animation);
+                    if (ImGui::Button("Create path animation")) {
+                        fabric::editor::CreateAnimationPrompt prompt{
+                            .name = instance->id + " path animation",
+                            .preview_entity_id = selected_entity->value,
+                            .generic_preview = false,
+                            .duration = 1.0,
+                            .loop = true};
+                        std::size_t suffix = 1U;
+                        while (std::ranges::any_of(resource_catalog.resources(),
+                            [&](const auto& resource) {
+                                return resource.kind == fabric::editor::StudioResourceKind::animation &&
+                                    resource.id == prompt.resource_id_for_document(
+                                        resource_catalog.project_root(), *resource_catalog.manifest());
+                            })) {
+                            prompt.name = instance->id + " path animation " +
+                                std::to_string(++suffix);
+                        }
+                        const auto created = resource_catalog.create_animation(prompt);
+                        const auto animation_id = prompt.resource_id_for_document(
+                            resource_catalog.project_root(), *resource_catalog.manifest());
+                        const auto track = created &&
+                            resource_catalog.set_selected_animation_segment(
+                                {.node_id = "root", .component_id = "pathFollower",
+                                 .property_id = "progress"},
+                                0.0F, 0.0F, 1.0F, 1.0F,
+                                fabric::project::AnimationInterpolation::linear);
+                        const auto saved = track && resource_catalog.save();
+                        const auto attached = saved && session.set_instance_property(
+                            selected_id,
+                            {.id = "animation",
+                             .value = fabric::project::ResourceReference{
+                                 {.value = animation_id.value}, "animation"}});
+                        status = attached
+                            ? "Path animation created and attached"
+                            : "Path animation could not be attached; inspect diagnostics";
+                    }
+                    ImGui::EndDisabled();
+                    draw_disabled_reason(!can_create_path_animation,
+                        path_reference_valid
+                            ? "Select an entity-backed instance before creating an animation."
+                            : "Choose a valid textured path before creating an animation.");
                 }
                 const auto transformations = load_transformations(
                     session.project_root(), *session.manifest());
