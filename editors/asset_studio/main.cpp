@@ -1,5 +1,6 @@
 #include "fabric/editor/canvas_interaction.hpp"
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/editor_action_registry.hpp"
 #include "fabric/editor/project_session.hpp"
 #include "fabric/editor/behavior_session.hpp"
 #include "fabric/editor/session_transition.hpp"
@@ -10882,6 +10883,56 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!behavior_session.dirty() || behavior_session.save()) &&
             (!transformation_session.dirty() || transformation_session.save());
     };
+    fabric::editor::EditorActionRegistry actions;
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::save},
+        .label = "Save",
+        .shortcut = save_shortcut,
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.has_project(),
+                .disabled_reason = "Open or create a project before saving.",
+            };
+        },
+        .execute = [&] {
+            const bool saved = save_all();
+            status = saved ? "Project saved."
+                           : "Save failed; inspect the diagnostics.";
+            return saved;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::undo},
+        .label = "Undo",
+        .shortcut = undo_shortcut,
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.can_undo(),
+                .disabled_reason = "No project change is available to undo.",
+            };
+        },
+        .execute = [&] {
+            const bool undone = session.undo();
+            if (undone) status = "Change undone.";
+            return undone;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::redo},
+        .label = "Redo",
+        .shortcut = redo_shortcut,
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.can_redo(),
+                .disabled_reason = "No project change is available to redo.",
+            };
+        },
+        .execute = [&] {
+            const bool redone = session.redo();
+            if (redone) status = "Change redone.";
+            return redone;
+        },
+    }));
     while (running) {
         const auto push_workflow_mouse = [&](const ImVec2 position,
                                              const std::optional<Uint32> type,
@@ -11598,11 +11649,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::editor::SessionAction::open_project,
                         dirty());
                 }
+                const auto save_availability = actions.availability(
+                    fabric::editor::editor_action_ids::save);
                 if (ImGui::MenuItem("Save", save_shortcut, false,
-                                    session.has_project())) {
-                    status = save_all()
-                        ? "Project saved."
-                        : "Save failed; inspect the diagnostics.";
+                                    save_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::save));
                 }
                 if (ImGui::MenuItem("Project settings...", nullptr, false,
                                     session.has_project())) {
@@ -11658,15 +11710,19 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Edit")) {
+                const auto undo_availability = actions.availability(
+                    fabric::editor::editor_action_ids::undo);
                 if (ImGui::MenuItem("Undo", undo_shortcut, false,
-                                    session.can_undo())) {
-                    static_cast<void>(session.undo());
-                    status = "Change undone.";
+                                    undo_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::undo));
                 }
+                const auto redo_availability = actions.availability(
+                    fabric::editor::editor_action_ids::redo);
                 if (ImGui::MenuItem("Redo", redo_shortcut, false,
-                                    session.can_redo())) {
-                    static_cast<void>(session.redo());
-                    status = "Change redone.";
+                                    redo_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::redo));
                 }
                 ImGui::EndMenu();
             }
@@ -11707,20 +11763,19 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_S, false)) {
-            status = save_all()
-                ? "Project saved."
-                : "Save failed; inspect the diagnostics.";
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::save));
         }
         if (shortcuts_enabled && command_modifier && !io.KeyShift &&
-            ImGui::IsKeyPressed(ImGuiKey_Z, false) && session.can_undo()) {
-            static_cast<void>(session.undo());
-            status = "Change undone.";
+            ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::undo));
         }
         if (shortcuts_enabled && command_modifier &&
             ((io.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false)) ||
-             ImGui::IsKeyPressed(ImGuiKey_Y, false)) && session.can_redo()) {
-            static_cast<void>(session.redo());
-            status = "Change redone.";
+             ImGui::IsKeyPressed(ImGuiKey_Y, false))) {
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::redo));
         }
 
         EntityPreviewResult entity_preview;

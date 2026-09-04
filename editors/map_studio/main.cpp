@@ -1,5 +1,6 @@
 #include "fabric/editor/map_session.hpp"
 #include "fabric/editor/creation_prompts.hpp"
+#include "fabric/editor/editor_action_registry.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/editor/project_session.hpp"
@@ -2714,6 +2715,57 @@ int run(const std::filesystem::path& project_root,
             (!session.dirty() || session.save()) &&
             (!scene_session.dirty() || scene_session.save());
     };
+    fabric::editor::EditorActionRegistry actions;
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::save},
+        .label = "Save",
+        .shortcut = "Ctrl+S",
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.has_map(),
+                .disabled_reason = "Open or create a map before saving.",
+            };
+        },
+        .execute = [&] {
+            const bool saved = save_dirty_documents();
+            status = saved ? "Documents saved" : "Save failed";
+            return saved;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::undo},
+        .label = "Undo",
+        .shortcut = "Ctrl+Z",
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.can_undo(),
+                .disabled_reason =
+                    "No map changes are available to undo.",
+            };
+        },
+        .execute = [&] {
+            const bool undone = session.undo();
+            if (undone) status = "Map change undone";
+            return undone;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::redo},
+        .label = "Redo",
+        .shortcut = "Ctrl+Y",
+        .availability = [&] {
+            return fabric::editor::EditorActionAvailability{
+                .enabled = session.can_redo(),
+                .disabled_reason =
+                    "No undone map changes are available to redo.",
+            };
+        },
+        .execute = [&] {
+            const bool redone = session.redo();
+            if (redone) status = "Map change redone";
+            return redone;
+        },
+    }));
     const auto prepare_package = [&] {
         if (!save_dirty_documents()) {
             status = "A document save failed; package action cancelled";
@@ -3027,18 +3079,19 @@ int run(const std::filesystem::path& project_root,
             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_S, false))
-            status = save_dirty_documents() ? "Documents saved" : "Save failed";
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::save));
         if (shortcuts_enabled && command_modifier &&
-            ImGui::IsKeyPressed(ImGuiKey_Z, false) && session.can_undo()) {
-            static_cast<void>(session.undo());
-            status = "Map change undone";
+            ImGui::IsKeyPressed(ImGuiKey_Z, false)) {
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::undo));
         }
         if (shortcuts_enabled && command_modifier &&
             (ImGui::IsKeyPressed(ImGuiKey_Y, false) ||
-             (imgui_io_frame.KeyShift && ImGui::IsKeyPressed(ImGuiKey_Z, false))) &&
-            session.can_redo()) {
-            static_cast<void>(session.redo());
-            status = "Map change redone";
+             (imgui_io_frame.KeyShift &&
+              ImGui::IsKeyPressed(ImGuiKey_Z, false)))) {
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::redo));
         }
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_Q, false))
@@ -3062,8 +3115,13 @@ int run(const std::filesystem::path& project_root,
                          ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_MenuBar);
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("File")) {
-                if (ImGui::MenuItem("Save", "Ctrl+S", false, session.has_map()))
-                    status = save_dirty_documents() ? "Documents saved" : "Save failed";
+                const auto save_availability = actions.availability(
+                    fabric::editor::editor_action_ids::save);
+                if (ImGui::MenuItem("Save", "Ctrl+S", false,
+                                    save_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::save));
+                }
                 if (ImGui::MenuItem("Quit", "Ctrl+Q"))
                     transition_guard.request(
                         fabric::editor::SessionAction::quit,
@@ -3072,15 +3130,19 @@ int run(const std::filesystem::path& project_root,
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Edit")) {
+                const auto undo_availability = actions.availability(
+                    fabric::editor::editor_action_ids::undo);
                 if (ImGui::MenuItem("Undo", "Ctrl+Z", false,
-                                    session.can_undo())) {
-                    static_cast<void>(session.undo());
-                    status = "Map change undone";
+                                    undo_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::undo));
                 }
+                const auto redo_availability = actions.availability(
+                    fabric::editor::editor_action_ids::redo);
                 if (ImGui::MenuItem("Redo", "Ctrl+Y", false,
-                                    session.can_redo())) {
-                    static_cast<void>(session.redo());
-                    status = "Map change redone";
+                                    redo_availability.enabled)) {
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::redo));
                 }
                 ImGui::EndMenu();
             }
@@ -3164,7 +3226,10 @@ int run(const std::filesystem::path& project_root,
             ImGui::TextColored(session.dirty() ? ImVec4{1.0F, 0.75F, 0.25F, 1.0F}
                                                : ImVec4{0.45F, 0.9F, 0.55F, 1.0F},
                                session.dirty() ? "dirty" : "saved");
-            if (ImGui::Button("Save")) status = session.save() ? "Map saved" : "Save failed";
+            if (ImGui::Button("Save")) {
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::save));
+            }
             ImGui::SameLine();
             const bool renderer_blocked = !map_renderer.ready() ||
                 !preview_render_state.errors.empty();
@@ -3211,17 +3276,27 @@ int run(const std::filesystem::path& project_root,
             ImGui::EndDisabled();
             draw_disabled_reason(renderer_blocked, renderer_block_reason);
             ImGui::SameLine();
-            ImGui::BeginDisabled(!session.can_undo());
-            if (ImGui::Button("Undo")) static_cast<void>(session.undo());
+            const auto undo_availability = actions.availability(
+                fabric::editor::editor_action_ids::undo);
+            ImGui::BeginDisabled(!undo_availability.enabled);
+            if (ImGui::Button("Undo")) {
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::undo));
+            }
             ImGui::EndDisabled();
-            draw_disabled_reason(!session.can_undo(),
-                                 "No map changes are available to undo.");
+            draw_disabled_reason(!undo_availability.enabled,
+                                 undo_availability.disabled_reason);
             ImGui::SameLine();
-            ImGui::BeginDisabled(!session.can_redo());
-            if (ImGui::Button("Redo")) static_cast<void>(session.redo());
+            const auto redo_availability = actions.availability(
+                fabric::editor::editor_action_ids::redo);
+            ImGui::BeginDisabled(!redo_availability.enabled);
+            if (ImGui::Button("Redo")) {
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::redo));
+            }
             ImGui::EndDisabled();
-            draw_disabled_reason(!session.can_redo(),
-                                 "No undone map changes are available to redo.");
+            draw_disabled_reason(!redo_availability.enabled,
+                                 redo_availability.disabled_reason);
             ImGui::Separator();
             const auto available_width = ImGui::GetContentRegionAvail().x;
             layers_pane_width = std::clamp(
