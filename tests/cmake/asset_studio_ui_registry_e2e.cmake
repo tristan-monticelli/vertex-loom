@@ -168,6 +168,28 @@ if(DEFINED BUTTON_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED WORKFLOW_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${WORKFLOW_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${WORKFLOW_ARTIFACT}")
+    endif()
+    if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-entity-animation-workflow.ppm")
+        message(FATAL_ERROR "Entity to Animation workflow did not produce its screenshot")
+    endif()
+    file(READ "${TEST_ROOT}/project/${WORKFLOW_ARTIFACT}" WORKFLOW_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"entity_from_visual_button_seen\": true"
+            "\"entity_created_by_click\": true"
+            "\"animate_selected_button_seen\": true"
+            "\"animation_create_button_seen\": true"
+            "\"animation_created_by_click\": true"
+            "\"quick_key_button_seen\": true"
+            "\"key_persisted_after_reload\": true")
+        string(FIND "${WORKFLOW_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Entity to Animation workflow probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
 if(NOT DEFINED REGISTRY_REQUIRED_IDS)
     set(REGISTRY_REQUIRED_IDS
@@ -185,7 +207,8 @@ endforeach()
 
 if(NOT DEFINED DRAG_ARTIFACT AND NOT DEFINED OVERRIDE_ARTIFACT AND
    NOT DEFINED TEXTURE_ARTIFACT AND NOT DEFINED INPUT_ARTIFACT AND
-   NOT DEFINED BEAM_ARTIFACT AND NOT DEFINED BUTTON_ARTIFACT)
+   NOT DEFINED BEAM_ARTIFACT AND NOT DEFINED BUTTON_ARTIFACT AND
+   NOT DEFINED WORKFLOW_ARTIFACT)
 execute_process(
     COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT

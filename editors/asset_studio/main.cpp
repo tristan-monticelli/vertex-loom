@@ -106,6 +106,14 @@ bool ui_animation_graph_probe_enabled = false;
 bool ui_animation_graph_seen = false;
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
+bool ui_entity_animation_workflow_probe_enabled = false;
+bool ui_entity_from_visual_seen = false;
+bool ui_entity_animate_seen = false;
+bool ui_entity_animate_clicked = false;
+bool ui_animation_create_seen = false;
+ImVec2 ui_entity_from_visual_screen{};
+ImVec2 ui_entity_animate_screen{};
+ImVec2 ui_animation_create_screen{};
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -1691,7 +1699,17 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 ? std::string{"Create Entity from visual"}
                 : "Create Entity from " +
                       std::to_string(selected_visuals.size()) + " visuals";
-            if (ImGui::Button(label.c_str()))
+            const bool create_entity_clicked = ImGui::Button(label.c_str());
+            if (ui_entity_animation_workflow_probe_enabled &&
+                selected->id.value == "beam") {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_entity_from_visual_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+                ui_entity_from_visual_seen = true;
+            }
+            if (create_entity_clicked)
                 request_entity_from_visuals(selected_visuals);
         }
         if (is_entity_artwork_kind(selected->kind)) same_line_if_room(82.0F);
@@ -2487,6 +2505,27 @@ void write_ui_button_probe(const std::filesystem::path& project_path) {
            << "  \"reloaded_with_original_texture_and_shader\": "
            << (ui_button_reloaded ? "true" : "false") << "\n"
            << "}\n";
+}
+
+void write_entity_animation_workflow_probe(
+    const std::filesystem::path& project_path,
+    const bool entity_created, const bool animation_created,
+    const bool key_persisted) {
+    if (project_path.empty()) return;
+    const nlohmann::json probe = {
+        {"schema", "asset-studio-entity-animation-workflow-v1"},
+        {"entity_from_visual_button_seen", ui_entity_from_visual_seen},
+        {"entity_created_by_click", entity_created},
+        {"animate_selected_button_seen", ui_entity_animate_seen},
+        {"animate_selected_button_clicked", ui_entity_animate_clicked},
+        {"animation_create_button_seen", ui_animation_create_seen},
+        {"animation_created_by_click", animation_created},
+        {"quick_key_button_seen", ui_animation_quick_key_seen},
+        {"key_persisted_after_reload", key_persisted},
+    };
+    std::ofstream output(
+        project_path / "asset-studio-entity-animation-workflow.json");
+    if (output) output << probe.dump(2) << '\n';
 }
 
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
@@ -6318,7 +6357,19 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     diagnostics.rms_constraint_error,
                                     diagnostics.compliant_energy);
             }
-            if (ImGui::Button("Animate selected node...", {-1.0F, 0.0F})) {
+            const bool animate_selected_clicked = ImGui::Button(
+                "Animate selected node...", {-1.0F, 0.0F});
+            if (ui_entity_animation_workflow_probe_enabled) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_entity_animate_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+                ui_entity_animate_seen = true;
+            }
+            if (animate_selected_clicked) {
+                if (ui_entity_animation_workflow_probe_enabled)
+                    ui_entity_animate_clicked = true;
                 if (!entity.nodes.empty())
                     animation_ui.node_id =
                         entity.nodes[std::min(canvas.selected_node,
@@ -8540,9 +8591,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         if (session.selected_resource() &&
             session.selected_resource()->kind ==
                 fabric::editor::StudioResourceKind::entity &&
-            session.selected_entity())
+            session.selected_entity()) {
             creation.animation.preview_entity_id =
                 session.selected_entity()->document.id.value;
+            const auto& entity = *session.selected_entity();
+            const auto node = std::ranges::find(
+                entity.nodes, animation_ui.node_id,
+                &fabric::project::EntityNode::id);
+            creation.animation.name = entity.document.name + " · " +
+                (node == entity.nodes.end() ? std::string{"Animation"}
+                                            : node->name + " Animation");
+        }
         ImGui::OpenPopup("Create animation");
         creation.request_animation = false;
     }
@@ -9384,7 +9443,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "markerTime");
         draw_prompt_summary(validation);
         ImGui::BeginDisabled(!validation.ok());
-        if (ImGui::Button("Create animation", {140.0F, 0.0F})) {
+        const bool create_animation_clicked = ImGui::Button(
+            "Create animation", {140.0F, 0.0F});
+        if (ui_entity_animation_workflow_probe_enabled) {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_animation_create_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_animation_create_seen = true;
+        }
+        if (create_animation_clicked) {
             if (session.create_animation(creation.animation)) {
                 clear_asset_preview(preview);
                 status = "Animation created and saved.";
@@ -9633,12 +9702,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      const bool ui_texture_test = false,
                      const bool ui_input_test = false,
                      const bool ui_beam_test = false,
-                     const bool ui_button_test = false) {
+                     const bool ui_button_test = false,
+                     const bool ui_entity_animation_workflow_test = false) {
     const bool graphical_test = behavior_e2e || transformation_e2e || entity_e2e ||
         animation_e2e || texture_e2e || vector_e2e || vector_canvas_e2e ||
         ui_test_mode || ui_min_window_test || ui_focus_test ||
         ui_accessibility_test || ui_drag_test || ui_override_test ||
-        ui_texture_test || ui_input_test || ui_beam_test || ui_button_test;
+        ui_texture_test || ui_input_test || ui_beam_test || ui_button_test ||
+        ui_entity_animation_workflow_test;
     const int graphical_failure = graphical_test ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
@@ -9672,7 +9743,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
               texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
               ui_min_window_test || ui_focus_test || ui_accessibility_test ||
               ui_drag_test || ui_override_test || ui_texture_test ||
-              ui_input_test || ui_beam_test || ui_button_test)
+              ui_input_test || ui_beam_test || ui_button_test ||
+              ui_entity_animation_workflow_test)
                  ? SDL_WINDOW_HIDDEN : 0U));
     if (window == nullptr) {
         std::cerr << "window creation failed: " << SDL_GetError() << '\n';
@@ -9705,7 +9777,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
          texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
          ui_min_window_test || ui_focus_test || ui_accessibility_test ||
          ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
-         ui_beam_test || ui_button_test) ? 0 : 1);
+         ui_beam_test || ui_button_test ||
+         ui_entity_animation_workflow_test) ? 0 : 1);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -9853,6 +9926,18 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_button_reloaded = false;
         creation.guided_button = true;
         creation.request_entity = true;
+    }
+    if (ui_entity_animation_workflow_test && session.has_project()) {
+        ui_entity_animation_workflow_probe_enabled = true;
+        ui_entity_from_visual_seen = false;
+        ui_entity_animate_seen = false;
+        ui_entity_animate_clicked = false;
+        ui_animation_create_seen = false;
+        ui_animation_quick_key_seen = false;
+        ui_animation_probe_enabled = true;
+        static_cast<void>(session.select_resource(
+            fabric::editor::StudioResourceKind::visual_component,
+            {.value = "beam"}));
     }
     if (ui_focus_test && session.has_project()) {
         creation.material.name.clear();
@@ -10333,6 +10418,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     bool entity_e2e_capture_written = false;
     bool animation_e2e_capture_written = false;
     std::size_t animation_ui_e2e_frame = 0U;
+    std::size_t entity_animation_workflow_frame = 0U;
+    std::string workflow_entity_id;
+    std::string workflow_animation_id;
+    bool entity_animation_workflow_complete = false;
     const auto dirty = [&] {
         return session.dirty() || behavior_session.dirty() ||
             transformation_session.dirty();
@@ -10343,6 +10432,63 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             (!transformation_session.dirty() || transformation_session.save());
     };
     while (running) {
+        const auto push_workflow_mouse = [&](const ImVec2 position,
+                                             const std::optional<Uint32> type) {
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(position.x));
+            motion.motion.y = static_cast<int>(std::lround(position.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            if (type) {
+                SDL_Event button{};
+                button.type = *type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        };
+        if (ui_entity_animation_workflow_test) {
+            if (entity_animation_workflow_frame >= 1U &&
+                entity_animation_workflow_frame <= 3U &&
+                ui_entity_from_visual_seen) {
+                const auto type = entity_animation_workflow_frame == 2U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 3U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_entity_from_visual_screen, type);
+            } else if (entity_animation_workflow_frame >= 5U &&
+                       entity_animation_workflow_frame <= 7U &&
+                       ui_entity_animate_seen) {
+                const auto type = entity_animation_workflow_frame == 6U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 7U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_entity_animate_screen, type);
+            } else if (entity_animation_workflow_frame >= 9U &&
+                       entity_animation_workflow_frame <= 11U &&
+                       ui_animation_create_seen) {
+                const auto type = entity_animation_workflow_frame == 10U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 11U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_create_screen, type);
+            } else if (entity_animation_workflow_frame >= 13U &&
+                       entity_animation_workflow_frame <= 15U &&
+                       ui_animation_quick_key_seen) {
+                const auto type = entity_animation_workflow_frame == 14U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 15U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_quick_key_screen, type);
+            }
+        }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 21U &&
             !vector_canvas_e2e_freeform_seed_applied &&
             vector_canvas_e2e_complete && session.created_vector()) {
@@ -11195,11 +11341,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                 "asset-studio-vector-canvas-advanced.ppm");
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
-            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)
+            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test ||
+            ui_entity_animation_workflow_test)
             write_ui_test_registry(initial_project, session);
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
-            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)
+            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test ||
+            ui_entity_animation_workflow_test)
             write_frame_capture(initial_project, window,
                                 "asset_studio-ui-test.ppm");
         if (ui_button_test && ui_button_frame == 2U)
@@ -11616,6 +11764,68 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 std::cerr << "Asset Studio Animation workspace E2E failed\n";
             running = false;
         }
+        if (ui_entity_animation_workflow_test) {
+            if (session.selected_resource() &&
+                session.selected_resource()->kind ==
+                    fabric::editor::StudioResourceKind::entity &&
+                workflow_entity_id.empty()) {
+                workflow_entity_id = session.selected_resource()->id.value;
+            }
+            if (session.selected_resource() &&
+                session.selected_resource()->kind ==
+                    fabric::editor::StudioResourceKind::animation &&
+                workflow_animation_id.empty()) {
+                workflow_animation_id = session.selected_resource()->id.value;
+            }
+            ++entity_animation_workflow_frame;
+            if (entity_animation_workflow_frame >= 18U) {
+                const bool saved = session.save();
+                fabric::editor::ProjectSession reloaded;
+                const bool entity_created = saved &&
+                    !workflow_entity_id.empty() &&
+                    reloaded.open(initial_project) &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::entity,
+                        {.value = workflow_entity_id}) &&
+                    reloaded.selected_entity() &&
+                    !reloaded.selected_entity()->nodes.empty() &&
+                    reloaded.selected_entity()->nodes.front().drawable.kind ==
+                        fabric::project::EntityDrawableKind::visual_component &&
+                    reloaded.selected_entity()->nodes.front().drawable.resource &&
+                    reloaded.selected_entity()->nodes.front().drawable.resource
+                            ->id.value == "beam";
+                const bool animation_created = entity_created &&
+                    !workflow_animation_id.empty() &&
+                    reloaded.select_resource(
+                        fabric::editor::StudioResourceKind::animation,
+                        {.value = workflow_animation_id}) &&
+                    reloaded.selected_animation() &&
+                    reloaded.selected_animation()->preview_entity &&
+                    reloaded.selected_animation()->preview_entity->id.value ==
+                        workflow_entity_id;
+                const bool key_persisted = animation_created &&
+                    std::ranges::any_of(
+                        reloaded.selected_animation()->tracks,
+                        [](const auto& track) {
+                            return track.binding.component_id == "transform" &&
+                                track.binding.property_id == "rotationDegrees" &&
+                                !track.keys.empty();
+                        });
+                entity_animation_workflow_complete =
+                    ui_entity_from_visual_seen && ui_entity_animate_seen &&
+                    ui_animation_create_seen && ui_animation_quick_key_seen &&
+                    entity_created && animation_created && key_persisted;
+                write_entity_animation_workflow_probe(
+                    initial_project, entity_created, animation_created,
+                    key_persisted);
+                write_frame_capture(
+                    initial_project, window,
+                    "asset-studio-entity-animation-workflow.ppm");
+                if (!entity_animation_workflow_complete)
+                    std::cerr << "Asset Studio Entity to Animation workflow E2E failed\n";
+                running = false;
+            }
+        }
         if (behavior_e2e || transformation_e2e || entity_e2e ||
             texture_e2e || vector_e2e)
             running = running && entity_gizmo_e2e_active;
@@ -11626,6 +11836,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         (transformation_e2e && !transformation_e2e_complete) ||
         (entity_e2e && !entity_e2e_complete) ||
         (animation_e2e && !animation_e2e_complete) ||
+        (ui_entity_animation_workflow_test &&
+         !entity_animation_workflow_complete) ||
         (texture_e2e && !texture_e2e_complete) ||
         (vector_e2e && !vector_e2e_complete) ||
         (vector_canvas_e2e && !vector_canvas_e2e_complete);
@@ -11698,12 +11910,16 @@ int main(const int argument_count, char** arguments) {
          ui_beam_holography_variant);
     const bool ui_button_test = argument_count == 3 &&
         std::string_view{arguments[1]} == "--ui-button-test";
+    const bool ui_entity_animation_workflow_test = argument_count == 3 &&
+        std::string_view{arguments[1]} ==
+            "--ui-entity-animation-workflow-test";
     if (argument_count > 2 && !behavior_e2e && !transformation_e2e &&
         !entity_e2e && !animation_e2e && !texture_e2e && !vector_e2e &&
         !vector_canvas_e2e && !ui_test_mode && !ui_min_window_test &&
         !ui_focus_test && !ui_accessibility_test && !ui_drag_test &&
         !ui_override_test && !ui_texture_test && !ui_input_test &&
-        !ui_beam_test && !ui_button_test) {
+        !ui_beam_test && !ui_button_test &&
+        !ui_entity_animation_workflow_test) {
         std::cerr << "usage: asset_studio [project-directory]\n"
                      "       asset_studio --e2e-behavior project-directory\n"
                      "       asset_studio --e2e-transformation project-directory\n"
@@ -11724,7 +11940,8 @@ int main(const int argument_count, char** arguments) {
                      "       asset_studio --ui-input-test project-directory\n"
                      "       asset_studio --ui-beam-test project-directory\n"
                      "       asset_studio --ui-beam-holography-test project-directory\n"
-                     "       asset_studio --ui-button-test project-directory\n";
+                     "       asset_studio --ui-button-test project-directory\n"
+                     "       asset_studio --ui-entity-animation-workflow-test project-directory\n";
         return 64;
     }
     const std::filesystem::path initial_project =
@@ -11732,7 +11949,8 @@ int main(const int argument_count, char** arguments) {
         texture_e2e || vector_e2e || vector_canvas_e2e || ui_test_mode ||
         ui_min_window_test || ui_focus_test || ui_accessibility_test ||
         ui_drag_test || ui_override_test || ui_texture_test || ui_input_test ||
-        ui_beam_test || ui_button_test)
+        ui_beam_test || ui_button_test ||
+        ui_entity_animation_workflow_test)
         ? std::filesystem::path{arguments[2]}
         : argument_count == 2 ? std::filesystem::path{arguments[1]}
                             : std::filesystem::path{};
@@ -11742,5 +11960,6 @@ int main(const int argument_count, char** arguments) {
                             vector_canvas_e2e, ui_test_mode, ui_min_window_test,
                             ui_focus_test, ui_accessibility_test, ui_drag_test,
                             ui_override_test, ui_texture_test, ui_input_test,
-                            ui_beam_test, ui_button_test);
+                            ui_beam_test, ui_button_test,
+                            ui_entity_animation_workflow_test);
 }

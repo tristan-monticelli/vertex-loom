@@ -86,6 +86,10 @@ La preuve E2E Animation doit choisir le nœud par son libellé visible puis acti
 une commande de clé rapide dans l'interface,
 sauvegarder, recharger et vérifier la piste typée correspondante avant de
 capturer le workspace avec un contexte OpenGL réel.
+La preuve transversale Entity→Animation part d'un visuel existant, clique les
+actions contextuelles réelles et ne prépare aucun document Entity ou Animation
+par `ProjectSession`. Le nom du clip est dérivé de la sélection visible et reste
+modifiable dans la modale courte avant validation.
 
 `Animation Graph` est un panneau dédié ouvert depuis l'Entity. Il édite des
 états toujours associés à un clip existant, leurs transitions, conditions,

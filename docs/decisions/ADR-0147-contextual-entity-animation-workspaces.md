@@ -58,6 +58,10 @@ ne contiennent plus l'arbre, les blocs ou les pistes.
   de document.
 - Sauvegarde, reload, undo/redo et Preview Runtime conservent les mêmes bindings
   typés ; aucun schéma persistant n'est modifié par cette réorganisation.
+- Un scénario de workflow part d'un visuel déjà indexé et n'utilise que les
+  coordonnées de widgets et des événements SDL pour créer l'Entity, ouvrir la
+  création d'animation et poser la première clé. Les appels directs de session
+  vérifient le résultat après reload, mais ne préparent pas les documents.
 
 ## Conséquences
 
@@ -73,3 +77,8 @@ commande undoable. L'arbre utilise les identifiants persistés pour afficher la
 parenté, mais toutes ses mutations passent par les indices résolus de la session
 et sont refusées si elles créent un cycle. La création depuis plusieurs visuels
 réutilise les `EntityCreationBlock` existants et ne copie pas les ressources.
+
+L'action contextuelle d'animation préremplit un nom lisible à partir de l'Entity
+et du nœud sélectionnés ; la résolution de destination produit un identifiant
+persistant unique. L'utilisateur peut accepter ce défaut et créer le clip sans
+comprendre ni saisir cet identifiant.

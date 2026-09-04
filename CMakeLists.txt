@@ -803,6 +803,17 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(
+            NAME asset_studio_entity_animation_workflow_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-entity-animation-workflow-e2e
+                -DUI_ARGUMENT=--ui-entity-animation-workflow-test
+                -DWORKFLOW_ARTIFACT=asset-studio-entity-animation-workflow.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-beam;resource-row-beam-entity-2;entity-node-root"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
             NAME asset_studio_behavior_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
@@ -913,6 +924,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             asset_studio_ui_overrides_e2e
             asset_studio_ui_texture_e2e
             asset_studio_ui_input_e2e
+            asset_studio_entity_animation_workflow_e2e
             asset_studio_behavior_e2e
             asset_studio_transformation_e2e
             asset_studio_entity_e2e
