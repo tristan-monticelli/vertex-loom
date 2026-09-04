@@ -32,6 +32,7 @@
 #include "textured_path_pen_panel.hpp"
 #include "raster_view_inspector.hpp"
 #include "raster_crop_canvas.hpp"
+#include "surface_color_mode.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -103,6 +104,7 @@ using fabric::asset_studio::RasterViewInspectorState;
 using fabric::asset_studio::draw_raster_view_inspector;
 using fabric::asset_studio::RasterCropCanvasProbe;
 using fabric::asset_studio::draw_raster_crop_canvas_panel;
+using fabric::asset_studio::draw_surface_color_mode;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -280,7 +282,8 @@ bool draw_surface_effect_stack(
             shine != shader.effects.end())
             shader.shine = shine->amount;
     };
-    if (guided_surface) {
+    changed |= draw_surface_color_mode(shader, identifier);
+    if (false && guided_surface && !shader.effects.empty()) {
         ImGui::SeparatorText("Quick look");
         ImGui::TextDisabled(
             "Preserve the source or recolor it with your selected color.");

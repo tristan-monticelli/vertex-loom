@@ -157,6 +157,11 @@ La frontière suivante extrait le canvas GPU de crop avec un adaptateur de probe
 explicite. Le zoom, pan et drag restent dans `CanvasUiState`; le module ne
 connaît ni l'importateur ni le filesystem.
 
+La frontière suivante extrait le mode couleur rapide partagé des surfaces. Le
+choix `Source intacte`/`Recoloration`, le reset neutre et la synchronisation des
+champs legacy sont communs à Beam, Button et Artwork ; la pile avancée reste
+dans le shell jusqu'à une extraction de son ordre et de ses callbacks.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

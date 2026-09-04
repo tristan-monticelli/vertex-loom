@@ -142,6 +142,10 @@ transform non destructifs, puis valide exclusivement via `ProjectSession`.
 Le canvas de crop et la texture GPU restent dans le shell jusqu'à extraction
 séparée de leurs dépendances d'affichage.
 
+Le mode couleur partagé devient la frontière suivante : il expose le choix
+`Source intacte`/`Recoloration`, le reset neutre et la synchronisation des
+champs legacy pour Beam, Button et Artwork sans posséder la pile avancée.
+
 `RasterCropCanvas` constitue cette extraction d'affichage : il reçoit la
 texture GPU et `CanvasUiState`, garde les gestes zoom/pan et poignées dans cet
 état, et expose un adaptateur de probe optionnel pour les E2E. Les seules

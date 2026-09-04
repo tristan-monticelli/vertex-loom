@@ -306,6 +306,7 @@ if(FABRIC_BUILD_EDITORS)
         editors/asset_studio/textured_path_pen_panel.cpp
         editors/asset_studio/raster_view_inspector.cpp
         editors/asset_studio/raster_crop_canvas.cpp
+        editors/asset_studio/surface_color_mode.cpp
         editors/asset_studio/vector_canvas.cpp
         editors/asset_studio/preview_canvas.cpp
         editors/asset_studio/import_workflow.cpp
