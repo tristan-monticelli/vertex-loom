@@ -20,14 +20,14 @@ struct SceneWorkspaceState {
     std::string edited_name;
     std::string map_id;
     std::string mount_id;
-    int selected_map{-1};
+    std::string selected_map_mount_id;
     std::string transition_id;
     std::string target_scene_id;
     std::string entry_point;
     std::string event_id;
-    int selected_transition{-1};
-    int remove_map_request{-1};
-    int remove_transition_request{-1};
+    std::string selected_transition_id;
+    std::string remove_map_request_id;
+    std::string remove_transition_request_id;
 };
 
 using SceneFolderPicker = std::function<std::optional<std::filesystem::path>(

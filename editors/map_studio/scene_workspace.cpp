@@ -101,7 +101,8 @@ void draw_scene_workspace(
         status = opened ? "Scene opened" : "Scene open rejected";
         if (opened) {
             state.edited_name = session.scene()->document.name;
-            state.selected_transition = -1;
+            state.selected_map_mount_id.clear();
+            state.selected_transition_id.clear();
         }
     }
     ImGui::EndDisabled();
@@ -182,21 +183,29 @@ void draw_scene_workspace(
                          &resource_catalog);
     ImGui::SetNextItemWidth(170.0F);
     ImGui::InputText("Mount id", &state.mount_id);
+    const auto selected_map = std::ranges::find(
+        session.scene()->maps, state.selected_map_mount_id,
+        &project::SceneMapReference::layer_id);
+    if (!state.selected_map_mount_id.empty() &&
+        selected_map == session.scene()->maps.end())
+        state.selected_map_mount_id.clear();
+    const bool editing_map = selected_map != session.scene()->maps.end();
     ImGui::SameLine();
     ImGui::BeginDisabled(state.map_id.empty() || state.mount_id.empty());
-    if (ImGui::Button(state.selected_map < 0 ? "Add mounted map"
-                                             : "Apply mounted map")) {
+    if (ImGui::Button(editing_map ? "Apply mounted map"
+                                  : "Add mounted map")) {
         const project::SceneMapReference edited{
             {{.value = state.map_id}, "map"}, state.mount_id};
-        const auto applied = state.selected_map < 0
+        const auto applied = !editing_map
             ? session.add_map(edited)
-            : session.set_map(static_cast<std::size_t>(state.selected_map),
+            : session.set_map(static_cast<std::size_t>(std::distance(
+                                  session.scene()->maps.begin(), selected_map)),
                               edited);
         status = applied ? "Scene map updated" : "Map mount rejected";
         if (applied) {
             state.map_id.clear();
             state.mount_id.clear();
-            state.selected_map = -1;
+            state.selected_map_mount_id.clear();
         }
     }
     ImGui::EndDisabled();
@@ -214,37 +223,38 @@ void draw_scene_workspace(
         ImGui::Text("%s → %s", map.map.id.value.c_str(), map.layer_id.c_str());
         ImGui::SameLine();
         if (ImGui::SmallButton("Edit map mount")) {
-            state.selected_map = static_cast<int>(index);
+            state.selected_map_mount_id = map.layer_id;
             state.map_id = map.map.id.value;
             state.mount_id = map.layer_id;
         }
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove map")) {
-            state.remove_map_request = static_cast<int>(index);
+            state.remove_map_request_id = map.layer_id;
             ImGui::OpenPopup("Remove mounted map?");
         }
         ImGui::PopID();
     }
     if (ImGui::BeginPopupModal("Remove mounted map?", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        const auto valid = state.remove_map_request >= 0 &&
-            static_cast<std::size_t>(state.remove_map_request) <
-                session.scene()->maps.size();
+        const auto pending = std::ranges::find(
+            session.scene()->maps, state.remove_map_request_id,
+            &project::SceneMapReference::layer_id);
+        const auto valid = pending != session.scene()->maps.end();
         if (valid) {
-            const auto& pending = session.scene()->maps[
-                static_cast<std::size_t>(state.remove_map_request)];
             ImGui::Text("Remove map '%s' from this scene?",
-                        pending.map.id.value.c_str());
+                        pending->map.id.value.c_str());
             ImGui::TextDisabled("The mount and its layer mapping will be "
                                 "removed; the map resource stays intact.");
         }
         ImGui::BeginDisabled(!valid);
         if (ImGui::Button("Remove mount")) {
             status = session.remove_map(
-                static_cast<std::size_t>(state.remove_map_request))
+                static_cast<std::size_t>(std::distance(
+                    session.scene()->maps.begin(), pending)))
                 ? "Map removed from scene" : "Map removal rejected";
-            state.selected_map = -1;
-            state.remove_map_request = -1;
+            if (state.selected_map_mount_id == state.remove_map_request_id)
+                state.selected_map_mount_id.clear();
+            state.remove_map_request_id.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
@@ -252,7 +262,7 @@ void draw_scene_workspace(
                              "Select a mounted map before removing its mount.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            state.remove_map_request = -1;
+            state.remove_map_request_id.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -309,15 +319,24 @@ void draw_scene_workspace(
     };
     const bool transition_incomplete = state.transition_id.empty() ||
         state.target_scene_id.empty() || state.entry_point.empty();
+    const auto selected_transition = std::ranges::find(
+        session.scene()->transitions, state.selected_transition_id,
+        &project::SceneTransition::id);
+    if (!state.selected_transition_id.empty() &&
+        selected_transition == session.scene()->transitions.end())
+        state.selected_transition_id.clear();
+    const bool editing_transition =
+        selected_transition != session.scene()->transitions.end();
     ImGui::BeginDisabled(transition_incomplete);
-    if (state.selected_transition < 0) {
+    if (!editing_transition) {
         if (ImGui::Button("Add transition")) {
             const auto added = session.add_transition(transition_from_state());
             status = added ? "Transition added" : "Transition rejected";
         }
     } else if (ImGui::Button("Apply transition")) {
         const auto applied = session.set_transition(
-            static_cast<std::size_t>(state.selected_transition),
+            static_cast<std::size_t>(std::distance(
+                session.scene()->transitions.begin(), selected_transition)),
             transition_from_state());
         status = applied ? "Transition changed" : "Transition rejected";
     }
@@ -327,7 +346,7 @@ void draw_scene_workspace(
         "Enter a transition id, target scene and entry point.");
     ImGui::SameLine();
     if (ImGui::SmallButton("New transition")) {
-        state.selected_transition = -1;
+        state.selected_transition_id.clear();
         state.transition_id.clear();
         state.target_scene_id.clear();
         state.entry_point.clear();
@@ -340,9 +359,8 @@ void draw_scene_workspace(
         const auto label = transition.id + " → " +
             transition.target_scene.id.value + ":" + transition.entry_point;
         if (ImGui::Selectable(label.c_str(),
-                              state.selected_transition ==
-                                  static_cast<int>(index))) {
-            state.selected_transition = static_cast<int>(index);
+                              state.selected_transition_id == transition.id)) {
+            state.selected_transition_id = transition.id;
             state.transition_id = transition.id;
             state.target_scene_id = transition.target_scene.id.value;
             state.entry_point = transition.entry_point;
@@ -351,30 +369,32 @@ void draw_scene_workspace(
         }
         ImGui::SameLine();
         if (ImGui::SmallButton("Remove transition")) {
-            state.remove_transition_request = static_cast<int>(index);
+            state.remove_transition_request_id = transition.id;
             ImGui::OpenPopup("Remove transition?");
         }
         ImGui::PopID();
     }
     if (ImGui::BeginPopupModal("Remove transition?", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        const auto valid = state.remove_transition_request >= 0 &&
-            static_cast<std::size_t>(state.remove_transition_request) <
-                session.scene()->transitions.size();
+        const auto pending = std::ranges::find(
+            session.scene()->transitions, state.remove_transition_request_id,
+            &project::SceneTransition::id);
+        const auto valid = pending != session.scene()->transitions.end();
         if (valid) {
-            const auto& pending = session.scene()->transitions[
-                static_cast<std::size_t>(state.remove_transition_request)];
-            ImGui::Text("Remove transition '%s'?", pending.id.c_str());
+            ImGui::Text("Remove transition '%s'?", pending->id.c_str());
             ImGui::TextDisabled("The scene link will be removed; the target "
                                 "scene and event remain intact.");
         }
         ImGui::BeginDisabled(!valid);
         if (ImGui::Button("Remove transition")) {
             status = session.remove_transition(
-                static_cast<std::size_t>(state.remove_transition_request))
+                static_cast<std::size_t>(std::distance(
+                    session.scene()->transitions.begin(), pending)))
                 ? "Transition removed" : "Transition removal rejected";
-            state.selected_transition = -1;
-            state.remove_transition_request = -1;
+            if (state.selected_transition_id ==
+                state.remove_transition_request_id)
+                state.selected_transition_id.clear();
+            state.remove_transition_request_id.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndDisabled();
@@ -382,7 +402,7 @@ void draw_scene_workspace(
                              "Select a transition before removing it.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            state.remove_transition_request = -1;
+            state.remove_transition_request_id.clear();
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();

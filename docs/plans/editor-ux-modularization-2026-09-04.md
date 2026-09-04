@@ -170,6 +170,12 @@ emplacement.
 Le test de fondation couvre déduplication, ordre et retour historique ; l'E2E
 Entity réordonne réellement les nœuds avant le rendu et exige leur résolution
 aux nouveaux indices avant de poursuivre les gestes canvas et le reload.
+Map Studio publie et restaure désormais tout le groupe d'instances par ces
+mêmes identifiants au lieu de réduire silencieusement la sélection au premier
+élément lors d'un retour historique. Le workspace Scene suit aussi le montage
+sélectionné par `layer_id` et la transition par son `id`, y compris dans les
+confirmations de suppression. Les collisions restent indexées par le schéma
+Map v1 et demandent une décision de format distincte.
 La création de déformation vide est remplacée par un quad quatre points valide,
 pondéré sur le nœud racine, compatible avec le preset tissu XPBD et créé par
 une commande undoable de la session ;

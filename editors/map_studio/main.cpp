@@ -1370,15 +1370,17 @@ int run(const std::filesystem::path& project_root,
                         preview_time = document.view.playhead;
                         placement_mode = document.view.active_tool == "place";
                         selected_instances.clear();
-                        if (document.selection_id && session.map() &&
-                            std::ranges::any_of(
-                                session.map()->instances,
-                                [&](const auto& instance) {
-                                    return instance.id ==
-                                        document.selection_id->value;
-                                })) {
-                            selected_instances.push_back(
-                                document.selection_id->value);
+                        if (session.map()) {
+                            std::vector<fabric::core::ResourceId> instance_ids;
+                            instance_ids.reserve(session.map()->instances.size());
+                            for (const auto& instance : session.map()->instances)
+                                instance_ids.push_back({.value = instance.id});
+                            const auto resolved =
+                                editor_context.resolve_selection(instance_ids);
+                            selected_instances.reserve(resolved.indices.size());
+                            for (const auto index : resolved.indices)
+                                selected_instances.push_back(
+                                    session.map()->instances[index].id);
                         }
                         active_workspace = ActiveWorkspace::map;
                         return true;
@@ -2753,15 +2755,18 @@ int run(const std::filesystem::path& project_root,
                 .active_tool = placement_mode ? "place" : "select",
                 .active_panel = "inspector",
             }));
-            std::optional<fabric::core::ResourceId> stable_selection;
-            if (!selected_instances.empty() &&
-                fabric::core::ResourceId::is_valid(
-                    selected_instances.front())) {
-                stable_selection = fabric::core::ResourceId{
-                    .value = selected_instances.front()};
+            std::vector<fabric::core::ResourceId> stable_selections;
+            stable_selections.reserve(selected_instances.size());
+            for (const auto& id : selected_instances) {
+                if (fabric::core::ResourceId::is_valid(id))
+                    stable_selections.push_back({.value = id});
             }
-            static_cast<void>(
-                editor_context.set_selection(std::move(stable_selection)));
+            const auto stable_selection = stable_selections.empty()
+                ? std::optional<fabric::core::ResourceId>{}
+                : std::optional<fabric::core::ResourceId>{
+                      stable_selections.front()};
+            static_cast<void>(editor_context.set_selection_set(
+                stable_selection, std::move(stable_selections)));
         }
 
         if (const auto ready = transition_guard.take_ready();

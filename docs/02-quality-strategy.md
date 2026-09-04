@@ -262,6 +262,14 @@ explicitement l'outil avec `Échap`, sauvegarde, recharge, valide le
 projet et capture
 `map-studio-continuous-placement-e2e.ppm`. Aucune instance n'est injectée par
 API avant ces gestes.
+Les sélections multiples d'instances sont enregistrées dans `EditorContext`
+par IDs et restaurées après navigation en filtrant les instances encore
+présentes. Le test de fondation du contexte vérifie l'ordre, le primaire et la
+résolution après réorganisation ; les E2E Map continuent d'exercer le même
+contexte avec leurs gestes, historique et reload.
+Le scénario Scene continue après ajout et suppression de montages et de
+transitions ; son état UI les résout par `layer_id` et `transition.id` avant
+chaque commande, afin qu'un changement d'ordre ne cible jamais l'ancien index.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique
 `Create Entity from visual`, dépose `button-primary` comme enfant, déplace cet
