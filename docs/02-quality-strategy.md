@@ -191,7 +191,11 @@ fixture réel `studio-beam` et montre trois blocs indépendants (texture, vecteu
 et Beam), tandis que l’Animation utilise le même Beam avec deux clés de
 position ; les fichiers
 `asset-studio-entity-e2e.ppm` et `asset-studio-animation-e2e.ppm` sont inspectés
-pour vérifier le résultat visuel, pas seulement le JSON sauvegardé.
+pour vérifier le résultat visuel, pas seulement le JSON sauvegardé. Le scénario
+Entity exige en plus que l'action nominale d'animation et le transform soient
+réellement rendus ; le scénario Animation exige le picker nominal de nœud et
+une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
+puisse pas satisfaire la recette UX.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires

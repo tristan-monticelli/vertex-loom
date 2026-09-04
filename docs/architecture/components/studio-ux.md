@@ -114,7 +114,10 @@ champ et la cause, puis propose `Retry`, `Discard` ou `Cancel`.
 # Asset Studio guided creation workspace
 
 Asset Studio presents user-facing visual creations first: Beam, Button,
-Artwork and composed Entity. Button always references an imported project PNG;
+Artwork and Entity. An Entity is either composed immediately from the current
+visual selection or created empty with only a name, then filled by drag/drop in
+its workspace; the creation modal no longer embeds a block editor. Button
+always references an imported project PNG;
 there is no generated Eye or generated Button preset. Internal resource types remain available through
 an explicit advanced workspace so existing project contracts stay readable and
 editable without making engine concepts part of the normal creation path.
@@ -132,7 +135,7 @@ flowchart LR
     Hub[Guided creation hub] --> Beam[Beam]
     Hub --> Button[Button]
     Hub --> Artwork[Artwork]
-    Hub --> Entity[Composed Entity]
+    Hub --> Entity[Entity from selection or empty]
     Hub --> Advanced[Advanced]
     Advanced --> Technical[Technical resources]
     Beam --> BeamContract[Beam request<br/>preserve_source par défaut<br/>ou recolor_from_detail]
@@ -148,6 +151,6 @@ flowchart LR
     ButtonE2E --> Shared
     Shared --> Studio[Asset Studio preview]
     Shared --> Runtime[Preview and published runtime]
-    Entity --> Blocks[Explicit visual blocks]
+    Entity --> Blocks[Visual blocks edited in workspace]
     Blocks --> EntityPreview[Composed Entity preview]
 ```

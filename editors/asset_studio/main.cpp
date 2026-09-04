@@ -100,9 +100,12 @@ ImVec2 ui_button_create_screen{};
 bool ui_animation_probe_enabled = false;
 bool ui_animation_timeline_seen = false;
 bool ui_animation_quick_key_seen = false;
+bool ui_animation_node_picker_seen = false;
 ImVec2 ui_animation_quick_key_screen{};
 bool ui_animation_graph_probe_enabled = false;
 bool ui_animation_graph_seen = false;
+bool ui_entity_animate_action_seen = false;
+bool ui_entity_transform_seen = false;
 int ui_drag_target_mode = 0;
 ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
@@ -462,7 +465,6 @@ struct CreationUiState {
     bool request_behavior{};
     bool request_transformation{};
     bool guided_button{};
-    bool guided_composed_entity{};
     bool guided_contextual_entity{};
     bool project_publish_attempted{};
     bool input_capture{};
@@ -2760,7 +2762,8 @@ bool draw_project_resource_picker(
     const char* label,
     const std::span<const fabric::editor::StudioResource> resources,
     const fabric::editor::StudioResourceKind expected_kind,
-    std::string& selected_id, const bool optional) {
+    std::string& selected_id, const bool optional,
+    const bool show_details = true) {
     const auto selected = std::ranges::find_if(
         resources, [&](const auto& resource) {
             return resource.kind == expected_kind &&
@@ -2771,7 +2774,8 @@ bool draw_project_resource_picker(
         : selected_id.empty() ? std::string{"Choose a project resource..."}
                               : std::string{"Missing: "} + selected_id;
     bool changed = false;
-    ImGui::SetNextItemWidth(420.0F);
+    ImGui::SetNextItemWidth(
+        std::max(120.0F, ImGui::GetContentRegionAvail().x * 0.62F));
     if (ImGui::BeginCombo(label, preview.c_str())) {
         static std::unordered_map<ImGuiID, std::string> filters;
         auto& filter = filters[ImGui::GetID(label)];
@@ -2805,7 +2809,7 @@ bool draw_project_resource_picker(
         if (!found) ImGui::TextDisabled("No matching project resource.");
         ImGui::EndCombo();
     }
-    if (selected != resources.end()) {
+    if (show_details && selected != resources.end()) {
         if (selected->kind == fabric::editor::StudioResourceKind::texture &&
             active_picker_session != nullptr && active_picker_texture_cache != nullptr) {
             auto& cache = *active_picker_texture_cache;
@@ -3795,6 +3799,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const float status_height = 34.0F;
     static float left_width = 280.0F;
     static float right_width = 340.0F;
+    static bool entity_advanced_mode = false;
     const float initial_left_width = std::clamp(viewport->Size.x * 0.22F, 240.0F, 330.0F);
     const float initial_right_width = std::clamp(viewport->Size.x * 0.26F, 330.0F, 380.0F);
     static bool panel_widths_initialized = false;
@@ -3861,9 +3866,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (ImGui::MenuItem("Artwork...")) {
                 creation.request_artwork = true;
             }
-            if (ImGui::MenuItem("Composed Entity...")) {
+            if (ImGui::MenuItem("Empty Entity...")) {
                 creation.guided_button = false;
-                creation.guided_composed_entity = true;
                 creation.request_entity = true;
             }
             ImGui::SeparatorText("Advanced");
@@ -4202,15 +4206,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
                              viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({right_width, content_height});
-    ImGui::Begin("Inspector", nullptr,
-                 fixed_panel_flags | ImGuiWindowFlags_HorizontalScrollbar);
+    const auto* inspector_resource = session.selected_resource();
+    const bool responsive_inspector = inspector_resource != nullptr &&
+        (inspector_resource->kind ==
+             fabric::editor::StudioResourceKind::animation ||
+         (inspector_resource->kind ==
+              fabric::editor::StudioResourceKind::entity &&
+          !entity_advanced_mode));
+    ImGui::Begin("Inspector", nullptr, fixed_panel_flags |
+        (responsive_inspector ? ImGuiWindowFlags_None
+                              : ImGuiWindowFlags_HorizontalScrollbar));
     if (session.has_project()) {
         const auto* selected = session.selected_resource();
         if (selected != nullptr) {
             ImGui::TextUnformatted(selected->name.c_str());
-            ImGui::TextDisabled("%s", selected->id.value.c_str());
-            ImGui::TextDisabled("%s",
-                                selected->document_path.generic_string().c_str());
+            if (!responsive_inspector ||
+                ImGui::CollapsingHeader("Document details")) {
+                ImGui::TextDisabled("%s", selected->id.value.c_str());
+                ImGui::TextWrapped("%s",
+                    selected->document_path.generic_string().c_str());
+            }
         } else {
             ImGui::TextDisabled("Select a resource to inspect it.");
         }
@@ -6021,7 +6036,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     else
                         status = "Advanced entity section saved.";
                 };
-            if (ImGui::CollapsingHeader("Advanced Entity systems")) {
+            if (entity_advanced_mode &&
+                ImGui::CollapsingHeader(
+                    "Advanced systems: constraints, IK and deformation")) {
             if (ImGui::CollapsingHeader("Constraints", ImGuiTreeNodeFlags_DefaultOpen)) {
                 for (std::size_t index = 0; index < entity.constraints.size(); ++index) {
                     auto constraint = entity.constraints[index];
@@ -6286,8 +6303,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     return added_ok;
                 };
-            ImGui::SeparatorText("Entity behavior");
-            if (entity.xpbd) {
+            ImGui::SeparatorText("Entity");
+            ImGui::TextWrapped(
+                "Select a node, adjust it in Transform, then animate it when the pose is ready.");
+            ImGui::Checkbox("Show advanced controls", &entity_advanced_mode);
+            if (entity_advanced_mode && entity.xpbd) {
                 const auto diagnostics =
                     fabric::project::measure_xpbd_system(*entity.xpbd);
                 ImGui::Text("XPBD · %zu particles · %zu constraints",
@@ -6298,35 +6318,39 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                     diagnostics.rms_constraint_error,
                                     diagnostics.compliant_energy);
             }
-            if (ImGui::Button("Open Animation Graph")) {
-                animation_graph_ui.open = true;
-                if (entity.animation_state_machine)
-                    animation_graph_ui.current_state =
-                        entity.animation_state_machine->initial_state;
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Add animation clip...")) {
+            if (ImGui::Button("Animate selected node...", {-1.0F, 0.0F})) {
                 if (!entity.nodes.empty())
                     animation_ui.node_id =
                         entity.nodes[std::min(canvas.selected_node,
                                               entity.nodes.size() - 1U)].id;
                 creation.request_animation = true;
-                status = "Create a clip targeted at this entity.";
+                status = "Create an animation for the selected node.";
             }
-            std::string behavior_id = entity.behavior
-                ? entity.behavior->id.value : std::string{};
-            if (draw_project_resource_picker(
-                    "Behavior", session.resources(),
-                    fabric::editor::StudioResourceKind::behavior,
-                    behavior_id, true)) {
-                const auto reference = behavior_id.empty()
-                    ? std::optional<fabric::project::ResourceReference>{}
-                    : std::optional<fabric::project::ResourceReference>{
-                        fabric::project::ResourceReference{
-                            {.value = behavior_id}, "behavior"}};
-                status = session.set_selected_entity_behavior(reference)
-                    ? "Entity behavior changed."
-                    : "Behavior attachment rejected; inspect diagnostics.";
+            if (ui_animation_graph_probe_enabled)
+                ui_entity_animate_action_seen = true;
+            if (entity_advanced_mode &&
+                ImGui::CollapsingHeader("Logic and animation graph")) {
+                if (ImGui::Button("Open Animation Graph")) {
+                    animation_graph_ui.open = true;
+                    if (entity.animation_state_machine)
+                        animation_graph_ui.current_state =
+                            entity.animation_state_machine->initial_state;
+                }
+                std::string behavior_id = entity.behavior
+                    ? entity.behavior->id.value : std::string{};
+                if (draw_project_resource_picker(
+                        "Behavior", session.resources(),
+                        fabric::editor::StudioResourceKind::behavior,
+                        behavior_id, true)) {
+                    const auto reference = behavior_id.empty()
+                        ? std::optional<fabric::project::ResourceReference>{}
+                        : std::optional<fabric::project::ResourceReference>{
+                            fabric::project::ResourceReference{
+                                {.value = behavior_id}, "behavior"}};
+                    status = session.set_selected_entity_behavior(reference)
+                        ? "Entity behavior changed."
+                        : "Behavior attachment rejected; inspect diagnostics.";
+                }
             }
             ImGui::SeparatorText("Entity hierarchy");
             if (!entity.nodes.empty()) {
@@ -6394,8 +6418,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     status = "Entity node rejected; inspect diagnostics.";
                 }
             }
-            ImGui::SameLine();
-            ImGui::Button("Drop artwork as child");
+            ImGui::Button("Drop artwork as child", {-1.0F, 0.0F});
             if (ui_drag_probe_enabled && ui_drag_target_mode == 2) {
                 const auto minimum = ImGui::GetItemRectMin();
                 const auto maximum = ImGui::GetItemRectMax();
@@ -6419,37 +6442,41 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::EndDragDropTarget();
             }
-            ImGui::SameLine();
             ImGui::TextDisabled("Textures, vectors or visual components");
-            ImGui::SameLine();
-            if (ImGui::Button("Duplicate")) {
-                if (session.duplicate_selected_entity_node(canvas.selected_node)) {
-                    canvas.selected_node = entity.nodes.size() - 1U;
-                    canvas.selected_entity_nodes = {canvas.selected_node};
-                    status = "Entity node duplicated.";
-                } else {
-                    status = "Entity node rejected; inspect diagnostics.";
+            bool request_delete_entity_node = false;
+            if (ImGui::Button("Node actions...")) ImGui::OpenPopup("Node actions");
+            if (ImGui::BeginPopup("Node actions")) {
+                if (ImGui::MenuItem("Duplicate")) {
+                    if (session.duplicate_selected_entity_node(canvas.selected_node)) {
+                        canvas.selected_node = entity.nodes.size() - 1U;
+                        canvas.selected_entity_nodes = {canvas.selected_node};
+                        status = "Entity node duplicated.";
+                    } else {
+                        status = "Entity node rejected; inspect diagnostics.";
+                    }
                 }
+                if (ImGui::MenuItem("Move up", nullptr, false,
+                                    canvas.selected_node > 0U) &&
+                    session.move_selected_entity_node(
+                        canvas.selected_node, canvas.selected_node - 1U)) {
+                    --canvas.selected_node;
+                    canvas.selected_entity_nodes = {canvas.selected_node};
+                    status = "Entity node moved.";
+                }
+                if (ImGui::MenuItem("Move down", nullptr, false,
+                                    canvas.selected_node + 1U < entity.nodes.size()) &&
+                    session.move_selected_entity_node(
+                        canvas.selected_node, canvas.selected_node + 1U)) {
+                    ++canvas.selected_node;
+                    canvas.selected_entity_nodes = {canvas.selected_node};
+                    status = "Entity node moved.";
+                }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Delete..."))
+                    request_delete_entity_node = true;
+                ImGui::EndPopup();
             }
-            ImGui::SameLine();
-            if (ImGui::Button("Move up") && canvas.selected_node > 0U &&
-                session.move_selected_entity_node(
-                    canvas.selected_node, canvas.selected_node - 1U)) {
-                --canvas.selected_node;
-                canvas.selected_entity_nodes = {canvas.selected_node};
-                status = "Entity node moved.";
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Move down") &&
-                canvas.selected_node + 1U < entity.nodes.size() &&
-                session.move_selected_entity_node(
-                    canvas.selected_node, canvas.selected_node + 1U)) {
-                ++canvas.selected_node;
-                canvas.selected_entity_nodes = {canvas.selected_node};
-                status = "Entity node moved.";
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Delete..."))
+            if (request_delete_entity_node)
                 ImGui::OpenPopup("Delete entity node?");
             if (ImGui::BeginPopupModal("Delete entity node?", nullptr,
                                        ImGuiWindowFlags_AlwaysAutoResize)) {
@@ -6476,7 +6503,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
                 ImGui::EndPopup();
             }
-            ImGui::TextDisabled("Cmd/Ctrl-click selects several nodes; drag a node onto another to reparent it.");
+            ImGui::TextWrapped(
+                "Cmd/Ctrl-click selects several nodes; drag a node onto another to reparent it.");
             const std::function<void(const std::optional<std::string>&)>
                 draw_entity_children = [&](const auto& parent_id) {
                 for (std::size_t node_index = 0;
@@ -6573,9 +6601,14 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                     ImGui::EndDragDropTarget();
                     }
-                    ImGui::SameLine();
-                    ImGui::TextDisabled("%s%s", candidate.id.c_str(),
-                                        candidate.locked ? " · locked" : "");
+                    if (entity_advanced_mode) {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("%s%s", candidate.id.c_str(),
+                                            candidate.locked ? " · locked" : "");
+                    } else if (candidate.locked) {
+                        ImGui::SameLine();
+                        ImGui::TextDisabled("locked");
+                    }
                     if (open) {
                         draw_entity_children(candidate.id);
                         ImGui::TreePop();
@@ -6597,8 +6630,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         status = "Entity change rejected; inspect diagnostics.";
                     }
                 };
-            ImGui::SeparatorText("Entity node properties");
-            if (node.drawable.material) {
+            ImGui::SeparatorText(node.name.c_str());
+            if (node.drawable.material &&
+                ImGui::CollapsingHeader("Appearance effects")) {
                 const auto loaded = fabric::project::load_material(
                     session.project_root(), *session.manifest(),
                     fabric::project::material_document_path(
@@ -6637,6 +6671,30 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 node.name = std::move(node_name);
                 commit_entity_node(node);
             }
+            ImGui::SeparatorText("Transform");
+            float position[]{node.transform.position.x, node.transform.position.y};
+            if (ImGui::InputFloat2("Position", position)) {
+                node.transform.position = {position[0], position[1]};
+                commit_entity_node(node);
+            }
+            if (ui_animation_graph_probe_enabled)
+                ui_entity_transform_seen = true;
+            draw_technical_tooltip("Entity node translation in project world units.");
+            float rotation = node.transform.rotation_degrees;
+            if (ImGui::InputFloat("Rotation", &rotation, 1.0F, 10.0F,
+                                  "%.2f deg")) {
+                node.transform.rotation_degrees = rotation;
+                commit_entity_node(node);
+            }
+            draw_technical_tooltip("Entity node rotation around its pivot, in degrees.");
+            float scale[]{node.transform.scale.x, node.transform.scale.y};
+            if (ImGui::InputFloat2("Scale", scale)) {
+                node.transform.scale = {scale[0], scale[1]};
+                commit_entity_node(node);
+            }
+            draw_technical_tooltip("Entity node scale multiplier.");
+            if (entity_advanced_mode) {
+            ImGui::SeparatorText("Advanced node settings");
             const auto parent_label = [&](const std::optional<std::string>& parent) {
                 if (!parent) return std::string{"None"};
                 for (const auto& candidate : entity.nodes) {
@@ -6660,38 +6718,20 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 }
                 ImGui::EndCombo();
             }
-            float position[]{node.transform.position.x, node.transform.position.y};
-            if (ImGui::InputFloat2("Entity position (world units)", position)) {
-                node.transform.position = {position[0], position[1]};
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node translation in project world units.");
-            float scale[]{node.transform.scale.x, node.transform.scale.y};
-            if (ImGui::InputFloat2("Entity scale (factor)", scale)) {
-                node.transform.scale = {scale[0], scale[1]};
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node scale multiplier.");
             float pivot[]{node.transform.pivot.x, node.transform.pivot.y};
             if (ImGui::InputFloat2("Entity pivot (world units)", pivot)) {
                 node.transform.pivot = {pivot[0], pivot[1]};
                 commit_entity_node(node);
             }
             draw_technical_tooltip("Entity node pivot in project world units.");
-            float rotation = node.transform.rotation_degrees;
-            if (ImGui::InputFloat("Entity rotation (degrees)", &rotation, 1.0F, 10.0F,
-                                  "%.2f deg")) {
-                node.transform.rotation_degrees = rotation;
-                commit_entity_node(node);
-            }
-            draw_technical_tooltip("Entity node rotation around its pivot, in degrees.");
             float z_order = node.z_order;
             if (ImGui::InputFloat("Z order (world units)", &z_order, 0.1F, 1.0F, "%.2f")) {
                 node.z_order = z_order;
                 commit_entity_node(node);
             }
             draw_technical_tooltip("Draw order; larger values render later.");
-            ImGui::SeparatorText("Drawable");
+            }
+            ImGui::SeparatorText("Artwork");
             const auto drawable_label = std::string(
                 fabric::project::to_string(node.drawable.kind));
             const auto apply_drawable_kind =
@@ -6769,7 +6809,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
             }
-            if (ImGui::BeginCombo("Kind", drawable_label.c_str())) {
+            if ((entity_advanced_mode || ui_override_probe_enabled) &&
+                ImGui::BeginCombo("Drawable type", drawable_label.c_str())) {
                 for (const auto kind : {
                          fabric::project::EntityDrawableKind::none,
                          fabric::project::EntityDrawableKind::texture,
@@ -6948,7 +6989,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     commit_entity_node(node);
                 }
             }
-            if (node.drawable.kind ==
+            if (entity_advanced_mode && node.drawable.kind ==
                     fabric::project::EntityDrawableKind::visual_component &&
                 node.drawable.resource) {
                 const auto component = fabric::project::load_visual_component(
@@ -7314,13 +7355,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             selected->kind == fabric::editor::StudioResourceKind::animation &&
             session.selected_animation()) {
             auto& clip = *session.selected_animation();
-            ImGui::SeparatorText("Animation timeline");
+            ImGui::SeparatorText("Animation");
+            ImGui::TextWrapped(
+                "Choose a node, move the playhead, then key the property you want to animate.");
             std::string preview_entity_id = clip.preview_entity
                 ? clip.preview_entity->id.value : std::string{};
             if (draw_project_resource_picker(
-                    "Preview entity (empty = generic)", session.resources(),
+                    "Preview with", session.resources(),
                     fabric::editor::StudioResourceKind::entity,
-                    preview_entity_id, true)) {
+                    preview_entity_id, true, false)) {
                 const auto target = preview_entity_id.empty()
                     ? std::optional<fabric::project::ResourceReference>{}
                     : std::optional<fabric::project::ResourceReference>{
@@ -7333,7 +7376,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (!clip.preview_entity)
                 ImGui::TextDisabled("Generic clip: no entity preview.");
             float duration = clip.duration;
-            if (ImGui::InputFloat("Duration (seconds)", &duration, 0.1F, 1.0F, "%.2f s")) {
+            if (ImGui::InputFloat("Duration", &duration, 0.1F, 1.0F, "%.2f s")) {
                 if (!session.set_selected_animation_duration(duration)) {
                     status = "Animation duration rejected; inspect diagnostics.";
                 }
@@ -7347,17 +7390,23 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
             animation_ui.scrub_time = std::clamp(animation_ui.scrub_time, 0.0F,
                                                   std::max(0.0F, clip.duration));
-            ImGui::SliderFloat("Scrub (seconds)", &animation_ui.scrub_time, 0.0F,
+            ImGui::SliderFloat("Playhead", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
             ImGui::SetItemTooltip("Preview time used to evaluate the animation clip.");
-            ImGui::Checkbox("Auto-key at scrub time", &animation_ui.auto_key);
-            ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
-            ImGui::SameLine();
-            ImGui::SetNextItemWidth(110.0F);
-            ImGui::InputFloat("Snap interval (seconds)", &animation_ui.key_snap_interval,
-                              0.05F, 0.5F, "%.2f s");
-            draw_technical_tooltip(
-                "Key times are rounded to this interval when snapping is enabled.");
+            ImGui::Checkbox("Auto-key while moving in the Viewer",
+                            &animation_ui.auto_key);
+            ImGui::TextDisabled(animation_ui.auto_key
+                ? "Viewer edits now create keys at the playhead."
+                : "Turn this on to animate directly in the Viewer.");
+            if (ImGui::CollapsingHeader("Timeline options")) {
+                ImGui::Checkbox("Snap key times", &animation_ui.snap_keys);
+                ImGui::SetNextItemWidth(-1.0F);
+                ImGui::InputFloat("Snap interval (seconds)",
+                                  &animation_ui.key_snap_interval,
+                                  0.05F, 0.5F, "%.2f s");
+                draw_technical_tooltip(
+                    "Key times are rounded to this interval when snapping is enabled.");
+            }
             animation_ui.key_snap_interval = std::max(0.01F,
                                                       animation_ui.key_snap_interval);
             const auto snap_key_time = [&](const float time) {
@@ -7367,9 +7416,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             };
             const auto evaluated = fabric::project::evaluate_animation(
                 clip, animation_ui.scrub_time);
-            ImGui::TextDisabled("Evaluated properties: %zu",
-                                evaluated.properties.size());
-            for (const auto& property : evaluated.properties) {
+            if (ImGui::CollapsingHeader("Evaluated values")) {
+              ImGui::TextDisabled("Evaluated properties: %zu",
+                                  evaluated.properties.size());
+              for (const auto& property : evaluated.properties) {
                 const bool target_node_missing = session.selected_entity().has_value() &&
                     std::ranges::none_of(session.selected_entity()->nodes,
                         [&](const auto& node) { return node.id == property.binding.node_id; });
@@ -7412,6 +7462,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                   property.binding.property_id.c_str(),
                                   value_label.c_str(),
                                   fabric::project::to_string(property.composition).data());
+              }
             }
             if (session.selected_entity() &&
                 !session.selected_entity()->nodes.empty()) {
@@ -7423,7 +7474,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     animation_ui.node_id = nodes.front().id;
                     selected_node = nodes.begin();
                 }
-                ImGui::SeparatorText("Quick keys");
+                ImGui::SeparatorText("Animate selected node");
+                const char* selected_node_label = selected_node->name.c_str();
+                if (ImGui::BeginCombo("Node", selected_node_label)) {
+                    for (const auto& candidate : nodes) {
+                        if (ImGui::Selectable(candidate.name.c_str(),
+                                              candidate.id == animation_ui.node_id)) {
+                            animation_ui.node_id = candidate.id;
+                            selected_node = std::ranges::find(
+                                nodes, animation_ui.node_id,
+                                &fabric::project::EntityNode::id);
+                        }
+                        if (entity_advanced_mode) {
+                            ImGui::SameLine();
+                            ImGui::TextDisabled("%s", candidate.id.c_str());
+                        }
+                    }
+                    ImGui::EndCombo();
+                }
+                if (ui_animation_probe_enabled)
+                    ui_animation_node_picker_seen = true;
                 const auto current_value =
                     [&](const fabric::project::PropertyBinding& binding,
                         fabric::project::AnimationValue fallback) {
@@ -7465,7 +7535,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             status = "Quick key rejected; inspect diagnostics.";
                         }
                     };
-                ImGui::TextDisabled("%s", selected_node->name.c_str());
                 set_quick_key("Key Position", "position",
                               selected_node->transform.position);
                 ImGui::SameLine();
@@ -7476,10 +7545,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 ImGui::SameLine();
                 set_quick_key("Key Pivot", "pivot",
                               selected_node->transform.pivot);
-                ImGui::TextDisabled(
-                    "Creates the typed track when missing and captures the current value.");
+                ImGui::TextWrapped(
+                    "Creates the track when missing and captures the current value.");
             }
-            ImGui::SeparatorText("Markers");
+            if (ImGui::CollapsingHeader("Markers and audio cues")) {
             ImGui::InputText("Marker id", &animation_ui.marker_id);
             animation_ui.marker_time = std::clamp(animation_ui.marker_time, 0.0F,
                                                    std::max(0.0F, clip.duration));
@@ -7556,6 +7625,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         : "Animation marker could not be removed; inspect diagnostics.";
                     break;
                 }
+            }
             }
             if (ImGui::CollapsingHeader("Advanced key authoring")) {
             ImGui::SeparatorText("Set key");
@@ -8423,10 +8493,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         } else {
             creation.entity.reset();
         }
-        if (creation.guided_composed_entity) {
-            creation.entity.name = "Composed entity";
-            creation.entity.node_name = "Root";
-        }
+        if (!creation.guided_button && creation.entity.name.empty())
+            creation.entity.name = "New entity";
         if (creation.guided_button) {
             creation.entity.name = "Button entity";
             creation.entity.drawable =
@@ -9112,9 +9180,10 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create entity", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create a reusable EntityDefinition v4");
+        ImGui::TextUnformatted(creation.guided_button
+            ? "Create a Button" : "Create an Entity");
         ImGui::TextDisabled(
-            "The validated entity is published atomically in the open project.");
+            "Name it and choose its initial visual. You can compose it in the workspace next.");
         if (creation.guided_button) {
             ImGui::SeparatorText("Original Button image");
             ImGui::TextWrapped(
@@ -9125,13 +9194,18 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##entity-name", creation.entity.name);
         focus_prompt_field(validation, "name", "entity-create");
-        draw_resource_name_field("Root node name", creation.entity.node_name,
-                                 360.0F);
-        focus_prompt_field(validation, "node_name", "entity-create");
+        const bool show_entity_creation_details =
+            ImGui::CollapsingHeader("Advanced creation settings");
+        if (show_entity_creation_details) {
+            draw_resource_name_field("Root node name", creation.entity.node_name,
+                                     360.0F);
+            focus_prompt_field(validation, "node_name", "entity-create");
+        }
         const auto drawable_label = std::string(
             fabric::project::to_string(creation.entity.drawable));
         ImGui::BeginDisabled(creation.guided_button);
-        if (ImGui::BeginCombo("Drawable", drawable_label.c_str())) {
+        if (show_entity_creation_details &&
+            ImGui::BeginCombo("Drawable type", drawable_label.c_str())) {
             for (const auto drawable : {
                      fabric::project::EntityDrawableKind::none,
                      fabric::project::EntityDrawableKind::vector,
@@ -9197,93 +9271,31 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             ImGui::TextDisabled(
                 "The selected visual component owns its composed materials.");
         }
-        if (creation.guided_composed_entity) {
-            ImGui::SeparatorText("Visual blocks");
-            ImGui::TextWrapped(
-                "Add each artwork, image, Beam or component explicitly. Blocks are independent and keep their own transform and draw order.");
-            if (ImGui::Button("Add visual block")) {
-                const auto index = creation.entity.blocks.size() + 1U;
-                creation.entity.blocks.push_back({
-                    .name = "Block " + std::to_string(index),
-                    .drawable = fabric::project::EntityDrawableKind::vector});
+        if (!creation.guided_button &&
+            creation.entity.drawable == fabric::project::EntityDrawableKind::none)
+            ImGui::TextDisabled(
+                "Starts empty. Drag artwork onto the root node in the Entity workspace.");
+        if (show_entity_creation_details) {
+            float position[] = {creation.entity.transform.position.x,
+                                creation.entity.transform.position.y};
+            if (ImGui::InputFloat2("Position (world units)", position)) {
+                creation.entity.transform.position = {position[0], position[1]};
             }
-            for (std::size_t index = 0; index < creation.entity.blocks.size(); ++index) {
-                auto& block = creation.entity.blocks[index];
-                ImGui::PushID(static_cast<int>(index));
-                ImGui::SeparatorText(("Block " + std::to_string(index + 1U)).c_str());
-                draw_resource_name_field("Block name", block.name, 360.0F);
-                const auto block_label = std::string(
-                    fabric::project::to_string(block.drawable));
-                if (ImGui::BeginCombo("Block type", block_label.c_str())) {
-                    for (const auto drawable : {
-                             fabric::project::EntityDrawableKind::vector,
-                             fabric::project::EntityDrawableKind::texture,
-                             fabric::project::EntityDrawableKind::visual_component}) {
-                        const bool selected = block.drawable == drawable;
-                        const auto option = std::string(
-                            fabric::project::to_string(drawable));
-                        if (ImGui::Selectable(option.c_str(), selected)) {
-                            block.drawable = drawable;
-                            block.resource_id.clear();
-                        }
-                        if (selected) ImGui::SetItemDefaultFocus();
-                    }
-                    ImGui::EndCombo();
-                }
-                const auto block_kind = block.drawable ==
-                        fabric::project::EntityDrawableKind::texture
-                    ? fabric::editor::StudioResourceKind::texture
-                    : block.drawable ==
-                          fabric::project::EntityDrawableKind::visual_component
-                    ? fabric::editor::StudioResourceKind::visual_component
-                    : fabric::editor::StudioResourceKind::vector;
-                static_cast<void>(draw_project_resource_picker(
-                    "Block resource", session.resources(), block_kind,
-                    block.resource_id, false));
-                float block_position[] = {block.transform.position.x,
-                                          block.transform.position.y};
-                if (ImGui::InputFloat2("Block position", block_position))
-                    block.transform.position = {block_position[0], block_position[1]};
-                float block_scale[] = {block.transform.scale.x,
-                                       block.transform.scale.y};
-                if (ImGui::InputFloat2("Block scale", block_scale))
-                    block.transform.scale = {block_scale[0], block_scale[1]};
-                ImGui::InputFloat("Block rotation", &block.transform.rotation_degrees,
-                                  1.0F, 10.0F, "%.2f deg");
-                ImGui::InputFloat("Block Z order", &block.z_order, 0.1F, 1.0F,
-                                  "%.2f");
-                if (ImGui::Button("Remove block")) {
-                    creation.entity.blocks.erase(
-                        creation.entity.blocks.begin() +
-                        static_cast<std::ptrdiff_t>(index));
-                    ImGui::PopID();
-                    break;
-                }
-                ImGui::PopID();
+            focus_prompt_field(validation, "transform", "entity-create");
+            float scale[] = {creation.entity.transform.scale.x,
+                             creation.entity.transform.scale.y};
+            if (ImGui::InputFloat2("Scale (factor)", scale)) {
+                creation.entity.transform.scale = {scale[0], scale[1]};
             }
-            if (creation.entity.blocks.empty())
-                ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
-                                   "Add at least one visual block before creating the Entity.");
+            ImGui::SetItemTooltip("Entity scale multiplier on each axis.");
+            ImGui::InputFloat("Rotation (degrees)",
+                              &creation.entity.transform.rotation_degrees,
+                              1.0F, 10.0F, "%.2f deg");
+            ImGui::SetItemTooltip("Entity rotation around its pivot, in degrees.");
+            ImGui::InputFloat("Z order (world units)", &creation.entity.z_order,
+                              0.1F, 1.0F, "%.2f");
+            ImGui::SetItemTooltip("Entity draw order; larger values render later.");
         }
-        float position[] = {creation.entity.transform.position.x,
-                            creation.entity.transform.position.y};
-        if (ImGui::InputFloat2("Position (world units)", position)) {
-            creation.entity.transform.position = {position[0], position[1]};
-        }
-        focus_prompt_field(validation, "transform", "entity-create");
-        float scale[] = {creation.entity.transform.scale.x,
-                         creation.entity.transform.scale.y};
-        if (ImGui::InputFloat2("Scale (factor)", scale)) {
-            creation.entity.transform.scale = {scale[0], scale[1]};
-        }
-        ImGui::SetItemTooltip("Entity scale multiplier on each axis.");
-        ImGui::InputFloat("Rotation (degrees)",
-                          &creation.entity.transform.rotation_degrees,
-                          1.0F, 10.0F, "%.2f deg");
-        ImGui::SetItemTooltip("Entity rotation around its pivot, in degrees.");
-        ImGui::InputFloat("Z order (world units)", &creation.entity.z_order, 0.1F, 1.0F,
-                          "%.2f");
-        ImGui::SetItemTooltip("Entity draw order; larger values render later.");
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "node_name");
         draw_prompt_error(validation, "id");
@@ -9291,9 +9303,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         draw_prompt_error(validation, "material");
         draw_prompt_error(validation, "transform");
         draw_prompt_summary(validation);
-        const bool entity_valid = validation.ok() &&
-            (!creation.guided_composed_entity ||
-             !creation.entity.blocks.empty());
+        const bool entity_valid = validation.ok();
         ImGui::BeginDisabled(!entity_valid);
         const bool create_entity_clicked = ImGui::Button(
             creation.guided_button ? "Create Button" : "Create entity",
@@ -9312,7 +9322,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 clear_asset_preview(preview);
                 status = "Entity created and saved.";
                 creation.guided_button = false;
-                creation.guided_composed_entity = false;
                 ImGui::CloseCurrentPopup();
             } else {
                 status = "Entity creation failed; inspect diagnostics.";
@@ -9320,14 +9329,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         }
         ImGui::EndDisabled();
         draw_disabled_reason(!entity_valid,
-                             !validation.ok()
-                                 ? "Complete the entity fields and resolve validation errors."
-                                 : "Add at least one visual block before creating the Entity.");
+                             "Complete the entity fields and resolve validation errors.");
         ImGui::SameLine();
         if (ImGui::Button("Cancel", {110.0F, 0.0F})) {
             creation.entity.reset();
             creation.guided_button = false;
-            creation.guided_composed_entity = false;
             ImGui::CloseCurrentPopup();
         }
         ImGui::EndPopup();
@@ -9337,9 +9343,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
 
     if (ImGui::BeginPopupModal("Create animation", nullptr,
                                ImGuiWindowFlags_AlwaysAutoResize)) {
-        ImGui::TextUnformatted("Create an AnimationClip v3");
+        ImGui::TextUnformatted("Create an Animation");
         ImGui::TextDisabled(
-            "The validated clip is published atomically in the open project.");
+            "Choose what to preview and its duration. Add keys in the workspace next.");
         const auto validation = creation.animation.validate(
             session.project_root(), *session.manifest());
         draw_resource_name_field("Name##animation-name", creation.animation.name);
@@ -9358,14 +9364,17 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                            0.1, 1.0, "%.2f");
         focus_prompt_field(validation, "duration", "animation-create");
         ImGui::Checkbox("Loop", &creation.animation.loop);
-        ImGui::SetNextItemWidth(360.0F);
-        ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
-        focus_prompt_field(validation, "marker", "animation-create");
-        if (!creation.animation.marker_id.empty()) {
-            ImGui::SetNextItemWidth(220.0F);
-            ImGui::InputDouble("Marker time (seconds)", &creation.animation.marker_time,
-                               0.1, 1.0, "%.2f");
-            focus_prompt_field(validation, "markerTime", "animation-create");
+        if (ImGui::CollapsingHeader("Advanced creation settings")) {
+            ImGui::SetNextItemWidth(360.0F);
+            ImGui::InputText("Marker id (optional)", &creation.animation.marker_id);
+            focus_prompt_field(validation, "marker", "animation-create");
+            if (!creation.animation.marker_id.empty()) {
+                ImGui::SetNextItemWidth(220.0F);
+                ImGui::InputDouble("Marker time (seconds)",
+                                   &creation.animation.marker_time,
+                                   0.1, 1.0, "%.2f");
+                focus_prompt_field(validation, "markerTime", "animation-create");
+            }
         }
         draw_prompt_error(validation, "name");
         draw_prompt_error(validation, "id");
@@ -10020,6 +10029,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     if (entity_e2e && session.has_project()) {
         ui_animation_graph_probe_enabled = true;
         ui_animation_graph_seen = false;
+        ui_entity_animate_action_seen = false;
+        ui_entity_transform_seen = false;
         const fabric::core::ResourceId entity_id{.value =
             "beam-entity"};
         const bool selected = session.select_resource(
@@ -10147,6 +10158,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_animation_probe_enabled = true;
         ui_animation_timeline_seen = false;
         ui_animation_quick_key_seen = false;
+        ui_animation_node_picker_seen = false;
         fabric::editor::CreateAnimationPrompt prompt;
         prompt.name = "Targeted Animation E2E";
         prompt.preview_entity_id = "beam-entity";
@@ -10824,7 +10836,6 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     }
                     if (ImGui::MenuItem("Entity...")) {
                         creation.guided_button = false;
-                        creation.guided_composed_entity = false;
                         creation.request_entity = true;
                     }
                     if (ImGui::BeginMenu("Advanced")) {
@@ -11550,7 +11561,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::editor::StudioResourceKind::entity,
                         {.value = "beam-entity"});
                 entity_e2e_complete = entity_e2e_complete && reopened &&
-                    ui_animation_graph_seen &&
+                    ui_animation_graph_seen && ui_entity_animate_action_seen &&
+                    ui_entity_transform_seen &&
                     canvas.xpbd_overlay_visible &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
                     reloaded.selected_entity()->nodes[1].transform.position.x !=
@@ -11598,6 +11610,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     });
             animation_e2e_complete = animation_e2e_complete &&
                 ui_animation_timeline_seen && ui_animation_quick_key_seen &&
+                ui_animation_node_picker_seen &&
                 rotation_track && canvas_auto_key && animation_ui.curve_view;
             if (!animation_e2e_complete)
                 std::cerr << "Asset Studio Animation workspace E2E failed\n";
