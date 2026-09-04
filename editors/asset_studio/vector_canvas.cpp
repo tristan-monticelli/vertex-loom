@@ -616,6 +616,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     }
     draw_list->PushClipRect(origin, {origin.x + available.x,
                                      origin.y + available.y}, true);
+    if (canvas.grid_visible) {
     for (int index = first_vertical; index <= last_vertical; ++index) {
         const auto line_start = to_screen({static_cast<float>(index) * grid_step,
                                            world_bottom});
@@ -637,6 +638,7 @@ void draw_native_vector_canvas(fabric::editor::ProjectSession& session,
     draw_list->AddText({origin.x + 10.0F, origin.y + 10.0F},
                        IM_COL32(185, 200, 205, 220),
                        ("Grid: " + std::to_string(grid_step) + " world units").c_str());
+    }
     for (std::size_t node_index = 0;
          node_index < asset.native->nodes.size(); ++node_index) {
         const auto& node = asset.native->nodes[node_index];

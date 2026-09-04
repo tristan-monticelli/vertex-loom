@@ -18,7 +18,8 @@ Rel(fabric, catalog, "Publie et charge des maps validées")
 
 Le premier écran doit répondre à une seule question : « que puis-je faire
 maintenant et sur quelle ressource ? ». Le créateur ouvre ou crée un projet,
-parcourt une ressource dans le rail droit, l'édite dans l'inspecteur, la
+parcourt une ressource dans le rail Project à gauche, l'édite dans l'Inspector
+à droite, la
 prévisualise immédiatement, puis compose une map avant validation et
 publication. Toute transition conserve le document actif jusqu'à `Save`,
 `Discard` ou `Cancel`.

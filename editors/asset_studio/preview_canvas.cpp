@@ -41,12 +41,14 @@ void draw_packet_preview_canvas(
                       center.y + canvas.pan.y - point.y * pixels_per_unit};
     };
     auto* draw_list = ImGui::GetWindowDrawList();
-    draw_list->AddLine(to_screen({0.0F, bounds.origin.y}),
-                       to_screen({0.0F, bounds.origin.y + bounds.size.y}),
-                       IM_COL32(100, 110, 125, 100));
-    draw_list->AddLine(to_screen({bounds.origin.x, 0.0F}),
-                       to_screen({bounds.origin.x + bounds.size.x, 0.0F}),
-                       IM_COL32(100, 110, 125, 100));
+    if (canvas.grid_visible) {
+        draw_list->AddLine(to_screen({0.0F, bounds.origin.y}),
+                           to_screen({0.0F, bounds.origin.y + bounds.size.y}),
+                           IM_COL32(100, 110, 125, 100));
+        draw_list->AddLine(to_screen({bounds.origin.x, 0.0F}),
+                           to_screen({bounds.origin.x + bounds.size.x, 0.0F}),
+                           IM_COL32(100, 110, 125, 100));
+    }
     if (editable_session && editable_session->selected_entity() &&
         editable_session->selected_entity()->xpbd) {
         canvas.xpbd_overlay_visible = true;

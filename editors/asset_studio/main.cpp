@@ -108,6 +108,14 @@ ImVec2 ui_drag_source_screen{};
 ImVec2 ui_drag_target_screen{};
 bool ui_drag_source_seen = false;
 bool ui_drag_target_seen = false;
+bool ui_workspace_probe_seen = false;
+float ui_workspace_project_x = 0.0F;
+float ui_workspace_viewer_x = 0.0F;
+float ui_workspace_inspector_x = 0.0F;
+float ui_workspace_viewer_width = 0.0F;
+bool ui_workspace_fit_seen = false;
+bool ui_workspace_grid_seen = false;
+bool ui_workspace_background_seen = false;
 
 struct ResourceDragPayload {
     int kind{};
@@ -1684,37 +1692,38 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             if (ImGui::Button(label.c_str()))
                 request_entity_from_visuals(selected_visuals);
         }
-        if (is_entity_artwork_kind(selected->kind)) same_line_if_room();
-        if (ImGui::Button("Duplicate")) {
-            const auto resource = *selected;
-            duplicate_project_resource(session, resource, preview, status);
-        }
-        same_line_if_room();
-        if (ImGui::Button("Rename...")) request_rename(*selected);
-        same_line_if_room();
-        if (ImGui::Button("Copy ID")) {
-            SDL_SetClipboardText(selected->id.value.c_str());
-            status = "Resource ID copied.";
-        }
-        same_line_if_room();
-        if (ImGui::Button("Copy path")) {
-            const auto path = selected->document_path.generic_string();
-            SDL_SetClipboardText(path.c_str());
-            status = "Resource path copied.";
-        }
-        same_line_if_room();
-        if (ImGui::Button("Reveal"))
-            reveal_project_resource(session, *selected, status);
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4{0.55F, 0.16F, 0.15F, 1.0F});
-        if (ImGui::Button("Delete...")) request_delete(*selected);
-        ImGui::PopStyleColor();
-        if (session.can_restore_trashed_resource()) {
-            same_line_if_room();
-            if (ImGui::Button("Undo delete")) {
+        if (is_entity_artwork_kind(selected->kind)) same_line_if_room(82.0F);
+        if (ImGui::Button("Actions..."))
+            ImGui::OpenPopup("Selected resource actions");
+        if (ImGui::BeginPopup("Selected resource actions")) {
+            if (ImGui::MenuItem("Duplicate")) {
+                const auto resource = *selected;
+                duplicate_project_resource(session, resource, preview, status);
+            }
+            if (ImGui::MenuItem("Duplicate with dependencies..."))
+                request_duplicate_options(*selected);
+            if (ImGui::MenuItem("Rename...")) request_rename(*selected);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Copy ID")) {
+                SDL_SetClipboardText(selected->id.value.c_str());
+                status = "Resource ID copied.";
+            }
+            if (ImGui::MenuItem("Copy path")) {
+                const auto path = selected->document_path.generic_string();
+                SDL_SetClipboardText(path.c_str());
+                status = "Resource path copied.";
+            }
+            if (ImGui::MenuItem("Reveal in file browser"))
+                reveal_project_resource(session, *selected, status);
+            ImGui::Separator();
+            if (ImGui::MenuItem("Delete...")) request_delete(*selected);
+            if (session.can_restore_trashed_resource() &&
+                ImGui::MenuItem("Undo delete")) {
                 status = session.restore_trashed_resource()
                     ? "Deleted resource restored."
                     : "Restore failed; inspect diagnostics.";
             }
+            ImGui::EndPopup();
         }
     }
     ImGui::Spacing();
@@ -2249,9 +2258,9 @@ void write_vector_canvas_visual_probe(const std::filesystem::path& project_path,
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
-    constexpr int clear_red = 9;
-    constexpr int clear_green = 10;
-    constexpr int clear_blue = 13;
+    constexpr int clear_red = 21;
+    constexpr int clear_green = 24;
+    constexpr int clear_blue = 30;
     std::size_t non_background_pixels = 0U;
     std::size_t anchor_pixels = 0U;
     std::size_t selected_anchor_pixels = 0U;
@@ -2321,7 +2330,20 @@ void write_ui_test_registry(const std::filesystem::path& project_path,
     if (project_path.empty()) return;
     nlohmann::json registry = {
         {"schema", "asset-studio-ui-test-v1"},
-        {"widgets", nlohmann::json::array()}};
+        {"widgets", nlohmann::json::array()},
+        {"workspace", {
+            {"rendered", ui_workspace_probe_seen},
+            {"project_x", ui_workspace_project_x},
+            {"viewer_x", ui_workspace_viewer_x},
+            {"inspector_x", ui_workspace_inspector_x},
+            {"viewer_width", ui_workspace_viewer_width},
+            {"project_viewer_inspector_order",
+             ui_workspace_project_x < ui_workspace_viewer_x &&
+                 ui_workspace_viewer_x < ui_workspace_inspector_x},
+            {"viewer_minimum_width_ok", ui_workspace_viewer_width >= 320.0F},
+            {"fit_control", ui_workspace_fit_seen},
+            {"grid_control", ui_workspace_grid_seen},
+            {"background_control", ui_workspace_background_seen}}}};
     auto& widgets = registry["widgets"];
     for (const auto& resource : session.resources()) {
         widgets.push_back({
@@ -2330,12 +2352,21 @@ void write_ui_test_registry(const std::filesystem::path& project_path,
             {"resource_kind", studio_resource_kind_label(resource.kind)},
             {"resource_id", resource.id.value}});
     }
-    if (session.selected_entity()) {
-        for (const auto& node : session.selected_entity()->nodes) {
-            widgets.push_back({
-                {"id", "entity-node-" + node.id},
-                {"kind", "entity_node"},
-                {"node_id", node.id}});
+    if (session.manifest()) {
+        for (const auto& resource : session.resources()) {
+            if (resource.kind != fabric::editor::StudioResourceKind::entity)
+                continue;
+            const auto loaded = fabric::project::load_entity(
+                session.project_root(), *session.manifest(),
+                resource.document_path);
+            if (!loaded.ok()) continue;
+            for (const auto& node : loaded.entity->nodes) {
+                widgets.push_back({
+                    {"id", "entity-node-" + node.id},
+                    {"kind", "entity_node"},
+                    {"resource_id", resource.id.value},
+                    {"node_id", node.id}});
+            }
         }
     }
     std::ofstream output(project_path / "asset-studio-ui-widgets.json");
@@ -3593,7 +3624,8 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
         canvas.crop_drag.reset();
     }
     ImGui::InvisibleButton("Raster crop canvas", available,
-                           ImGuiButtonFlags_MouseButtonLeft);
+                           ImGuiButtonFlags_MouseButtonLeft |
+                               ImGuiButtonFlags_MouseButtonMiddle);
     if (ui_texture_probe_enabled) {
         const auto maximum = ImGui::GetItemRectMax();
         ui_texture_canvas_seen = true;
@@ -3604,12 +3636,27 @@ void draw_raster_crop_canvas(fabric::editor::ProjectSession& session,
     const ImVec2 origin = ImGui::GetItemRectMin();
     const float source_width = static_cast<float>(texture.width);
     const float source_height = static_cast<float>(texture.height);
-    const float scale = std::max(
+    const float fit_scale = std::max(
         0.001F, std::min((available.x - 32.0F) / source_width,
                          (available.y - 32.0F) / source_height));
+    if (ImGui::IsItemHovered() && ImGui::GetIO().MouseWheel != 0.0F)
+        canvas.zoom = std::clamp(
+            canvas.zoom * (ImGui::GetIO().MouseWheel > 0.0F ? 1.15F
+                                                             : 1.0F / 1.15F),
+            0.1F, 20.0F);
+    if (ImGui::IsItemHovered() &&
+        ImGui::IsMouseDragging(ImGuiMouseButton_Middle)) {
+        const auto delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
+        canvas.pan.x += delta.x;
+        canvas.pan.y += delta.y;
+        ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
+    }
+    const float scale = fit_scale * canvas.zoom;
     const ImVec2 image_size{source_width * scale, source_height * scale};
-    const ImVec2 image_min{origin.x + (available.x - image_size.x) * 0.5F,
-                           origin.y + (available.y - image_size.y) * 0.5F};
+    const ImVec2 image_min{origin.x + (available.x - image_size.x) * 0.5F +
+                               canvas.pan.x,
+                           origin.y + (available.y - image_size.y) * 0.5F +
+                               canvas.pan.y};
     const ImVec2 image_max{image_min.x + image_size.x,
                            image_min.y + image_size.y};
     auto view = texture.view.value_or(fabric::project::RasterView{
@@ -3747,9 +3794,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const float menu_height = ImGui::GetFrameHeight();
     const float status_height = 34.0F;
     static float left_width = 280.0F;
-    static float right_width = 320.0F;
+    static float right_width = 340.0F;
     const float initial_left_width = std::clamp(viewport->Size.x * 0.22F, 240.0F, 330.0F);
-    const float initial_right_width = std::clamp(viewport->Size.x * 0.24F, 270.0F, 360.0F);
+    const float initial_right_width = std::clamp(viewport->Size.x * 0.26F, 330.0F, 380.0F);
     static bool panel_widths_initialized = false;
     if (!panel_widths_initialized) {
         left_width = initial_left_width;
@@ -3758,8 +3805,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     }
     left_width = std::clamp(left_width, 240.0F,
                             std::max(240.0F, viewport->Size.x - right_width - 320.0F));
-    right_width = std::clamp(right_width, 270.0F,
-                             std::max(270.0F, viewport->Size.x - left_width - 320.0F));
+    right_width = std::clamp(right_width, 300.0F,
+                             std::max(300.0F, viewport->Size.x - left_width - 320.0F));
     const float content_height = viewport->Size.y - menu_height - status_height;
     const bool animation_workspace = session.selected_resource() != nullptr &&
         session.selected_resource()->kind ==
@@ -3773,9 +3820,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ? content_height - timeline_height - timeline_gap
         : content_height;
 
-    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
-                             viewport->Pos.y + menu_height});
-    ImGui::SetNextWindowSize({right_width, content_height});
+    ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
+    ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
     draw_project_tree(session, creation, preview, status);
     if (!session.has_project()) {
@@ -3869,6 +3915,41 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                               preview_height});
     ImGui::Begin("Preview", nullptr,
                  fixed_panel_flags | ImGuiWindowFlags_NoBackground);
+    ui_workspace_probe_seen = true;
+    ui_workspace_project_x = viewport->Pos.x;
+    ui_workspace_viewer_x = viewport->Pos.x + left_width;
+    ui_workspace_inspector_x = viewport->Pos.x + viewport->Size.x - right_width;
+    ui_workspace_viewer_width = viewport->Size.x - left_width - right_width;
+
+    if (ImGui::Button("Fit##viewer")) {
+        canvas.zoom = 1.0F;
+        canvas.pan = {};
+        status = "Viewer fitted to the active resource.";
+    }
+    ui_workspace_fit_seen = true;
+    ImGui::SameLine();
+    if (ImGui::Button("-##viewer-zoom"))
+        canvas.zoom = std::clamp(canvas.zoom / 1.25F, 0.1F, 20.0F);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%.0f%%", canvas.zoom * 100.0F);
+    ImGui::SameLine();
+    if (ImGui::Button("+##viewer-zoom"))
+        canvas.zoom = std::clamp(canvas.zoom * 1.25F, 0.1F, 20.0F);
+    ImGui::SameLine();
+    ImGui::Checkbox("Grid##viewer", &canvas.grid_visible);
+    ui_workspace_grid_seen = true;
+    ImGui::SameLine();
+    const char* background_label =
+        canvas.background == CanvasUiState::Background::dark ? "Dark" : "Light";
+    const auto background_button = std::string{"BG: "} + background_label;
+    if (ImGui::Button(background_button.c_str()))
+        canvas.background = canvas.background == CanvasUiState::Background::dark
+            ? CanvasUiState::Background::light
+            : CanvasUiState::Background::dark;
+    ui_workspace_background_seen = true;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Viewer background; it never changes the asset.");
+    ImGui::Separator();
     const ImVec2 available = ImGui::GetContentRegionAvail();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     auto* draw_list = ImGui::GetWindowDrawList();
@@ -3894,18 +3975,26 @@ void draw_workspace(fabric::editor::ProjectSession& session,
              fabric::editor::StudioResourceKind::animation &&
          session.selected_entity() && !entity_preview.packets.empty());
     if (!open_gl_canvas) {
+        const ImU32 background = canvas.background == CanvasUiState::Background::dark
+            ? IM_COL32(21, 24, 30, 255)
+            : IM_COL32(205, 209, 216, 255);
         draw_list->AddRectFilled(
             origin, {origin.x + available.x, origin.y + available.y},
-            IM_COL32(21, 24, 30, 255), 4.0F);
+            background, 4.0F);
     }
-    constexpr float grid = 32.0F;
-    for (float x = origin.x; x < origin.x + available.x; x += grid) {
-        draw_list->AddLine({x, origin.y}, {x, origin.y + available.y},
-                           IM_COL32(43, 48, 58, 120));
-    }
-    for (float y = origin.y; y < origin.y + available.y; y += grid) {
-        draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
-                           IM_COL32(43, 48, 58, 120));
+    if (canvas.grid_visible && !native_selected && !entity_selected) {
+        constexpr float grid = 32.0F;
+        const ImU32 grid_color = canvas.background == CanvasUiState::Background::dark
+            ? IM_COL32(43, 48, 58, 120)
+            : IM_COL32(145, 151, 162, 120);
+        for (float x = origin.x; x < origin.x + available.x; x += grid) {
+            draw_list->AddLine({x, origin.y}, {x, origin.y + available.y},
+                               grid_color);
+        }
+        for (float y = origin.y; y < origin.y + available.y; y += grid) {
+            draw_list->AddLine({origin.x, y}, {origin.x + available.x, y},
+                               grid_color);
+        }
     }
     if (native_selected) {
         ImGui::SetCursorScreenPos({origin.x + 8.0F, origin.y + 8.0F});
@@ -4049,9 +4138,12 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         const float image_height = static_cast<float>(preview.height);
         const float scale = std::min((available.x - 40.0F) / image_width,
                                      (available.y - 40.0F) / image_height);
-        const ImVec2 image_size{image_width * scale, image_height * scale};
-        ImGui::SetCursorScreenPos({origin.x + (available.x - image_size.x) * 0.5F,
-                                   origin.y + (available.y - image_size.y) * 0.5F});
+        const ImVec2 image_size{image_width * scale * canvas.zoom,
+                                image_height * scale * canvas.zoom};
+        ImGui::SetCursorScreenPos({origin.x + (available.x - image_size.x) * 0.5F +
+                                       canvas.pan.x,
+                                   origin.y + (available.y - image_size.y) * 0.5F +
+                                       canvas.pan.y});
         ImGui::Image(ImTextureRef(static_cast<ImTextureID>(preview.texture)),
                      image_size, {0.0F, 1.0F}, {1.0F, 0.0F});
     } else {
@@ -4083,8 +4175,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                         std::max(240.0F, viewport->Size.x - right_width - 320.0F));
     draw_panel_splitter("right-panel-splitter",
                         viewport->Pos.x + viewport->Size.x - right_width,
-                        right_width, -1.0F, 270.0F,
-                        std::max(270.0F, viewport->Size.x - left_width - 320.0F));
+                        right_width, -1.0F, 300.0F,
+                        std::max(300.0F, viewport->Size.x - left_width - 320.0F));
     ImGui::End();
 
     if (animation_workspace) {
@@ -4107,9 +4199,11 @@ void draw_workspace(fabric::editor::ProjectSession& session,
         ImGui::End();
     }
 
-    ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
-    ImGui::SetNextWindowSize({left_width, content_height});
-    ImGui::Begin("Inspector", nullptr, fixed_panel_flags);
+    ImGui::SetNextWindowPos({viewport->Pos.x + viewport->Size.x - right_width,
+                             viewport->Pos.y + menu_height});
+    ImGui::SetNextWindowSize({right_width, content_height});
+    ImGui::Begin("Inspector", nullptr,
+                 fixed_panel_flags | ImGuiWindowFlags_HorizontalScrollbar);
     if (session.has_project()) {
         const auto* selected = session.selected_resource();
         if (selected != nullptr) {
@@ -11004,6 +11098,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 .y = std::max(0, drawable_height - static_cast<std::int32_t>(
                     (canvas.native_origin.y + canvas.native_size.y) * scale_y)),
             };
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(native_viewport.x, native_viewport.y,
+                      native_viewport.width, native_viewport.height);
+            if (canvas.background == CanvasUiState::Background::dark)
+                glClearColor(0.082F, 0.094F, 0.118F, 1.0F);
+            else
+                glClearColor(0.804F, 0.820F, 0.847F, 1.0F);
+            glClear(GL_COLOR_BUFFER_BIT);
             glDisable(GL_SCISSOR_TEST);
             glDisable(GL_BLEND);
             const fabric::render::OpenGLTextureResolver texture_resolver =
@@ -11078,6 +11180,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 20U)
             write_frame_capture(initial_project, window,
                                 "asset-studio-vector-canvas-advanced.ppm");
+        if (ui_test_mode || ui_min_window_test || ui_focus_test ||
+            ui_accessibility_test || ui_drag_test || ui_override_test ||
+            ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)
+            write_ui_test_registry(initial_project, session);
         if (ui_test_mode || ui_min_window_test || ui_focus_test ||
             ui_accessibility_test || ui_drag_test || ui_override_test ||
             ui_texture_test || ui_input_test || ui_beam_test || ui_button_test)

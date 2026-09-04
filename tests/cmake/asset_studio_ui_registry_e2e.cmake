@@ -32,6 +32,21 @@ endif()
 if(NOT EXISTS "${TEST_ROOT}/project/asset_studio-ui-test.ppm")
     message(FATAL_ERROR "Asset Studio UI test did not produce its screenshot")
 endif()
+file(READ "${REGISTRY}" REGISTRY_RESULT)
+foreach(REQUIRED_WORKSPACE_RESULT
+        "\"rendered\": true"
+        "\"project_viewer_inspector_order\": true"
+        "\"viewer_minimum_width_ok\": true"
+        "\"fit_control\": true"
+        "\"grid_control\": true"
+        "\"background_control\": true")
+    string(FIND "${REGISTRY_RESULT}" "${REQUIRED_WORKSPACE_RESULT}"
+           WORKSPACE_RESULT_POSITION)
+    if(WORKSPACE_RESULT_POSITION LESS 0)
+        message(FATAL_ERROR
+            "Asset Studio workspace probe is missing ${REQUIRED_WORKSPACE_RESULT}")
+    endif()
+endforeach()
 if(DEFINED FOCUS_ARTIFACT)
     if(NOT EXISTS "${TEST_ROOT}/project/${FOCUS_ARTIFACT}")
         message(FATAL_ERROR "Asset Studio UI test did not produce ${FOCUS_ARTIFACT}")

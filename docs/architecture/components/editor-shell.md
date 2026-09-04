@@ -7,9 +7,9 @@ C4Component
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
-        Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
+        Component(browser, "Resource Explorer", "Dear ImGui", "Rail gauche qui indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
         Component(customizer, "Vector inspector", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
-        Component(canvas, "Vector canvas", "C++20 + Dear ImGui + OpenGL", "Prévisualise les paths natifs, sélectionne les coins, édite les poignées Bézier et applique les outils Pen/Move/Rotate/Scale/Pivot")
+        Component(canvas, "Viewer et vector canvas", "C++20 + Dear ImGui + OpenGL", "Zone centrale avec Fit, zoom, grille et fond ; prévisualise les paths natifs, sélectionne les coins, édite les poignées Bézier et applique les outils Pen/Move/Rotate/Scale/Pivot")
         Component(preview_canvas, "Entity preview canvas", "C++20 + Dear ImGui + OpenGL", "Affiche les draw packets d'entité et permet le déplacement du nœud sélectionné")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
@@ -105,22 +105,28 @@ C4Component
   sélecteur dédié.
   Les actions matériau, entité et animation utilisent leurs prompts typés et
   publient des documents validés avant réindexation.
-- Le rail droit liste les ressources réellement présentes, conserve une
+- Le rail gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
   L'index est reconstruit à l'ouverture et après publication ; sélectionner
   recharge le document validé et son aperçu depuis le projet.
-- Le rail droit du Resource Explorer regroupe dossiers logiques, recherche,
+- Le rail gauche du Resource Explorer regroupe dossiers logiques, recherche,
   filtre de type et actions contextuelles. Une duplication conserve les
   dépendances partagées et génère un identifiant et un chemin uniques. Rename
   ne modifie que le nom visible. Delete analyse d'abord toutes les références
   entrantes, refuse une rupture, exige confirmation puis déplace uniquement le
   document dans `.vertex-loom-trash`; Undo le restaure sans supprimer les
   sources PNG ou SVG partagées.
-- Les rails Project et Inspector d’Asset Studio sont séparés du preview par
+- Les rails Project à gauche et Inspector à droite d’Asset Studio sont séparés du Viewer par
   deux splitters `left-panel-splitter` et `right-panel-splitter`, bornés pour
   préserver une zone centrale minimale et redimensionnables au glisser. Les
   actions du Resource Explorer se réorganisent sur plusieurs lignes lorsque la
-  largeur du rail ne permet plus de les afficher côte à côte.
+  largeur du rail ne permet plus de les afficher côte à côte ; les opérations
+  secondaires de la sélection sont regroupées dans `Actions...` pour éviter
+  toute rangée tronquée à 900 × 600.
+- Le Viewer expose une barre commune `Fit`, zoom, `Grid` et fond `Dark/Light`.
+  Son état est éphémère et partagé par les previews raster, vectorielles,
+  Entity, Animation et composition. La Timeline Animation reste dockée sous le
+  Viewer et ne déplace jamais l'Inspector.
 - Map Studio conserve ses deux panneaux `map-layers-pane` et
   `map-selection-pane`, avec splitter borné ; les sous-zones `Layers` et
   `Events` sont repliables et portent des IDs stables pour la navigation clavier

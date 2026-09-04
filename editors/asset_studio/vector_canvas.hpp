@@ -15,6 +15,11 @@
 namespace fabric::asset_studio {
 
 struct CanvasUiState {
+    enum class Background {
+        dark,
+        light,
+    };
+
     enum class Tool {
         move,
         rotate,
@@ -38,6 +43,8 @@ struct CanvasUiState {
 
     float zoom{1.0F};
     ImVec2 pan{};
+    bool grid_visible{true};
+    Background background{Background::dark};
     std::size_t selected_node{};
     std::string selected_entity_id;
     std::vector<std::size_t> selected_entity_nodes;
