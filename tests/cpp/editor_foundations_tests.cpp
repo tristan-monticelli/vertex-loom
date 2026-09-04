@@ -1,4 +1,6 @@
 #include "fabric/editor/command_stack.hpp"
+#include "fabric/editor/editor_action_registry.hpp"
+#include "fabric/editor/editor_context.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/autosave_scheduler.hpp"
 
@@ -254,4 +256,147 @@ TEST_CASE("continuous changes cannot postpone autosave past thirty seconds") {
             start + std::chrono::seconds{second}));
     }
     CHECK(scheduler.due(start + 30s));
+}
+
+TEST_CASE("editor context restores document workspace and stable selection") {
+    using fabric::core::ResourceId;
+    using fabric::editor::EditorContext;
+    using fabric::editor::EditorWorkspace;
+
+    EditorContext context;
+    REQUIRE(context.open_document(ResourceId{.value = "hero-entity"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.set_selection(ResourceId{.value = "body-component"}));
+    REQUIRE(context.open_document(ResourceId{.value = "walk-animation"},
+                                  EditorWorkspace::animation));
+    REQUIRE(context.set_selection(ResourceId{.value = "left-foot-track"}));
+
+    REQUIRE(context.go_back());
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->id.value == "hero-entity");
+    CHECK(context.active_document()->workspace == EditorWorkspace::entity);
+    REQUIRE(context.active_document()->selection_id.has_value());
+    CHECK(context.active_document()->selection_id->value == "body-component");
+
+    REQUIRE(context.go_forward());
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->id.value == "walk-animation");
+    CHECK(context.active_document()->workspace == EditorWorkspace::animation);
+    REQUIRE(context.active_document()->selection_id.has_value());
+    CHECK(context.active_document()->selection_id->value == "left-foot-track");
+    CHECK(context.open_documents().size() == 2);
+}
+
+TEST_CASE("editor context discards forward history after new navigation") {
+    using fabric::core::ResourceId;
+    using fabric::editor::EditorContext;
+    using fabric::editor::EditorWorkspace;
+
+    EditorContext context;
+    REQUIRE(context.open_document(ResourceId{.value = "entity-a"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.open_document(ResourceId{.value = "animation-a"},
+                                  EditorWorkspace::animation));
+    REQUIRE(context.open_document(ResourceId{.value = "behavior-a"},
+                                  EditorWorkspace::logic));
+    REQUIRE(context.go_back());
+    REQUIRE(context.navigate(ResourceId{.value = "scene-a"},
+                             EditorWorkspace::scene));
+
+    CHECK_FALSE(context.can_go_forward());
+    CHECK_FALSE(context.go_forward());
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->id.value == "scene-a");
+}
+
+TEST_CASE("editor context preserves selection and active document identity") {
+    using fabric::core::ResourceId;
+    using fabric::editor::EditorContext;
+    using fabric::editor::EditorWorkspace;
+
+    EditorContext context;
+    REQUIRE(context.open_document(ResourceId{.value = "entity-a"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.set_selection(ResourceId{.value = "component-a"}));
+    REQUIRE(context.open_document(ResourceId{.value = "entity-b"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.open_document(ResourceId{.value = "entity-a"},
+                                  EditorWorkspace::animation));
+
+    REQUIRE(context.active_document() != nullptr);
+    REQUIRE(context.active_document()->selection_id.has_value());
+    CHECK(context.active_document()->selection_id->value == "component-a");
+    REQUIRE(context.close_document(ResourceId{.value = "entity-b"}));
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->id.value == "entity-a");
+    REQUIRE(context.active_document()->selection_id.has_value());
+    CHECK(context.active_document()->selection_id->value == "component-a");
+}
+
+TEST_CASE("editor context rejects invalid transient identifiers") {
+    fabric::editor::EditorContext context;
+
+    CHECK_FALSE(context.open_document(
+        fabric::core::ResourceId{.value = "invalid id"}));
+    CHECK(context.active_document() == nullptr);
+    CHECK(context.open_documents().empty());
+}
+
+TEST_CASE("editor action registry exposes availability and disabled reason") {
+    using fabric::editor::EditorActionAvailability;
+    using fabric::editor::EditorActionDefinition;
+    using fabric::editor::EditorActionInvocation;
+    using fabric::editor::EditorActionRegistry;
+
+    bool dirty = false;
+    int saves = 0;
+    EditorActionRegistry actions;
+    REQUIRE(actions.register_action(EditorActionDefinition{
+        .id = "save",
+        .label = "Enregistrer",
+        .shortcut = "Cmd+S",
+        .availability = [&dirty] {
+            return EditorActionAvailability{
+                .enabled = dirty,
+                .disabled_reason = dirty ? "" : "Aucune modification",
+            };
+        },
+        .execute = [&saves] {
+            ++saves;
+            return true;
+        },
+    }));
+
+    CHECK_FALSE(actions.availability("save").enabled);
+    CHECK(actions.availability("save").disabled_reason ==
+          "Aucune modification");
+    CHECK(actions.invoke("save") == EditorActionInvocation::disabled);
+    CHECK(saves == 0);
+
+    dirty = true;
+    CHECK(actions.availability("save").enabled);
+    CHECK(actions.availability("save").disabled_reason.empty());
+    CHECK(actions.invoke("save") == EditorActionInvocation::invoked);
+    CHECK(saves == 1);
+}
+
+TEST_CASE("editor action registry rejects duplicates and reports unknown ids") {
+    using fabric::editor::EditorActionDefinition;
+    using fabric::editor::EditorActionInvocation;
+    fabric::editor::EditorActionRegistry actions;
+    const auto action = [] { return true; };
+
+    REQUIRE(actions.register_action(EditorActionDefinition{
+        .id = "preview",
+        .label = "Preview",
+        .execute = action,
+    }));
+    CHECK_FALSE(actions.register_action(EditorActionDefinition{
+        .id = "preview",
+        .label = "Duplicate",
+        .execute = action,
+    }));
+    CHECK(actions.invoke("missing") == EditorActionInvocation::unknown);
+    CHECK_FALSE(actions.availability("missing").enabled);
+    CHECK_FALSE(actions.availability("missing").disabled_reason.empty());
 }
