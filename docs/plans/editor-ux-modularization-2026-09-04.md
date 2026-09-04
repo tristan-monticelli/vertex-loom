@@ -1,6 +1,6 @@
 # Plan de refactoring UX des Studios — 2026-09-04
 
-Statut : approuvé par ADR-0151 ; aucune modification produit dans cette passe.
+Statut : tranche 1 réalisée le 4 septembre 2026 ; tranche 2 non démarrée.
 
 ## Résultat attendu
 
@@ -45,6 +45,12 @@ propriété claire de l'état, l'absence de duplication et les parcours E2E.
 - Aucun accès direct au filesystem depuis les nouveaux widgets.
 - Un seul picker typé et une seule fonction de diagnostic utilisés par les
   deux Studios.
+
+Preuves réalisées : `EditorContext` et `EditorActionRegistry` sont couverts
+par `fabric_editor_foundations_tests`; `fabric_editor_ui` fournit les champs,
+tooltips, raisons de blocage et le picker recherché commun. Les builds des deux
+Studios et 13 E2E graphiques réels, dont Entity → Animation, Behavior,
+Transformation, Scene et Mechanic, passent sans test ignoré.
 
 ## Tranche 2 — shell, documents et sélection
 
