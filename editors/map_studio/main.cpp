@@ -2605,6 +2605,20 @@ int run(const std::filesystem::path& project_root,
                         }
                     }
                     ImGui::EndDisabled();
+                    const bool has_path_animation = std::ranges::any_of(
+                        instance->properties, [](const auto& property) {
+                            return property.id == "animation" &&
+                                std::holds_alternative<fabric::project::ResourceReference>(
+                                    property.value) &&
+                                std::get<fabric::project::ResourceReference>(property.value)
+                                    .expected_type == "animation";
+                        });
+                    ImGui::BeginDisabled(!has_path_animation);
+                    if (ImGui::Button("Remove path animation")) {
+                        status = session.set_instance_animation(selected_id, std::nullopt)
+                            ? "Path animation removed" : "Path animation removal rejected";
+                    }
+                    ImGui::EndDisabled();
                     draw_disabled_reason(!can_create_path_animation,
                         path_reference_valid
                             ? "Select an entity-backed instance before creating an animation."
