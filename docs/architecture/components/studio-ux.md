@@ -177,8 +177,9 @@ flowchart LR
 | DocumentTabs | onglets, retour/avant et activation de la session par ID stable | chargement ou mutation d'une ressource |
 | LayoutPreferences | mode compact/large et dimensions des panneaux dans le dossier utilisateur | ressource ou manifeste du projet |
 | Map Resource Picker Adapter | énumération des documents Map/Scene/Mechanic et délégation au picker partagé | mutation du document sélectionné |
+| Scene Workspace | composition de scène, transitions, validation et publication via `SceneSession` | boucle SDL, navigation globale ou seconde copie du document |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
-| Widgets ImGui partagés | champs communs, tooltips, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
+| Widgets ImGui partagés | champs communs, tooltips, diagnostics/focus de champ, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
 | Inspector | propriétés de la sélection et sections progressives | sélection indépendante du canvas |
 | Task Dock | timeline, palette, trace, diagnostics ou simulation contextuelle | navigation globale du projet |

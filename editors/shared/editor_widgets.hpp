@@ -2,6 +2,7 @@
 
 #include "fabric/editor/editor_context.hpp"
 #include "fabric/editor/editor_action_registry.hpp"
+#include "fabric/project/manifest.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -37,6 +38,63 @@ inline bool draw_resource_name_field(
     const ImGuiInputTextFlags flags = 0) {
     ImGui::SetNextItemWidth(width);
     return ImGui::InputText(label, &name, flags);
+}
+
+inline void draw_validation_errors(
+    const std::span<const project::Error> errors,
+    const std::string_view prefix = {}) {
+    for (const auto& error : errors) {
+        ImGui::PushStyleColor(ImGuiCol_Text, {0.95F, 0.42F, 0.38F, 1.0F});
+        if (prefix.empty()) {
+            ImGui::TextWrapped("%s: %s", error.field.c_str(),
+                               error.message.c_str());
+        } else {
+            ImGui::TextWrapped("%s %s: %s", std::string(prefix).c_str(),
+                               error.field.c_str(), error.message.c_str());
+        }
+        ImGui::PopStyleColor();
+    }
+}
+
+inline void draw_field_errors(
+    const std::span<const project::Error> errors,
+    const std::string_view field,
+    const std::string_view correction) {
+    const auto qualified_field = "." + std::string(field);
+    for (const auto& error : errors) {
+        if (error.field != field && !error.field.starts_with(field) &&
+            !error.field.ends_with(qualified_field)) {
+            continue;
+        }
+        ImGui::PushStyleColor(ImGuiCol_Text, {0.98F, 0.48F, 0.42F, 1.0F});
+        ImGui::TextWrapped("%s: %s", error.field.c_str(),
+                           error.message.c_str());
+        ImGui::PopStyleColor();
+        ImGui::TextDisabled("Correction: %s", std::string(correction).c_str());
+    }
+}
+
+inline void focus_first_field_error(
+    const std::span<const project::Error> errors,
+    const std::string_view field,
+    const std::string_view scope) {
+    static std::string focused_error;
+    if (errors.empty()) {
+        focused_error.clear();
+        return;
+    }
+    const auto& first = errors.front();
+    const auto qualified_field = "." + std::string(field);
+    if (first.field != field && !first.field.starts_with(field) &&
+        !first.field.ends_with(qualified_field)) {
+        return;
+    }
+    const std::string key = std::string(scope) + ":" + first.field + ":" +
+        first.message;
+    if (focused_error == key) return;
+    ImGui::SetKeyboardFocusHere(-1);
+    ImGui::SetScrollHereY(0.0F);
+    focused_error = key;
 }
 
 struct SearchableIdOption {

@@ -317,6 +317,7 @@ if(FABRIC_BUILD_EDITORS)
     add_executable(map_studio
         editors/map_studio/main.cpp
         editors/map_studio/resource_picker.cpp
+        editors/map_studio/scene_workspace.cpp
     )
     target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(map_studio PRIVATE fabric_editor fabric_editor_ui nfd)
