@@ -2720,8 +2720,12 @@ int run(const std::filesystem::path& project_root,
                             reference->expected_type = "animation";
                         else property.reset();
                     }
-                    const auto applied = property && session.set_instance_property(
-                        selected_id, std::move(*property));
+                    const auto applied = property && property->id == "animation"
+                        ? session.set_instance_animation(
+                              selected_id,
+                              std::get<fabric::project::ResourceReference>(property->value))
+                        : property && session.set_instance_property(
+                              selected_id, std::move(*property));
                     status = applied ? "Instance property applied" : "Instance property rejected";
                     if (applied) {
                         instance_property_id.clear();

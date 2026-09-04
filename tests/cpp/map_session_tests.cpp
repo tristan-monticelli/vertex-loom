@@ -185,6 +185,20 @@ TEST_CASE("map session snaps placement on a configurable grid") {
     CHECK(std::get<std::int64_t>(session.map()->instances.front().properties.front().value) == 4);
     REQUIRE(session.undo());
     CHECK(std::get<std::int64_t>(session.map()->instances.front().properties.front().value) == 3);
+    REQUIRE(session.set_instance_animation(
+        {.value = "hero"},
+        fabric::project::ResourceReference{{.value = "walk"}, "animation"}));
+    REQUIRE(session.map()->instances.front().properties.size() == 2);
+    CHECK(std::get<fabric::project::ResourceReference>(
+              session.map()->instances.front().properties.back().value).id ==
+          fabric::core::ResourceId{.value = "walk"});
+    CHECK_FALSE(session.set_instance_animation(
+        {.value = "hero"},
+        fabric::project::ResourceReference{{.value = "walk"}, "entity"}));
+    REQUIRE(session.set_instance_animation({.value = "hero"}, std::nullopt));
+    CHECK(session.map()->instances.front().properties.size() == 1);
+    REQUIRE(session.undo());
+    CHECK(session.map()->instances.front().properties.size() == 2);
     CHECK_FALSE(session.set_instance_property({.value = "hero"}, {"", false}));
     CHECK(fabric::editor::MapSession::snap_position({5.0F, 5.0F}, {.grid_size = 0.0F}) ==
           fabric::core::Vec2{5.0F, 5.0F});

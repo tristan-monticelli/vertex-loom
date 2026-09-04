@@ -344,6 +344,32 @@ bool MapSession::set_instance_property(const core::ResourceId& instance_id,
     return commit(commands_, *map_, std::move(before), std::move(next));
 }
 
+bool MapSession::set_instance_animation(
+    const core::ResourceId& instance_id,
+    std::optional<project::ResourceReference> animation) {
+    if (!map_) return false;
+    const auto found = find_instance(*map_, instance_id);
+    if (!found || instance_locked(*map_, *found)) return false;
+    if (animation &&
+        (animation->expected_type != "animation" ||
+         !core::ResourceId::is_valid(animation->id.value)))
+        return false;
+
+    auto next = *map_;
+    auto& properties = next.instances[*found].properties;
+    const auto existing = std::find_if(properties.begin(), properties.end(),
+        [](const auto& candidate) { return candidate.id == "animation"; });
+    if (animation) {
+        project::MapProperty property{"animation", *animation};
+        if (existing != properties.end()) existing->value = std::move(property.value);
+        else properties.push_back(std::move(property));
+    } else if (existing != properties.end()) {
+        properties.erase(existing);
+    }
+    auto before = *map_;
+    return commit(commands_, *map_, std::move(before), std::move(next));
+}
+
 bool MapSession::set_instance_path_follower(
     const core::ResourceId& instance_id,
     std::optional<project::PathFollowerState> follower) {

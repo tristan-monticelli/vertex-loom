@@ -46,6 +46,9 @@ public:
                                             const core::ResourceId& layer_id);
     [[nodiscard]] bool set_instance_property(const core::ResourceId& instance_id,
                                               project::MapProperty property);
+    [[nodiscard]] bool set_instance_animation(
+        const core::ResourceId& instance_id,
+        std::optional<project::ResourceReference> animation);
     [[nodiscard]] bool set_instance_path_follower(
         const core::ResourceId& instance_id,
         std::optional<project::PathFollowerState> follower);

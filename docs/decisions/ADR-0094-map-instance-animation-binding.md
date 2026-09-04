@@ -29,6 +29,11 @@ il échantillonne le rail attaché à la même instance et compose sa transforma
 avec le déplacement de base. Map Studio peut créer ce clip depuis l'inspecteur
 PathFollower et l'attacher avec une référence `animation` ordinaire.
 
+L'attachement et le retrait depuis l'éditeur passent par une commande
+nominale `MapSession::set_instance_animation`. Cette commande accepte
+uniquement une référence de type `animation`, vérifie l'identifiant et reste
+undoable ; l'interface n'écrit donc plus directement une propriété custom.
+
 ## Conséquences
 
 - Une map peut persister une animation par instance sans changer de schéma.
