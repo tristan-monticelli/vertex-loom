@@ -1754,8 +1754,11 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 for (auto& packet : visual.packets) {
                     if (packet.image_fill &&
                         !ensure_texture(packet.image_fill->texture)) return false;
+                    const auto render_transform = instance.path_follower
+                        ? impl_->entity_simulations.at(instance.id).instance_transform
+                        : instance.transform;
                     transform_packet(packet, resolved_entity, node_index,
-                                     instance.transform);
+                                     render_transform);
                     packet.node_id = instance.id + ":" + node.id + ":" +
                         packet.node_id;
                     impl_->packet_base_transforms.emplace(
@@ -1801,7 +1804,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     }
                     apply_material(packet, *loaded_material.asset);
                 }
-                transform_packet(packet, resolved_entity, node_index, instance.transform);
+                const auto render_transform = instance.path_follower
+                    ? impl_->entity_simulations.at(instance.id).instance_transform
+                    : instance.transform;
+                transform_packet(packet, resolved_entity, node_index, render_transform);
                 packet.node_id = instance.id + ":" + node.id;
                 impl_->packet_base_transforms.emplace(
                     packet.node_id, Impl::PacketBaseTransform{
@@ -1810,7 +1816,7 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                         .scale = node.transform.scale,
                         .world_origin = apply_node_transform(
                             {0.0F, 0.0F}, resolved_entity, node_index,
-                            instance.transform)});
+                            render_transform)});
                 impl_->packet_sort_keys.emplace(
                     packet.node_id, Impl::PacketSortKey{layer_depth, node.z_order});
                 impl_->packets.push_back(std::move(packet));
