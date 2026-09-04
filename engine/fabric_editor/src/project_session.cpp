@@ -3568,6 +3568,23 @@ bool ProjectSession::move_selected_animation_keys(
     return true;
 }
 
+bool ProjectSession::scale_selected_animation_keys(
+    const std::span<const AnimationKeySelection> selection,
+    const float pivot_time, const float scale,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.scale_keys(selection, pivot_time, scale)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks.keys.time",
+                    "the selected keys cannot be scaled around this pivot"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_animation_track_curve(
     project::PropertyBinding binding,
     const project::AnimationInterpolation interpolation,

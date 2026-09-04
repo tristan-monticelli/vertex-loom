@@ -121,7 +121,8 @@ workspaces Asset Studio et du reste de l'inspecteur Map demeure ouverte.
 - Map : palette, duplication/multi-placement, collisions directes, bodies,
   pivots, joints, sensors et liens sélectionnables sur le canvas.
 - Rig : bones, mesh, poids colorés, IK et contraintes éditables sur le Stage.
-- Animation : box-select, déplacement/scale multi-clés, courbes et événements.
+- Animation : courbes avancées et événements ; box-select, déplacement groupé
+  et `Alt`+glisser pour scaler une sélection autour du playhead sont réalisés.
 - Logic : erreurs sur ports/liens, trace live, pause, step et breakpoints.
 - Publish : dépendances, validations cliquables, plateforme et résultat du
   runtime dans un workspace dédié.

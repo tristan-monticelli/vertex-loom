@@ -60,6 +60,9 @@ public:
     [[nodiscard]] bool move_keys(
         std::span<const AnimationKeySelection> selection,
         float time_delta);
+    [[nodiscard]] bool scale_keys(
+        std::span<const AnimationKeySelection> selection,
+        float pivot_time, float scale);
     [[nodiscard]] bool set_track_curve(
         const project::PropertyBinding& binding,
         project::AnimationInterpolation interpolation,

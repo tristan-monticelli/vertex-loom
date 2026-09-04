@@ -270,6 +270,11 @@ public:
         std::span<const AnimationKeySelection> selection, float time_delta,
         AutosaveScheduler::Clock::time_point now =
             AutosaveScheduler::Clock::now());
+    [[nodiscard]] bool scale_selected_animation_keys(
+        std::span<const AnimationKeySelection> selection,
+        float pivot_time, float scale,
+        AutosaveScheduler::Clock::time_point now =
+            AutosaveScheduler::Clock::now());
     [[nodiscard]] bool set_selected_animation_track_curve(
         project::PropertyBinding binding,
         project::AnimationInterpolation interpolation,

@@ -634,6 +634,8 @@ struct AnimationUiState {
     std::optional<KeySelection> dragging_key;
     float dragging_key_time{};
     float dragging_key_original_time{};
+    float dragging_key_pivot_time{};
+    bool scaling_keys{};
     std::vector<KeySelection> selected_keys;
     std::vector<ClipboardEntry> key_clipboard;
     bool box_selecting{};
@@ -772,6 +774,8 @@ void draw_animation_timeline_dock(
             }
         }
     }
+    ImGui::TextDisabled(
+        "Drag selected keys to move · Alt+drag to scale around the playhead");
 
     if (!ImGui::BeginChild("Animation timeline scroll", {0.0F, 0.0F}, true,
                            ImGuiWindowFlags_HorizontalScrollbar)) {
@@ -888,8 +892,25 @@ void draw_animation_timeline_dock(
             const AnimationUiState::KeySelection candidate{track.binding, key_index};
             const bool dragging = ui.dragging_key &&
                 same_animation_key(*ui.dragging_key, candidate);
-            const float key_time = dragging ? ui.dragging_key_time
-                                            : track.keys[key_index].time;
+            const bool selected = std::ranges::any_of(
+                ui.selected_keys, [&](const auto& value) {
+                    return same_animation_key(value, candidate);
+                });
+            float key_time = dragging ? ui.dragging_key_time
+                                      : track.keys[key_index].time;
+            if (ui.scaling_keys && ui.dragging_key && selected) {
+                const float denominator = ui.dragging_key_original_time -
+                    ui.dragging_key_pivot_time;
+                if (std::abs(denominator) > 0.0001F) {
+                    const float scale = (ui.dragging_key_time -
+                        ui.dragging_key_pivot_time) / denominator;
+                    if (scale > 0.0F) {
+                        key_time = ui.dragging_key_pivot_time +
+                            (track.keys[key_index].time -
+                             ui.dragging_key_pivot_time) * scale;
+                    }
+                }
+            }
             const float x = x_for_time(key_time);
             if (ui_entity_animation_workflow_probe_enabled &&
                 track.binding.property_id == "position" && key_index == 1U) {
@@ -899,10 +920,6 @@ void draw_animation_timeline_dock(
                     ui_animation_second_key_original_time =
                         track.keys[key_index].time;
             }
-            const bool selected = std::ranges::any_of(
-                ui.selected_keys, [&](const auto& value) {
-                    return same_animation_key(value, candidate);
-                });
             const ImU32 color = selected ? IM_COL32(255, 190, 80, 255)
                                          : IM_COL32(104, 190, 255, 255);
             draw->AddQuadFilled({x, center - 6.0F}, {x + 6.0F, center},
@@ -951,10 +968,13 @@ void draw_animation_timeline_dock(
                 clip.tracks, hovered_key->binding,
                 &fabric::project::AnimationTrack::binding);
             if (track != clip.tracks.end() && hovered_key->index < track->keys.size()) {
-                ui.scrub_time = track->keys[hovered_key->index].time;
+                ui.scaling_keys = ImGui::GetIO().KeyAlt;
+                ui.dragging_key_pivot_time = ui.scrub_time;
+                if (!ui.scaling_keys)
+                    ui.scrub_time = track->keys[hovered_key->index].time;
                 ui.dragging_key = hovered_key;
-                ui.dragging_key_time = ui.scrub_time;
-                ui.dragging_key_original_time = ui.scrub_time;
+                ui.dragging_key_time = track->keys[hovered_key->index].time;
+                ui.dragging_key_original_time = ui.dragging_key_time;
             }
         } else if (mouse.x >= time_start) {
             ui.scrub_time = time_for_x(mouse.x);
@@ -965,8 +985,6 @@ void draw_animation_timeline_dock(
                 ui.box_select_start = mouse;
                 ui.box_select_current = mouse;
                 if (!ui.box_select_additive) ui.selected_keys.clear();
-            } else {
-                ui.selected_keys.clear();
             }
         }
     }
@@ -1026,19 +1044,35 @@ void draw_animation_timeline_dock(
             if (selection.empty()) {
                 selection.push_back({moving.binding, moving.index});
             }
-            if (session.move_selected_animation_keys(selection, delta)) {
+            const float denominator = ui.dragging_key_original_time -
+                ui.dragging_key_pivot_time;
+            const float scale = std::abs(denominator) > 0.0001F
+                ? (ui.dragging_key_time - ui.dragging_key_pivot_time) /
+                    denominator
+                : 0.0F;
+            const bool changed = ui.scaling_keys
+                ? session.scale_selected_animation_keys(
+                      selection, ui.dragging_key_pivot_time, scale)
+                : session.move_selected_animation_keys(selection, delta);
+            if (changed) {
                 ui.scrub_time = ui.dragging_key_time;
                 const auto moved_count = selection.size();
-                ui.selected_keys.clear();
-                status = moved_count == 1U
-                    ? "Animation key moved."
-                    : std::to_string(moved_count) +
-                        " animation keys moved together.";
+                if (!ui.scaling_keys) ui.selected_keys.clear();
+                status = ui.scaling_keys
+                    ? std::to_string(moved_count) +
+                        " animation keys scaled around the playhead."
+                    : moved_count == 1U
+                        ? "Animation key moved."
+                        : std::to_string(moved_count) +
+                            " animation keys moved together.";
             } else {
-                status = "Key move rejected; keep the group inside the clip.";
+                status = ui.scaling_keys
+                    ? "Key scale rejected; keep the group on one side of a valid pivot and inside the clip."
+                    : "Key move rejected; keep the group inside the clip.";
             }
         }
         ui.dragging_key.reset();
+        ui.scaling_keys = false;
     }
     ImGui::EndChild();
     if (quick_marker) {

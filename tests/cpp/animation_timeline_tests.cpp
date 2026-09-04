@@ -46,6 +46,39 @@ TEST_CASE("animation timeline edits are undoable and redoable") {
     REQUIRE(source.tracks.front().keys.size() == 2);
 }
 
+TEST_CASE("animation timeline scales a key selection atomically around a pivot") {
+    auto source = clip();
+    fabric::editor::CommandStack commands;
+    fabric::editor::AnimationTimeline timeline(source, commands);
+    const fabric::project::PropertyBinding binding{
+        "root", "transform", "opacity"};
+    REQUIRE(timeline.insert_key(
+        binding, 0.5F, 0.0F,
+        fabric::project::AnimationInterpolation::linear));
+    REQUIRE(timeline.insert_key(
+        binding, 1.5F, 1.0F,
+        fabric::project::AnimationInterpolation::linear));
+    const std::vector selection{
+        fabric::editor::AnimationKeySelection{binding, 0U},
+        fabric::editor::AnimationKeySelection{binding, 1U}};
+
+    REQUIRE(timeline.scale_keys(selection, 1.0F, 0.5F));
+    CHECK(source.tracks.front().keys[0].time == 0.75F);
+    CHECK(source.tracks.front().keys[1].time == 1.25F);
+    REQUIRE(commands.undo());
+    CHECK(source.tracks.front().keys[0].time == 0.5F);
+    CHECK(source.tracks.front().keys[1].time == 1.5F);
+    REQUIRE(commands.redo());
+    CHECK(source.tracks.front().keys[0].time == 0.75F);
+    CHECK(source.tracks.front().keys[1].time == 1.25F);
+
+    const auto before = source;
+    CHECK_FALSE(timeline.scale_keys(selection, 0.0F, 2.0F));
+    CHECK(source == before);
+    CHECK_FALSE(timeline.scale_keys(selection, 1.0F, -1.0F));
+    CHECK(source == before);
+}
+
 TEST_CASE("animation timeline lists registered animatable properties for a node") {
     fabric::project::PropertyDescriptorRegistry registry;
     REQUIRE(registry.register_descriptor({

@@ -249,6 +249,48 @@ bool AnimationTimeline::move_keys(
     return commit(commands_, clip_, std::move(before), std::move(next));
 }
 
+bool AnimationTimeline::scale_keys(
+    const std::span<const AnimationKeySelection> selection,
+    const float pivot_time, const float scale) {
+    if (selection.empty() || !std::isfinite(pivot_time) ||
+        !std::isfinite(scale) || pivot_time < 0.0F ||
+        pivot_time > clip_.duration || scale <= 0.0F) {
+        return false;
+    }
+    auto next = clip_;
+    std::vector<AnimationKeySelection> applied;
+    std::vector<project::PropertyBinding> touched_tracks;
+    applied.reserve(selection.size());
+    touched_tracks.reserve(selection.size());
+    for (const auto& selected : selection) {
+        if (std::ranges::find(applied, selected) != applied.end()) return false;
+        auto* track = find_track(next, selected.binding);
+        if (track == nullptr || selected.key_index >= track->keys.size())
+            return false;
+        const float scaled_time = pivot_time +
+            (track->keys[selected.key_index].time - pivot_time) * scale;
+        if (!std::isfinite(scaled_time) || scaled_time < 0.0F ||
+            scaled_time > next.duration) {
+            return false;
+        }
+        track->keys[selected.key_index].time = scaled_time;
+        applied.push_back(selected);
+        if (std::ranges::find(touched_tracks, selected.binding) ==
+            touched_tracks.end()) {
+            touched_tracks.push_back(selected.binding);
+        }
+    }
+    for (const auto& binding : touched_tracks) {
+        auto* track = find_track(next, binding);
+        std::stable_sort(track->keys.begin(), track->keys.end(),
+                         [](const auto& left, const auto& right) {
+                             return left.time < right.time;
+                         });
+    }
+    auto before = clip_;
+    return commit(commands_, clip_, std::move(before), std::move(next));
+}
+
 bool AnimationTimeline::set_track_curve(
     const project::PropertyBinding& binding,
     const project::AnimationInterpolation interpolation,

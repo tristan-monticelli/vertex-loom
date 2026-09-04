@@ -22,6 +22,16 @@ sélectionnées dans une seule commande. L'opération est refusée en entier si 
 référence est périmée, dupliquée ou si une clé sortirait de la durée du clip ;
 undo/redo ne peut donc jamais laisser un groupe partiellement déplacé.
 
+La mise à l'échelle temporelle d'un groupe suit la même règle atomique. Elle
+utilise le playhead comme pivot et un facteur strictement positif ; chaque
+temps devient `pivot + (temps - pivot) × facteur`. L'opération entière est
+refusée si le pivot ou le facteur est invalide, si une référence est périmée
+ou si une clé sortirait du clip. Dans la timeline, `Alt` + glisser une clé d'une
+sélection calcule ce facteur depuis la clé manipulée ; le glisser sans
+modificateur conserve la translation commune.
+Un clic dans la règle déplace le playhead sans vider la sélection, afin que le
+pivot puisse être posé après un box-select sans reconstruire le groupe.
+
 Les bindings visuels de base restent explicites dans le clip : `material/color`
 et `material/opacity` sont conservés, tandis que l’éditeur expose aussi
 `fill/color` et `imageFill/opacity` pour cibler directement les paquets de

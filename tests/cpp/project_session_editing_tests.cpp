@@ -1681,6 +1681,15 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
     CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.0F);
     CHECK(session.selected_animation()->tracks.front().keys[1].time == 1.25F);
     REQUIRE(session.redo(start));
+    REQUIRE(session.scale_selected_animation_keys(
+        multi_key_selection, 1.0F, 0.5F, start));
+    CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.625F);
+    CHECK(session.selected_animation()->tracks.front().keys[1].time == 1.25F);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_animation()->tracks.front().keys[0].time == 0.25F);
+    CHECK(session.selected_animation()->tracks.front().keys[1].time == 1.5F);
+    CHECK_FALSE(session.scale_selected_animation_keys(
+        multi_key_selection, 1.0F, 0.0F, start));
     const std::array duplicate_selection{
         fabric::editor::AnimationKeySelection{position_binding, 0U},
         fabric::editor::AnimationKeySelection{position_binding, 0U}};
