@@ -1,6 +1,7 @@
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/editor/editor_action_registry.hpp"
 #include "fabric/editor/editor_context.hpp"
+#include "fabric/editor/studio_workspace.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/autosave_scheduler.hpp"
 
@@ -331,6 +332,68 @@ TEST_CASE("editor context preserves selection and active document identity") {
     CHECK(context.active_document()->id.value == "entity-a");
     REQUIRE(context.active_document()->selection_id.has_value());
     CHECK(context.active_document()->selection_id->value == "component-a");
+}
+
+TEST_CASE("editor context restores view state per stable document") {
+    using fabric::core::ResourceId;
+    using fabric::editor::EditorContext;
+    using fabric::editor::EditorViewState;
+    using fabric::editor::EditorWorkspace;
+
+    EditorContext context;
+    REQUIRE(context.open_document(ResourceId{.value = "entity-a"},
+                                  EditorWorkspace::entity));
+    REQUIRE(context.set_view(EditorViewState{
+        .zoom = 2.0F,
+        .pan = {14.0F, -7.0F},
+        .active_tool = "move",
+        .active_panel = "hierarchy",
+    }));
+    REQUIRE(context.open_document(ResourceId{.value = "animation-a"},
+                                  EditorWorkspace::animation));
+    REQUIRE(context.set_view(EditorViewState{
+        .zoom = 0.75F,
+        .playhead = 1.25F,
+        .active_tool = "key",
+        .active_panel = "timeline",
+    }));
+
+    REQUIRE(context.go_back());
+    REQUIRE(context.active_document() != nullptr);
+    CHECK(context.active_document()->view.zoom == 2.0F);
+    CHECK(context.active_document()->view.pan == fabric::core::Vec2{14.0F,
+                                                                    -7.0F});
+    CHECK(context.active_document()->view.active_tool == "move");
+    REQUIRE(context.go_forward());
+    CHECK(context.active_document()->view.playhead == 1.25F);
+    CHECK(context.active_document()->view.active_panel == "timeline");
+}
+
+TEST_CASE("every studio resource kind routes to a task workspace") {
+    using Kind = fabric::editor::StudioResourceKind;
+    using Workspace = fabric::editor::EditorWorkspace;
+
+    CHECK(fabric::editor::workspace_for(Kind::texture) == Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::vector) == Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::material) == Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::textured_path) ==
+          Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::visual_composition) ==
+          Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::visual_component) ==
+          Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::audio) == Workspace::visual);
+    CHECK(fabric::editor::workspace_for(Kind::entity) == Workspace::entity);
+    CHECK(fabric::editor::workspace_for(Kind::transformation) ==
+          Workspace::entity);
+    CHECK(fabric::editor::workspace_for(Kind::animation) ==
+          Workspace::animation);
+    CHECK(fabric::editor::workspace_for(Kind::input) == Workspace::logic);
+    CHECK(fabric::editor::workspace_for(Kind::behavior) == Workspace::logic);
+    CHECK(fabric::editor::workspace_for(Kind::mechanic) == Workspace::logic);
+    CHECK(fabric::editor::workspace_for(Kind::map) == Workspace::map);
+    CHECK(fabric::editor::workspace_for(Kind::scene) == Workspace::scene);
+    CHECK(fabric::editor::workspace_for(Kind::replay) == Workspace::publish);
 }
 
 TEST_CASE("editor context rejects invalid transient identifiers") {

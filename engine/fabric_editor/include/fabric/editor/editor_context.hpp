@@ -1,10 +1,12 @@
 #pragma once
 
 #include "fabric/core/resource_id.hpp"
+#include "fabric/core/types.hpp"
 
 #include <algorithm>
 #include <cstddef>
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -30,10 +32,22 @@ struct EditorLocation {
         default;
 };
 
+struct EditorViewState {
+    float zoom{1.0F};
+    core::Vec2 pan;
+    float playhead{};
+    std::string active_tool;
+    std::string active_panel;
+
+    friend bool operator==(const EditorViewState&, const EditorViewState&) =
+        default;
+};
+
 struct EditorDocumentState {
     core::ResourceId id;
     EditorWorkspace workspace{EditorWorkspace::visual};
     std::optional<core::ResourceId> selection_id;
+    EditorViewState view;
 };
 
 class EditorContext {
@@ -145,6 +159,14 @@ public:
         if (!history_.empty()) {
             history_[history_cursor_].selection_id = std::move(selection_id);
         }
+        return true;
+    }
+
+    [[nodiscard]] bool set_view(EditorViewState view) {
+        if (!active_document_.has_value()) {
+            return false;
+        }
+        documents_[*active_document_].view = std::move(view);
         return true;
     }
 

@@ -188,6 +188,12 @@ composition ; Behavior et Mechanic partagent la grammaire Logic sans fusionner
 leurs contrats ; Map et Scene partagent le contexte de monde ; Replay, package
 et diagnostics rejoignent Publish.
 
+Pendant la migration, la barre `DocumentTabs` est hébergée en tête du panneau
+Project d’Asset Studio et du contenu principal de Map Studio. Elle conserve
+par ID de ressource le workspace, la sélection et l’état de vue éphémère ; une
+activation demande ensuite à la session métier existante de charger la
+ressource. Elle ne détient jamais le document persistant.
+
 Le premier incrément n'ajoute aucune fonction visible. Il extrait les widgets
 partagés et l'état UI afin que les incréments suivants puissent garantir :
 
