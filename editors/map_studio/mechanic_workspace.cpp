@@ -196,10 +196,9 @@ void draw_mechanic_workspace(fabric::editor::MechanicSession& session,
                           std::string& status,
                           fabric::editor::ProjectSession& resource_catalog,
                           MechanicWorkspaceProbe* probe) {
-    ImGui::Begin("Mechanics");
+    ImGui::SeparatorText("Mechanics");
     if (!map_session.map()) {
         ImGui::TextDisabled("Open a map before editing mechanics.");
-        ImGui::End();
         return;
     }
 
@@ -352,7 +351,6 @@ void draw_mechanic_workspace(fabric::editor::MechanicSession& session,
         for (const auto& error : session.errors())
             ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
                                error.field.c_str(), error.message.c_str());
-        ImGui::End();
         return;
     }
     if (state.pending_canvas_connection) {
@@ -731,7 +729,6 @@ void draw_mechanic_workspace(fabric::editor::MechanicSession& session,
         ImGui::TextColored({1.0F, 0.62F, 0.25F, 1.0F}, "%s: %s",
                            error.field.c_str(), error.message.c_str());
     ImGui::Columns(1);
-    ImGui::End();
 }
 
 

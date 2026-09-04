@@ -104,7 +104,9 @@ avec affichage réel.
 Progression : Resource Picker, Scene, Mechanic et le canvas Map sont sortis de
 `map_studio/main.cpp`. Les diagnostics de champ et pickers simples sont
 partagés. Scene publie désormais sa campagne et la recharge avec le runtime du
-paquet. Dans Asset Studio, Animation Graph est accessible directement depuis
+paquet. Map, Scene et Mechanics partagent désormais la surface principale et
+les onglets/historique d'`EditorContext` au lieu de trois fenêtres concurrentes.
+Dans Asset Studio, Animation Graph est accessible directement depuis
 l'Entity et remplace la timeline dans le Task Workspace contextuel au lieu de
 s'ouvrir dans une fenêtre sans historique commun. Behavior Graph utilise le
 Stage complet du document sélectionné et sa création est une action nominale

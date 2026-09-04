@@ -561,6 +561,10 @@ int run(const std::filesystem::path& project_root,
     MechanicWorkspaceState mechanic_editor;
     MechanicWorkspaceProbe mechanic_probe;
     SceneWorkspaceState scene_editor;
+    enum class ActiveWorkspace { map, scene, mechanic };
+    ActiveWorkspace active_workspace = mechanic_e2e
+        ? ActiveWorkspace::mechanic
+        : scene_e2e ? ActiveWorkspace::scene : ActiveWorkspace::map;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
     if (!map_renderer.initialize()) {
@@ -1147,27 +1151,40 @@ int run(const std::filesystem::path& project_root,
                             selected_instances.push_back(
                                 document.selection_id->value);
                         }
-                        ImGui::SetWindowFocus("Map Studio");
+                        active_workspace = ActiveWorkspace::map;
                         return true;
                     }
                     if (document.workspace ==
                             fabric::editor::EditorWorkspace::scene &&
                         scene_session.scene() &&
                         scene_session.scene()->document.id == document.id) {
-                        ImGui::SetWindowFocus("Scene Studio");
+                        active_workspace = ActiveWorkspace::scene;
                         return true;
                     }
                     if (document.workspace ==
                             fabric::editor::EditorWorkspace::logic &&
                         mechanic_session.graph() &&
                         mechanic_session.graph()->document.id == document.id) {
-                        ImGui::SetWindowFocus("Mechanics");
+                        active_workspace = ActiveWorkspace::mechanic;
                         return true;
                     }
                     return false;
                 }));
             ImGui::Separator();
         }
+        if (ImGui::RadioButton(
+                "Map", active_workspace == ActiveWorkspace::map))
+            active_workspace = ActiveWorkspace::map;
+        ImGui::SameLine();
+        if (ImGui::RadioButton(
+                "Scene", active_workspace == ActiveWorkspace::scene))
+            active_workspace = ActiveWorkspace::scene;
+        ImGui::SameLine();
+        if (ImGui::RadioButton(
+                "Mechanics", active_workspace == ActiveWorkspace::mechanic))
+            active_workspace = ActiveWorkspace::mechanic;
+        ImGui::Separator();
+        if (active_workspace == ActiveWorkspace::map) {
         if (!session.has_map()) {
             const float start_width = std::min(640.0F, ImGui::GetContentRegionAvail().x);
             ImGui::SetCursorPosX(std::max(
@@ -2433,6 +2450,15 @@ int run(const std::filesystem::path& project_root,
             draw_validation_errors(package_errors, "Package");
             draw_validation_errors(session.errors());
         }
+        } else if (active_workspace == ActiveWorkspace::scene) {
+            draw_scene_workspace(
+                scene_session, project_root, window, scene_editor, status,
+                package_errors, resource_catalog, choose_folder);
+        } else {
+            draw_mechanic_workspace(
+                mechanic_session, session, mechanic_editor, status,
+                resource_catalog, &mechanic_probe);
+        }
         ImGui::End();
         const auto* selected_document = editor_context.active_document();
         if (selected_document != nullptr &&
@@ -2455,14 +2481,6 @@ int run(const std::filesystem::path& project_root,
             static_cast<void>(
                 editor_context.set_selection(std::move(stable_selection)));
         }
-
-        draw_mechanic_workspace(mechanic_session, session, mechanic_editor,
-                                status, resource_catalog, &mechanic_probe);
-        draw_scene_workspace(scene_session, project_root, window, scene_editor,
-                             status, package_errors, resource_catalog,
-                             choose_folder);
-        if (mechanic_e2e && mechanic_e2e_frame == 0U)
-            ImGui::SetWindowFocus("Mechanics");
 
         if (const auto ready = transition_guard.take_ready();
             ready == fabric::editor::SessionAction::quit) {

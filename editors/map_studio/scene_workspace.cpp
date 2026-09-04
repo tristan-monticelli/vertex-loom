@@ -28,17 +28,15 @@ void draw_scene_workspace(
     std::vector<project::Error>& package_errors,
     editor::ProjectSession& resource_catalog,
     const SceneFolderPicker& choose_folder) {
-    ImGui::Begin("Scene Studio");
+    ImGui::SeparatorText("Scenes");
     if (project_root.empty()) {
         ImGui::TextDisabled("Open a project map to author its scenes.");
-        ImGui::End();
         return;
     }
     const auto loaded_manifest = project::load_manifest(project_root);
     if (!loaded_manifest.ok()) {
         ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
                            "Project manifest unavailable");
-        ImGui::End();
         return;
     }
     const auto maps_directory =
@@ -112,7 +110,6 @@ void draw_scene_workspace(
 
     if (!session.has_scene()) {
         draw_validation_errors(session.errors());
-        ImGui::End();
         return;
     }
     if (session.has_recovery()) {
@@ -392,7 +389,6 @@ void draw_scene_workspace(
     }
     draw_validation_errors(package_errors, "Package");
     draw_validation_errors(session.errors());
-    ImGui::End();
 }
 
 } // namespace fabric::map_studio
