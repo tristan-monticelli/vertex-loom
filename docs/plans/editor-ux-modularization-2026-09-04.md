@@ -129,6 +129,9 @@ picker typé, sans lui céder sauvegarde, undo/redo ou mutations persistantes.
 Animation Graph suit la même frontière : cartes, transitions, paramètres de
 preview, sélection et sonde E2E appartiennent au module du graphe, tandis que
 `ProjectSession` reste seul propriétaire de l'Entity et de son historique.
+La timeline Animation est séparée à son tour avec son état de transport,
+sélection multiple, presse-papiers de clés et sonde graphique ; le shell et
+l'inspecteur partagent cet état explicite sans recopier le clip persistant.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne
