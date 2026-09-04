@@ -1,6 +1,7 @@
 #include "fabric/editor/command_stack.hpp"
 #include "fabric/editor/editor_action_registry.hpp"
 #include "fabric/editor/editor_context.hpp"
+#include "fabric/editor/editor_layout_preferences.hpp"
 #include "fabric/editor/studio_workspace.hpp"
 #include "fabric/editor/session_transition.hpp"
 #include "fabric/editor/autosave_scheduler.hpp"
@@ -8,6 +9,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -394,6 +398,46 @@ TEST_CASE("every studio resource kind routes to a task workspace") {
     CHECK(fabric::editor::workspace_for(Kind::map) == Workspace::map);
     CHECK(fabric::editor::workspace_for(Kind::scene) == Workspace::scene);
     CHECK(fabric::editor::workspace_for(Kind::replay) == Workspace::publish);
+}
+
+TEST_CASE("editor layout preferences round trip outside project documents") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("vertex-loom-layout-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    const auto path = root / "layout.json";
+    const fabric::editor::EditorLayoutPreferences expected{
+        .mode = fabric::editor::EditorLayoutMode::compact,
+        .primary_panel_width = 235.0F,
+        .secondary_panel_width = 315.0F,
+        .task_panel_height = 205.0F,
+    };
+
+    REQUIRE(fabric::editor::save_layout_preferences(path, expected));
+    const auto loaded = fabric::editor::load_layout_preferences(path);
+    REQUIRE(loaded.has_value());
+    CHECK(*loaded == expected);
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("invalid editor layout preferences fail without changing defaults") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("vertex-loom-layout-invalid-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    std::filesystem::create_directories(root);
+    const auto path = root / "layout.json";
+    {
+        std::ofstream output(path);
+        output << "{\"schemaVersion\":1,\"mode\":42}";
+    }
+    std::string error;
+    CHECK_FALSE(fabric::editor::load_layout_preferences(path, &error)
+                    .has_value());
+    CHECK_FALSE(error.empty());
+
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
 }
 
 TEST_CASE("editor context rejects invalid transient identifiers") {

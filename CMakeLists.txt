@@ -237,6 +237,7 @@ add_library(fabric_editor STATIC
     engine/fabric_editor/src/command_stack.cpp
     engine/fabric_editor/src/creation_prompts.cpp
     engine/fabric_editor/src/map_session.cpp
+    engine/fabric_editor/src/editor_layout_preferences.cpp
     engine/fabric_editor/src/mechanic_presets.cpp
     engine/fabric_editor/src/mechanic_session.cpp
     engine/fabric_editor/src/project_session.cpp

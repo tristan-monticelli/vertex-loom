@@ -150,6 +150,7 @@ flowchart LR
     Shell --> Tabs[Documents et historique]
     Shell --> Context[EditorContext]
     Shell --> SharedWidgets[Widgets ImGui partagés]
+    Shell --> Preferences[Préférences locales de layout]
     Context --> Selection[Sélection logique]
     Context --> Actions[Registre d'actions]
     Context --> Diagnostics[Diagnostics contextualisés]
@@ -174,6 +175,7 @@ flowchart LR
 | Editor Shell | fenêtre, menus, onglets, navigation, layout local | document métier ou sérialisation |
 | EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
 | DocumentTabs | onglets, retour/avant et activation de la session par ID stable | chargement ou mutation d'une ressource |
+| LayoutPreferences | mode compact/large et dimensions des panneaux dans le dossier utilisateur | ressource ou manifeste du projet |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |
 | Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
