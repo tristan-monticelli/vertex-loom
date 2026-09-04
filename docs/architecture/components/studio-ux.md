@@ -136,6 +136,65 @@ connexion rapide part d'un port de sortie et choisit automatiquement le premier
 port d'entrée compatible de la cible. L'identifiant unique est généré par
 l'interface, tandis que `BehaviorSession` conserve validation, undo et dirty.
 
+## Cible de modularisation du shell
+
+ADR-0151 remplace l'accumulation de panneaux dans les deux points d'entrée par
+une migration progressive vers un shell partagé. Cette section décrit la cible,
+pas l'état actuel : tant qu'un workspace n'est pas porté, son implémentation
+historique reste la surface active et ses tests continuent de s'appliquer.
+
+```mermaid
+flowchart LR
+    User[Créateur] --> Shell[Editor Shell partagé]
+    Shell --> Browser[Resource Browser]
+    Shell --> Tabs[Documents et historique]
+    Shell --> Context[EditorContext]
+    Context --> Selection[Sélection logique]
+    Context --> Actions[Registre d'actions]
+    Context --> Diagnostics[Diagnostics contextualisés]
+    Shell --> Workspaces[Registre de workspaces]
+    Workspaces --> Visual[Visual et Entity]
+    Workspaces --> Animation[Animation]
+    Workspaces --> Logic[Logic]
+    Workspaces --> Map[Map et Scene]
+    Workspaces --> Rig[Rig et Physics]
+    Workspaces --> Publish[Publish]
+    Selection --> Hierarchy[Hierarchy]
+    Selection --> Stage[Stage ou graphe]
+    Selection --> Inspector[Inspector]
+    Selection --> TaskDock[Timeline, trace ou palette]
+    Actions --> Sessions[Sessions métier existantes]
+    Sessions --> Storage[Validation et stockage atomique]
+```
+
+| Composant | Propriétaire | Ne doit pas posséder |
+| --- | --- | --- |
+| Editor Shell | fenêtre, menus, onglets, navigation, layout local | document métier ou sérialisation |
+| EditorContext | documents ouverts, sélection stable, workspace, historique | copie mutable d'une ressource |
+| Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
+| Workspace | composition des panneaux et outils de la tâche | seconde implémentation d'une commande métier |
+| Inspector | propriétés de la sélection et sections progressives | sélection indépendante du canvas |
+| Task Dock | timeline, palette, trace, diagnostics ou simulation contextuelle | navigation globale du projet |
+| Session métier | validation, commande, undo/redo, dirty, autosave | état de fenêtre, zoom ou layout |
+
+Le shell route une ressource vers son workspace responsable au lieu de traiter
+les 16 types comme 16 applications équivalentes. Texture, vectoriel, matériau,
+TexturedPath, VisualComponent et VisualComposition appartiennent au parcours
+Visual ; Entity, Animation et Transformation partagent la même identité de
+composition ; Behavior et Mechanic partagent la grammaire Logic sans fusionner
+leurs contrats ; Map et Scene partagent le contexte de monde ; Replay, package
+et diagnostics rejoignent Publish.
+
+Le premier incrément n'ajoute aucune fonction visible. Il extrait les widgets
+partagés et l'état UI afin que les incréments suivants puissent garantir :
+
+- une sélection stable par identifiant, jamais par index statique transversal ;
+- retour/avant et onglets sans perdre playhead, zoom, outil ni panneau actif ;
+- les mêmes actions et raisons de blocage dans menu, palette, raccourci et bouton ;
+- un layout large à trois zones et un layout compact qui replie les panneaux
+  latéraux sans réduire le Stage sous sa taille utile ;
+- un diagnostic activable qui revient au document, à l'objet et au champ fautif.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne

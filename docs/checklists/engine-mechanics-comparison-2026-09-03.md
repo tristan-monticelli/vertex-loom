@@ -88,6 +88,83 @@ Les fenêtres modales doivent rester limitées au nom, au template et aux
 confirmations. La composition, le rig, les graphes et les relations doivent
 rester visibles pendant l'édition et conserver sélection, zoom et contexte.
 
+## Audit UX transversal et décision de refactoring — 2026-09-04
+
+### Réponse directe
+
+Un refactoring global de l'UX est nécessaire. Une réécriture globale ne l'est
+pas. Les sessions métier, commandes undoables, validateurs, formats JSON et
+renderers sont des fondations réutilisables ; le problème est leur orchestration
+dans l'éditeur. La cible est fixée par
+[ADR-0151](../decisions/ADR-0151-progressive-editor-ux-modularization.md) et ses
+tranches sont détaillées dans le
+[plan de refactoring UX](../plans/editor-ux-modularization-2026-09-04.md).
+
+Les preuves structurelles sont mesurables : `asset_studio/main.cpp` contient
+12 770 lignes et 1 824 appels ImGui ; `map_studio/main.cpp` contient 4 612
+lignes et 786 appels ImGui. Les deux fichiers mélangent bootstrap, état UI,
+widgets, workspaces, orchestration des sessions et E2E. Ils dupliquent les
+pickers, filtres, aides techniques et raisons de désactivation. Asset Studio
+force trois panneaux par coordonnées ; Map Studio force une fenêtre plein
+écran puis compose trois enfants, tandis que Scene, Mechanics, Behavior Graph
+et Animation Graph gardent des fenêtres et sélections séparées. Il n'existe ni
+onglets de documents, ni historique retour/avant global, ni palette de
+commandes, ni état de sélection transversal unique.
+
+### Comparaison de réalisation UX
+
+`Fort` signifie qu'une documentation officielle décrit le parcours comme une
+surface nominale ; cela ne mesure ni la qualité esthétique ni la profondeur du
+runtime. `N/A` conserve le périmètre spécialisé de Spine et Rive.
+
+| Dimension UX | Vertex Loom réalisé | Godot | Unity | Unreal | GameMaker | Construct | Spine | Rive | Verdict |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Projet et ressources | arbre filtrable de 16 types, import et actions ; deux Studios séparés | Fort | Fort | Fort | Fort | Fort | N/A | partiel | Regrouper la navigation et router vers le bon workspace, sans fusionner les contrats |
+| Hiérarchie → canvas → inspecteur | cohérent pour Entity ; partiel et dense pour Map | Fort | Fort | Fort | Fort | Fort | Fort | Fort | Convergence externe claire ; une sélection stable partagée est P0 |
+| Composition Entity/prefab | drag, parentage, multi-sélection et gizmo prouvés | Fort | Fort | Fort | partiel | Fort | partiel | partiel | Parcours nominal utilisable ; variantes, overrides et réparation doivent rester contextuels |
+| Animation de propriétés | deux poses, auto-key, playhead, déplacement de clé et événement prouvés | Fort | Fort | Fort | Fort | partiel | Fort | Fort | Bonne base ; courbes, sélection multi-clés et preuve publiée manquent |
+| Machine d'états et logique | graphes Animation, Behavior et Mechanic visibles ; debug faible | Fort | Fort | Fort | partiel | Fort | N/A | Fort | Ajouter recherche contextuelle, erreurs sur liens, trace et breakpoints avant plus de nœuds |
+| Construction de niveau | placement, calques, snapping, collisions et triggers ; formulaire très dense | Fort | Fort | Fort | Fort | Fort | N/A | N/A | Écart majeur : pas de palette de peinture, tilemap, terrain, navigation ni édition directe des joints |
+| Rig, IK, mesh et poids | contrats/solveurs et inspecteurs numériques | Fort | Fort | Fort | partiel | partiel | Fort | Fort | Le runtime précède fortement l'authoring ; workspace canvas dédié requis |
+| Preview, debug et publication | preview/package/tests disponibles mais parcours auteur publié incomplet | Fort | Fort | Fort | Fort | Fort | preview/export | preview/export | Unifier Play/Pause/Step, diagnostics cliquables et preuve UI→package→runtime |
+| Adaptation de l'espace | large/minimum testés ; positions forcées et préférences non persistées | Fort | Fort | Fort | Fort | Fort | Fort | Fort | Shell adaptatif et préférences locales nécessaires ; éviter la configurabilité illimitée au départ |
+| Découverte et commandes | recherche de ressources et palettes de graphes ; actions dispersées | Fort | Fort | Fort | Fort | Fort | Fort | Fort | Registre d'actions et palette de commandes partagés, mêmes raccourcis et raisons de blocage |
+| Accessibilité | navigation clavier et contraste testés ; libellés mixtes anglais/français | partiel | partiel | partiel | partiel | partiel | partiel | partiel | La preuve actuelle est minimale ; focus, ordre, mise à l'échelle et localisation restent à couvrir |
+| Architecture de l'éditeur | deux grands points d'entrée et état statique local | docks/plugins documentés | fenêtres dockables documentées | éditeurs/modules/plugins documentés | interne non prouvé | vues/bars/addons documentés | interne non prouvé | interne non prouvé | Refactor Vertex Loom requis ; ne pas inférer l'architecture des outils propriétaires depuis leur apparence |
+
+Sources de cette synthèse : G9/G16–G18, U8/U15–U17, E9/E17–E19,
+GM4/GM5/GM8/GM9, C6/C8/C10/C11, S4–S6 et R4–R6.
+
+### Parcours complets à accepter
+
+| Parcours | État actuel | Condition de sortie |
+| --- | --- | --- |
+| Projet → import → visuel → Entity | L3 | mêmes actions dans un navigateur partagé, retour/avant et reload sans perte de sélection |
+| Entity → enfant → clip → deux poses → événement | L3 | ajouter courbes/multi-clés puis exécuter le résultat dans le paquet publié |
+| Entity → Animation Graph → Behavior | L3 | conserver l'Entity et le nœud sélectionnés, montrer la trace et revenir à la propriété fautive |
+| Map → placement → collision/trigger → mécanique | L2/L3 | sélection unique entre canvas, inspecteur et graphe ; bodies/pivots/joints manipulables sur la map |
+| Map → Scene → campagne → Publish | L2 | onglets/historique partagés, dépendances visibles, validation cliquable et runtime de release lancé |
+| Entity → Rig/IK/XPBD → Animation | L1/L2 | création de bones/mesh/poids/contraintes sur canvas, preview puis reload sans préparation API |
+| Erreur → diagnostic → réparation | L1/L2 | chaque erreur ouvre le document, sélectionne l'objet et focalise le champ ou handle concerné |
+
+### Ordre de refactoring retenu
+
+1. `P0 — fondation sans changement visuel` : extraire état UI, actions,
+   diagnostics et widgets partagés ; interdire de nouveaux éditeurs complets
+   dans les deux `main.cpp`.
+2. `P0 — continuité` : shell commun, onglets/historique, sélection par ID,
+   Resource Browser, Inspector et palette de commandes ; E2E de navigation.
+3. `P0 — production` : porter Entity/Animation/Logic, puis Map/Scene ; ajouter
+   édition directe des mécaniques et preuve UI→package→runtime.
+4. `P1 — outils spécialisés` : Rig/IK/XPBD, tilemap/navigation, Audio, Replay
+   et debug visuel sur les mêmes composants.
+5. `P2 — extension` : plugins, collaboration et personnalisation poussée après
+   stabilisation des frontières du shell.
+
+Ce plan reprend les principes convergents des autres moteurs sans importer leur
+complexité générale. Chaque tranche doit garder les E2E existants verts et ne
+modifier aucun schéma persistant.
+
 ## Tableau maître
 
 | Domaine | Capacité | Preuve Vertex Loom | Studio | Preview | Runtime publié | État | Godot | Unity | Unreal | GameMaker | Construct | Spine | Rive | Écart/impact | Priorité | Recommandation | Sources officielles |
@@ -145,6 +222,15 @@ rester visibles pendant l'édition et conserver sélection, zoom et contexte.
 | Collaboration | A51 — source control, diff/merge sémantique et verrouillage | JSON textuel diffable et écritures atomiques ; aucune intégration VCS ni merge sémantique | non | N/A | N/A | partiel | ✓ | ✓ | ✓ | partiel | partiel | N/A | N/A | Conflits sur gros documents et assets binaires non assistés | P2 | Garder les formats stables puis ajouter diff sémantique avant intégration VCS | G1, U1, E1 |
 | Plateformes | A52 — matrice d'export et certification | CMake/builds natifs et package interne ; preuve release complète limitée au macOS local documenté | partiel | partiel | partiel | non prouvé | ✓ | ✓ | ✓ | ✓ | ✓ | runtimes ciblés | runtimes ciblés | Portabilité de code ne vaut pas validation Windows/Linux/mobile/web/console | P0 | Matrice CI réelle par cible, smoke GPU/audio/input et artefacts signés | G7, U7, E7, C5, S3, R3 |
 | 3D | A53 — scène, rendu, animation et physique 3D | Périmètre architectural explicitement 2D ; aucun contrat 3D | non | non | non | absent | ✓ | ✓ | ✓ | partiel | — | N/A | N/A | Pas un défaut pour le périmètre 2D actuel ; bloque seulement un futur produit 3D | P2 | Conserver hors périmètre tant qu'un besoin produit ne justifie pas un second moteur | G1, U1, E1 |
+| UX globale | A54 — navigation unifiée, documents, retour/avant et restauration du contexte | Arbre Asset Studio et ouverture Map séparés ; aucune barre d'onglets ni historique global ; état local par fenêtre | partiel | N/A | N/A | absent | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Les tâches transversales perdent workspace, sélection, zoom ou playhead | P0 | Shell partagé et `EditorContext` selon ADR-0151, avec E2E Entity→Animation→Map→retour | G16, U15, E17, GM8, C10, R6 |
+| UX globale | A55 — sélection logique synchronisée entre arbre, canvas, timeline, graphe et inspecteur | Entity synchronise plusieurs surfaces ; Map, Scene et graphes gardent des sélections locales, parfois par index statique | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Risque de modifier un autre objet après navigation ou mutation de collection | P0 | Identité de sélection par ressource/objet stable, propriétaire unique dans `EditorContext` | G9, U15, E9, GM8, C6, S5, R6 |
+| UX globale | A56 — registre d'actions et palette de commandes contextuelle | Menus, raccourcis et boutons invoquent directement des branches distinctes ; palettes limitées aux graphes | partiel | N/A | N/A | absent | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Découverte faible et raisons de blocage incohérentes entre surfaces | P0 | Une action nommée avec disponibilité, raccourci, raison et invocation partagée | G16, U15, E17, GM8, C10, S5, R6 |
+| Inspecteur | A57 — divulgation progressive, recherche, multi-édition, revert et favoris | Sections repliables et quelques pickers ; pas de recherche globale de propriétés, favoris ou revert uniforme ; multi-édition limitée | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Les fonctions avancées restent longues à trouver et les écarts aux défauts sont peu visibles | P1 | Inspector partagé, recherche, propriétés modifiées, revert et édition commune de sélection | G9, U15, E9, GM8, C6, S5, R6 |
+| UX globale | A58 — layout adaptatif, panneaux repliables et préférences locales | Tailles minimale testées ; positions forcées, largeurs statiques en mémoire et fenêtres auxiliaires | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Le canvas Map devient trop petit et l'espace n'est pas restauré entre sessions | P1 | Deux layouts bornés large/compact puis persistance locale ; garder le Stage prioritaire | G16, U15, E18, GM8, C10, S5, R6 |
+| Outils canvas | A59 — modes contextuels et manipulation directe des relations | Gizmos Entity/vectoriels et placement Map ; rig, IK, XPBD et joints mécaniques restent des formulaires | partiel | oui | oui | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | Le runtime physique est plus riche que ce qu'un auteur peut construire visuellement | P0 | Barre d'outils par workspace et handles directs synchronisés avec l'Inspector | G6, U8, E18, GM9, C6, S6, R6 |
+| Debug UX | A60 — diagnostics cliquables, trace, breakpoints et inspection live | erreurs textuelles, overlays et pas fixe ; aucune navigation diagnostic→objet ni breakpoint de graphe | partiel | partiel | partiel | absent | ✓ | ✓ | ✓ | ✓ | ✓ | N/A | partiel | Débogage coûteux et rupture entre erreur, document et cause | P0 | Diagnostic typé avec cible navigable, trace sur nœuds, pause/step et breakpoints éphémères | G10, U10, E11, GM7, C8, R5 |
+| Architecture UX | A61 — shell et workspaces modulaires testables | `asset_studio/main.cpp` 12 770 lignes/1 824 appels ImGui ; `map_studio/main.cpp` 4 612/786 ; helpers et états dupliqués | non | N/A | N/A | absent | ✓ | ✓ | ✓ | non prouvé | partiel | non prouvé | non prouvé | Chaque ajout augmente le couplage, la duplication et le risque de régression transversale | P0 | Migration en quatre tranches ADR-0151 ; bootstrap, shell, widgets et workspaces séparés | G18, U17, E19, GM5, C11, S5, R6 |
+| Accessibilité UX | A62 — focus, clavier, échelle et langue cohérente | contraste et navigation ImGui testés ; focus partiel ; libellés français/anglais mélangés et aucune localisation du Studio | partiel | N/A | N/A | partiel | ✓ | ✓ | ✓ | ✓ | ✓ | partiel | partiel | Utilisation clavier et compréhension inégales selon panneau et taille d'écran | P1 | Catalogue de libellés, ordre de focus, échelle UI et scénarios clavier par parcours | G9, U15, E9, GM8, C10, S5, R6 |
 
 ## Couverture exhaustive interne
 
@@ -198,7 +284,9 @@ projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
   package, published runtime, benchmark/logging → A01/A03/A35/A36/A34/A37.
 - Capacités transverses comparées : scripting/extensions → A43/A44 ; navigation
   → A45 ; VFX → A46 ; UI/localisation → A47/A48 ; réseau → A49 ; debug → A50 ;
-  collaboration → A51 ; plateformes/3D → A52/A53.
+  collaboration → A51 ; plateformes/3D → A52/A53 ; navigation et sélection UX,
+  actions, inspecteur, layout, outils canvas, debug, architecture et
+  accessibilité des Studios → A54–A62.
 
 ### Groupes d'ADR
 
@@ -211,6 +299,7 @@ projet. Le menu `draw_kind` expose bien les 16 valeurs de l'explorateur.
 | Prompts, entités, preview, simulation | 0086–0103 | A14–A21, A24–A28 |
 | Composition, chemins, comportements, publication | 0104–0135 | A09–A16, A22–A23, A29, A31, A36 |
 | Beam/Button/surfaces/release/UX | 0136–0150 | A06–A07, A10–A11, A21, A34, A36–A42 |
+| Modularisation progressive des Studios | 0151 | A54–A62 |
 
 ## Registre affirmation → source officielle
 
@@ -290,23 +379,47 @@ de qualité ou de format.
 | C8 | Event Sheet édite visuellement conditions/actions et fournit recherche et breakpoints. | [Construct — Event Sheet View](https://www.construct.net/en/make-games/manuals/construct-3/interface/event-sheet-view) |
 | C9 | L'objet Particles Construct émet et paramètre des particules 2D. | [Construct — Particles](https://www.construct.net/en/make-games/manuals/construct-3/plugin-reference/particles) |
 | R5 | En mode State Machine, Rive remplace la timeline par un graphe visuel d'états et transitions. | [Rive — State Machine](https://rive.app/docs/editor/state-machine/state-machine) |
+| G16 | Godot organise FileSystem, Scene, Inspector et panneaux inférieurs autour du viewport ; l'animation et le debug apparaissent dans le contexte du projet. | [Godot — First look at the editor](https://docs.godotengine.org/en/stable/getting_started/introduction/first_look_at_the_editor.html) |
+| G17 | Le TileMap editor fournit sélection, peinture, ligne, rectangle, remplissage, motifs, terrains et placeholders de références absentes. | [Godot — Using TileMaps](https://docs.godotengine.org/en/stable/tutorials/2d/using_tilemaps.html) |
+| U15 | Unity 6 relie Hierarchy et Scene, et l'Inspector affiche les propriétés de la sélection d'objets, assets ou composants. | [Unity 6 — Hierarchy](https://docs.unity3d.com/6000.0/Documentation/Manual/Hierarchy.html), [Inspector](https://docs.unity3d.com/6000.0/Documentation/Manual/UsingTheInspector.html) |
+| U16 | Le mode Prefab isole l'édition de l'asset tout en conservant son contexte et ses objets dans Hierarchy/Scene. | [Unity 6 — Editing a Prefab in Prefab Mode](https://docs.unity3d.com/6000.0/Documentation/Manual/EditingInPrefabMode.html) |
+| E17 | Unreal est réalisé comme une suite d'éditeurs spécialisés — Level, Blueprint, Physics Asset, Sequencer et Animation — partageant des conventions d'outils. | [Unreal — Tools and Editors](https://dev.epicgames.com/documentation/unreal-engine/tools-and-editors-in-unreal-engine) |
+| E18 | Le Level Editor combine viewport, Content Browser, Outliner, Details et modes d'édition spécialisés. | [Unreal — Level Editor](https://dev.epicgames.com/documentation/unreal-engine/level-editor-in-unreal-engine) |
+| GM8 | L'Inspector GameMaker suit assets, couches, instances et pistes, accepte la multi-sélection et peut rester verrouillé sur une cible. | [GameMaker — Inspector](https://manual.gamemaker.io/monthly/en/IDE_Tools/The_Inspector.htm) |
+| GM9 | Le Sequence Editor crée une piste et une clé lorsqu'un asset est placé dans son canvas, puis anime ses paramètres au playhead. | [GameMaker — Sequences](https://manual.gamemaker.io/monthly/en/Quick_Start_Guide/Sequences.htm) |
+| C10 | Construct organise menu/toolbar, onglets de vues, vue centrale, Properties, Project et Layers bars ; les bars sont réarrangeables et dockables. | [Construct 3 — Interface](https://www.construct.net/en/make-games/manuals/construct-3/overview/the-interface) |
+| S5 | Spine centre la navigation sur un Tree hiérarchique filtrable et synchronise sélection et clés entre viewport, dopesheet et graph. | [Spine — Tree view](https://en.esotericsoftware.com/spine-tree), [Dopesheet](https://us.esotericsoftware.com/spine-dopesheet) |
+| S6 | Spine expose les poids dans une vue dédiée avec bones colorés, sélection de vertex, pinceaux, auto, smooth et test de déformation. | [Spine — Weights view](https://us.esotericsoftware.com/spine-weights) |
+| R6 | Rive n'affiche que les outils contextuels : Hierarchy, Stage et Inspector partagent la sélection ; la Timeline apparaît en Animate et cède sa place au graphe d'état. | [Rive — Interface Overview](https://rive.app/docs/editor/interface-overview/overview) |
+| G18 | Les plugins Godot peuvent ajouter des outils, nœuds et docks à l'éditeur sans recompiler le moteur. | [Godot — Making plugins](https://docs.godotengine.org/en/stable/tutorials/plugins/editor/making_plugins.html) |
+| U17 | `EditorWindow` permet d'implémenter des fenêtres Unity spécialisées flottantes ou dockées comme onglets. | [Unity 6 — EditorWindow](https://docs.unity3d.com/6000.0/Documentation/ScriptReference/EditorWindow.html) |
+| E19 | Unreal encapsule outils éditeur et runtime dans des modules, et ses plugins peuvent ajouter menus, commandes, sous-modes et types de fichiers. | [Unreal — Modules](https://dev.epicgames.com/documentation/en-us/unreal-engine/unreal-engine-modules), [Plugins](https://dev.epicgames.com/documentation/en-us/unreal-engine/plugins-in-unreal-engine) |
+| C11 | L'Addon SDK de Construct étend l'éditeur et le runtime avec plugins, behaviors, effets, thèmes et importeurs personnalisés. | [Construct — Addon SDK](https://www.construct.net/en/make-games/manuals/addon-sdk) |
 
 ## Conclusion et ordre de correction
 
 La régression A07 a été corrigée et vérifiée sur affichage réel : les nouveaux
 Beam et Button préservent la source sans effet ; la recoloration reste
-explicite. En revanche, A15/A17/A18/A23/A27/A28/A39/A40 ne peuvent pas être
-considérés comme terminés côté utilisateur : leurs contrats et runtimes sont
-plus avancés que leurs parcours Studio et que leur niveau de preuve.
+explicite. Les parcours Entity, Animation, Animation Graph, Behavior Graph et
+Mechanic Graph ont atteint L3 : ils sont réellement manipulables, sauvegardés
+et rechargés par l'UI. Ils ne deviennent pas L4 tant que le même scénario ne
+va pas jusqu'au runtime publié.
+
+Le déficit dominant est désormais transversal. A54–A61 montrent que les outils
+utilisables restent assemblés dans deux points d'entrée monolithiques, avec des
+sélections, fenêtres, actions et diagnostics locaux. Ajouter des fonctions dans
+cette structure recréerait les chemins incohérents déjà observés. Le refactoring
+progressif d'ADR-0151 est donc un prérequis P0, pas un nettoyage facultatif.
 
 Ordre de correction recommandé :
 
-1. `P0 — rendre le cœur utilisable` : Entity de zéro à sauvegarde, Animation de
-   zéro à lecture, graphes visuels Animation/Behavior/Mechanic, debug pas-à-pas
-   et E2E UI→Preview→package→runtime sans préparation API.
-2. `P1 — rendre la production efficace` : rig/IK/XPBD sur canvas, Map palette et
+1. `P0 — stabiliser l'éditeur` : état, actions, widgets et diagnostics partagés,
+   puis shell commun, navigation et sélection stable.
+2. `P0 — finir le flux produit` : porter Entity/Animation/Logic et Map/Scene,
+   manipuler mécaniques sur canvas et prouver UI→Preview→package→runtime.
+3. `P1 — rendre la production efficace` : rig/IK/XPBD sur canvas, Map palette et
    tilemap, import/édition Audio, navigation, VFX, UI de jeu et localisation.
-3. `P2 — élargir seulement sur besoin produit` : réseau, collaboration intégrée,
+4. `P2 — élargir seulement sur besoin produit` : réseau, collaboration intégrée,
    3D et familles supplémentaires de contraintes/effets.
 
 Le gate juridique A38 et la matrice de plateformes A52 restent bloquants avant
