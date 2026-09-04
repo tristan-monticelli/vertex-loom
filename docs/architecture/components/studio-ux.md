@@ -52,7 +52,7 @@ la totalité du futur document.
 | Workspace | Sélection conservée | Canvas | Inspecteur | Dock inférieur |
 | --- | --- | --- | --- | --- |
 | Entity | ressource et nœud | composition, sélection directe et gizmos | propriétés du nœud ; commandes de clé | diagnostics/dépendances |
-| Animation | Entity, nœud, clip et playhead | pose évaluée et gizmos auto-key | propriété ou clé sélectionnée | transport, pistes, clés, marqueurs et courbes |
+| Animation | Entity, nœud, clip et playhead | pose évaluée et gizmos auto-key | propriété ou clé sélectionnée | transport, pistes, clés, marqueurs, courbes et diagnostics du graphe |
 
 Le Resource Explorer fournit `Créer une Entity depuis la sélection`. Le
 workspace Entity fournit `Animate selected node…` en conservant le nœud par son
@@ -68,7 +68,10 @@ clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
 tangentes, composition additive et segment A→B sont avancés, jamais requis pour
 la première animation. `toggle_animation_graph` partage enfin l'ouverture du
 graphe entre le bouton Entity et la palette, sans seconde branche de
-navigation. Voir ADR-0147 et ADR-0150.
+navigation. Animation Graph affiche dans ce workspace les erreurs structurées
+de validation (champ et message) avant la preview, depuis la même source
+`ProjectSession`, sans contrat de diagnostic UI parallèle. Voir ADR-0147 et
+ADR-0150.
 
 La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
 vectoriels ou composants. Elle appartient au workspace, pas à une variable

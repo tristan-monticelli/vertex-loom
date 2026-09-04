@@ -47,6 +47,10 @@ clip` ; l'identifiant est dérivé du clip et rendu unique. L'utilisateur ne doi
 pas ouvrir l'onglet technique `States` ni saisir d'identifiant pour agrandir le
 graphe nominal.
 
+Le workspace affiche immédiatement le résultat de `validate_animation_state_machine`.
+Chaque erreur expose son champ et son message avant l'évaluation de la preview,
+afin que l'auteur puisse corriger le graphe dans le même contexte.
+
 La Timeline expose aussi `Ajouter un événement au playhead` dans sa barre
 principale. Cette action génère un nom `event-N` unique et crée un marqueur sans
 audio ; le volet avancé reste disponible pour renommer, choisir un temps exact

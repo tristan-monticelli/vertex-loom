@@ -2,6 +2,8 @@
 
 #include "editor_widgets.hpp"
 
+#include "fabric/project/animation_state_machine.hpp"
+
 #include <imgui.h>
 #include <imgui_stdlib.h>
 
@@ -99,6 +101,23 @@ void draw_animation_graph_workspace(
     ImGui::TextDisabled("%zu states · %zu transitions",
                         machine_snapshot.states.size(),
                         machine_snapshot.transitions.size());
+    const auto graph_validation =
+        fabric::project::validate_animation_state_machine(machine_snapshot);
+    if (!graph_validation.ok()) {
+        ImGui::SeparatorText("Graph diagnostics");
+        ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
+                           "%zu issue%s block reliable preview",
+                           graph_validation.errors.size(),
+                           graph_validation.errors.size() == 1U ? "" : "s");
+        for (const auto& error : graph_validation.errors) {
+            ImGui::BulletText("%s", error.field.c_str());
+            ImGui::SameLine();
+            ImGui::TextWrapped("%s", error.message.c_str());
+        }
+    } else {
+        ImGui::TextColored({0.45F, 0.85F, 0.55F, 1.0F},
+                           "Graph valid for preview");
+    }
     if (ui.new_state_clip_id.empty() &&
         first_animation != session.resources().end())
         ui.new_state_clip_id = first_animation->id.value;
