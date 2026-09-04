@@ -98,6 +98,13 @@ doivent provenir de ces gestes et non d'un segment A→B préparé par la sessio
 états toujours associés à un clip existant, leurs transitions, conditions,
 priorités et temps de sortie, puis simule le choix déterministe avec des
 paramètres éphémères. Il ne mélange pas ces paramètres de preview au document.
+Son entrée nominale est un canevas auto-layouté : les cartes exposent le nom et
+le clip, l'état initial est marqué, et les transitions sont des flèches. Une
+commande de liaison sur la carte source suivie d'un clic sur la carte cible
+ajoute une transition avec un identifiant unique. Le layout et la sélection
+restent éphémères ; les états, liens et options continuent à passer par la
+commande Entity existante. Les onglets `States`, `Transitions` et `Preview`
+servent d'inspecteurs avancés, sans devenir obligatoires pour relier deux états.
 L'ancien formulaire de state machine dans `Advanced Entity systems` est retiré
 du parcours : il pouvait tenter de sauvegarder un état sans clip valide.
 L'E2E du panneau et celui du gizmo Entity s'exécutent successivement afin qu'une

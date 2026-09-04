@@ -196,6 +196,12 @@ Entity exige en plus que l'action nominale d'animation et le transform soient
 réellement rendus ; le scénario Animation exige le picker nominal de nœud et
 une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
 puisse pas satisfaire la recette UX.
+Le même E2E Entity initialise deux états sans transition, puis utilise les
+coordonnées réelles de `Connect from here` et de la carte cible dans le canevas
+Animation Graph. Après sauvegarde/rechargement, il exige la transition
+`idle-to-active` et produit `asset-studio-animation-graph-e2e.ppm` avec les
+deux cartes et leur flèche. Une transition injectée par la session avant
+l'affichage ne satisfait pas cette recette.
 Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique successivement
 `Create Entity from visual`, `Animate selected node...`, `Create animation` et

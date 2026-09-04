@@ -33,6 +33,13 @@ playhead. En auto-key, une modification par gizmo ou inspecteur produit le même
 résultat. Le binding brut, les tangentes, la composition additive et le
 formulaire A→B restent dans un volet avancé.
 
+L'Animation Graph s'ouvre sur un canevas d'états, pas sur le schéma persistant.
+Chaque état affiche son nom, son clip et son rôle initial ; chaque transition est
+une flèche. `Relier depuis cet état`, puis la sélection d'une carte cible, crée
+une transition valide avec un identifiant généré. Les onglets de formulaire
+restent disponibles pour les conditions, priorités et temps de sortie. Le layout
+automatique du canevas est un état de présentation et ne modifie aucun contrat.
+
 Les dialogues modaux se limitent au nom, au template ou à la confirmation. Ils
 ne contiennent plus l'arbre, les blocs ou les pistes.
 
@@ -66,6 +73,10 @@ ne contiennent plus l'arbre, les blocs ou les pistes.
   événements SDL. La piste Position doit contenir les poses initiale et finale
   après rechargement ; modifier directement l'état du document ou du playhead
   depuis le harnais ne satisfait pas ce critère.
+- L'Animation Graph rend tous les états et toutes les transitions dans le
+  canevas. Une liaison peut être créée en choisissant la source puis la cible,
+  sans saisir les identifiants techniques ; elle reste éditable dans
+  l'inspecteur et persiste après rechargement.
 
 ## Conséquences
 

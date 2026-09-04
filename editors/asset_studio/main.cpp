@@ -110,6 +110,12 @@ ImVec2 ui_animation_auto_key_screen{};
 ImVec2 ui_animation_playhead_target_screen{};
 bool ui_animation_graph_probe_enabled = false;
 bool ui_animation_graph_seen = false;
+bool ui_animation_graph_canvas_seen = false;
+bool ui_animation_graph_link_seen = false;
+bool ui_animation_graph_connect_seen = false;
+bool ui_animation_graph_target_seen = false;
+ImVec2 ui_animation_graph_connect_screen{};
+ImVec2 ui_animation_graph_target_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_animation_workflow_probe_enabled = false;
@@ -620,6 +626,8 @@ struct AnimationUiState {
 struct AnimationGraphUiState {
     bool open{};
     std::string current_state;
+    std::string selected_state;
+    std::string connection_source;
     std::string last_transition;
     float normalized_time{};
     std::vector<fabric::project::AnimationParameter> parameters;
@@ -3379,6 +3387,132 @@ void draw_animation_graph_editor(
     ImGui::TextDisabled("%zu states · %zu transitions",
                         machine_snapshot.states.size(),
                         machine_snapshot.transitions.size());
+    ImGui::SeparatorText("State graph");
+    ImGui::TextDisabled(
+        "Choose Connect from here, then click the destination state.");
+    const float graph_height = 250.0F;
+    if (ImGui::BeginChild("Animation state graph canvas", {0.0F, graph_height},
+                          ImGuiChildFlags_Borders)) {
+        if (ui_animation_graph_probe_enabled)
+            ui_animation_graph_canvas_seen = true;
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const float available_width = ImGui::GetContentRegionAvail().x;
+        constexpr float card_width = 176.0F;
+        constexpr float card_height = 58.0F;
+        constexpr float cell_width = 210.0F;
+        constexpr float cell_height = 108.0F;
+        const int columns = std::max(
+            1, static_cast<int>(available_width / cell_width));
+        std::vector<ImVec2> positions;
+        positions.reserve(machine_snapshot.states.size());
+        for (std::size_t index = 0; index < machine_snapshot.states.size();
+             ++index) {
+            const auto column = static_cast<int>(index) % columns;
+            const auto row = static_cast<int>(index) / columns;
+            positions.push_back({18.0F + static_cast<float>(column) * cell_width,
+                                 16.0F + static_cast<float>(row) * cell_height});
+        }
+
+        auto* draw = ImGui::GetWindowDrawList();
+        const ImU32 transition_color = ImGui::GetColorU32(ImGuiCol_PlotLines);
+        for (const auto& transition : machine_snapshot.transitions) {
+            const auto source = std::ranges::find(
+                machine_snapshot.states, transition.from_state,
+                &fabric::project::AnimationState::id);
+            const auto destination = std::ranges::find(
+                machine_snapshot.states, transition.to_state,
+                &fabric::project::AnimationState::id);
+            if (source == machine_snapshot.states.end() ||
+                destination == machine_snapshot.states.end())
+                continue;
+            const auto source_index = static_cast<std::size_t>(
+                std::distance(machine_snapshot.states.begin(), source));
+            const auto destination_index = static_cast<std::size_t>(
+                std::distance(machine_snapshot.states.begin(), destination));
+            const ImVec2 start{origin.x + positions[source_index].x + card_width,
+                               origin.y + positions[source_index].y +
+                                   card_height * 0.5F};
+            const ImVec2 end{origin.x + positions[destination_index].x,
+                             origin.y + positions[destination_index].y +
+                                 card_height * 0.5F};
+            const float bend = std::max(40.0F, std::abs(end.x - start.x) * 0.4F);
+            draw->AddBezierCubic(start, {start.x + bend, start.y},
+                                 {end.x - bend, end.y}, end,
+                                 transition_color, 2.0F);
+            draw->AddTriangleFilled(
+                end, {end.x - 9.0F, end.y - 5.0F},
+                {end.x - 9.0F, end.y + 5.0F}, transition_color);
+            if (ui_animation_graph_probe_enabled)
+                ui_animation_graph_link_seen = true;
+        }
+
+        std::optional<std::pair<std::string, std::string>> pending_connection;
+        for (std::size_t index = 0; index < machine_snapshot.states.size();
+             ++index) {
+            const auto& state = machine_snapshot.states[index];
+            ImGui::SetCursorScreenPos(
+                {origin.x + positions[index].x, origin.y + positions[index].y});
+            ImGui::PushID(state.id.c_str());
+            const bool selected_state = ui.selected_state == state.id;
+            if (selected_state)
+                ImGui::PushStyleColor(ImGuiCol_Button,
+                                      ImGui::GetStyleColorVec4(ImGuiCol_Header));
+            std::string label = state.id;
+            if (state.id == machine_snapshot.initial_state) label += "  [initial]";
+            label += "\n" + state.clip.id.value;
+            if (ImGui::Button(label.c_str(), {card_width, card_height})) {
+                ui.selected_state = state.id;
+                if (!ui.connection_source.empty() &&
+                    ui.connection_source != state.id)
+                    pending_connection =
+                        std::pair{ui.connection_source, state.id};
+            }
+            if (ui_animation_graph_probe_enabled && index == 1U) {
+                ui_animation_graph_target_seen = true;
+                ui_animation_graph_target_screen = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_animation_graph_target_screen.x =
+                    (ui_animation_graph_target_screen.x + maximum.x) * 0.5F;
+                ui_animation_graph_target_screen.y =
+                    (ui_animation_graph_target_screen.y + maximum.y) * 0.5F;
+            }
+            if (selected_state) ImGui::PopStyleColor();
+            if (ui.connection_source == state.id) {
+                if (ImGui::SmallButton("Cancel connection"))
+                    ui.connection_source.clear();
+            } else if (ImGui::SmallButton("Connect from here")) {
+                ui.connection_source = state.id;
+                ui.selected_state = state.id;
+            }
+            if (ui_animation_graph_probe_enabled && index == 0U) {
+                ui_animation_graph_connect_seen = true;
+                ui_animation_graph_connect_screen = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_animation_graph_connect_screen.x =
+                    (ui_animation_graph_connect_screen.x + maximum.x) * 0.5F;
+                ui_animation_graph_connect_screen.y =
+                    (ui_animation_graph_connect_screen.y + maximum.y) * 0.5F;
+            }
+            ImGui::PopID();
+        }
+        if (pending_connection) {
+            auto next = machine_snapshot;
+            std::string id = pending_connection->first + "-to-" +
+                pending_connection->second;
+            const std::string base = id;
+            std::size_t suffix = 2U;
+            while (std::ranges::any_of(next.transitions,
+                                        [&](const auto& candidate) {
+                return candidate.id == id;
+            })) id = base + "-" + std::to_string(suffix++);
+            next.transitions.push_back({.id = id,
+                .from_state = pending_connection->first,
+                .to_state = pending_connection->second});
+            commit_machine(std::move(next), "Animation states connected.");
+            ui.connection_source.clear();
+        }
+    }
+    ImGui::EndChild();
     if (ImGui::BeginTabBar("Animation graph tabs")) {
         if (ImGui::BeginTabItem("States")) {
             auto machine = machine_snapshot;
@@ -3646,6 +3780,8 @@ void draw_animation_graph_editor(
         if (ImGui::Button("Remove graph")) {
             commit_machine(std::nullopt, "Animation Graph removed.");
             ui.current_state.clear();
+            ui.selected_state.clear();
+            ui.connection_source.clear();
             ui.last_transition.clear();
             ImGui::CloseCurrentPopup();
         }
@@ -10151,6 +10287,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     if (entity_e2e && session.has_project()) {
         ui_animation_graph_probe_enabled = true;
         ui_animation_graph_seen = false;
+        ui_animation_graph_canvas_seen = false;
+        ui_animation_graph_link_seen = false;
+        ui_animation_graph_connect_seen = false;
+        ui_animation_graph_target_seen = false;
         ui_entity_animate_action_seen = false;
         ui_entity_transform_seen = false;
         const fabric::core::ResourceId entity_id{.value =
@@ -10203,16 +10343,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     .initial_state = "idle",
                     .states = {
                         {"idle", {{.value = "beam-scroll"}, "animation"}},
-                        {"active", {{.value = "beam-scroll"}, "animation"}}},
-                    .transitions = {{
-                        .id = "activate",
-                        .from_state = "idle",
-                        .to_state = "active",
-                        .conditions = {{
-                            "enabled",
-                            fabric::project::AnimationConditionOperator::equal,
-                            true}},
-                        .priority = 1}}};
+                        {"active", {{.value = "beam-scroll"}, "animation"}}}};
             with_graph.xpbd = fabric::project::XpbdSystem{
                 .particles = {
                     {{-5.0F, -2.0F}, 0.0F}, {{0.0F, 2.0F}, 1.0F},
@@ -10252,7 +10383,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             reloaded.selected_entity()->animation_state_machine &&
             reloaded.selected_entity()->animation_state_machine->states.size() == 2U &&
             reloaded.selected_entity()->animation_state_machine
-                    ->transitions.size() == 1U &&
+                    ->transitions.empty() &&
             visual.packets.size() >= 3U;
         if (!entity_e2e_complete)
             std::cerr << "Asset Studio Entity E2E failed\n";
@@ -10453,6 +10584,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     std::size_t ui_beam_frame = 0U;
     std::size_t ui_button_frame = 0U;
     bool entity_e2e_capture_written = false;
+    bool animation_graph_e2e_capture_written = false;
     bool animation_e2e_capture_written = false;
     std::size_t animation_ui_e2e_frame = 0U;
     std::size_t entity_animation_workflow_frame = 0U;
@@ -10904,13 +11036,35 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 static_cast<void>(SDL_PushEvent(&key));
             }
         }
-        if (entity_e2e && entity_gizmo_e2e_frame == 1U &&
-            ui_animation_graph_seen)
+        if (entity_e2e && entity_gizmo_e2e_frame >= 1U &&
+            entity_gizmo_e2e_frame <= 2U &&
+            ui_animation_graph_connect_seen && ui_animation_graph_target_seen) {
+            const ImVec2 target = entity_gizmo_e2e_frame == 1U
+                ? ui_animation_graph_connect_screen
+                : ui_animation_graph_target_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            for (const auto type : {SDL_MOUSEBUTTONDOWN, SDL_MOUSEBUTTONUP}) {
+                SDL_Event button{};
+                button.type = type;
+                button.button.button = SDL_BUTTON_LEFT;
+                button.button.windowID = SDL_GetWindowID(window);
+                button.button.x = motion.motion.x;
+                button.button.y = motion.motion.y;
+                static_cast<void>(SDL_PushEvent(&button));
+            }
+        }
+        if (entity_e2e && entity_gizmo_e2e_frame == 4U &&
+            ui_animation_graph_link_seen)
             animation_graph_ui.open = false;
-        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 1U &&
-            entity_gizmo_e2e_frame < 4U) {
+        if (entity_gizmo_e2e_active && entity_gizmo_e2e_frame >= 5U &&
+            entity_gizmo_e2e_frame < 8U) {
             const auto start = canvas.entity_gizmo_screen;
-            const auto moved = entity_gizmo_e2e_frame >= 2U;
+            const auto moved = entity_gizmo_e2e_frame >= 6U;
             const int mouse_x = static_cast<int>(start.x) + (moved ? 36 : 0);
             const int mouse_y = static_cast<int>(start.y);
             SDL_Event motion{};
@@ -10920,13 +11074,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             motion.motion.y = mouse_y;
             static_cast<void>(SDL_PushEvent(&motion));
             SDL_Event button{};
-            button.type = entity_gizmo_e2e_frame == 3U
+            button.type = entity_gizmo_e2e_frame == 7U
                 ? SDL_MOUSEBUTTONUP : SDL_MOUSEBUTTONDOWN;
             button.button.button = SDL_BUTTON_LEFT;
             button.button.windowID = SDL_GetWindowID(window);
             button.button.x = mouse_x;
             button.button.y = mouse_y;
-            if (entity_gizmo_e2e_frame != 2U)
+            if (entity_gizmo_e2e_frame != 6U)
                 static_cast<void>(SDL_PushEvent(&button));
         }
         if (animation_e2e && animation_ui_e2e_frame == 1U &&
@@ -11369,8 +11523,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         glViewport(0, 0, drawable_width, drawable_height);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (entity_e2e && ui_animation_graph_link_seen &&
+            !animation_graph_e2e_capture_written) {
+            write_frame_capture(initial_project, window,
+                                "asset-studio-animation-graph-e2e.ppm");
+            animation_graph_e2e_capture_written = true;
+        }
         if (entity_e2e && entity_e2e_complete &&
-            entity_gizmo_e2e_frame >= 2U && !entity_e2e_capture_written) {
+            entity_gizmo_e2e_frame >= 6U && !entity_e2e_capture_written) {
             write_frame_capture(initial_project, window,
                                 "asset-studio-entity-e2e.ppm");
             entity_e2e_capture_written = true;
@@ -11768,7 +11928,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (entity_gizmo_e2e_active) {
             ++entity_gizmo_e2e_frame;
-            if (entity_gizmo_e2e_frame == 4U) {
+            if (entity_gizmo_e2e_frame == 8U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool reopened = saved && reloaded.open(initial_project) &&
@@ -11776,7 +11936,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         fabric::editor::StudioResourceKind::entity,
                         {.value = "beam-entity"});
                 entity_e2e_complete = entity_e2e_complete && reopened &&
-                    ui_animation_graph_seen && ui_entity_animate_action_seen &&
+                    ui_animation_graph_seen && ui_animation_graph_canvas_seen &&
+                    ui_animation_graph_link_seen &&
+                    ui_entity_animate_action_seen &&
                     ui_entity_transform_seen &&
                     canvas.xpbd_overlay_visible &&
                     reloaded.selected_entity()->nodes.size() > 1U &&
@@ -11789,7 +11951,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     !reloaded.selected_entity()->animation_state_machine
                          ->transitions.empty() &&
                     reloaded.selected_entity()->animation_state_machine
-                            ->transitions.front().id == "activate";
+                            ->transitions.front().id == "idle-to-active";
                 if (!entity_e2e_complete)
                     std::cerr << "Asset Studio Entity Gizmo E2E failed: initial="
                               << entity_gizmo_e2e_initial_position.x << "\n";
