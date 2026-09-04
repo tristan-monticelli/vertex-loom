@@ -62,6 +62,7 @@ using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
 using fabric::asset_studio::draw_packet_preview_canvas;
 using fabric::editor_ui::contains_ascii_insensitive;
+using fabric::editor_ui::draw_command_palette;
 using fabric::editor_ui::draw_disabled_reason;
 using fabric::editor_ui::draw_document_navigation;
 using fabric::editor_ui::draw_resource_name_field;
@@ -2492,7 +2493,8 @@ float relative_luminance(const ImVec4 color) {
 }
 
 void write_ui_accessibility_probe(const std::filesystem::path& project_path,
-                                  const bool keyboard_navigation_enabled) {
+                                  const bool keyboard_navigation_enabled,
+                                  const bool command_palette_rendered) {
     if (project_path.empty()) return;
     const auto& colors = ImGui::GetStyle().Colors;
     const float background = relative_luminance(colors[ImGuiCol_WindowBg]);
@@ -2502,6 +2504,7 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
     nlohmann::json probe = {
         {"schema", "asset-studio-ui-accessibility-test-v1"},
         {"keyboard_navigation_enabled", keyboard_navigation_enabled},
+        {"command_palette_rendered", command_palette_rendered},
         {"text_window_contrast", contrast},
         {"text_window_contrast_ok", contrast >= 4.5F}};
     std::ofstream output(project_path / "asset-studio-ui-accessibility.json");
@@ -4241,6 +4244,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
+                    fabric::editor::EditorActionRegistry& actions,
+                    bool& command_palette_open,
+                    bool& command_palette_rendered,
                     fabric::editor::SessionTransitionGuard& transition_guard,
                     bool& running,
                     std::string& status) {
@@ -4354,6 +4360,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     ImGui::SetNextWindowPos({viewport->Pos.x, viewport->Pos.y + menu_height});
     ImGui::SetNextWindowSize({left_width, content_height});
     ImGui::Begin("Project", nullptr, fixed_panel_flags);
+    command_palette_rendered =
+        draw_command_palette(actions, command_palette_open) ||
+        command_palette_rendered;
     if (!editor_context.open_documents().empty()) {
         static_cast<void>(draw_document_navigation(
             editor_context,
@@ -11007,6 +11016,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     };
     fabric::editor::EditorActionRegistry actions;
     static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::new_project},
+        .label = "New project...",
+        .shortcut = new_shortcut,
+        .execute = [&] {
+            transition_guard.request(
+                fabric::editor::SessionAction::create_project, dirty());
+            return true;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{fabric::editor::editor_action_ids::open_project},
+        .label = "Open project...",
+        .shortcut = open_shortcut,
+        .execute = [&] {
+            if (session.has_project())
+                copy_path_to_buffer(session.project_root(), path_buffer);
+            transition_guard.request(
+                fabric::editor::SessionAction::open_project, dirty());
+            return true;
+        },
+    }));
+    static_cast<void>(actions.register_action({
         .id = std::string{fabric::editor::editor_action_ids::save},
         .label = "Save",
         .shortcut = save_shortcut,
@@ -11055,6 +11086,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             return redone;
         },
     }));
+    bool command_palette_open = ui_accessibility_test;
+    bool command_palette_rendered = false;
     while (running) {
         const auto push_workflow_mouse = [&](const ImVec2 position,
                                              const std::optional<Uint32> type,
@@ -11759,17 +11792,12 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("File")) {
                 if (ImGui::MenuItem("New project...", new_shortcut)) {
-                    transition_guard.request(
-                        fabric::editor::SessionAction::create_project,
-                        dirty());
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::new_project));
                 }
                 if (ImGui::MenuItem("Open project...", open_shortcut)) {
-                    if (session.has_project()) {
-                        copy_path_to_buffer(session.project_root(), path_buffer);
-                    }
-                    transition_guard.request(
-                        fabric::editor::SessionAction::open_project,
-                        dirty());
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::open_project));
                 }
                 const auto save_availability = actions.availability(
                     fabric::editor::editor_action_ids::save);
@@ -11846,6 +11874,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     static_cast<void>(actions.invoke(
                         fabric::editor::editor_action_ids::redo));
                 }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Command Palette...", "Cmd/Ctrl+Shift+P"))
+                    command_palette_open = true;
                 ImGui::EndMenu();
             }
             ImGui::TextDisabled("Native vector resource workspace");
@@ -11861,14 +11892,13 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId);
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_O, false)) {
-            transition_guard.request(fabric::editor::SessionAction::open_project,
-                                     dirty());
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::open_project));
         }
         if (shortcuts_enabled && command_modifier &&
             ImGui::IsKeyPressed(ImGuiKey_N, false)) {
-            transition_guard.request(
-                fabric::editor::SessionAction::create_project,
-                dirty());
+            static_cast<void>(actions.invoke(
+                fabric::editor::editor_action_ids::new_project));
         }
         if (shortcuts_enabled && command_modifier && session.has_project() &&
             ImGui::IsKeyPressed(ImGuiKey_I, false)) {
@@ -11898,6 +11928,10 @@ int run_asset_studio(const std::filesystem::path& initial_project,
              ImGui::IsKeyPressed(ImGuiKey_Y, false))) {
             static_cast<void>(actions.invoke(
                 fabric::editor::editor_action_ids::redo));
+        }
+        if (shortcuts_enabled && command_modifier && io.KeyShift &&
+            ImGui::IsKeyPressed(ImGuiKey_P, false)) {
+            command_palette_open = true;
         }
 
         EntityPreviewResult entity_preview;
@@ -11979,6 +12013,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        project_settings,
                        pending_drawable_kind,
                        request_open, request_png, request_svg,
+                       actions, command_palette_open,
+                       command_palette_rendered,
                        transition_guard, running, status);
         draw_behavior_editor(session, behavior_session, creation, status);
         draw_transformation_editor(session, transformation_session, creation,
@@ -12188,7 +12224,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         if (ui_accessibility_test && ++ui_test_frame >= 1U) {
             write_ui_accessibility_probe(
                 initial_project,
-                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
+                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0,
+                command_palette_rendered);
             running = false;
         }
         if (ui_drag_test) {

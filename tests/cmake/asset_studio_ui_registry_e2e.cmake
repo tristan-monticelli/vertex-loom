@@ -64,6 +64,7 @@ if(DEFINED ACCESSIBILITY_ARTIFACT)
     file(READ "${TEST_ROOT}/project/${ACCESSIBILITY_ARTIFACT}" ACCESSIBILITY_RESULT)
     foreach(REQUIRED_RESULT
             "\"keyboard_navigation_enabled\": true"
+            "\"command_palette_rendered\": true"
             "\"text_window_contrast_ok\": true")
         string(FIND "${ACCESSIBILITY_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)

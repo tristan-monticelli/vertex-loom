@@ -10,6 +10,8 @@
 namespace fabric::editor {
 
 namespace editor_action_ids {
+inline constexpr std::string_view new_project = "new_project";
+inline constexpr std::string_view open_project = "open_project";
 inline constexpr std::string_view save = "save";
 inline constexpr std::string_view preview = "preview";
 inline constexpr std::string_view validate = "validate";

@@ -50,6 +50,7 @@
 namespace {
 
 using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_command_palette;
 using fabric::editor_ui::draw_document_navigation;
 using fabric::editor_ui::draw_resource_name_field;
 using fabric::editor_ui::draw_searchable_id_picker;
@@ -231,7 +232,8 @@ float relative_luminance(const ImVec4 color) {
 
 void write_ui_accessibility_probe(const std::filesystem::path& project_path,
                                   SDL_Window* window,
-                                  const bool keyboard_navigation_enabled) {
+                                  const bool keyboard_navigation_enabled,
+                                  const bool command_palette_rendered) {
     if (project_path.empty() || window == nullptr) return;
     const auto& colors = ImGui::GetStyle().Colors;
     const float background = relative_luminance(colors[ImGuiCol_WindowBg]);
@@ -256,6 +258,8 @@ void write_ui_accessibility_probe(const std::filesystem::path& project_path,
         output << "{\n  \"schema\": \"map-studio-ui-accessibility-test-v1\",\n"
                << "  \"keyboard_navigation_enabled\": "
                << (keyboard_navigation_enabled ? "true" : "false") << ",\n"
+               << "  \"command_palette_rendered\": "
+               << (command_palette_rendered ? "true" : "false") << ",\n"
                << "  \"text_window_contrast\": " << contrast << ",\n"
                << "  \"text_window_contrast_ok\": "
                << (contrast >= 4.5F ? "true" : "false") << ",\n"
@@ -3031,6 +3035,8 @@ int run(const std::filesystem::path& project_root,
     }
     std::string known_scene_document;
     std::string known_mechanic_document;
+    bool command_palette_open = ui_accessibility_test;
+    bool command_palette_rendered = false;
     bool running = true;
     while (running) {
         if (mechanic_e2e &&
@@ -3141,6 +3147,10 @@ int run(const std::filesystem::path& project_root,
             transition_guard.request(
                 fabric::editor::SessionAction::quit,
                 session.dirty() || mechanic_session.dirty() || scene_session.dirty());
+        if (shortcuts_enabled && command_modifier && imgui_io_frame.KeyShift &&
+            ImGui::IsKeyPressed(ImGuiKey_P, false)) {
+            command_palette_open = true;
+        }
         if (session.update_autosave() == fabric::editor::AutosaveStatus::failed)
             status = "Map autosave failed";
         if (mechanic_session.update_autosave() ==
@@ -3187,6 +3197,9 @@ int run(const std::filesystem::path& project_root,
                     static_cast<void>(actions.invoke(
                         fabric::editor::editor_action_ids::redo));
                 }
+                ImGui::Separator();
+                if (ImGui::MenuItem("Command Palette...", "Ctrl+Shift+P"))
+                    command_palette_open = true;
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Help")) {
@@ -3197,6 +3210,9 @@ int run(const std::filesystem::path& project_root,
             }
             ImGui::EndMenuBar();
         }
+        command_palette_rendered =
+            draw_command_palette(actions, command_palette_open) ||
+            command_palette_rendered;
         if (!editor_context.open_documents().empty()) {
             static_cast<void>(draw_document_navigation(
                 editor_context,
@@ -4713,7 +4729,8 @@ int run(const std::filesystem::path& project_root,
         if (ui_accessibility_test) {
             write_ui_accessibility_probe(
                 project_root, window,
-                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
+                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0,
+                command_palette_rendered);
             running = false;
         }
         SDL_GL_SwapWindow(window);

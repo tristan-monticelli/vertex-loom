@@ -194,6 +194,9 @@ Project d’Asset Studio et du contenu principal de Map Studio. Elle conserve
 par ID de ressource le workspace, la sélection et l’état de vue éphémère ; une
 activation demande ensuite à la session métier existante de charger la
 ressource. Elle ne détient jamais le document persistant.
+La palette de commandes est rendue par le kit UI partagé et ne contient aucune
+commande propre : elle filtre le même `EditorActionRegistry` que les menus,
+raccourcis et barres d’actions.
 
 Le premier incrément n'ajoute aucune fonction visible. Il extrait les widgets
 partagés et l'état UI afin que les incréments suivants puissent garantir :

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "fabric/editor/editor_context.hpp"
+#include "fabric/editor/editor_action_registry.hpp"
 
 #include <imgui.h>
 #include <imgui_stdlib.h>
@@ -211,6 +212,59 @@ bool draw_document_navigation(editor::EditorContext& context,
         ImGui::EndTabBar();
     }
     return changed;
+}
+
+inline bool draw_command_palette(editor::EditorActionRegistry& registry,
+                                 bool& open) {
+    if (open) {
+        ImGui::OpenPopup("Command Palette");
+        open = false;
+    }
+    ImGui::SetNextWindowSize({520.0F, 360.0F}, ImGuiCond_Appearing);
+    if (!ImGui::BeginPopupModal("Command Palette", nullptr,
+                                ImGuiWindowFlags_NoSavedSettings)) {
+        return false;
+    }
+
+    static std::string filter;
+    ImGui::SetNextItemWidth(-1.0F);
+    if (ImGui::IsWindowAppearing()) {
+        ImGui::SetKeyboardFocusHere();
+    }
+    ImGui::InputTextWithHint("##command-search", "Search commands...",
+                             &filter);
+    ImGui::Separator();
+    bool found = false;
+    for (const auto& action : registry.actions()) {
+        if (!contains_ascii_insensitive(action.label, filter) &&
+            !contains_ascii_insensitive(action.id, filter) &&
+            !contains_ascii_insensitive(action.shortcut, filter)) {
+            continue;
+        }
+        found = true;
+        const auto state = registry.availability(action.id);
+        ImGui::BeginDisabled(!state.enabled);
+        const std::string label = action.shortcut.empty()
+            ? action.label + "##command-" + action.id
+            : action.label + "\t" + action.shortcut + "##command-" +
+                action.id;
+        if (ImGui::Selectable(label.c_str())) {
+            static_cast<void>(registry.invoke(action.id));
+            filter.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        draw_disabled_reason(!state.enabled, state.disabled_reason);
+    }
+    if (!found) {
+        ImGui::TextDisabled("No matching command.");
+    }
+    if (ImGui::IsKeyPressed(ImGuiKey_Escape)) {
+        filter.clear();
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+    return true;
 }
 
 } // namespace fabric::editor_ui
