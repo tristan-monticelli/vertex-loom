@@ -80,12 +80,8 @@ TEST_CASE("visual preset components resolve to shared draw packets") {
     const TemporaryProject project{"fabric-composition-render"};
     publish_thread_texture(project.root());
     for (const auto [kind, id, expected_packets] : {
-             std::tuple{fabric::editor::VisualPresetKind::eye,
-                        "preview-eye", 4U},
-             std::tuple{fabric::editor::VisualPresetKind::button,
-                        "preview-button", 5U},
              std::tuple{fabric::editor::VisualPresetKind::seam,
-                        "preview-seam", 1U},
+                        "preview-seam", 2U},
              std::tuple{fabric::editor::VisualPresetKind::zipper,
                         "preview-zipper", 14U}}) {
         REQUIRE(fabric::editor::publish_visual_preset(
@@ -161,6 +157,49 @@ TEST_CASE("component parameters transform their generic target layer") {
     }));
 }
 
+TEST_CASE("Beam inspector effect color reaches the resolved shader") {
+    const TemporaryProject project{"fabric-beam-effect-color-render"};
+    publish_thread_texture(project.root());
+    auto beam_request = request(fabric::editor::VisualPresetKind::beam,
+                                "inspected-beam");
+    beam_request.guided_beam = true;
+    beam_request.beam_holography = 0.0F;
+    REQUIRE(fabric::editor::publish_visual_preset(
+        project.root(), TemporaryProject::manifest(), beam_request).ok());
+
+    auto component = load_component(project, "inspected-beam");
+    const auto effect = std::ranges::find_if(
+        component.parameters, [](const auto& parameter) {
+            return parameter.id == "effect-color";
+        });
+    REQUIRE(effect != component.parameters.end());
+    effect->default_value = fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F};
+    const auto color_mode = std::ranges::find_if(
+        component.parameters, [](const auto& parameter) {
+            return parameter.id == "color-mode";
+        });
+    REQUIRE(color_mode != component.parameters.end());
+    color_mode->default_value = std::string{"preserve"};
+
+    const auto resolved = fabric::render::resolve_visual_component(
+        project.root(), TemporaryProject::manifest(), component);
+    REQUIRE(resolved.ok());
+    REQUIRE(resolved.packets.size() == 1U);
+    REQUIRE(resolved.packets.front().shader.has_value());
+    CHECK(resolved.packets.front().shader->effect_color ==
+          fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F});
+    const auto holography = std::ranges::find(
+        resolved.packets.front().shader->effects,
+        fabric::project::SurfaceEffectKind::holography,
+        &fabric::project::SurfaceEffect::kind);
+    REQUIRE(holography != resolved.packets.front().shader->effects.end());
+    CHECK(holography->color ==
+          fabric::core::Color{0.1F, 0.9F, 0.3F, 1.0F});
+    CHECK(resolved.packets.front().shader->profile ==
+          fabric::project::SurfaceShaderProfile::plastic);
+    CHECK(resolved.packets.front().shader->holography == Catch::Approx(0.0F));
+}
+
 TEST_CASE("textured layer opacity is applied exactly once") {
     const TemporaryProject project{"fabric-composition-opacity"};
     publish_thread_texture(project.root());
@@ -178,11 +217,13 @@ TEST_CASE("textured layer opacity is applied exactly once") {
     const auto resolved = fabric::render::resolve_visual_composition(
         project.root(), TemporaryProject::manifest(), *loaded.asset);
     REQUIRE(resolved.ok());
-    REQUIRE(resolved.packets.size() == 1U);
+    REQUIRE(resolved.packets.size() == 2U);
     REQUIRE(resolved.packets.front().image_fill.has_value());
     REQUIRE(resolved.packets.front().fill_color.has_value());
     CHECK(resolved.packets.front().image_fill->opacity == Catch::Approx(0.5F));
     CHECK(resolved.packets.front().fill_color->alpha == Catch::Approx(1.0F));
+    REQUIRE(resolved.packets.back().stroke.has_value());
+    CHECK(resolved.packets.back().stroke->width == Catch::Approx(0.06F));
 }
 
 TEST_CASE("animated component parameters rebuild Beam packets generically") {
@@ -206,13 +247,20 @@ TEST_CASE("animated component parameters rebuild Beam packets generically") {
         "beam-node", evaluation);
     REQUIRE(base.ok());
     REQUIRE(animated.ok());
-    REQUIRE(base.packets.size() == 1U);
-    REQUIRE(animated.packets.size() == 1U);
+    REQUIRE(base.packets.size() == 2U);
+    REQUIRE(animated.packets.size() == 2U);
     REQUIRE_FALSE(base.packets.front().fill_uv.empty());
     REQUIRE_FALSE(animated.packets.front().fill_uv.empty());
     CHECK(animated.packets.front().fill_uv.front().x == Catch::Approx(2.0F));
     CHECK(animated.packets.front().fill_color ==
           fabric::core::Color{0.2F, 0.4F, 0.8F, 1.0F});
+    REQUIRE(base.packets.back().stroke.has_value());
+    REQUIRE(animated.packets.back().stroke.has_value());
+    CHECK(base.packets.back().stroke->width == Catch::Approx(0.06F));
+    CHECK(base.packets.back().stroke->join ==
+          fabric::project::VectorStrokeJoin::round);
+    CHECK(base.packets.back().stroke->cap ==
+          fabric::project::VectorStrokeCap::round);
     CHECK(animated.bounds.size.y > base.bounds.size.y);
 }
 

@@ -11,19 +11,36 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_audio_schema_version = 1;
+inline constexpr std::uint32_t current_audio_schema_version = 2;
+
+struct AudioSpatialSettings {
+    core::Vec2 position;
+    float minimum_distance{1.0F};
+    float maximum_distance{20.0F};
+    friend bool operator==(const AudioSpatialSettings&,
+                           const AudioSpatialSettings&) = default;
+};
+
+struct AudioBus {
+    std::string id;
+    float volume{1.0F};
+    friend bool operator==(const AudioBus&, const AudioBus&) = default;
+};
 
 struct AudioEvent {
     std::string id;
     std::string source;
     float volume{1.0F};
     bool loop{};
+    std::string bus{"master"};
+    std::optional<AudioSpatialSettings> spatial;
     friend bool operator==(const AudioEvent&, const AudioEvent&) = default;
 };
 
 struct AudioDocument {
     DocumentHeader document{.schema_version = current_audio_schema_version,
                             .type = "audio", .name = "Audio"};
+    std::vector<AudioBus> buses;
     std::vector<AudioEvent> events;
     friend bool operator==(const AudioDocument&, const AudioDocument&) = default;
 };

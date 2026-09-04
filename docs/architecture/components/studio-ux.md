@@ -43,8 +43,114 @@ C4Component
 6. Composer la map/scène avec les références existantes et publier après validation.
 7. Lancer Preview Runtime ; toute divergence renvoie à la ressource et au paramètre concernés.
 
+## Workspaces orientés tâche
+
+Le triptyque explorateur/canvas/inspecteur reste stable ; un dock inférieur
+change selon la tâche. La création ne doit pas ouvrir un formulaire contenant
+la totalité du futur document.
+
+| Workspace | Sélection conservée | Canvas | Inspecteur | Dock inférieur |
+| --- | --- | --- | --- | --- |
+| Entity | ressource et nœud | composition, sélection directe et gizmos | propriétés du nœud ; commandes de clé | diagnostics/dépendances |
+| Animation | Entity, nœud, clip et playhead | pose évaluée et gizmos auto-key | propriété ou clé sélectionnée | transport, pistes, clés, marqueurs et courbes |
+
+Le Resource Explorer fournit `Créer une Entity depuis la sélection`. Le
+workspace Entity fournit `Animate selected node…` en conservant le nœud par son
+nom visible. L'Inspector nominal présente d'abord hiérarchie, visibilité,
+transform et artwork ; parentage, pivot, ordre Z, overrides et systèmes de
+simulation restent dans des sections avancées fermées. Le workspace Animation
+garde visibles le choix du nœud, le playhead, l'auto-key et les quatre clés de
+transform. Une propriété animable fournit une icône de
+clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
+tangentes, composition additive et segment A→B sont avancés, jamais requis pour
+la première animation. Voir ADR-0147 et ADR-0150.
+
+La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
+vectoriels ou composants. `Create Entity from N visuals` publie alors la racine
+et ses blocs enfants en une seule transition. Dans l'Entity, l'arbre récursif,
+le canvas et l'inspecteur partagent une sélection primaire et un groupe. Un
+drag de nœud change son parent après validation de cycle ; un drag du gizmo
+déplace atomiquement tous les nœuds sélectionnés non verrouillés. Changer
+d'Entity réinitialise la sélection sur sa racine afin d'éviter un index hérité.
+Une référence drawable absente propose une réparation limitée au même type de
+ressource et ne choisit jamais un type incompatible.
+
+Le layout desktop conserve le triptyque existant et matérialise le dock
+Timeline sous le canvas lorsqu'un clip est actif. L'action contextuelle de
+l'explorateur prépare l'Entity depuis les visuels courants ; elle ne duplique ni
+ne convertit les ressources sources. Le dock rend les pistes et clés sur un axe de
+temps manipulable et réutilise les commandes undoables de `ProjectSession`.
+La lecture, le scrub et le déplacement des clés restent des états d'interface ;
+seule une commande de clé validée modifie le document.
+La preuve E2E Animation doit choisir le nœud par son libellé visible puis activer
+une commande de clé rapide dans l'interface,
+sauvegarder, recharger et vérifier la piste typée correspondante avant de
+capturer le workspace avec un contexte OpenGL réel.
+
+`Animation Graph` est un panneau dédié ouvert depuis l'Entity. Il édite des
+états toujours associés à un clip existant, leurs transitions, conditions,
+priorités et temps de sortie, puis simule le choix déterministe avec des
+paramètres éphémères. Il ne mélange pas ces paramètres de preview au document.
+L'ancien formulaire de state machine dans `Advanced Entity systems` est retiré
+du parcours : il pouvait tenter de sauvegarder un état sans clip valide.
+L'E2E du panneau et celui du gizmo Entity s'exécutent successivement afin qu'une
+fenêtre au premier plan ne masque pas artificiellement l'interaction canvas.
+
+Le volet `Entity simulation` résume le système XPBD avec les erreurs max/RMS et
+l'énergie compliante définies par ADR-0139. Le canvas superpose particules et
+liaisons sans les confondre avec les contraintes d'animation de nœuds ; ces
+diagnostics ne sont jamais sauvegardés dans l'Entity.
+
+Le panneau d'une ressource Audio maintient un brouillon stable du document :
+bus nommés, volume, boucle et spatialisation sont édités ensemble puis validés
+atomiquement. Le choix `master` reste toujours disponible et un bus supprimé
+réaffecte ses événements à `master`, ce qui évite les références cassées.
+
 ## Parcours d'échec
 
 Une référence absente, une valeur hors domaine ou une écriture disque échouée ne
 doit jamais fermer le document courant. L'interface affiche la ressource, le
 champ et la cause, puis propose `Retry`, `Discard` ou `Cancel`.
+# Asset Studio guided creation workspace
+
+Asset Studio presents user-facing visual creations first: Beam, Button,
+Artwork and Entity. An Entity is either composed immediately from the current
+visual selection or created empty with only a name, then filled by drag/drop in
+its workspace; the creation modal no longer embeds a block editor. Button
+always references an imported project PNG;
+there is no generated Eye or generated Button preset. Internal resource types remain available through
+an explicit advanced workspace so existing project contracts stay readable and
+editable without making engine concepts part of the normal creation path.
+
+Beam is the guided authoring type for the persisted textured-path contract.
+The internal `beam` request is distinct from the legacy `seam` preset while
+existing JSON and resource identifiers remain compatible. Its preview and
+published rendering use the shared arc-length ribbon geometry builder; the
+manifest `defaultStrokeTexture` initializes newly created Beam and thread-based
+presets, while a manually selected texture remains local to the selected
+resource.
+
+```mermaid
+flowchart LR
+    Hub[Guided creation hub] --> Beam[Beam]
+    Hub --> Button[Button]
+    Hub --> Artwork[Artwork]
+    Hub --> Entity[Entity from selection or empty]
+    Hub --> Advanced[Advanced]
+    Advanced --> Technical[Technical resources]
+    Beam --> BeamContract[Beam request<br/>preserve_source par défaut<br/>ou recolor_from_detail]
+    BeamContract --> Legacy[Compatible texturedPath contract]
+    Beam --> Shared[Shared textured-path geometry]
+    Beam --> BeamE2E[UI click, screenshot and reload proof]
+    BeamE2E --> Shared
+    Button --> ButtonTexture[Imported Button PNG]
+    ButtonTexture --> ButtonMaterial[Material v2 appearance<br/>source intacte par défaut<br/>ou recoloration explicite]
+    ButtonMaterial --> Entity
+    ButtonMaterial --> Shared
+    Button --> ButtonE2E[UI click, screenshot and reload proof]
+    ButtonE2E --> Shared
+    Shared --> Studio[Asset Studio preview]
+    Shared --> Runtime[Preview and published runtime]
+    Entity --> Blocks[Visual blocks edited in workspace]
+    Blocks --> EntityPreview[Composed Entity preview]
+```

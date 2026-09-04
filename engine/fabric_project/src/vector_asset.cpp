@@ -410,6 +410,66 @@ std::optional<VectorStroke> read_stroke(const Json& object,
         read_bool(object, "repeatTextureX", stroke.repeat_texture_x, errors,
                   field);
     }
+    const auto shader = object.find("shader");
+    if (shader != object.end() && shader->is_object()) {
+        std::string profile;
+        std::string classification;
+        read_string(*shader, "profile", profile, errors);
+        read_string(*shader, "classification", classification, errors);
+        if (profile == "Thread") stroke.shader.profile = SurfaceShaderProfile::thread;
+        else if (profile == "Plastic") stroke.shader.profile = SurfaceShaderProfile::plastic;
+        else if (profile == "Monochrome") stroke.shader.profile = SurfaceShaderProfile::monochrome;
+        else if (profile == "Custom") stroke.shader.profile = SurfaceShaderProfile::custom;
+        if (classification == "floor") stroke.shader.classification = TextureClassification::floor;
+        else if (classification == "rope") stroke.shader.classification = TextureClassification::rope;
+        else if (classification == "beam") stroke.shader.classification = TextureClassification::beam;
+        else if (classification == "buttonEye") stroke.shader.classification = TextureClassification::button_eye;
+        else if (classification == "collisionMarker") stroke.shader.classification = TextureClassification::collision_marker;
+        if (shader->contains("primaryColor")) read_color((*shader)["primaryColor"], stroke.shader.primary_color, errors, field + ".shader.primaryColor");
+        if (shader->contains("effectColor")) read_color((*shader)["effectColor"], stroke.shader.effect_color, errors, field + ".shader.effectColor");
+        read_float(*shader, "shine", stroke.shader.shine, errors, field + ".shader.shine");
+        read_float(*shader, "holography", stroke.shader.holography, errors, field + ".shader.holography");
+        read_float(*shader, "opacity", stroke.shader.opacity, errors, field + ".shader.opacity");
+        read_float(*shader, "intensity", stroke.shader.intensity, errors, field + ".shader.intensity");
+        read_vec2(*shader, "repetition", stroke.shader.repetition, errors, field + ".shader.repetition");
+        read_vec2(*shader, "deformation", stroke.shader.deformation, errors, field + ".shader.deformation");
+        if (const auto effects = shader->find("effects"); effects != shader->end()) {
+            if (!effects->is_array()) {
+                add_error(errors, ErrorCode::invalid_asset,
+                          field + ".shader.effects", "expected an array");
+            } else {
+                for (std::size_t index = 0; index < effects->size(); ++index) {
+                    const auto& effect = (*effects)[index];
+                    const auto effect_field = field + ".shader.effects[" +
+                        std::to_string(index) + "]";
+                    if (!effect.is_object()) {
+                        add_error(errors, ErrorCode::invalid_asset, effect_field,
+                                  "expected an object");
+                        continue;
+                    }
+                    SurfaceEffect parsed;
+                    std::string kind;
+                    read_string(effect, "kind", kind, errors);
+                    if (kind == "Tint") parsed.kind = SurfaceEffectKind::tint;
+                    else if (kind == "Holography") parsed.kind = SurfaceEffectKind::holography;
+                    else if (kind == "Shine") parsed.kind = SurfaceEffectKind::shine;
+                    else add_error(errors, ErrorCode::invalid_asset,
+                                   effect_field + ".kind",
+                                   "unsupported surface effect");
+                    read_bool(effect, "enabled", parsed.enabled, errors,
+                              effect_field + ".enabled");
+                    if (effect.contains("color"))
+                        read_color(effect["color"], parsed.color, errors,
+                                   effect_field + ".color");
+                    read_float(effect, "amount", parsed.amount, errors,
+                               effect_field + ".amount");
+                    read_float(effect, "scale", parsed.scale, errors,
+                               effect_field + ".scale");
+                    stroke.shader.effects.push_back(parsed);
+                }
+            }
+        }
+    }
     return stroke;
 }
 
@@ -1329,6 +1389,27 @@ std::string serialize_vector_asset(const VectorAsset& asset) {
                     {"join", std::string(to_string(stroke.join))},
                     {"cap", std::string(to_string(stroke.cap))},
                 };
+                if (!(stroke.shader == ShaderSurfaceSettings{})) node_json["stroke"]["shader"] = {
+                    {"profile", std::string(to_string(stroke.shader.profile))},
+                    {"classification", std::string(to_string(stroke.shader.classification))},
+                    {"primaryColor", {{"red", stroke.shader.primary_color.red}, {"green", stroke.shader.primary_color.green}, {"blue", stroke.shader.primary_color.blue}, {"alpha", stroke.shader.primary_color.alpha}}},
+                    {"effectColor", {{"red", stroke.shader.effect_color.red}, {"green", stroke.shader.effect_color.green}, {"blue", stroke.shader.effect_color.blue}, {"alpha", stroke.shader.effect_color.alpha}}},
+                    {"shine", stroke.shader.shine}, {"holography", stroke.shader.holography}, {"opacity", stroke.shader.opacity}, {"intensity", stroke.shader.intensity},
+                    {"repetition", serialize_vec2(stroke.shader.repetition)}, {"deformation", serialize_vec2(stroke.shader.deformation)}};
+                if (!stroke.shader.effects.empty()) {
+                    auto& effects = node_json["stroke"]["shader"]["effects"];
+                    effects = Json::array();
+                    for (const auto& effect : stroke.shader.effects) {
+                        effects.push_back({
+                            {"kind", std::string(to_string(effect.kind))},
+                            {"enabled", effect.enabled},
+                            {"color", {{"red", effect.color.red},
+                                       {"green", effect.color.green},
+                                       {"blue", effect.color.blue},
+                                       {"alpha", effect.color.alpha}}},
+                            {"amount", effect.amount}, {"scale", effect.scale}});
+                    }
+                }
                 if (stroke.image) {
                     const auto& image = *stroke.image;
                     node_json["stroke"]["image"] = {

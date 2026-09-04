@@ -120,9 +120,10 @@ C4Component
   transparent. Un fill image référence un `TextureAsset`, conserve son mode de
   cadrage, son transform indépendant, son opacité et son choix de suivre la
   déformation de la forme. Sa publication est atomique et ne crée aucun SVG.
-- `MaterialDefinition v1` est stocké sous
+- `MaterialDefinition v2` est stocké sous
   `assets/materials/<id>.material.json` et porte couleur, opacité, blend,
-  transform UV, texture optionnelle et motif vectoriel optionnel.
+  transform UV, texture optionnelle, motif vectoriel optionnel et apparence
+  shader optionnelle. Les documents v1 migrent sans activer de shader.
 - `EntityDefinition v4` est stocké sous `entities/<id>.entity.json` et porte
   des nœuds stables, parentage, transform, ordre Z, drawable vectoriel,
   raster ou composant visuel paramétrique, matériau optionnel, visibilité,

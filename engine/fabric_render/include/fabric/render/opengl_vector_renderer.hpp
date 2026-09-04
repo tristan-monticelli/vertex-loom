@@ -80,11 +80,25 @@ private:
     std::int32_t image_texture_uniform_{-1};
     std::int32_t textured_uniform_{-1};
     std::int32_t opacity_uniform_{-1};
+    std::int32_t shader_enabled_uniform_{-1};
+    std::int32_t shader_profile_uniform_{-1};
+    std::int32_t shader_primary_uniform_{-1};
+    std::int32_t shader_effect_uniform_{-1};
+    std::int32_t shader_shine_uniform_{-1};
+    std::int32_t shader_holography_uniform_{-1};
+    std::int32_t shader_opacity_uniform_{-1};
+    std::int32_t shader_intensity_uniform_{-1};
+    std::int32_t shader_effects_uniform_{-1};
+    std::int32_t shader_effect_count_uniform_{-1};
+    std::int32_t shader_effect_texture_width_uniform_{-1};
+    std::uint32_t shader_effect_texture_{};
+    std::int32_t maximum_effect_texture_width_{};
     std::string initialization_error_;
     std::size_t vertex_buffer_capacity_{};
     std::size_t index_buffer_capacity_{};
     std::vector<Vertex> vertex_scratch_;
     std::vector<std::uint32_t> index_scratch_;
+    std::vector<std::uint8_t> effect_texture_scratch_;
     std::vector<const VectorDrawPacket*> batch_scratch_;
 };
 

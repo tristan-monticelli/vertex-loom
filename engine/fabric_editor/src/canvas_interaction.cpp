@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <vector>
 
 namespace fabric::editor {
 
@@ -85,6 +86,47 @@ bool update_bezier_handle(project::VectorShape& shape, const std::size_t index,
         else command.control1 = aligned;
     }
     return true;
+}
+
+bool create_bezier_segment(project::VectorShape& shape, const std::size_t index,
+                           const core::Vec2 end_point) noexcept {
+    using Kind = project::VectorPathCommandKind;
+    if (shape.kind != project::VectorShapeKind::path || index >= shape.path.size() ||
+        shape.path[index].kind != Kind::line) return false;
+    core::Vec2 start_point{};
+    for (std::size_t cursor = index; cursor-- > 0U;) {
+        const auto& candidate = shape.path[cursor];
+        if (candidate.kind == Kind::move || candidate.kind == Kind::line ||
+            candidate.kind == Kind::cubic) {
+            start_point = candidate.point;
+            break;
+        }
+    }
+    const core::Vec2 delta{end_point.x - start_point.x,
+                           end_point.y - start_point.y};
+    const core::Vec2 normal{-delta.y * 0.2F, delta.x * 0.2F};
+    auto& command = shape.path[index];
+    command.kind = Kind::cubic;
+    command.point = end_point;
+    command.control1 = {start_point.x + delta.x / 3.0F + normal.x,
+                        start_point.y + delta.y / 3.0F + normal.y};
+    command.control2 = {end_point.x - delta.x / 3.0F + normal.x,
+                        end_point.y - delta.y / 3.0F + normal.y};
+    return true;
+}
+
+bool remove_selected_path_points(project::VectorShape& shape,
+                                 const std::span<const std::size_t> indices) noexcept {
+    if (shape.kind != project::VectorShapeKind::path || indices.empty())
+        return false;
+    std::vector<std::size_t> ordered(indices.begin(), indices.end());
+    std::ranges::sort(ordered, std::greater<>());
+    bool removed = false;
+    for (const auto index : ordered) {
+        if (index > 0U && project::remove_path_command(shape, index))
+            removed = true;
+    }
+    return removed;
 }
 
 project::RasterView drag_raster_crop(

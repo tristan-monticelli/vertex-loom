@@ -214,6 +214,151 @@ bool same_texture_tint(const VectorDrawPacket& left,
     return texture_tint(left) == texture_tint(right);
 }
 
+struct ClipVertex {
+    core::Vec2 position;
+    core::Vec2 uv;
+};
+
+float polygon_area(const std::vector<core::Vec2>& polygon) {
+    float area = 0.0F;
+    for (std::size_t index = 0; index < polygon.size(); ++index) {
+        const auto& current = polygon[index];
+        const auto& next = polygon[(index + 1U) % polygon.size()];
+        area += current.x * next.y - next.x * current.y;
+    }
+    return area * 0.5F;
+}
+
+bool is_convex_polygon(const std::vector<core::Vec2>& polygon) {
+    if (polygon.size() < 3U) return false;
+    int sign = 0;
+    for (std::size_t index = 0; index < polygon.size(); ++index) {
+        const auto& first = polygon[index];
+        const auto& second = polygon[(index + 1U) % polygon.size()];
+        const auto& third = polygon[(index + 2U) % polygon.size()];
+        const float turn = (second.x - first.x) * (third.y - second.y) -
+            (second.y - first.y) * (third.x - second.x);
+        if (std::abs(turn) <= 1.0e-6F) continue;
+        const int next_sign = turn > 0.0F ? 1 : -1;
+        if (sign != 0 && sign != next_sign) return false;
+        sign = next_sign;
+    }
+    return sign != 0;
+}
+
+std::optional<std::vector<ClipVertex>> clip_convex_polygon(
+    std::vector<ClipVertex> subject, const std::vector<core::Vec2>& clip) {
+    if (!is_convex_polygon(clip) || subject.size() < 3U) return std::nullopt;
+    const float orientation = polygon_area(clip) >= 0.0F ? 1.0F : -1.0F;
+    for (std::size_t edge = 0; edge < clip.size(); ++edge) {
+        const auto edge_start = clip[edge];
+        const auto edge_end = clip[(edge + 1U) % clip.size()];
+        const auto signed_distance = [&](const core::Vec2 point) {
+            return orientation * ((edge_end.x - edge_start.x) *
+                                      (point.y - edge_start.y) -
+                                  (edge_end.y - edge_start.y) *
+                                      (point.x - edge_start.x));
+        };
+        std::vector<ClipVertex> output;
+        for (std::size_t index = 0; index < subject.size(); ++index) {
+            const auto& first = subject[index];
+            const auto& second = subject[(index + 1U) % subject.size()];
+            const float first_distance = signed_distance(first.position);
+            const float second_distance = signed_distance(second.position);
+            const bool first_inside = first_distance >= -1.0e-5F;
+            const bool second_inside = second_distance >= -1.0e-5F;
+            if (first_inside != second_inside) {
+                const float denominator = first_distance - second_distance;
+                const float factor = std::abs(denominator) > 1.0e-6F
+                    ? first_distance / denominator : 0.0F;
+                output.push_back({
+                    .position = {first.position.x +
+                                     (second.position.x - first.position.x) * factor,
+                                 first.position.y +
+                                     (second.position.y - first.position.y) * factor},
+                    .uv = {first.uv.x + (second.uv.x - first.uv.x) * factor,
+                           first.uv.y + (second.uv.y - first.uv.y) * factor}});
+            }
+            if (second_inside) output.push_back(second);
+        }
+        subject = std::move(output);
+        if (subject.size() < 3U) return subject;
+    }
+    return subject;
+}
+
+std::optional<VectorDrawPacket> cpu_clip_packet(
+    const VectorDrawPacket& packet,
+    const std::vector<const VectorDrawPacket*>& clip_chain) {
+    if (packet.fill_vertices.size() < 3U || packet.fill_indices.size() < 3U ||
+        packet.fill_indices.size() % 3U != 0U)
+        return std::nullopt;
+    for (const auto* clip : clip_chain)
+        if (clip == nullptr || !is_convex_polygon(clip->outline))
+            return std::nullopt;
+    VectorDrawPacket result = packet;
+    result.clip_node_id.reset();
+    result.outline.clear();
+    result.fill_vertices.clear();
+    result.fill_uv.clear();
+    result.fill_indices.clear();
+    const auto clip_mesh = [&](const std::vector<core::Vec2>& vertices,
+                               const std::vector<core::Vec2>& uvs,
+                               const std::vector<std::uint32_t>& indices,
+                               std::vector<core::Vec2>& output_vertices,
+                               std::vector<core::Vec2>& output_uvs,
+                               std::vector<std::uint32_t>& output_indices) {
+        if (indices.size() < 3U || indices.size() % 3U != 0U) return false;
+        for (std::size_t index = 0; index < indices.size(); index += 3U) {
+            if (indices[index] >= vertices.size() ||
+                indices[index + 1U] >= vertices.size() ||
+                indices[index + 2U] >= vertices.size()) return false;
+            std::vector<ClipVertex> subject;
+            subject.reserve(3U);
+            for (std::size_t corner = 0; corner < 3U; ++corner) {
+                const auto vertex_index = indices[index + corner];
+                subject.push_back({vertices[vertex_index],
+                                   uvs.size() == vertices.size()
+                                       ? uvs[vertex_index] : core::Vec2{}});
+            }
+            for (const auto* clip : clip_chain) {
+                const auto clipped = clip_convex_polygon(std::move(subject),
+                                                          clip->outline);
+                if (!clipped) return false;
+                subject = *clipped;
+                if (subject.size() < 3U) break;
+            }
+            for (std::uint32_t corner = 1U;
+                 corner + 1U < subject.size(); ++corner) {
+                const auto base = static_cast<std::uint32_t>(output_vertices.size());
+                output_vertices.push_back(subject[0].position);
+                output_vertices.push_back(subject[corner].position);
+                output_vertices.push_back(subject[corner + 1U].position);
+                output_uvs.push_back(subject[0].uv);
+                output_uvs.push_back(subject[corner].uv);
+                output_uvs.push_back(subject[corner + 1U].uv);
+                output_indices.insert(output_indices.end(), {base, base + 1U,
+                                                              base + 2U});
+            }
+        }
+        return true;
+    };
+    if (!clip_mesh(packet.fill_vertices, packet.fill_uv, packet.fill_indices,
+                   result.fill_vertices, result.fill_uv, result.fill_indices))
+        return std::nullopt;
+    if (result.fill_indices.empty()) return std::nullopt;
+    result.outline = result.fill_vertices;
+    if (packet.stroke && !packet.stroke_vertices.empty() &&
+        !packet.stroke_indices.empty()) {
+        if (!clip_mesh(packet.stroke_vertices, packet.stroke_uv,
+                       packet.stroke_indices, result.stroke_vertices,
+                       result.stroke_uv, result.stroke_indices))
+            return std::nullopt;
+    }
+    result.closed_outline = true;
+    return result;
+}
+
 } // namespace
 
 OpenGLVectorRenderer::~OpenGLVectorRenderer() { shutdown(); }
@@ -271,11 +416,100 @@ uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
+uniform int shaderEnabled;
+uniform int shaderProfile;
+uniform vec4 shaderPrimary;
+uniform vec4 shaderEffect;
+uniform float shaderShine;
+uniform float shaderHolography;
+uniform float shaderOpacity;
+uniform float shaderIntensity;
+uniform sampler2D shaderEffects;
+uniform int shaderEffectCount;
+uniform float shaderEffectTextureWidth;
 varying vec2 fragmentUv;
 void main() {
-    gl_FragColor = textured == 1
+    vec4 base = textured == 1
         ? texture2D(imageTexture, fragmentUv) * color * opacity
         : color;
+    if (shaderEnabled == 1) {
+        float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+        float holo = clamp(shaderHolography, 0.0, 1.0);
+        float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
+        float effectMix = holo * (0.15 + 0.35 * band);
+        float threadDetail = 0.55 + 0.45 * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb * threadDetail,
+            shaderEffect.rgb * threadDetail, effectMix);
+        vec3 plasticColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+        vec3 monochrome = mix(shaderPrimary.rgb * luma,
+            shaderEffect.rgb * luma, effectMix);
+        vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.4 + 0.6 * luma), effectMix);
+        vec3 surface = shaderProfile == 0 ? threadColor :
+            shaderProfile == 1 ? plasticColor :
+            shaderProfile == 2 ? monochrome : customColor;
+        float surfaceAlpha = base.a * mix(shaderPrimary.a, shaderEffect.a,
+            effectMix) * shaderOpacity;
+        if (shaderEffectCount > 0) {
+            // Thread is a reference image: keep its luminance/detail, then
+            // let the selected effect color define the visible palette.
+            surface = shaderProfile == 0 ? vec3(luma) : base.rgb;
+            surfaceAlpha = base.a * shaderOpacity;
+            for (int effectIndex = 0; effectIndex < shaderEffectCount;
+                 ++effectIndex) {
+                float firstX = (float(effectIndex * 2) + 0.5) /
+                    shaderEffectTextureWidth;
+                float secondX = (float(effectIndex * 2 + 1) + 0.5) /
+                    shaderEffectTextureWidth;
+                vec4 effectColor = texture2D(shaderEffects, vec2(firstX, 0.5));
+                vec4 settings = texture2D(shaderEffects, vec2(secondX, 0.5));
+                if (settings.a > 0.5) {
+                    float amount = clamp(settings.g, 0.0, 1.0);
+                    if (settings.r < 0.25) {
+                        // Tint recolors the reference luminance while keeping
+                        // the fiber contrast and alpha intact.
+                        vec3 tinted = vec3(luma) * effectColor.rgb;
+                        surface = mix(surface, tinted, amount);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amount);
+                    } else if (settings.r < 0.75) {
+                        float effectBand = 0.5 + 0.5 * sin(
+                            (fragmentUv.x * 1.35 + fragmentUv.y * 0.65) *
+                            6.2831853 * max(settings.b * 6.0, 0.05));
+                        float glint = pow(0.5 + 0.5 * effectBand, 8.0);
+                        float sweep = smoothstep(0.42, 0.92, effectBand);
+                        float amountBand = amount * (0.20 + 0.65 * sweep);
+                        vec3 holographic = surface *
+                            (0.84 + 0.16 * effectColor.rgb) +
+                            effectColor.rgb *
+                                (0.10 + 0.42 * sweep) *
+                                (0.45 + 0.55 * luma) +
+                            effectColor.rgb * glint * (0.12 + 0.28 * luma);
+                        surface = mix(surface, holographic, amountBand);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amountBand);
+                    } else {
+                        // Shine is a stable material lift, not an edge-only
+                        // highlight that disappears at tile boundaries.
+                        surface += effectColor.rgb * amount * 0.16;
+                    }
+                }
+            }
+        } else {
+            // Legacy Thread assets must follow the same rule as the modular
+            // path: the reference PNG contributes detail, while the selected
+            // primary color controls the visible palette.
+            if (shaderProfile == 0) {
+                surface = vec3(luma) * shaderPrimary.rgb;
+                if (holo > 0.0) {
+                    surface = mix(surface,
+                        shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+                }
+            }
+            surface += shaderEffect.rgb * clamp(shaderShine, 0.0, 1.0) * 0.16;
+        }
+        base = vec4(surface * shaderIntensity, surfaceAlpha);
+    }
+    gl_FragColor = base;
 }
 )GLSL"}
         : std::string{
@@ -289,12 +523,101 @@ uniform vec4 color;
 uniform sampler2D imageTexture;
 uniform int textured;
 uniform float opacity;
+uniform int shaderEnabled;
+uniform int shaderProfile;
+uniform vec4 shaderPrimary;
+uniform vec4 shaderEffect;
+uniform float shaderShine;
+uniform float shaderHolography;
+uniform float shaderOpacity;
+uniform float shaderIntensity;
+uniform sampler2D shaderEffects;
+uniform int shaderEffectCount;
+uniform float shaderEffectTextureWidth;
 in vec2 fragmentUv;
 out vec4 fragmentColor;
 void main() {
-    fragmentColor = textured == 1
+    vec4 base = textured == 1
         ? texture(imageTexture, fragmentUv) * color * opacity
         : color;
+    if (shaderEnabled == 1) {
+        float luma = clamp(dot(base.rgb, vec3(0.2126, 0.7152, 0.0722)), 0.0, 1.0);
+        float holo = clamp(shaderHolography, 0.0, 1.0);
+        float band = 0.5 + 0.5 * sin((fragmentUv.x + fragmentUv.y) * 18.8495559);
+        float effectMix = holo * (0.15 + 0.35 * band);
+        float threadDetail = 0.55 + 0.45 * luma;
+        vec3 threadColor = mix(shaderPrimary.rgb * threadDetail,
+            shaderEffect.rgb * threadDetail, effectMix);
+        vec3 plasticColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+        vec3 monochrome = mix(shaderPrimary.rgb * luma,
+            shaderEffect.rgb * luma, effectMix);
+        vec3 customColor = mix(base.rgb * shaderPrimary.rgb,
+            shaderEffect.rgb * (0.4 + 0.6 * luma), effectMix);
+        vec3 surface = shaderProfile == 0 ? threadColor :
+            shaderProfile == 1 ? plasticColor :
+            shaderProfile == 2 ? monochrome : customColor;
+        float surfaceAlpha = base.a * mix(shaderPrimary.a, shaderEffect.a,
+            effectMix) * shaderOpacity;
+        if (shaderEffectCount > 0) {
+            // Thread is a reference image: keep its luminance/detail, then
+            // let the selected effect color define the visible palette.
+            surface = shaderProfile == 0 ? vec3(luma) : base.rgb;
+            surfaceAlpha = base.a * shaderOpacity;
+            for (int effectIndex = 0; effectIndex < shaderEffectCount;
+                 ++effectIndex) {
+                float firstX = (float(effectIndex * 2) + 0.5) /
+                    shaderEffectTextureWidth;
+                float secondX = (float(effectIndex * 2 + 1) + 0.5) /
+                    shaderEffectTextureWidth;
+                vec4 effectColor = texture(shaderEffects, vec2(firstX, 0.5));
+                vec4 settings = texture(shaderEffects, vec2(secondX, 0.5));
+                if (settings.a > 0.5) {
+                    float amount = clamp(settings.g, 0.0, 1.0);
+                    if (settings.r < 0.25) {
+                        // Tint recolors the reference luminance while keeping
+                        // the fiber contrast and alpha intact.
+                        vec3 tinted = vec3(luma) * effectColor.rgb;
+                        surface = mix(surface, tinted, amount);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amount);
+                    } else if (settings.r < 0.75) {
+                        float effectBand = 0.5 + 0.5 * sin(
+                            (fragmentUv.x * 1.35 + fragmentUv.y * 0.65) *
+                            6.2831853 * max(settings.b * 6.0, 0.05));
+                        float glint = pow(0.5 + 0.5 * effectBand, 8.0);
+                        float sweep = smoothstep(0.42, 0.92, effectBand);
+                        float amountBand = amount * (0.20 + 0.65 * sweep);
+                        vec3 holographic = surface *
+                            (0.84 + 0.16 * effectColor.rgb) +
+                            effectColor.rgb *
+                                (0.10 + 0.42 * sweep) *
+                                (0.45 + 0.55 * luma) +
+                            effectColor.rgb * glint * (0.12 + 0.28 * luma);
+                        surface = mix(surface, holographic, amountBand);
+                        surfaceAlpha *= mix(1.0, effectColor.a, amountBand);
+                    } else {
+                        // Shine is a stable material lift, not an edge-only
+                        // highlight that disappears at tile boundaries.
+                        surface += effectColor.rgb * amount * 0.16;
+                    }
+                }
+            }
+        } else {
+            // Legacy Thread assets must follow the same rule as the modular
+            // path: the reference PNG contributes detail, while the selected
+            // primary color controls the visible palette.
+            if (shaderProfile == 0) {
+                surface = vec3(luma) * shaderPrimary.rgb;
+                if (holo > 0.0) {
+                    surface = mix(surface,
+                        shaderEffect.rgb * (0.55 + 0.45 * luma), effectMix);
+                }
+            }
+            surface += shaderEffect.rgb * clamp(shaderShine, 0.0, 1.0) * 0.16;
+        }
+        base = vec4(surface * shaderIntensity, surfaceAlpha);
+    }
+    fragmentColor = base;
 }
 )GLSL"};
     std::string error;
@@ -349,6 +672,18 @@ void main() {
     image_texture_uniform_ = functions.get_uniform_location(program_, "imageTexture");
     textured_uniform_ = functions.get_uniform_location(program_, "textured");
     opacity_uniform_ = functions.get_uniform_location(program_, "opacity");
+    shader_enabled_uniform_ = functions.get_uniform_location(program_, "shaderEnabled");
+    shader_profile_uniform_ = functions.get_uniform_location(program_, "shaderProfile");
+    shader_primary_uniform_ = functions.get_uniform_location(program_, "shaderPrimary");
+    shader_effect_uniform_ = functions.get_uniform_location(program_, "shaderEffect");
+    shader_shine_uniform_ = functions.get_uniform_location(program_, "shaderShine");
+    shader_holography_uniform_ = functions.get_uniform_location(program_, "shaderHolography");
+    shader_opacity_uniform_ = functions.get_uniform_location(program_, "shaderOpacity");
+    shader_intensity_uniform_ = functions.get_uniform_location(program_, "shaderIntensity");
+    shader_effects_uniform_ = functions.get_uniform_location(program_, "shaderEffects");
+    shader_effect_count_uniform_ = functions.get_uniform_location(program_, "shaderEffectCount");
+    shader_effect_texture_width_uniform_ = functions.get_uniform_location(
+        program_, "shaderEffectTextureWidth");
     if (world_to_clip_uniform_ < 0 || color_uniform_ < 0 ||
         image_texture_uniform_ < 0 || textured_uniform_ < 0 || opacity_uniform_ < 0) {
         functions.delete_buffers(1, &vertex_buffer_);
@@ -359,6 +694,15 @@ void main() {
         program_ = 0U;
         return false;
     }
+    glGetIntegerv(GL_MAX_TEXTURE_SIZE, &maximum_effect_texture_width_);
+    glGenTextures(1, &shader_effect_texture_);
+    functions.active_texture(GL_TEXTURE1);
+    functions.bind_texture(GL_TEXTURE_2D, shader_effect_texture_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    functions.active_texture(GL_TEXTURE0);
     return true;
 }
 
@@ -371,6 +715,7 @@ void OpenGLVectorRenderer::shutdown() noexcept {
         if (use_vertex_array_) functions.delete_vertex_arrays(1, &vertex_array_);
         functions.delete_program(program_);
     }
+    if (shader_effect_texture_ != 0U) glDeleteTextures(1, &shader_effect_texture_);
     program_ = 0U;
     legacy_fixed_function_ = false;
     vertex_array_ = 0U;
@@ -382,6 +727,19 @@ void OpenGLVectorRenderer::shutdown() noexcept {
     image_texture_uniform_ = -1;
     textured_uniform_ = -1;
     opacity_uniform_ = -1;
+    shader_enabled_uniform_ = -1;
+    shader_profile_uniform_ = -1;
+    shader_primary_uniform_ = -1;
+    shader_effect_uniform_ = -1;
+    shader_shine_uniform_ = -1;
+    shader_holography_uniform_ = -1;
+    shader_opacity_uniform_ = -1;
+    shader_intensity_uniform_ = -1;
+    shader_effects_uniform_ = -1;
+    shader_effect_count_uniform_ = -1;
+    shader_effect_texture_width_uniform_ = -1;
+    shader_effect_texture_ = 0U;
+    maximum_effect_texture_width_ = 0;
     initialization_error_.clear();
     vertex_buffer_capacity_ = 0U;
     index_buffer_capacity_ = 0U;
@@ -437,6 +795,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                     left.image_fill->opacity == right.image_fill->opacity &&
                     left.raster_filter == right.raster_filter &&
                     left.repeat_texture_x == right.repeat_texture_x &&
+                    left.mirror_texture_x == right.mirror_texture_x &&
                     same_texture_tint(left, right);
             }
             if (!left.fill_color || !right.fill_color) return false;
@@ -472,6 +831,10 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             }
             vertex_scratch_.clear();
             index_scratch_.clear();
+            const float texture_aspect = texture && texture->height > 0U
+                ? static_cast<float>(texture->width) /
+                      static_cast<float>(texture->height)
+                : 1.0F;
             std::size_t next = packet_index;
             while (next < packets.size()) {
                 const auto& candidate = packets[next];
@@ -484,10 +847,24 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 const auto base = static_cast<std::uint32_t>(vertex_scratch_.size());
                 vertex_scratch_.reserve(vertex_scratch_.size() +
                                         candidate.fill_vertices.size());
+                auto minimum = candidate.outline.empty()
+                    ? core::Vec2{} : candidate.outline.front();
+                auto maximum = minimum;
+                for (const auto point : candidate.outline) {
+                    minimum.x = std::min(minimum.x, point.x);
+                    minimum.y = std::min(minimum.y, point.y);
+                    maximum.x = std::max(maximum.x, point.x);
+                    maximum.y = std::max(maximum.y, point.y);
+                }
+                const float geometry_aspect = maximum.y - minimum.y > 0.0001F
+                    ? (maximum.x - minimum.x) / (maximum.y - minimum.y) : 1.0F;
                 for (std::size_t index = 0; index < candidate.fill_vertices.size(); ++index) {
                     const auto point = candidate.fill_vertices[index];
                     const auto uv = candidate.image_fill
-                        ? candidate.fill_uv[index] : core::Vec2{};
+                        ? apply_image_fill_fit(candidate.fill_uv[index],
+                                               candidate.image_fill->fit,
+                                               geometry_aspect, texture_aspect)
+                        : core::Vec2{};
                     vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
                 }
                 index_scratch_.reserve(index_scratch_.size() +
@@ -502,7 +879,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 glBindTexture(GL_TEXTURE_2D, texture->handle);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                                 packet.repeat_texture_x
-                                    ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                    ? (packet.mirror_texture_x
+                                        ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                    : GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                                 GL_CLAMP_TO_EDGE);
                 if (packet.raster_filter) {
@@ -606,6 +985,8 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
     }
     const auto functions = load_functions();
     glViewport(viewport.x, viewport.y, viewport.width, viewport.height);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     functions.use_program(program_);
     const auto matrix = world_to_clip(viewport);
     functions.uniform_matrix_4fv(world_to_clip_uniform_, 1, GL_FALSE,
@@ -635,8 +1016,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         GLint stencil_bits = 0;
         glGetIntegerv(GL_STENCIL_BITS, &stencil_bits);
         if (stencil_bits <= 0) {
-            stats.errors.push_back(
-                "OpenGL vector clipping requires a stencil buffer");
+            // Convex clip chains use the CPU fallback below when the context
+            // has no stencil attachment. Unsupported silhouettes still report
+            // an error when the fallback is attempted.
         } else {
             stencil_ready = true;
             glEnable(GL_STENCIL_TEST);
@@ -644,6 +1026,63 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             glStencilMask(0xffU);
         }
     }
+
+    const auto apply_shader = [&](const VectorDrawPacket& packet) {
+        const auto& shader = packet.shader;
+        functions.uniform_1i(shader_enabled_uniform_, shader ? 1 : 0);
+        functions.uniform_1i(shader_effect_count_uniform_, 0);
+        if (!shader) return true;
+        functions.uniform_1i(shader_profile_uniform_,
+                             static_cast<int>(shader->profile));
+        functions.uniform_4f(shader_primary_uniform_, shader->primary_color.red, shader->primary_color.green, shader->primary_color.blue, shader->primary_color.alpha);
+        functions.uniform_4f(shader_effect_uniform_, shader->effect_color.red, shader->effect_color.green, shader->effect_color.blue, shader->effect_color.alpha);
+        functions.uniform_1f(shader_shine_uniform_, shader->shine);
+        functions.uniform_1f(shader_holography_uniform_, shader->holography);
+        functions.uniform_1f(shader_opacity_uniform_, shader->opacity);
+        functions.uniform_1f(shader_intensity_uniform_, shader->intensity);
+        if (shader->effects.empty()) return true;
+        if (maximum_effect_texture_width_ <= 0 ||
+            shader->effects.size() >
+                static_cast<std::size_t>(maximum_effect_texture_width_ / 2)) {
+            stats.errors.push_back(
+                "OpenGL surface effect stack exceeds the GPU texture capacity");
+            functions.uniform_1i(shader_enabled_uniform_, 0);
+            return false;
+        }
+        const auto byte = [](const float value) {
+            return static_cast<std::uint8_t>(std::lround(
+                std::clamp(value, 0.0F, 1.0F) * 255.0F));
+        };
+        const auto texture_width = shader->effects.size() * 2U;
+        effect_texture_scratch_.assign(texture_width * 4U, 0U);
+        for (std::size_t index = 0; index < shader->effects.size(); ++index) {
+            const auto& effect = shader->effects[index];
+            const auto color_offset = index * 8U;
+            effect_texture_scratch_[color_offset] = byte(effect.color.red);
+            effect_texture_scratch_[color_offset + 1U] = byte(effect.color.green);
+            effect_texture_scratch_[color_offset + 2U] = byte(effect.color.blue);
+            effect_texture_scratch_[color_offset + 3U] = byte(effect.color.alpha);
+            effect_texture_scratch_[color_offset + 4U] =
+                effect.kind == project::SurfaceEffectKind::tint ? 0U :
+                effect.kind == project::SurfaceEffectKind::holography ? 127U :
+                255U;
+            effect_texture_scratch_[color_offset + 5U] = byte(effect.amount);
+            effect_texture_scratch_[color_offset + 6U] = byte(effect.scale / 8.0F);
+            effect_texture_scratch_[color_offset + 7U] = effect.enabled ? 255U : 0U;
+        }
+        functions.active_texture(GL_TEXTURE1);
+        functions.bind_texture(GL_TEXTURE_2D, shader_effect_texture_);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+                     static_cast<GLsizei>(texture_width), 1, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, effect_texture_scratch_.data());
+        functions.uniform_1i(shader_effects_uniform_, 1);
+        functions.uniform_1i(shader_effect_count_uniform_,
+                             static_cast<GLint>(shader->effects.size()));
+        functions.uniform_1f(shader_effect_texture_width_uniform_,
+                             static_cast<float>(texture_width));
+        functions.active_texture(GL_TEXTURE0);
+        return true;
+    };
 
     const auto draw_fill = [&](const VectorDrawPacket& packet,
                                const bool stencil_only,
@@ -674,11 +1113,37 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 ? resolved_image && has_uv
                 : packet.fill_color.has_value()));
         if (!can_draw_fill) return false;
+        float geometry_width = 0.0F;
+        float geometry_height = 0.0F;
+        if (packet.image_fill && packet.outline.size() >= 2U) {
+            auto minimum = packet.outline.front();
+            auto maximum = minimum;
+            for (const auto point : packet.outline) {
+                minimum.x = std::min(minimum.x, point.x);
+                minimum.y = std::min(minimum.y, point.y);
+                maximum.x = std::max(maximum.x, point.x);
+                maximum.y = std::max(maximum.y, point.y);
+            }
+            geometry_width = maximum.x - minimum.x;
+            geometry_height = maximum.y - minimum.y;
+        }
+        const float geometry_aspect = geometry_height > 0.0001F
+            ? geometry_width / geometry_height : 1.0F;
+        const float texture_aspect = texture && texture->height > 0U
+            ? static_cast<float>(texture->width) /
+                  static_cast<float>(texture->height)
+            : 1.0F;
         vertex_scratch_.clear();
         vertex_scratch_.reserve(packet.fill_vertices.size());
         for (std::size_t index = 0; index < packet.fill_vertices.size(); ++index) {
             const auto point = packet.fill_vertices[index];
-            const auto uv = has_uv ? packet.fill_uv[index] : core::Vec2{};
+            const auto uv = has_uv
+                ? apply_image_fill_fit(packet.fill_uv[index],
+                                       packet.image_fill
+                                           ? packet.image_fill->fit
+                                           : project::VectorImageFit::stretch,
+                                       geometry_aspect, texture_aspect)
+                : core::Vec2{};
             vertex_scratch_.push_back({point.x, point.y, uv.x, uv.y});
         }
         upload_buffer(GL_ARRAY_BUFFER, vertex_scratch_.size() * sizeof(Vertex),
@@ -697,7 +1162,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                             packet.repeat_texture_x
-                                ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                ? (packet.mirror_texture_x
+                                    ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                : GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                             GL_CLAMP_TO_EDGE);
             if (packet.raster_filter) {
@@ -716,6 +1183,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        if (!apply_shader(packet)) return false;
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.fill_indices.size()),
             GL_UNSIGNED_INT, nullptr);
@@ -772,6 +1240,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        if (!apply_shader(packet)) return false;
         functions.draw_elements(
             GL_TRIANGLES, static_cast<GLsizei>(packet.stroke_indices.size()),
             GL_UNSIGNED_INT, nullptr);
@@ -783,12 +1252,14 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
 
     const auto same_fill_material = [](const VectorDrawPacket& left,
                                        const VectorDrawPacket& right) {
+        if (left.shader != right.shader) return false;
         if (left.image_fill.has_value() != right.image_fill.has_value()) return false;
         if (left.image_fill) {
             return left.image_fill->texture.id == right.image_fill->texture.id &&
                 left.image_fill->opacity == right.image_fill->opacity &&
                 left.raster_filter == right.raster_filter &&
                 left.repeat_texture_x == right.repeat_texture_x &&
+                left.mirror_texture_x == right.mirror_texture_x &&
                 same_texture_tint(left, right);
         }
         if (left.fill_color.has_value() != right.fill_color.has_value()) return false;
@@ -862,7 +1333,9 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.bind_texture(GL_TEXTURE_2D, texture->handle);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
                             first.repeat_texture_x
-                                ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+                                ? (first.mirror_texture_x
+                                    ? GL_MIRRORED_REPEAT : GL_REPEAT)
+                                : GL_CLAMP_TO_EDGE);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
                             GL_CLAMP_TO_EDGE);
             if (first.raster_filter) {
@@ -878,6 +1351,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
             functions.uniform_1i(textured_uniform_, 0);
             functions.uniform_1f(opacity_uniform_, 1.0F);
         }
+        if (!apply_shader(first)) return false;
         functions.draw_elements(GL_TRIANGLES, static_cast<GLsizei>(index_scratch_.size()),
                                 GL_UNSIGNED_INT, nullptr);
         ++stats.draw_calls;
@@ -907,10 +1381,6 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         }
         bool packet_drawn = false;
         if (packet.clip_node_id.has_value()) {
-            if (!stencil_ready) {
-                ++packet_index;
-                continue;
-            }
             std::vector<const VectorDrawPacket*> clip_chain;
             std::unordered_set<std::string> visited_clips;
             auto next_clip_id = packet.clip_node_id;
@@ -937,6 +1407,20 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
                 continue;
             }
             std::ranges::reverse(clip_chain);
+            if (!stencil_ready) {
+                const auto clipped = cpu_clip_packet(packet, clip_chain);
+                if (!clipped) {
+                    stats.errors.push_back(
+                        "CPU vector clipping requires convex clip silhouettes");
+                    ++packet_index;
+                    continue;
+                }
+                packet_drawn = draw_fill(*clipped, false, true) ||
+                    draw_stroke(*clipped);
+                if (packet_drawn) ++stats.packets_drawn;
+                ++packet_index;
+                continue;
+            }
             glClearStencil(0);
             glClear(GL_STENCIL_BUFFER_BIT);
             glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
@@ -970,6 +1454,7 @@ OpenGLVectorRenderStats OpenGLVectorRenderer::draw(
         ++packet_index;
     }
     if (stencil_ready) glDisable(GL_STENCIL_TEST);
+    glDisable(GL_BLEND);
     if (use_vertex_array_) functions.bind_vertex_array(0U);
     functions.use_program(0U);
     return stats;

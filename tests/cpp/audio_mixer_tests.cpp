@@ -1,11 +1,13 @@
 #include "fabric/runtime/audio_mixer.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <thread>
 
 namespace {
 
@@ -71,6 +73,75 @@ TEST_CASE("mixer rejects incompatible clips and clamps output") {
     REQUIRE(output.size() == 2);
     CHECK(output[0] == 32767);
     CHECK(output[1] == 32767);
+}
+
+TEST_CASE("mixer applies named bus gain and stereo pan") {
+    fabric::runtime::PcmAudioMixer mixer;
+    REQUIRE(mixer.configure(44100, 2));
+    REQUIRE(mixer.set_bus_gain("effects", 0.5F));
+    const fabric::runtime::PcmWavClip clip{
+        .sample_rate = 44100, .channels = 1, .samples = {10000}};
+    REQUIRE(mixer.play(clip, "effects", 0.8F, 0.5F));
+
+    const auto output = mixer.mix(1);
+
+    REQUIRE(output.size() == 2U);
+    CHECK(output[0] == 2000);
+    CHECK(output[1] == 4000);
+    CHECK_FALSE(mixer.play(clip, "missing", 1.0F, 0.0F));
+    CHECK_FALSE(mixer.play(clip, "effects", 1.0F, 1.1F));
+}
+
+TEST_CASE("looping voices fill buffers across clip boundaries") {
+    fabric::runtime::PcmAudioMixer mixer;
+    REQUIRE(mixer.configure(8000, 1));
+    const fabric::runtime::PcmWavClip clip{
+        .sample_rate = 8000, .channels = 1, .samples = {100, -100}};
+    REQUIRE(mixer.play(clip, "master", 1.0F, 0.0F, true));
+
+    CHECK(mixer.mix(5) ==
+          std::vector<std::int16_t>{100, -100, 100, -100, 100});
+    CHECK(mixer.voice_count() == 1U);
+}
+
+TEST_CASE("spatial audio resolves listener-relative attenuation and pan") {
+    const auto close = fabric::runtime::resolve_spatial_audio(1.0F, 0.0F,
+                                                               2.0F, 10.0F);
+    CHECK(close.attenuation == 1.0F);
+    CHECK(close.pan == Catch::Approx(0.1F));
+
+    const auto middle = fabric::runtime::resolve_spatial_audio(6.0F, 0.0F,
+                                                                2.0F, 10.0F);
+    CHECK(middle.attenuation == Catch::Approx(0.5F));
+    CHECK(middle.pan == Catch::Approx(0.6F));
+
+    const auto relative = fabric::runtime::resolve_spatial_audio(
+        -10.0F, 0.0F, 2.0F, 10.0F, -2.0F, 0.0F);
+    CHECK(relative.attenuation == Catch::Approx(0.25F));
+    CHECK(relative.pan == Catch::Approx(-0.8F));
+
+    const auto outside = fabric::runtime::resolve_spatial_audio(
+        20.0F, 0.0F, 2.0F, 10.0F);
+    CHECK(outside.attenuation == 0.0F);
+    CHECK(outside.pan == 1.0F);
+}
+
+TEST_CASE("real audio device accepts a non-silent stereo probe", "[.device]") {
+    constexpr std::uint32_t sample_rate = 8000U;
+    fabric::runtime::PcmAudioDevice device;
+    REQUIRE(device.open(sample_rate, 2U, 256U));
+
+    std::vector<std::int16_t> samples(sample_rate / 10U * 2U);
+    for (std::size_t frame = 0; frame < samples.size() / 2U; ++frame) {
+        const auto phase = static_cast<float>(frame % 20U) / 20.0F;
+        const auto sample = static_cast<std::int16_t>(
+            phase < 0.5F ? 3500 : -3500);
+        samples[frame * 2U] = sample;
+        samples[frame * 2U + 1U] = sample;
+    }
+    REQUIRE(device.submit(samples));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    device.close();
 }
 
 } // namespace

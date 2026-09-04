@@ -1,5 +1,6 @@
 #include "fabric/editor/visual_presets.hpp"
 
+#include <cmath>
 #include <utility>
 
 namespace fabric::editor {
@@ -42,6 +43,21 @@ project::VectorNode rectangle(std::string id, std::string name,
                       .kind = VectorShapeKind::rectangle,
                       .bounds = bounds},
             .fill = {.kind = VectorFillKind::solid, .color = color}};
+}
+
+project::VectorNode outlined_rectangle(std::string id, std::string name,
+                                       const core::Rect bounds,
+                                       const core::Color color,
+                                       const float width) {
+    auto node = rectangle(std::move(id), std::move(name), bounds,
+                          {0.0F, 0.0F, 0.0F, 0.0F});
+    node.fill = {.kind = VectorFillKind::none};
+    node.stroke = project::VectorStroke{
+        .color = color,
+        .width = width,
+        .join = project::VectorStrokeJoin::round,
+        .cap = project::VectorStrokeCap::round};
+    return node;
 }
 
 project::VectorAsset vector_asset(const core::ResourceId& id,
@@ -99,92 +115,6 @@ project::VisualComponent component_for(
     };
 }
 
-VisualPresetBundle eye_preset(const VisualPresetRequest& request) {
-    const auto artwork_id = child_id(request.id, "artwork");
-    const auto composition_id = child_id(request.id, "composition");
-    auto artwork = vector_asset(
-        artwork_id, request.name + " Artwork", {2.0F, 1.5F},
-        {ellipse("sclera", "Sclera", {{-1.0F, -0.65F}, {2.0F, 1.3F}},
-                 {0.96F, 0.91F, 0.78F, 1.0F}),
-         ellipse("iris", "Iris", {{-0.48F, -0.48F}, {0.96F, 0.96F}},
-                 {0.28F, 0.55F, 0.62F, 1.0F}),
-         ellipse("pupil", "Pupil", {{-0.2F, -0.32F}, {0.4F, 0.64F}},
-                 {0.08F, 0.07F, 0.06F, 1.0F}),
-         ellipse("highlight", "Highlight", {{0.02F, -0.18F}, {0.12F, 0.18F}},
-                 {1.0F, 0.98F, 0.9F, 0.9F})});
-    project::VisualComposition composition{
-        .document = {.schema_version =
-                         project::current_visual_composition_schema_version,
-                     .type = "visualComposition",
-                     .id = composition_id,
-                     .name = request.name + " Composition"},
-        .size = {2.0F, 1.5F},
-        .layers = {layer("eye", "Eye", VisualLayerKind::vector,
-                         artwork_id, "vector")},
-    };
-    using Type = project::VisualParameterType;
-    auto component = component_for(
-        request, composition_id, {{-1.0F, -0.75F}, {2.0F, 1.5F}},
-        {{"scale", "Scale", Type::vec2, core::Vec2{1.0F, 1.0F},
-          binding("eye", "transform", "scale"), true},
-         {"rotation", "Rotation", Type::angle, 0.0F,
-          binding("eye", "transform", "rotationDegrees"), true},
-         {"opacity", "Opacity", Type::scalar, 1.0F,
-          binding("eye", "layer", "opacity"), true}},
-        {{"sleepy", "Sleepy",
-          {{"scale", core::Vec2{1.0F, 0.55F}}}},
-         {"wide", "Wide",
-          {{"scale", core::Vec2{1.2F, 1.1F}}}}});
-    return {.vectors = {std::move(artwork)},
-            .composition = std::move(composition),
-            .component = std::move(component)};
-}
-
-VisualPresetBundle button_preset(const VisualPresetRequest& request) {
-    const auto artwork_id = child_id(request.id, "artwork");
-    const auto composition_id = child_id(request.id, "composition");
-    std::vector<project::VectorNode> nodes;
-    nodes.push_back(ellipse("body", "Button body",
-                            {{-0.75F, -0.75F}, {1.5F, 1.5F}},
-                            {0.72F, 0.24F, 0.18F, 1.0F}));
-    constexpr float hole = 0.12F;
-    for (std::size_t index = 0U; index < 4U; ++index) {
-        const float x = index % 2U == 0U ? -0.27F : 0.27F;
-        const float y = index < 2U ? -0.27F : 0.27F;
-        nodes.push_back(ellipse(
-            "hole-" + std::to_string(index + 1U), "Thread hole",
-            {{x - hole, y - hole}, {hole * 2.0F, hole * 2.0F}},
-            {0.12F, 0.08F, 0.06F, 1.0F}));
-    }
-    auto artwork = vector_asset(
-        artwork_id, request.name + " Artwork", {1.5F, 1.5F},
-        std::move(nodes));
-    project::VisualComposition composition{
-        .document = {.schema_version =
-                         project::current_visual_composition_schema_version,
-                     .type = "visualComposition",
-                     .id = composition_id,
-                     .name = request.name + " Composition"},
-        .size = {1.5F, 1.5F},
-        .layers = {layer("button", "Button", VisualLayerKind::vector,
-                         artwork_id, "vector")},
-    };
-    using Type = project::VisualParameterType;
-    auto component = component_for(
-        request, composition_id, {{-0.75F, -0.75F}, {1.5F, 1.5F}},
-        {{"scale", "Scale", Type::vec2, core::Vec2{1.0F, 1.0F},
-          binding("button", "transform", "scale"), true},
-         {"rotation", "Rotation", Type::angle, 0.0F,
-          binding("button", "transform", "rotationDegrees"), true},
-         {"opacity", "Opacity", Type::scalar, 1.0F,
-          binding("button", "layer", "opacity"), true}},
-        {{"small", "Small", {{"scale", core::Vec2{0.7F, 0.7F}}}},
-         {"large", "Large", {{"scale", core::Vec2{1.4F, 1.4F}}}}});
-    return {.vectors = {std::move(artwork)},
-            .composition = std::move(composition),
-            .component = std::move(component)};
-}
-
 project::TexturedPath rail(const core::ResourceId& id, std::string name,
                            const project::ResourceReference& texture,
                            const float x) {
@@ -210,6 +140,7 @@ project::TexturedPath rail(const core::ResourceId& id, std::string name,
 
 VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     const auto path_id = child_id(request.id, "rail");
+    const auto border_id = child_id(request.id, "border");
     const auto composition_id = child_id(request.id, "composition");
     auto path = rail(path_id, request.name + " Rail",
                      *request.thread_texture, 0.0F);
@@ -217,6 +148,48 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
     path.commands.back().point = {2.0F, 0.0F};
     path.commands.back().control1 = {-0.8F, 0.3F};
     path.commands.back().control2 = {0.8F, -0.3F};
+    if (request.guided_beam) {
+        path.width = request.beam_width;
+        path.opacity = request.beam_opacity;
+        path.uv_scale.x = request.beam_repetition;
+        path.cap = project::TexturedPathCap::butt;
+        // The provided Beam PNG remains intact. The 192 px alpha bounds keep
+        // 35 px of vertical safety margin; U keeps the full 2048 px width.
+        path.texture_metrics = {
+            .origin = {0.0F, 0.4375F},
+            .size = {1.0F, 0.12890625F}};
+        // Beam coloring belongs to the Thread shader. Tinting the raster fill
+        // too would multiply the same color twice and erase source details.
+        path.color = {1.0F, 1.0F, 1.0F, 1.0F};
+        const bool preserve_source = request.beam_color_mode ==
+            BeamColorMode::preserve_source;
+        path.shader.profile = preserve_source
+            ? project::SurfaceShaderProfile::plastic
+            : project::SurfaceShaderProfile::thread;
+        path.shader.classification = project::TextureClassification::beam;
+        path.shader.primary_color = request.beam_color;
+        path.shader.effect_color = request.beam_effect_color;
+        path.shader.shine = request.beam_shine;
+        path.shader.holography = request.beam_holography;
+        path.shader.repetition = {request.beam_repetition, 1.0F};
+        path.shader.effects = {
+            {.kind = project::SurfaceEffectKind::tint,
+             .color = request.beam_color,
+             .amount = preserve_source ? 0.0F : 1.0F},
+            {.kind = project::SurfaceEffectKind::holography,
+             .color = request.beam_effect_color,
+             .amount = request.beam_holography},
+            {.kind = project::SurfaceEffectKind::shine,
+             .color = {1.0F, 1.0F, 1.0F, 1.0F},
+             .amount = request.beam_shine},
+        };
+    }
+    auto border = vector_asset(
+        border_id, request.name + " Border", {4.0F, 0.8F},
+        {outlined_rectangle("border-shape", "Beam border",
+                            {{-2.0F, -0.4F}, {4.0F, 0.8F}},
+                            {0.08F, 0.04F, 0.02F, 1.0F}, 0.06F)});
+    const std::string layer_id = request.guided_beam ? "beam" : "seam";
     project::VisualComposition composition{
         .document = {.schema_version =
                          project::current_visual_composition_schema_version,
@@ -224,23 +197,62 @@ VisualPresetBundle seam_preset(const VisualPresetRequest& request) {
                      .id = composition_id,
                      .name = request.name + " Composition"},
         .size = {4.0F, 0.8F},
-        .layers = {layer("seam", "Seam", VisualLayerKind::textured_path,
-                         path_id, "texturedPath")},
+        .layers = {layer(layer_id, request.guided_beam ? "Beam" : "Seam",
+                         VisualLayerKind::textured_path,
+                         path_id, "texturedPath", {}, 0.0F)},
     };
+    if (!request.guided_beam) {
+        composition.layers.push_back(layer(
+            "border", "Beam border", VisualLayerKind::vector,
+            border_id, "vector", {}, 1.0F));
+    }
     using Type = project::VisualParameterType;
+    std::vector<project::VisualComponentParameter> parameters;
+    if (request.guided_beam) {
+        parameters = {
+            {"texture", "Texture", Type::resource, path.texture,
+             binding(layer_id, "texturedPath", "texture"), false},
+            {"color-mode", "Color handling", Type::text,
+             std::string{request.beam_color_mode ==
+                     BeamColorMode::preserve_source
+                 ? "preserve" : "recolor"},
+             binding(layer_id, "shader", "colorMode"), false},
+            {"width", "Thickness", Type::scalar, path.width,
+             binding(layer_id, "texturedPath", "width"), true},
+            {"repeat", "Repetition", Type::scalar, path.uv_scale.x,
+             binding(layer_id, "texturedPath", "uvScaleX"), true},
+            {"color", "Base tint", Type::color, path.shader.primary_color,
+             binding(layer_id, "shader", "primaryColor"), true},
+            {"effect-color", "Holo color", Type::color,
+             path.shader.effect_color,
+             binding(layer_id, "shader", "effectColor"), true},
+            {"shine", "Shine", Type::scalar, path.shader.shine,
+             binding(layer_id, "shader", "shine"), true},
+            {"holography", "Holography", Type::scalar,
+             path.shader.holography,
+             binding(layer_id, "shader", "holography"), true},
+            {"opacity", "Opacity", Type::scalar, path.opacity,
+             binding(layer_id, "texturedPath", "opacity"), true}};
+    } else {
+        parameters = {
+            {"width", "Width", Type::scalar, path.width,
+             binding(layer_id, "texturedPath", "width"), true},
+            {"repeat", "Repeat", Type::scalar, path.uv_scale.x,
+             binding(layer_id, "texturedPath", "uvScaleX"), true},
+            {"offset", "Texture offset", Type::scalar, 0.0F,
+             binding(layer_id, "texturedPath", "uvOffsetX"), true},
+            {"color", "Color", Type::color, path.color,
+             binding(layer_id, "texturedPath", "color"), true},
+            {"opacity", "Opacity", Type::scalar, path.opacity,
+             binding(layer_id, "texturedPath", "opacity"), true}};
+    }
     auto component = component_for(
         request, composition_id, {{-2.0F, -0.4F}, {4.0F, 0.8F}},
-        {{"width", "Width", Type::scalar, path.width,
-          binding("seam", "texturedPath", "width"), true},
-         {"repeat", "Repeat", Type::scalar, path.uv_scale.x,
-          binding("seam", "texturedPath", "uvScaleX"), true},
-         {"offset", "Texture offset", Type::scalar, 0.0F,
-          binding("seam", "texturedPath", "uvOffsetX"), true},
-         {"color", "Color", Type::color, path.color,
-          binding("seam", "texturedPath", "color"), true},
-         {"opacity", "Opacity", Type::scalar, path.opacity,
-          binding("seam", "texturedPath", "opacity"), true}});
-    return {.textured_paths = {std::move(path)},
+        std::move(parameters));
+    return {.vectors = request.guided_beam
+            ? std::vector<project::VectorAsset>{}
+            : std::vector<project::VectorAsset>{std::move(border)},
+            .textured_paths = {std::move(path)},
             .composition = std::move(composition),
             .component = std::move(component)};
 }
@@ -339,8 +351,7 @@ std::vector<std::filesystem::path> document_paths(
 
 std::string_view label(const VisualPresetKind kind) noexcept {
     switch (kind) {
-    case VisualPresetKind::eye: return "Eye";
-    case VisualPresetKind::button: return "Button";
+    case VisualPresetKind::beam: return "Beam";
     case VisualPresetKind::seam: return "Seam";
     case VisualPresetKind::zipper: return "Zipper";
     }
@@ -351,6 +362,10 @@ VisualPresetResult build_visual_preset(
     const project::ProjectManifest& manifest,
     const VisualPresetRequest& request) {
     VisualPresetResult result;
+    auto effective_request = request;
+    if (!effective_request.thread_texture && manifest.default_stroke_texture)
+        effective_request.thread_texture = project::ResourceReference{
+            *manifest.default_stroke_texture, "texture"};
     if (!core::ResourceId::is_valid(request.id.value)) {
         add_error(result.errors, project::ErrorCode::invalid_resource_id,
                   "id", "preset id must be a valid resource identifier");
@@ -359,29 +374,51 @@ VisualPresetResult build_visual_preset(
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "name", "preset name must not be empty");
     }
-    const bool uses_thread = request.kind == VisualPresetKind::seam ||
-        request.kind == VisualPresetKind::zipper;
-    if (uses_thread && (!request.thread_texture ||
-        request.thread_texture->expected_type != "texture" ||
-        !core::ResourceId::is_valid(request.thread_texture->id.value))) {
+    const bool uses_thread = effective_request.kind == VisualPresetKind::beam ||
+        effective_request.kind == VisualPresetKind::seam ||
+        effective_request.kind == VisualPresetKind::zipper;
+    if (uses_thread && (!effective_request.thread_texture ||
+        effective_request.thread_texture->expected_type != "texture" ||
+        !core::ResourceId::is_valid(effective_request.thread_texture->id.value))) {
         add_error(result.errors, project::ErrorCode::resource_type_mismatch,
                   "threadTexture",
-                  "seam and zipper presets require a texture resource");
+                  "beam, seam and zipper presets require a texture resource");
     }
-    if (request.kind == VisualPresetKind::zipper &&
-        (request.zipper_tooth_count < 2U ||
-         request.zipper_tooth_count > 128U)) {
+    if (effective_request.kind == VisualPresetKind::zipper &&
+        (effective_request.zipper_tooth_count < 2U ||
+         effective_request.zipper_tooth_count > 128U)) {
         add_error(result.errors, project::ErrorCode::invalid_asset,
                   "zipperToothCount", "tooth count must be between 2 and 128");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_width) ||
+         effective_request.beam_width <= 0.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamWidth", "beam width must be finite and positive");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_repetition) ||
+         effective_request.beam_repetition <= 0.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamRepetition",
+                  "beam repetition must be finite and positive");
+    }
+    if (effective_request.kind == VisualPresetKind::beam &&
+        (!std::isfinite(effective_request.beam_opacity) ||
+         effective_request.beam_opacity < 0.0F ||
+         effective_request.beam_opacity > 1.0F)) {
+        add_error(result.errors, project::ErrorCode::invalid_asset,
+                  "beamOpacity", "beam opacity must be in [0, 1]");
     }
     if (!result.errors.empty()) return result;
 
     VisualPresetBundle bundle;
+    if (effective_request.kind == VisualPresetKind::beam)
+        effective_request.guided_beam = true;
     switch (request.kind) {
-    case VisualPresetKind::eye: bundle = eye_preset(request); break;
-    case VisualPresetKind::button: bundle = button_preset(request); break;
-    case VisualPresetKind::seam: bundle = seam_preset(request); break;
-    case VisualPresetKind::zipper: bundle = zipper_preset(request); break;
+    case VisualPresetKind::beam: bundle = seam_preset(effective_request); break;
+    case VisualPresetKind::seam: bundle = seam_preset(effective_request); break;
+    case VisualPresetKind::zipper: bundle = zipper_preset(effective_request); break;
     }
     for (const auto& vector : bundle.vectors) {
         append_errors(result.errors,

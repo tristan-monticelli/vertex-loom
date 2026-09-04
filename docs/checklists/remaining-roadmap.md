@@ -110,7 +110,7 @@ runtime et chaque futur document possède un propriétaire clair.
 - [x] Ajouter les prompts dédiés pour matériau/fill, entité et animation ; les
   trois créations publient désormais leurs documents atomiquement.
 
-Asset Studio publie désormais un `MaterialDefinition v1` depuis un prompt
+Asset Studio publie désormais un `MaterialDefinition v2` depuis un prompt
 dédié : couleur, opacité, blend, références locales optionnelles et transform
 UV sont validés, écrits atomiquement et réindexés sans créer de bitmap.
 Il publie également un `EntityDefinition v1` mono-nœud avec drawable, matériau
@@ -173,9 +173,12 @@ parentes avant d’exposer leurs sommets monde. Le backend OpenGL 3 compile,
 initialise et dessine les triangles de fills couleur dans le canvas Asset
 Studio ainsi que les contours ouverts/fermés. Asset Studio résout maintenant
 les `TextureAsset` locaux à la demande et met leurs handles GPU en cache ; la
-validation visuelle complète du gate reste ouverte. Les `clipNodeId` simples
-sont maintenant appliqués par stencil dans le backend ; clips imbriqués,
-gizmos de clip et validation visuelle complète restent ouverts.
+  validation visuelle complète du gate reste ouverte. La tessellation concave
+  est maintenant vérifiée par aire dans `fabric_render_tests`. Les `clipNodeId`
+  simples sont maintenant appliqués par stencil dans le backend ; les clips
+  imbriqués disposent d’un fallback CPU convexe, et le canvas consomme les
+  triangles de stroke avec captures distinctes pour miter/round/bevel. Les
+  gizmos de clip et la validation visuelle complète du gate restent ouverts.
 
 ## Étape D — Personnalisateur intégré
 
@@ -195,8 +198,9 @@ monde ; le cadrage explicite et les interactions de gizmo restent ouverts.
 L’inspecteur permet désormais de choisir le parent et le clip d’un nœud natif
 avec historique et validation ; l’arbre de calques, la sélection multiple et
 les groupes restent ouverts.
-- [ ] Ajouter plume Bézier, primitives, édition des nœuds et poignées
-  liées/libres, ouverture et fermeture de contour.
+- [x] Ajouter plume Bézier, primitives, édition des nœuds et poignées
+  liées/libres, ouverture et fermeture de contour. `asset_studio_vector_canvas_e2e`
+  vérifie aussi la création d’un path libre et sa persistance après reload.
 - [x] Ajouter gizmos rotation, échelle et pivot ; la transform du fill reste
   indépendante du transform de la forme et ouverte.
 - [ ] Ajouter sélecteur de fill : couleur, image, motif et matériau référencé.

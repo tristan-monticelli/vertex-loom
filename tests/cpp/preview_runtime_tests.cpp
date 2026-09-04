@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 
@@ -27,6 +28,29 @@
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
+
+TEST_CASE("preview runtime diagnostics preserve Studio trace context") {
+    std::ostringstream log;
+    fabric::runtime::PreviewRuntime runtime;
+    CHECK_FALSE(runtime.load({
+        .project_root = std::filesystem::temp_directory_path() /
+            "missing-vertex-loom-trace-project",
+        .map_id = {.value = "trace-map"},
+        .mode = fabric::runtime::RuntimeMode::smoke_test,
+        .trace = {.session_id = "studio-session-42",
+                  .resource_id = "trace-map"},
+        .log_output = &log}));
+    CHECK(runtime.trace_context().session_id == "studio-session-42");
+    CHECK(runtime.trace_context().resource_id == "trace-map");
+    CHECK(log.str().find("\"sessionId\":\"studio-session-42\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"resourceId\":\"trace-map\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"category\":\"runtime.load\"") !=
+          std::string::npos);
+    CHECK(log.str().find("\"message\":\"failed\"") !=
+          std::string::npos);
+}
 
 fabric::project::ProjectManifest manifest() {
     return {.schema_version = fabric::project::current_schema_version,
@@ -192,7 +216,8 @@ fabric::project::AnimationClip component_animation() {
 }
 
 fabric::project::MaterialDefinition material() {
-    return {.document = {.schema_version = 1,
+    return {.document = {.schema_version =
+                             fabric::project::current_material_schema_version,
                          .type = "material",
                          .id = {.value = "runtime-material"},
                          .name = "Runtime Material"},
@@ -1981,7 +2006,22 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
              .crop = {{0.0F, 0.0F}, {0.5F, 1.0F}},
              .pivot = {0.5F, 0.5F},
          }}, input).ok());
-    REQUIRE(fabric::project::publish_entity(root, manifest(), texture_entity()).ok());
+    auto button_material = material();
+    button_material.shader = fabric::project::ShaderSurfaceSettings{
+        .profile = fabric::project::SurfaceShaderProfile::custom,
+        .classification = fabric::project::TextureClassification::button_eye,
+        .primary_color = {0.2F, 0.7F, 1.0F, 1.0F},
+        .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
+        .shine = 0.4F,
+        .holography = 0.3F,
+    };
+    REQUIRE(fabric::project::publish_material(
+        root, manifest(), button_material).ok());
+    auto button = texture_entity();
+    button.nodes.front().drawable.material =
+        fabric::project::ResourceReference{
+            {.value = "runtime-material"}, "material"};
+    REQUIRE(fabric::project::publish_entity(root, manifest(), button).ok());
     REQUIRE(fabric::project::publish_map(root, manifest(), map_with_texture_entity()).ok());
 
     fabric::runtime::PreviewRuntime runtime;
@@ -2006,7 +2046,14 @@ TEST_CASE("preview runtime uploads texture entity drawables") {
     });
     REQUIRE(studio_packet.ok());
     REQUIRE(studio_packet.packets.size() == 1U);
-    CHECK(packets.front() == studio_packet.packets.front());
+    REQUIRE(packets.front().shader.has_value());
+    CHECK(*packets.front().shader == *button_material.shader);
+    REQUIRE(packets.front().fill_color.has_value());
+    CHECK(packets.front().fill_color->red == 0.5F);
+    CHECK(packets.front().fill_color->alpha == 0.25F);
+    CHECK(packets.front().fill_vertices ==
+          studio_packet.packets.front().fill_vertices);
+    CHECK(packets.front().fill_uv == studio_packet.packets.front().fill_uv);
 
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);

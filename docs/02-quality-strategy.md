@@ -14,7 +14,26 @@
 | Security | Oui | validation locale | `ctest --test-dir build -C Debug` | Chemins et imports invalides. |
 | Mutation | Non | — | null | Trop coûteux avant stabilisation de la physique. |
 
+La mesure locale du 31 août 2026 donne, sur 600 frames et 10 000 éléments,
+`fabric_render_benchmark` à 199,8 FPS p95 (2 487 ms cumulées) et
+`fabric_runtime_benchmark` à 37,0 FPS p95 (15 743 ms cumulées). Ces chiffres
+établissent une baseline reproductible, mais ne ferment pas la recette release
+qui demande aussi démarrage, mémoire et temps de chargement sur deux tailles
+de projet.
+Le checker vector canvas compare aussi l’occupation et la plage de canaux de sa
+capture à la référence versionnée
+`tests/fixtures/visual-baselines/asset-studio-vector-canvas-visual.json`.
+Cette baseline utilise désormais `beam-border`, après retrait des faux artworks
+Eye/Button, et conserve une plage qui exclut explicitement un canvas vide.
+
 ## Decision rule
+
+Le test Node `default-assets.test.mjs` décode les trois PNG distribués, exige
+RGBA8 2048×2048, vérifie alpha, zone de silhouette et SHA-256, puis contrôle
+les champs de provenance. Avec `VERTEX_LOOM_PUBLIC_RELEASE=1`, il exige en plus
+une licence résolue et une preuve écrite présente pour chaque image. Le smoke
+d’installation recalcule les mêmes empreintes depuis un préfixe isolé et exige
+le manifeste, la notice et le bundle de licences.
 
 Les tests unitaires et de contrat s'exécutent à chaque modification du cœur.
 Les intégrations précèdent chaque étape fonctionnelle. Le benchmark
@@ -54,11 +73,66 @@ lorsqu'aucun contexte n'est disponible.
 Le test CTest `asset_studio_texture_e2e` lance également le binaire SDL caché,
 importe et sélectionne une texture, persiste un crop non destructif, crée une
 seconde ressource et valide le projet résultant.
+Le workflow annule automatiquement les runs obsolètes d'une même branche. Les
+parcours SDL des studios ont un timeout CTest de 180 secondes et le job
+plateforme une limite de 20 minutes afin qu'un blocage de fenêtre, de driver,
+de build ou d'installation devienne un échec diagnostiquable sur Windows.
+Le workflow publie aussi les captures `asset-studio-vector-canvas-pen.ppm`,
+`asset-studio-vector-canvas-handles.ppm`, `asset-studio-vector-canvas-final.ppm`,
+les trois couples join/cap et la variante avancée afin que la preuve visuelle
+soit récupérable depuis chaque run multiplateforme.
+Le même parcours mute un vectoriel déjà créé pour appliquer un fill image et un
+stroke image, puis vérifie leur rendu dans les captures finales.
+Le test CTest `asset_studio_vector_canvas_e2e` configure un stroke image répété,
+capture les frames Pen et poignées du canvas après rendu OpenGL/ImGui, vérifie
+un probe pixel de sa zone native avec un nombre minimal de pixels et une plage
+de canaux suffisante pour exclure un aplat, puis rejoue le clic sur un coin existant, sa
+sélection, `Delete`, la sauvegarde et le reload. Il échoue si une capture est
+absente ou plate, si la sélection n'est pas faite ou si le path supprimé
+réapparaît après reload.
+`fabric_canvas_interaction_tests` vérifie aussi la suppression d’une sélection
+multiple de points, l’ordre d’effacement et la conservation de la tête `move`.
+Le test CTest `release_product_recipe` enchaîne le parcours complet sur la
+fixture textile : édition et sauvegarde dans Asset Studio, réouverture et
+validation du projet, puis lancement du Runtime sur la map publiée en mode
+smoke. Il constitue la preuve automatisée du flux produit avant les recettes
+manuelles de release.
+Le test CTest `release_data_robustness` rejette un projet invalide et un projet
+dont une ressource vectorielle référencée a été supprimée, tout en conservant
+le cas valide comme contrôle de non-régression.
+Le test `release_recovery_smoke` copie la fixture, simule une interruption après
+autosave, réouvre une nouvelle session, accepte la récupération et vérifie que
+la modification sauvegardée survit à un reload sans candidat résiduel.
+Le test CTest `release_performance_smoke` exécute les benchmarks renderer et
+runtime sur des profils de 100 puis 10 000 éléments, avec seuils FPS et rapports
+JSON séparés ; les rapports exposent aussi le temps d'initialisation/rendu, le
+temps de chargement runtime et le pic mémoire du processus, mesuré avec les
+APIs natives de chaque OS.
+Les rapports renderer enregistrent maintenant vendor, renderer et version
+OpenGL. La variable `FABRIC_REQUIRE_NATIVE_GL=1` fait échouer explicitement une
+recette qui reçoit Mesa, llvmpipe, softpipe ou un renderer inconnu.
+Le workflow `platform-studio.yml` expose une exécution manuelle
+`native_gpu=true` sur un runner Windows auto-hébergé étiqueté `gpu`; cette gate
+exécute tout CTest sans la configuration Mesa et applique cette variable au
+benchmark renderer.
+Le smoke packaging réinstalle également sur le même préfixe puis vérifie que le
+staging peut être entièrement retiré ; l’intégration aux installateurs natifs
+reste une validation par plateforme.
 Les parcours E2E qui nécessitent une fenêtre retournent le code `77` lorsque
 SDL ne peut pas initialiser l'affichage ou le contexte ; CTest les marque alors
 explicitement comme ignorés, tandis qu'une assertion de scénario conserve un
 échec normal. Un test ignoré ne constitue donc pas une preuve d'exécution
 graphique et ne ferme aucune case de couverture visuelle.
+
+Le smoke OpenGL des profils shader vérifie quatre invariants pixels : le mode
+`Source intacte` avec teinte, holographie et shine à zéro restitue les canaux et
+l'alpha utiles du PNG, la couleur holographique reste inactive à `0`,
+l'holographie utilise seulement la couleur choisie à `1`, et `Recoloration`
+utilise seulement la couleur utilisateur. Il contrôle
+aussi un gain de shine identique sur deux texels distincts et produit
+`build/test-artifacts/fabric-render-shader-smoke.ppm` pour inspection isolée. La seule présence des
+paramètres dans un draw packet ou un document JSON ne constitue pas une preuve
+de coloring.
 Le mode `build/asset_studio --ui-test <projet>` rend une frame, écrit le
 registre JSON des IDs stables et capture `asset_studio-ui-test.ppm` dans le
 projet de test ; il est destiné aux contrôleurs UX et ne modifie pas le
@@ -72,8 +146,12 @@ attend l’application du focus ImGui sur le premier champ, puis vérifie l’ar
 `asset-studio-ui-focus.json` et la demande de scroll associée.
 Le test `asset_studio_ui_accessibility_e2e` vérifie l’activation de la navigation
 clavier ImGui et un ratio de contraste texte/fond d’au moins 4,5:1.
+Le test `map_studio_ui_accessibility_e2e` applique la même preuve à Map Studio
+et produit avant le swap un artefact JSON ainsi qu’une capture PPM ; la preuve
+échoue sous 960×640 ou si tous les canaux sont identiques. Il est ignoré avec
+le code `77` sans écran SDL.
 Le test `asset_studio_ui_drag_e2e` capture les coordonnées des widgets source et
-cible, injecte un drag SDL de `head-button-artwork` vers le nœud `root`, puis
+cible, injecte un drag SDL de `beam-border` vers le nœud `root`, puis
 exige la mutation confirmée dans `asset-studio-ui-drag.json`.
 Les variantes `asset_studio_ui_drag_root_e2e` et
 `asset_studio_ui_drag_child_e2e` couvrent respectivement l’ajout d’un nouveau
@@ -85,6 +163,39 @@ non destructif borné dans `asset-studio-ui-texture.json`.
 Le test `asset_studio_ui_input_e2e` rend le prompt de bindings, prépare les
 actions `move` et `attack`, crée le document depuis ce parcours et vérifie sa
 relecture avec un binding clavier et un binding gamepad.
+Le test `asset_studio_ui_beam_e2e` rend l'assistant Beam sur le fixture projet
+réel `studio-beam`, dont `defaultStrokeTexture` pointe vers `beam-thread`,
+localise son bouton, injecte un clic souris en trois frames, capture le
+formulaire dans `asset-studio-beam-create.ppm`, puis capture un Beam blanc
+neutre et recharge le `texturedPath`. Il vérifie la texture héritée,
+l'épaisseur, l'opacité et la répétition sans injecter la texture ni appeler
+directement la factory à la place de l'action UI. Le test séparé
+`asset_studio_ui_beam_holography_e2e` rejoue le même parcours avec une teinte
+bleue, une couleur holographique or et de la brillance ; sa capture doit rester
+exempte de rose implicite.
+Le test géométrique `Beam keeps repeated texture UVs continuous across
+external segments` couvre aussi une texture externe sur une ligne, une courbe
+et un segment final, avec UV d'arc-length monotones et shader holographique.
+Le rail Asset Studio masque par défaut les dépendances visuelles générées
+(`*-border`, `*-rail`, `*-composition`) afin que l'utilisateur ouvre le
+composant Beam plutôt que son vecteur interne ; la case `Show technical
+resources` conserve l'accès expert sans modifier les contrats persistés.
+Le test `asset_studio_ui_button_e2e` rend l'assistant Button avec un PNG
+original, ses couleurs et paramètres shader, injecte un clic sur le vrai bouton
+de création, capture le résultat puis recharge l'Entity et son Material v2. Il
+vérifie que la référence reste le PNG choisi et qu'aucune image de substitution
+n'est créée.
+Les E2E `asset_studio_entity_e2e` et `asset_studio_animation_e2e` exigent aussi
+une capture OpenGL dédiée après composition/rechargement ; l’Entity utilise le
+fixture réel `studio-beam` et montre trois blocs indépendants (texture, vecteur
+et Beam), tandis que l’Animation utilise le même Beam avec deux clés de
+position ; les fichiers
+`asset-studio-entity-e2e.ppm` et `asset-studio-animation-e2e.ppm` sont inspectés
+pour vérifier le résultat visuel, pas seulement le JSON sauvegardé. Le scénario
+Entity exige en plus que l'action nominale d'animation et le transform soient
+réellement rendus ; le scénario Animation exige le picker nominal de nœud et
+une clé rapide, afin qu'un contrôle présent uniquement dans un volet avancé ne
+puisse pas satisfaire la recette UX.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires
@@ -168,8 +279,11 @@ Les chemins texturés couvriront courbes ouvertes et fermées, répétition,
 étirement, largeur variable, UV continus, raccords, texture manquante et
 séparation stricte entre ruban de rendu et collision.
 Le stroke image vectoriel est couvert par `fabric_render_tests` (texture,
-répétition, UV et transform) et par le preset `beam` de la fixture
-`tests/fixtures/studio-beam`, qui reste visible dans le parcours des presets.
+répétition, UV et transform). Le preset `beam` de la fixture
+`tests/fixtures/studio-beam` combine ce ruban texturé avec un calque vectoriel
+de bordure ; `fabric_visual_composition_renderer_tests` vérifie les deux
+packets et les propriétés du contour, et le résultat reste visible dans le
+parcours des presets.
 Le graphe de mécaniques couvre validation des ports, références, cycles
 interdits, ordre déterministe, corps et joints invalides, capteurs, moteurs,
 undo/redo et reconstruction du monde après reset de preview. La première
@@ -377,8 +491,9 @@ le registre de propriétés, sélectionné comme binding de timeline et interpol
 par `AnimationClip v3` sans piste ni valeur spécialisée.
 Le resolver animé compose ensuite ces valeurs avec l'instance de composant et
 reconstruit ses packets. Les tests vérifient largeur, offset UV et couleur du
-Beam dans le resolver partagé, puis le remplacement d'une échelle de composant
-sur une frame réellement produite par Preview Runtime.
+ruban Beam, ainsi que la présence de sa bordure vectorielle, dans le resolver
+partagé, puis le remplacement d'une échelle de composant sur une frame
+réellement produite par Preview Runtime.
 Le test de session crée aussi une fermeture depuis le même point d'entrée que
 le Studio, vérifie l'indexation de ses ressources, puis rouvre le projet et
 resélectionne son composant.
@@ -398,7 +513,7 @@ La session éditeur couvre la conversion liée-vers-native, sa publication,
 undo, restauration du SVG lié, redo implicite et rechargement après sauvegarde.
 `fabric_asset_preview` est vérifié headless sur les mêmes draw packets que le
 renderer et refuse les documents liés ou invalides sans créer de fenêtre.
-Les contrats `MaterialDefinition v1` et `EntityDefinition v4` couvrent
+Les contrats `MaterialDefinition v2` et `EntityDefinition v4` couvrent
 round-trip, migration des entités v1, publication atomique, références typées,
 instances de composants visuels, transforms non finies, identifiants dupliqués
 et cycles de parentage. Le validateur headless résout aussi variantes, ancres et
@@ -407,6 +522,14 @@ parcours map → entité → composant jusqu'aux draw packets transformés.
 Le contrat `AnimationClip v3` couvre parseur strict, round-trip, publication
 atomique, bindings stables, valeurs scalaire/Vec2/couleur/booléen/référence,
 interpolations step/linear/cubic, boucle et rejet des valeurs non interpolables.
+La pile modulaire d'effets de surface couvre le round-trip de plus de deux
+blocs, leur ordre, leur activation, leurs couleurs et leurs bornes. Le smoke
+OpenGL compare deux ordres de pile, refuse qu'ils produisent le même pixel et
+écrit `build/test-artifacts/fabric-render-effect-stack-smoke.ppm`. Les E2E Beam et Button montrent
+la pile directement dans l'inspecteur avec la preview texturée, puis vérifient
+sa persistance après reload. Le test de session Button ajoute un quatrième
+bloc depuis l'apparence référencée et vérifie son undo, son redo et chaque
+rechargement disque intermédiaire.
 Le registre de descripteurs couvre résolution par binding, propriétés
 animables/inscriptibles, doublons, identifiants manquants et bornes inversées.
 La timeline couvre insertion, tri, déplacement, suppression protégée de la

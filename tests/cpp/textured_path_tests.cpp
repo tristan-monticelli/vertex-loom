@@ -88,6 +88,71 @@ TEST_CASE("textured path v1 round trips its authoring contract") {
     CHECK(references.front() == source.texture);
 }
 
+TEST_CASE("textured path persists mirror mapping for non-tileable friezes") {
+    auto source = textured_path();
+    source.uv_mode = fabric::project::TexturedPathUvMode::mirror;
+    const auto serialized = fabric::project::serialize_textured_path(source);
+    CHECK(serialized.find("\"uvMode\"") != std::string::npos);
+    CHECK(serialized.find("mirror") != std::string::npos);
+    const auto parsed = fabric::project::parse_textured_path(
+        manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->uv_mode ==
+          fabric::project::TexturedPathUvMode::mirror);
+}
+
+TEST_CASE("textured path persists shader profile and animated surface settings") {
+    auto source = textured_path();
+    source.shader.profile = fabric::project::SurfaceShaderProfile::thread;
+    source.shader.classification = fabric::project::TextureClassification::beam;
+    source.shader.primary_color = {0.2F, 0.4F, 0.8F, 1.0F};
+    source.shader.effect_color = {1.0F, 0.2F, 0.7F, 1.0F};
+    source.shader.shine = 0.75F;
+    source.shader.holography = 0.35F;
+    source.shader.intensity = 1.4F;
+    source.shader.repetition = {3.0F, 2.0F};
+    source.shader.deformation = {0.1F, -0.2F};
+    source.shader.effects = {
+        {.kind = fabric::project::SurfaceEffectKind::tint,
+         .color = {0.2F, 0.4F, 0.8F, 1.0F}, .amount = 0.8F},
+        {.kind = fabric::project::SurfaceEffectKind::holography,
+         .color = {1.0F, 0.2F, 0.7F, 0.9F}, .amount = 0.35F,
+         .scale = 2.0F},
+        {.kind = fabric::project::SurfaceEffectKind::shine,
+         .enabled = false, .color = {1.0F, 0.8F, 0.2F, 1.0F},
+         .amount = 0.4F},
+        {.kind = fabric::project::SurfaceEffectKind::shine,
+         .color = {0.2F, 0.8F, 1.0F, 1.0F}, .amount = 0.2F},
+    };
+    const auto parsed = fabric::project::parse_textured_path(
+        manifest(), fabric::project::serialize_textured_path(source));
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->shader == source.shader);
+    CHECK(parsed.asset->shader.effects.size() == 4U);
+}
+
+TEST_CASE("textured path rejects invalid modular surface effects") {
+    auto source = textured_path();
+    source.shader.effects = {{
+        .kind = fabric::project::SurfaceEffectKind::holography,
+        .amount = 1.2F, .scale = 0.0F}};
+    const auto report = fabric::project::validate_textured_path(
+        manifest(), source);
+    CHECK_FALSE(report.ok());
+    CHECK(has_field(report, "shader.effects[0].amount"));
+    CHECK(has_field(report, "shader.effects[0].scale"));
+}
+
+TEST_CASE("textured path persists source edge and thickness metrics") {
+    auto source = textured_path();
+    source.texture_metrics = {
+        .origin = {0.05F, 0.2F}, .size = {0.9F, 0.6F}};
+    const auto parsed = fabric::project::parse_textured_path(
+        manifest(), fabric::project::serialize_textured_path(source));
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->texture_metrics == source.texture_metrics);
+}
+
 TEST_CASE("textured path parser is strict") {
     const auto source = textured_path();
     auto serialized = fabric::project::serialize_textured_path(source);

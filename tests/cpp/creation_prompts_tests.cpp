@@ -218,7 +218,7 @@ TEST_CASE("entity prompt validates drawable and material references") {
     std::filesystem::create_directories(project.path() / "assets/components");
     std::ofstream{project.path() / "assets/textures/hero.texture.json"} << "{}";
     std::ofstream{project.path() / "assets/materials/paper.material.json"} << "{}";
-    std::ofstream{project.path() / "assets/components/eye.component.json"} << "{}";
+    std::ofstream{project.path() / "assets/components/sample.component.json"} << "{}";
     fabric::editor::CreateEntityPrompt prompt;
     prompt.name = "Hero entity";
     prompt.node_name = "Body";
@@ -234,7 +234,7 @@ TEST_CASE("entity prompt validates drawable and material references") {
     CHECK(prompt.validate(project.path(), manifest())
               .error_for("resource").has_value());
     prompt.drawable = fabric::project::EntityDrawableKind::visual_component;
-    prompt.resource_id = "eye";
+    prompt.resource_id = "sample";
     prompt.material_id.clear();
     CHECK(prompt.validate(project.path(), manifest()).ok());
     prompt.material_id = "paper";

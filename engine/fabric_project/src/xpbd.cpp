@@ -235,4 +235,72 @@ XpbdResult solve_xpbd_substep(XpbdSystem& system, float dt, std::size_t iteratio
     return result;
 }
 
+XpbdDiagnostics measure_xpbd_system(const XpbdSystem& system) {
+    XpbdDiagnostics result{
+        .particle_count = system.particles.size(),
+        .dynamic_particle_count = static_cast<std::size_t>(std::ranges::count_if(
+            system.particles, [](const auto& particle) {
+                return particle.inverse_mass > 0.0F;
+            })),
+        .constraint_count = system.distance_constraints.size() +
+            system.pin_constraints.size() + system.bending_constraints.size() +
+            system.area_constraints.size() + system.collision_constraints.size()};
+    float squared_error{};
+    std::size_t measured{};
+    const auto record = [&](const float error_value, const float compliance) {
+        const float absolute_error = std::abs(error_value);
+        result.maximum_constraint_error =
+            std::max(result.maximum_constraint_error, absolute_error);
+        squared_error += absolute_error * absolute_error;
+        ++measured;
+        if (compliance > 0.0F)
+            result.compliant_energy +=
+                0.5F * absolute_error * absolute_error / compliance;
+    };
+    for (const auto& constraint : system.distance_constraints) {
+        if (constraint.first >= system.particles.size() ||
+            constraint.second >= system.particles.size()) continue;
+        record(length(subtract(system.particles[constraint.second].position,
+                               system.particles[constraint.first].position)) -
+                   constraint.rest_length,
+               constraint.compliance);
+    }
+    for (const auto& constraint : system.pin_constraints) {
+        if (constraint.particle >= system.particles.size()) continue;
+        record(length(subtract(system.particles[constraint.particle].position,
+                               constraint.target)),
+               constraint.compliance);
+    }
+    for (const auto& constraint : system.bending_constraints) {
+        if (constraint.first >= system.particles.size() ||
+            constraint.third >= system.particles.size()) continue;
+        record(length(subtract(system.particles[constraint.third].position,
+                               system.particles[constraint.first].position)) -
+                   constraint.rest_length,
+               constraint.compliance);
+    }
+    for (const auto& constraint : system.area_constraints) {
+        if (constraint.first >= system.particles.size() ||
+            constraint.second >= system.particles.size() ||
+            constraint.third >= system.particles.size()) continue;
+        record(triangle_area(system.particles[constraint.first].position,
+                             system.particles[constraint.second].position,
+                             system.particles[constraint.third].position) -
+                   constraint.rest_area,
+               constraint.compliance);
+    }
+    for (const auto& constraint : system.collision_constraints) {
+        if (constraint.particle >= system.particles.size()) continue;
+        const float normal_length = length(constraint.normal);
+        if (normal_length <= 1.0e-12F) continue;
+        const auto normal = scale(constraint.normal, 1.0F / normal_length);
+        record(std::max(0.0F, constraint.offset -
+            dot(system.particles[constraint.particle].position, normal)),
+            constraint.compliance);
+    }
+    result.rms_constraint_error = measured == 0U ? 0.0F
+        : std::sqrt(squared_error / static_cast<float>(measured));
+    return result;
+}
+
 } // namespace fabric::project

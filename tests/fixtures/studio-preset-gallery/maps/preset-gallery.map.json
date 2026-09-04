@@ -9,58 +9,6 @@
       "chunkY": 0,
       "entity": {
         "expectedType": "entity",
-        "id": "preset-eye-entity"
-      },
-      "id": "preset-eye",
-      "layer": "instances",
-      "properties": [],
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": -6.0,
-          "y": 0.0
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 1.0,
-          "y": 1.0
-        }
-      }
-    },
-    {
-      "chunkX": -1,
-      "chunkY": 0,
-      "entity": {
-        "expectedType": "entity",
-        "id": "preset-button-entity"
-      },
-      "id": "preset-button",
-      "layer": "instances",
-      "properties": [],
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": -2.0,
-          "y": 0.0
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 1.0,
-          "y": 1.0
-        }
-      }
-    },
-    {
-      "chunkX": 0,
-      "chunkY": 0,
-      "entity": {
-        "expectedType": "entity",
         "id": "preset-seam-entity"
       },
       "id": "preset-seam",
@@ -72,7 +20,7 @@
           "y": 0.0
         },
         "position": {
-          "x": 2.0,
+          "x": -2.0,
           "y": 0.0
         },
         "rotationDegrees": 0.0,
@@ -98,7 +46,7 @@
           "y": 0.0
         },
         "position": {
-          "x": 6.0,
+          "x": 2.0,
           "y": 0.0
         },
         "rotationDegrees": 0.0,

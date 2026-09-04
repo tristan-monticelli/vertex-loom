@@ -6,6 +6,7 @@
     "scenes": "scenes",
     "schemas": "schemas"
   },
+  "defaultStrokeTexture": "cotton-thread",
   "id": "studio-preset-gallery",
   "name": "Studio Preset Gallery",
   "pixelsPerUnit": 100.0,

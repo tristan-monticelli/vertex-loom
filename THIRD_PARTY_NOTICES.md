@@ -1,5 +1,12 @@
 # Third-party notices
 
+## Vertex Loom default Studio images
+
+The three PNG files under `editors/asset_studio/assets` are user-supplied
+content. Their author, rights holder and redistribution license have not yet
+been confirmed. They must not be included in a public archive until every
+entry in the adjacent manifest links written approval.
+
 ## CTXRoute
 
 CTXRoute is copyright its contributors and is distributed under the MIT License.

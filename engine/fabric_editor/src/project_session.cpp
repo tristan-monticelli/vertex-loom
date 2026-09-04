@@ -654,6 +654,16 @@ bool ProjectSession::import_png(const std::filesystem::path& source,
         return false;
     }
 
+    if (!manifest_->default_stroke_texture) {
+        manifest_->default_stroke_texture = id;
+        const auto saved_manifest = project::save_manifest_atomic(
+            project_root_, *manifest_);
+        if (!saved_manifest.ok()) {
+            errors_ = saved_manifest.errors;
+            return false;
+        }
+    }
+
     imported_texture_ = ImportedTexture{
         .asset = std::move(*published.asset),
         .image = std::move(*decoded.image),
@@ -864,11 +874,42 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
         return false;
     }
     if (!save_before_document_transition()) return false;
+    const auto entity_id = prompt.resource_id_for_document(
+        project_root_, *manifest_);
+    const core::ResourceId appearance_material_id{
+        .value = entity_id.value + "-appearance"};
+    if (prompt.appearance_shader) {
+        const auto material_path = project::material_document_path(
+            *manifest_, appearance_material_id);
+        std::error_code filesystem_error;
+        if (std::filesystem::exists(project_root_ / material_path,
+                                    filesystem_error) || filesystem_error) {
+            errors_ = {{project::ErrorCode::asset_already_exists,
+                        "appearance",
+                        "the Button appearance destination already exists"}};
+            return false;
+        }
+        project::MaterialDefinition appearance{
+            .document = {
+                .schema_version = project::current_material_schema_version,
+                .type = "material",
+                .id = appearance_material_id,
+                .name = prompt.name + " Appearance",
+            },
+            .shader = prompt.appearance_shader,
+        };
+        const auto published_appearance = project::publish_material(
+            project_root_, *manifest_, appearance);
+        if (!published_appearance.ok()) {
+            errors_ = published_appearance.errors;
+            return false;
+        }
+    }
     project::EntityDefinition entity{
         .document = {
             .schema_version = project::current_entity_schema_version,
             .type = "entity",
-            .id = prompt.resource_id_for_document(project_root_, *manifest_),
+            .id = entity_id,
             .name = prompt.name,
         },
     };
@@ -894,8 +935,34 @@ bool ProjectSession::create_entity(const CreateEntityPrompt& prompt) {
     if (!prompt.material_id.empty()) {
         node.drawable.material = project::ResourceReference{
             {.value = prompt.material_id}, "material"};
+    } else if (prompt.appearance_shader) {
+        node.drawable.material = project::ResourceReference{
+            appearance_material_id, "material"};
     }
     entity.nodes.push_back(std::move(node));
+    for (std::size_t index = 0; index < prompt.blocks.size(); ++index) {
+        const auto& block = prompt.blocks[index];
+        project::EntityNode child{
+            .id = "block-" + std::to_string(index + 1U),
+            .name = block.name,
+            .parent = "root",
+            .transform = block.transform,
+            .z_order = block.z_order,
+            .drawable = {.kind = block.drawable},
+        };
+        if (!block.resource_id.empty()) {
+            child.drawable.resource = project::ResourceReference{
+                {.value = block.resource_id},
+                block.drawable == project::EntityDrawableKind::texture
+                    ? "texture"
+                    : block.drawable == project::EntityDrawableKind::visual_component
+                    ? "visualComponent" : "vector"};
+            if (block.drawable == project::EntityDrawableKind::visual_component)
+                child.drawable.component_instance =
+                    project::VisualComponentInstance{};
+        }
+        entity.nodes.push_back(std::move(child));
+    }
     const auto published = project::publish_entity(
         project_root_, *manifest_, entity);
     if (!published.ok()) {
@@ -1018,6 +1085,13 @@ bool ProjectSession::set_selected_audio_event(const std::size_t event_index,
     }
     auto candidate = *loaded.audio;
     candidate.events[event_index] = std::move(event);
+    return set_selected_audio_document(std::move(candidate));
+}
+
+bool ProjectSession::set_selected_audio_document(project::AudioDocument candidate) {
+    const auto* selected = selected_resource();
+    if (selected == nullptr || selected->kind != StudioResourceKind::audio ||
+        selected->id != candidate.document.id) return false;
     const auto validation = project::validate_audio(*manifest_, candidate);
     if (!validation.ok()) { errors_ = validation.errors; return false; }
     const auto published = project::publish_audio(project_root_, *manifest_, candidate);
@@ -1034,6 +1108,26 @@ bool ProjectSession::create_visual_preset(
                     "a project must be open before creating a visual preset"}};
         return false;
     }
+    const bool uses_thread_texture =
+        request.kind == VisualPresetKind::beam ||
+        request.kind == VisualPresetKind::seam ||
+        request.kind == VisualPresetKind::zipper;
+    if (uses_thread_texture) {
+        const auto texture_id = request.thread_texture
+            ? request.thread_texture->id
+            : manifest_->default_stroke_texture;
+        const auto texture = texture_id
+            ? std::ranges::find_if(resources_, [&](const auto& resource) {
+                return resource.kind == StudioResourceKind::texture &&
+                    resource.id == *texture_id;
+            })
+            : resources_.end();
+        if (!texture_id || texture == resources_.end()) {
+            errors_ = {{project::ErrorCode::missing_resource, "threadTexture",
+                        "choose an existing project texture for this Beam or thread preset"}};
+            return false;
+        }
+    }
     if (!save_before_document_transition()) return false;
     auto published = publish_visual_preset(
         project_root_, *manifest_, request);
@@ -1042,6 +1136,10 @@ bool ProjectSession::create_visual_preset(
         return false;
     }
     if (!refresh_resources()) return false;
+    if (request.kind == VisualPresetKind::beam) {
+        return select_resource(StudioResourceKind::textured_path,
+                               {.value = request.id.value + "-rail"});
+    }
     return select_resource(StudioResourceKind::visual_component, request.id);
 }
 
@@ -2533,6 +2631,55 @@ bool ProjectSession::set_selected_material(
     return true;
 }
 
+bool ProjectSession::set_referenced_material(
+    const core::ResourceId& material_id,
+    project::MaterialDefinition material) {
+    if (!selected_entity_ || !manifest_) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select an Entity before editing its appearance"}};
+        return false;
+    }
+    const bool referenced = std::ranges::any_of(
+        selected_entity_->nodes, [&](const auto& node) {
+            return node.drawable.material &&
+                node.drawable.material->id == material_id;
+        });
+    if (!referenced) {
+        errors_ = {{project::ErrorCode::invalid_asset, "material",
+                    "the material is not referenced by the selected Entity"}};
+        return false;
+    }
+    if (dirty_document_ != DirtyDocument::none &&
+        dirty_document_ != DirtyDocument::material) {
+        errors_ = {{project::ErrorCode::invalid_asset, "material",
+                    "save or undo the current document before editing the Button appearance"}};
+        return false;
+    }
+    if (!selected_material_ || selected_material_->document.id != material_id) {
+        const auto loaded = project::load_material(
+            project_root_, *manifest_,
+            project::material_document_path(*manifest_, material_id));
+        if (!loaded.ok()) {
+            errors_ = loaded.errors;
+            return false;
+        }
+        selected_material_ = *loaded.asset;
+        selected_material_document_path_ =
+            project::material_document_path(*manifest_, material_id);
+        commands_.clear();
+        commands_.mark_clean();
+    }
+    if (!set_selected_material(std::move(material))) return false;
+    const auto published = project::publish_material(
+        project_root_, *manifest_, *selected_material_);
+    if (!published.ok()) {
+        errors_ = published.errors;
+        return false;
+    }
+    errors_.clear();
+    return true;
+}
+
 bool ProjectSession::set_selected_vector_node(
     const std::size_t node_index, project::VectorNode node,
     const AutosaveScheduler::Clock::time_point now) {
@@ -2697,6 +2844,47 @@ bool ProjectSession::set_selected_entity_node(
             selected_entity_->nodes[node_index], std::move(node)))) {
         errors_ = {{project::ErrorCode::invalid_asset, "node",
                     "cannot execute the entity node modification"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::entity;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::set_selected_entity_nodes(
+    std::vector<std::pair<std::size_t, project::EntityNode>> nodes,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!selected_entity_ || nodes.empty()) {
+        errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                    "select one or more entity nodes before editing them"}};
+        return false;
+    }
+    auto candidate = *selected_entity_;
+    std::vector<bool> visited(candidate.nodes.size(), false);
+    for (auto& [index, node] : nodes) {
+        if (index >= candidate.nodes.size() || visited[index]) {
+            errors_ = {{project::ErrorCode::invalid_asset, "selection",
+                        "entity node selection contains an invalid or duplicate index"}};
+            return false;
+        }
+        visited[index] = true;
+        candidate.nodes[index] = std::move(node);
+    }
+    const auto validation = project::validate_entity(*manifest_, candidate);
+    if (!validation.ok()) {
+        errors_ = validation.errors;
+        return false;
+    }
+    if (!prepare_dirty_document_edit(
+            DirtyDocument::entity, project::ErrorCode::invalid_asset,
+            "selection", "save or undo the current document before editing an entity",
+            now)) return false;
+    if (!commands_.execute(
+            std::make_unique<ReplaceValueCommand<project::EntityDefinition>>(
+                *selected_entity_, std::move(candidate)))) {
+        errors_ = {{project::ErrorCode::invalid_asset, "nodes",
+                    "cannot execute the entity node group modification"}};
         return false;
     }
     dirty_document_ = DirtyDocument::entity;
@@ -3264,12 +3452,14 @@ bool ProjectSession::set_selected_animation_key(
     const project::AnimationComposition composition,
     const project::AnimationEasing easing,
     std::optional<project::AnimationValue> in_tangent,
-    std::optional<project::AnimationValue> out_tangent) {
+    std::optional<project::AnimationValue> out_tangent,
+    const bool mergeable) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
     if (!timeline.set_key(std::move(binding), time, std::move(value),
                           interpolation, composition, easing,
-                          std::move(in_tangent), std::move(out_tangent))) {
+                          std::move(in_tangent), std::move(out_tangent),
+                          mergeable)) {
         errors_ = {{project::ErrorCode::invalid_asset, "tracks",
                     "animation key is invalid or conflicts with its track"}};
         return false;
@@ -3361,12 +3551,38 @@ bool ProjectSession::move_selected_animation_key(
     return true;
 }
 
-bool ProjectSession::insert_selected_animation_marker(
-    std::string id, const float time,
+bool ProjectSession::set_selected_animation_track_curve(
+    project::PropertyBinding binding,
+    const project::AnimationInterpolation interpolation,
+    const project::AnimationEasing easing,
     const AutosaveScheduler::Clock::time_point now) {
     if (!prepare_animation_edit(now)) return false;
     AnimationTimeline timeline(*selected_animation_, commands_);
-    if (!timeline.insert_marker(std::move(id), time)) {
+    if (!timeline.set_track_curve(binding, interpolation, easing)) {
+        errors_ = {{project::ErrorCode::invalid_asset, "tracks",
+                    "select an existing animation track before editing its curve"}};
+        return false;
+    }
+    dirty_document_ = DirtyDocument::animation;
+    autosave_.mark_changed(now);
+    errors_.clear();
+    return true;
+}
+
+bool ProjectSession::insert_selected_animation_marker(
+    std::string id, const float time,
+    const AutosaveScheduler::Clock::time_point now) {
+    return insert_selected_animation_marker(
+        std::move(id), time, std::nullopt, now);
+}
+
+bool ProjectSession::insert_selected_animation_marker(
+    std::string id, const float time,
+    std::optional<project::AnimationAudioCue> audio,
+    const AutosaveScheduler::Clock::time_point now) {
+    if (!prepare_animation_edit(now)) return false;
+    AnimationTimeline timeline(*selected_animation_, commands_);
+    if (!timeline.insert_marker(std::move(id), time, std::move(audio))) {
         errors_ = {{project::ErrorCode::invalid_asset, "markers",
                     "the marker id or time is invalid or already exists"}};
         return false;
@@ -3398,6 +3614,15 @@ bool ProjectSession::undo(const AutosaveScheduler::Clock::time_point now) {
     }
     if (dirty_document_ == DirtyDocument::animation &&
         !sync_animation_preview_entity()) return false;
+    if (dirty_document_ == DirtyDocument::material && selected_entity_ &&
+        selected_material_) {
+        const auto published = project::publish_material(
+            project_root_, *manifest_, *selected_material_);
+        if (!published.ok()) {
+            errors_ = published.errors;
+            return false;
+        }
+    }
     autosave_.mark_changed(now);
     errors_.clear();
     return true;
@@ -3409,6 +3634,15 @@ bool ProjectSession::redo(const AutosaveScheduler::Clock::time_point now) {
     }
     if (dirty_document_ == DirtyDocument::animation &&
         !sync_animation_preview_entity()) return false;
+    if (dirty_document_ == DirtyDocument::material && selected_entity_ &&
+        selected_material_) {
+        const auto published = project::publish_material(
+            project_root_, *manifest_, *selected_material_);
+        if (!published.ok()) {
+            errors_ = published.errors;
+            return false;
+        }
+    }
     autosave_.mark_changed(now);
     errors_.clear();
     return true;

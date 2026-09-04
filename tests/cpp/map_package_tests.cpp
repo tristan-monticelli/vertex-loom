@@ -184,6 +184,7 @@ TEST_CASE("map package planning closes the rotating platform graph") {
         {"mechanic", "rotating-platform"},
         {"texture", "platform-thread"},
         {"texturedPath", "platform-strip-rail"},
+        {"vector", "platform-strip-border"},
         {"visualComponent", "platform-strip"},
         {"visualComposition", "platform-strip-composition"},
     };
@@ -216,7 +217,7 @@ TEST_CASE("map package planning includes native vector dependencies") {
     CHECK(std::ranges::count_if(
               planned.manifest->resources, [](const auto& resource) {
                   return resource.resource.expected_type == "vector";
-              }) == 2);
+              }) == 3);
 }
 
 TEST_CASE("map package planning rejects missing and absolute resources") {

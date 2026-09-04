@@ -30,6 +30,23 @@ fabric::project::MaterialDefinition material() {
         .blend = fabric::project::MaterialBlendMode::multiply,
         .texture = fabric::project::ResourceReference{
             {.value = "wool-fill"}, "texture"},
+        .shader = fabric::project::ShaderSurfaceSettings{
+            .profile = fabric::project::SurfaceShaderProfile::plastic,
+            .classification = fabric::project::TextureClassification::button_eye,
+            .primary_color = {0.2F, 0.7F, 1.0F, 1.0F},
+            .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
+            .shine = 0.4F,
+            .holography = 0.3F,
+            .effects = {
+                {.kind = fabric::project::SurfaceEffectKind::tint,
+                 .color = {0.2F, 0.7F, 1.0F, 1.0F}},
+                {.kind = fabric::project::SurfaceEffectKind::holography,
+                 .color = {1.0F, 0.2F, 0.8F, 1.0F}, .amount = 0.3F},
+                {.kind = fabric::project::SurfaceEffectKind::shine,
+                 .amount = 0.4F},
+                {.kind = fabric::project::SurfaceEffectKind::shine,
+                 .enabled = false, .amount = 0.1F}},
+        },
         .uv_transform = {.position = {0.1F, -0.2F},
                          .rotation_degrees = 15.0F,
                          .scale = {1.2F, 0.8F},
@@ -70,6 +87,8 @@ TEST_CASE("material definition round trips and publishes atomically") {
         manifest(), fabric::project::serialize_material(source));
     REQUIRE(parsed.ok());
     REQUIRE(*parsed.asset == source);
+    REQUIRE(parsed.asset->shader);
+    CHECK(parsed.asset->shader->effects.size() == 4U);
 
     const auto root = std::filesystem::temp_directory_path() /
         ("fabric-material-" + std::to_string(
@@ -81,6 +100,21 @@ TEST_CASE("material definition round trips and publishes atomically") {
         root / "assets/materials/wool-material.material.json"));
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
+}
+
+TEST_CASE("material v1 migrates without enabling a surface shader") {
+    auto legacy = material();
+    legacy.shader.reset();
+    auto serialized = fabric::project::serialize_material(legacy);
+    const auto version = serialized.find("\"schemaVersion\": 2");
+    REQUIRE(version != std::string::npos);
+    serialized.replace(version, std::string{"\"schemaVersion\": 2"}.size(),
+                       "\"schemaVersion\": 1");
+    const auto parsed = fabric::project::parse_material(manifest(), serialized);
+    REQUIRE(parsed.ok());
+    CHECK(parsed.asset->document.schema_version ==
+          fabric::project::current_material_schema_version);
+    CHECK_FALSE(parsed.asset->shader.has_value());
 }
 
 TEST_CASE("entity definition round trips and rejects parent cycles") {
@@ -141,7 +175,7 @@ TEST_CASE("entity visual component instances round-trip and expose resources") {
     auto& drawable = source.nodes.front().drawable;
     drawable.kind = fabric::project::EntityDrawableKind::visual_component;
     drawable.resource = fabric::project::ResourceReference{
-        {.value = "button-eye"}, "visualComponent"};
+        {.value = "sample-component"}, "visualComponent"};
     drawable.material.reset();
     drawable.component_instance = fabric::project::VisualComponentInstance{
         .variant_id = "stitched",
@@ -158,7 +192,7 @@ TEST_CASE("entity visual component instances round-trip and expose resources") {
 
     const auto references = fabric::project::entity_resource_references(source);
     CHECK(std::ranges::any_of(references, [](const auto& reference) {
-        return reference.id.value == "button-eye" &&
+        return reference.id.value == "sample-component" &&
             reference.expected_type == "visualComponent";
     }));
     CHECK(std::ranges::any_of(references, [](const auto& reference) {

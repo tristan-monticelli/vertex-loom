@@ -22,7 +22,10 @@ phase de compositing.
 
 Le packet décrit suffisamment le fill sans posséder de pixels ni d’atlas. Les
 textures doivent être validées par le registre de ressources avant publication.
-Le renderer OpenGL devra appliquer le fit, le transform, l’opacité et
-`deform_with_shape` lors d’un incrément ultérieur.
+Le renderer OpenGL applique le fit en fonction du ratio réel de la texture, le
+transform et l’opacité. `deform_with_shape = true` mappe l’image dans les
+coordonnées locales de la silhouette ; `false` l’ancre dans l’espace projet et
+la silhouette ne sert plus que de clip géométrique. Le mapping reste dans les
+draw packets et aucune image déformée n’est persistée.
 Les nouvelles liaisons utilisent `deform_with_shape = false` par défaut afin
 que cette capacité différée ne transforme jamais implicitement une image.

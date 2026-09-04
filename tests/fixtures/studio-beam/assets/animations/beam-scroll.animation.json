@@ -8,13 +8,13 @@
     "expectedType": "entity",
     "id": "beam-entity"
   },
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "tracks": [
     {
       "binding": {
         "component": "beam",
         "node": "root",
-        "property": "offset"
+        "property": "repeat"
       },
       "composition": "replace",
       "easing": "linear",
@@ -24,14 +24,14 @@
           "time": 0.0,
           "value": {
             "kind": "scalar",
-            "value": 0.0
+            "value": 1.0
           }
         },
         {
           "time": 1.0,
           "value": {
             "kind": "scalar",
-            "value": 4.0
+            "value": 2.0
           }
         }
       ]

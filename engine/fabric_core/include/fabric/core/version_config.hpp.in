@@ -1,0 +1,3 @@
+#pragma once
+
+#define VERTEX_LOOM_VERSION "@PROJECT_VERSION@"

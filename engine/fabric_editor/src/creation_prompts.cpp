@@ -436,7 +436,7 @@ PromptValidation CreateMaterialPrompt::validate(
     const auto destination = project::material_document_path(manifest, id);
     validation.destination = project_root / destination;
     validation.summary = {
-        "Create MaterialDefinition v1: " + name,
+        "Create MaterialDefinition v2: " + name,
         "Id: " + id.value,
         "Destination: " + validation.destination.generic_string(),
         "Blend: " + std::string(project::to_string(blend)),
@@ -503,6 +503,12 @@ PromptValidation CreateEntityPrompt::validate(
         !material_id.empty())
         add_error(validation, "material",
                   "Visual components own their composed materials.");
+    if (appearance_shader && drawable != project::EntityDrawableKind::texture)
+        add_error(validation, "appearance",
+                  "Surface appearance is only available for image drawables.");
+    if (appearance_shader && !material_id.empty())
+        add_error(validation, "appearance",
+                  "Choose either a generated appearance or an existing material.");
     if (!material_id.empty()) {
         if (!core::ResourceId::is_valid(material_id)) {
             add_error(validation, "material", "Material id must be valid.");
@@ -510,6 +516,37 @@ PromptValidation CreateEntityPrompt::validate(
                                               "materials", ".material.json")) {
             add_error(validation, "material",
                       "Material is not registered in the project.");
+        }
+    }
+    for (std::size_t index = 0; index < blocks.size(); ++index) {
+        const auto& block = blocks[index];
+        const auto field = "blocks[" + std::to_string(index) + "]";
+        if (blank(block.name))
+            add_error(validation, field + ".name", "Block name must not be empty.");
+        const auto block_finite = std::isfinite(block.z_order) &&
+            std::isfinite(block.transform.position.x) &&
+            std::isfinite(block.transform.position.y) &&
+            std::isfinite(block.transform.rotation_degrees) &&
+            std::isfinite(block.transform.scale.x) &&
+            std::isfinite(block.transform.scale.y) &&
+            std::isfinite(block.transform.pivot.x) &&
+            std::isfinite(block.transform.pivot.y);
+        if (!block_finite)
+            add_error(validation, field + ".transform",
+                      "Block transform and z-order must be finite.");
+        if (block.drawable == project::EntityDrawableKind::none) {
+            if (!block.resource_id.empty())
+                add_error(validation, field + ".resource",
+                          "None block cannot reference a resource.");
+        } else if (block.drawable == project::EntityDrawableKind::texture) {
+            validate_resource(block.resource_id, "textures", ".texture.json",
+                              field + ".resource");
+        } else if (block.drawable == project::EntityDrawableKind::vector) {
+            validate_resource(block.resource_id, "vectors", ".vector.json",
+                              field + ".resource");
+        } else if (block.drawable == project::EntityDrawableKind::visual_component) {
+            validate_resource(block.resource_id, "components", ".component.json",
+                              field + ".resource");
         }
     }
     validation.destination = project_root /

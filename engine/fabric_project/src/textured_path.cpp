@@ -82,6 +82,27 @@ bool read_vec2(const Json& object, const char* key, core::Vec2& output,
         read_float(*iterator, "y", output.y, errors, target);
 }
 
+Json serialize_texture_metrics(const TexturedPathTextureMetrics& metrics) {
+    return {{"origin", serialize_vec2(metrics.origin)},
+            {"size", serialize_vec2(metrics.size)}};
+}
+
+bool read_texture_metrics(const Json& object,
+                          TexturedPathTextureMetrics& output,
+                          std::vector<Error>& errors) {
+    const auto iterator = object.find("textureMetrics");
+    if (iterator == object.end()) return true;
+    if (!iterator->is_object()) {
+        add_error(errors, ErrorCode::invalid_asset, "textureMetrics",
+                  "expected an object");
+        return false;
+    }
+    reject_unknown(*iterator, {"origin", "size"}, "textureMetrics", errors);
+    return read_vec2(*iterator, "origin", output.origin, errors,
+                     "textureMetrics") &&
+        read_vec2(*iterator, "size", output.size, errors, "textureMetrics");
+}
+
 Json serialize_color(const core::Color color) {
     return {{"red", color.red}, {"green", color.green},
             {"blue", color.blue}, {"alpha", color.alpha}};
@@ -128,6 +149,120 @@ bool finite(const core::Vec2 value) {
     return std::isfinite(value.x) && std::isfinite(value.y);
 }
 
+Json serialize_shader(const ShaderSurfaceSettings& value) {
+    Json result = {{"profile", std::string(to_string(value.profile))},
+            {"classification", std::string(to_string(value.classification))},
+            {"primaryColor", serialize_color(value.primary_color)},
+            {"effectColor", serialize_color(value.effect_color)},
+            {"shine", value.shine}, {"holography", value.holography},
+            {"opacity", value.opacity}, {"intensity", value.intensity},
+            {"repetition", serialize_vec2(value.repetition)},
+            {"deformation", serialize_vec2(value.deformation)}};
+    if (!value.effects.empty()) {
+        result["effects"] = Json::array();
+        for (const auto& effect : value.effects) {
+            result["effects"].push_back({
+                {"kind", std::string(to_string(effect.kind))},
+                {"enabled", effect.enabled},
+                {"color", serialize_color(effect.color)},
+                {"amount", effect.amount}, {"scale", effect.scale}});
+        }
+    }
+    return result;
+}
+
+void read_shader(const Json& document, ShaderSurfaceSettings& value,
+                 std::vector<Error>& errors) {
+    const auto item = document.find("shader");
+    if (item == document.end()) return;
+    if (!item->is_object()) { add_error(errors, ErrorCode::invalid_asset, "shader", "expected an object"); return; }
+    std::string profile; std::string classification;
+    read_text(*item, "profile", profile, errors, "shader");
+    read_text(*item, "classification", classification, errors, "shader");
+    if (profile == "Thread") value.profile = SurfaceShaderProfile::thread;
+    else if (profile == "Plastic") value.profile = SurfaceShaderProfile::plastic;
+    else if (profile == "Monochrome") value.profile = SurfaceShaderProfile::monochrome;
+    else if (profile == "Custom") value.profile = SurfaceShaderProfile::custom;
+    else add_error(errors, ErrorCode::invalid_asset, "shader.profile", "unsupported shader profile");
+    if (classification == "floor") value.classification = TextureClassification::floor;
+    else if (classification == "rope") value.classification = TextureClassification::rope;
+    else if (classification == "beam") value.classification = TextureClassification::beam;
+    else if (classification == "buttonEye") value.classification = TextureClassification::button_eye;
+    else if (classification == "collisionMarker") value.classification = TextureClassification::collision_marker;
+    else add_error(errors, ErrorCode::invalid_asset, "shader.classification", "unsupported texture classification");
+    read_color(*item, "primaryColor", value.primary_color, errors, "shader");
+    read_color(*item, "effectColor", value.effect_color, errors, "shader");
+    read_float(*item, "shine", value.shine, errors, "shader");
+    read_float(*item, "holography", value.holography, errors, "shader");
+    read_float(*item, "opacity", value.opacity, errors, "shader");
+    read_float(*item, "intensity", value.intensity, errors, "shader");
+    read_vec2(*item, "repetition", value.repetition, errors, "shader");
+    read_vec2(*item, "deformation", value.deformation, errors, "shader");
+    if (const auto effects = item->find("effects"); effects != item->end()) {
+        if (!effects->is_array()) {
+            add_error(errors, ErrorCode::invalid_asset, "shader.effects",
+                      "expected an array");
+        } else {
+            for (std::size_t index = 0; index < effects->size(); ++index) {
+                const auto& effect = (*effects)[index];
+                const auto field = "shader.effects[" + std::to_string(index) + "]";
+                if (!effect.is_object()) {
+                    add_error(errors, ErrorCode::invalid_asset, field,
+                              "expected an object");
+                    continue;
+                }
+                SurfaceEffect parsed;
+                std::string kind;
+                read_text(effect, "kind", kind, errors, field);
+                if (kind == "Tint") parsed.kind = SurfaceEffectKind::tint;
+                else if (kind == "Holography") parsed.kind = SurfaceEffectKind::holography;
+                else if (kind == "Shine") parsed.kind = SurfaceEffectKind::shine;
+                else add_error(errors, ErrorCode::invalid_asset,
+                               field + ".kind", "unsupported surface effect");
+                const auto enabled = effect.find("enabled");
+                if (enabled == effect.end() || !enabled->is_boolean())
+                    add_error(errors, ErrorCode::invalid_asset,
+                              field + ".enabled", "expected a boolean");
+                else parsed.enabled = enabled->get<bool>();
+                read_color(effect, "color", parsed.color, errors, field);
+                read_float(effect, "amount", parsed.amount, errors, field);
+                read_float(effect, "scale", parsed.scale, errors, field);
+                value.effects.push_back(parsed);
+            }
+        }
+    }
+}
+
+void validate_shader(const ShaderSurfaceSettings& value, std::vector<Error>& errors) {
+    for (const auto color : {value.primary_color, value.effect_color})
+        for (const auto component : {color.red, color.green, color.blue, color.alpha})
+            if (!std::isfinite(component) || component < 0.0F || component > 1.0F)
+                add_error(errors, ErrorCode::invalid_asset, "shader.color", "channels must be finite in [0,1]");
+    for (const auto number : {value.shine, value.holography, value.opacity, value.intensity})
+        if (!std::isfinite(number) || number < 0.0F)
+            add_error(errors, ErrorCode::invalid_asset, "shader", "numeric settings must be finite and non-negative");
+    if (!finite(value.repetition) || value.repetition.x <= 0.0F || value.repetition.y <= 0.0F)
+        add_error(errors, ErrorCode::invalid_asset, "shader.repetition", "must be finite and positive");
+    if (!finite(value.deformation)) add_error(errors, ErrorCode::invalid_asset, "shader.deformation", "must be finite");
+    for (std::size_t index = 0; index < value.effects.size(); ++index) {
+        const auto& effect = value.effects[index];
+        const auto field = "shader.effects[" + std::to_string(index) + "]";
+        for (const auto component : {effect.color.red, effect.color.green,
+                                     effect.color.blue, effect.color.alpha})
+            if (!std::isfinite(component) || component < 0.0F || component > 1.0F)
+                add_error(errors, ErrorCode::invalid_asset, field + ".color",
+                          "channels must be finite in [0,1]");
+        if (!std::isfinite(effect.amount) || effect.amount < 0.0F ||
+            effect.amount > 1.0F)
+            add_error(errors, ErrorCode::invalid_asset, field + ".amount",
+                      "must be finite in [0,1]");
+        if (!std::isfinite(effect.scale) || effect.scale <= 0.0F ||
+            effect.scale > 8.0F)
+            add_error(errors, ErrorCode::invalid_asset, field + ".scale",
+                      "must be finite in (0,8]");
+    }
+}
+
 ValidationReport parse_validation(const ProjectManifest& manifest,
                                   const std::string_view contents) {
     auto parsed = parse_textured_path(manifest, contents);
@@ -148,6 +283,7 @@ std::string_view to_string(const TexturedPathCommandKind kind) noexcept {
 std::string_view to_string(const TexturedPathUvMode mode) noexcept {
     switch (mode) {
     case TexturedPathUvMode::repeat: return "repeat";
+    case TexturedPathUvMode::mirror: return "mirror";
     case TexturedPathUvMode::stretch: return "stretch";
     }
     return "repeat";
@@ -239,6 +375,7 @@ ValidationReport validate_textured_path(
         add_error(report.errors, ErrorCode::invalid_asset, "width",
                   "must be finite and positive");
     }
+    validate_shader(path.shader, report.errors);
     if (!path.width_profile.empty()) {
         if (path.width_profile.size() < 2U ||
             path.width_profile.front().position != 0.0F ||
@@ -276,6 +413,15 @@ ValidationReport validate_textured_path(
     if (!finite(path.uv_offset)) {
         add_error(report.errors, ErrorCode::invalid_asset, "uvOffset",
                   "must be finite");
+    }
+    const auto& metrics = path.texture_metrics;
+    if (!finite(metrics.origin) || !finite(metrics.size) ||
+        metrics.origin.x < 0.0F || metrics.origin.y < 0.0F ||
+        metrics.size.x <= 0.0F || metrics.size.y <= 0.0F ||
+        metrics.origin.x + metrics.size.x > 1.0F ||
+        metrics.origin.y + metrics.size.y > 1.0F) {
+        add_error(report.errors, ErrorCode::invalid_asset, "textureMetrics",
+                  "bounds must be finite, positive, and contained in the source image");
     }
     const auto valid_channel = [](const float value) {
         return std::isfinite(value) && value >= 0.0F && value <= 1.0F;
@@ -320,6 +466,11 @@ std::string serialize_textured_path(const TexturedPath& path) {
                   {"miterLimit", path.miter_limit},
                   {"commands", Json::array()},
                   {"widthProfile", Json::array()}};
+    if (!(path.texture_metrics == TexturedPathTextureMetrics{}))
+        document["textureMetrics"] =
+            serialize_texture_metrics(path.texture_metrics);
+    if (!(path.shader == ShaderSurfaceSettings{}))
+        document["shader"] = serialize_shader(path.shader);
     for (const auto& command : path.commands) {
         Json serialized{{"kind", std::string(to_string(command.kind))},
                         {"point", serialize_vec2(command.point)}};
@@ -356,7 +507,7 @@ TexturedPathResult parse_textured_path(
                    {"schemaVersion", "type", "id", "name", "commands",
                     "closed", "width", "widthProfile", "texture", "uvMode",
                     "uvScale", "uvOffset", "color", "opacity", "join",
-                    "cap", "miterLimit"},
+                    "cap", "miterLimit", "textureMetrics", "shader"},
                    "texturedPath", result.errors);
     TexturedPath path;
     const auto schema = document.find("schemaVersion");
@@ -380,9 +531,11 @@ TexturedPathResult parse_textured_path(
     read_reference(document, "texture", path.texture, result.errors, "");
     read_vec2(document, "uvScale", path.uv_scale, result.errors, "");
     read_vec2(document, "uvOffset", path.uv_offset, result.errors, "");
+    read_texture_metrics(document, path.texture_metrics, result.errors);
     read_color(document, "color", path.color, result.errors, "");
     read_float(document, "opacity", path.opacity, result.errors, "");
     read_float(document, "miterLimit", path.miter_limit, result.errors, "");
+    read_shader(document, path.shader, result.errors);
     std::string uv_mode;
     std::string join;
     std::string cap;
@@ -390,6 +543,7 @@ TexturedPathResult parse_textured_path(
     read_text(document, "join", join, result.errors);
     read_text(document, "cap", cap, result.errors);
     if (uv_mode == "repeat") path.uv_mode = TexturedPathUvMode::repeat;
+    else if (uv_mode == "mirror") path.uv_mode = TexturedPathUvMode::mirror;
     else if (uv_mode == "stretch") path.uv_mode = TexturedPathUvMode::stretch;
     else if (!uv_mode.empty()) add_error(result.errors, ErrorCode::invalid_asset,
                                          "uvMode", "unsupported UV mode");

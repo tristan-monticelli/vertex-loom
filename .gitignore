@@ -4,6 +4,7 @@ node_modules/
 coverage/
 dist/
 build/
+/build-release/
 .env
 .env.*
 !.env.example

@@ -3,6 +3,7 @@
 #include "fabric/core/types.hpp"
 #include "fabric/project/document.hpp"
 #include "fabric/project/manifest.hpp"
+#include "fabric/project/shader_profile.hpp"
 
 #include <cstdint>
 #include <filesystem>
@@ -15,7 +16,7 @@ namespace fabric::project {
 inline constexpr std::uint32_t current_textured_path_schema_version = 1;
 
 enum class TexturedPathCommandKind { move, line, cubic };
-enum class TexturedPathUvMode { repeat, stretch };
+enum class TexturedPathUvMode { repeat, mirror, stretch };
 enum class TexturedPathJoin { miter, round, bevel };
 enum class TexturedPathCap { butt, round, square };
 
@@ -43,6 +44,16 @@ struct TexturedPathWidthKey {
                            const TexturedPathWidthKey&) = default;
 };
 
+struct TexturedPathTextureMetrics {
+    // Normalized source-image bounds. U is the immutable left/right axis;
+    // V is the non-repeating top/bottom thickness axis.
+    core::Vec2 origin;
+    core::Vec2 size{1.0F, 1.0F};
+
+    friend bool operator==(const TexturedPathTextureMetrics&,
+                           const TexturedPathTextureMetrics&) = default;
+};
+
 struct TexturedPath {
     DocumentHeader document{
         .schema_version = current_textured_path_schema_version,
@@ -56,11 +67,13 @@ struct TexturedPath {
     TexturedPathUvMode uv_mode{TexturedPathUvMode::repeat};
     core::Vec2 uv_scale{1.0F, 1.0F};
     core::Vec2 uv_offset;
+    TexturedPathTextureMetrics texture_metrics;
     core::Color color;
     float opacity{1.0F};
     TexturedPathJoin join{TexturedPathJoin::miter};
     TexturedPathCap cap{TexturedPathCap::butt};
     float miter_limit{4.0F};
+    ShaderSurfaceSettings shader;
 
     friend bool operator==(const TexturedPath&, const TexturedPath&) = default;
 };

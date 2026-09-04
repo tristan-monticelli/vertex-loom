@@ -1,6 +1,6 @@
 # ADR-0134 — Panneaux séparés dans Map Studio
 
-- Statut : accepté
+- Statut : remplacé par ADR-0149 pour la disposition globale
 - Date : 2026-08-26
 
 ## Contexte

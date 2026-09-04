@@ -57,3 +57,21 @@ TEST_CASE("XPBD bending constraint keeps chain endpoint distance") {
     const auto& endpoint = system.particles[2].position;
     REQUIRE(std::abs(std::sqrt(endpoint.x * endpoint.x + endpoint.y * endpoint.y) - 2.0F) <= 1.0e-3F);
 }
+
+TEST_CASE("XPBD diagnostics quantify violations and compliant energy") {
+    using namespace fabric::project;
+    const XpbdSystem system{
+        .particles = {{{0.0F, 0.0F}, 0.0F}, {{2.0F, 0.0F}, 1.0F}},
+        .distance_constraints = {{0, 1, 1.0F, 0.5F, 0.0F}},
+        .pin_constraints = {{0, {0.0F, 1.0F}, 0.5F, {}}},
+    };
+
+    const auto diagnostics = measure_xpbd_system(system);
+
+    CHECK(diagnostics.particle_count == 2U);
+    CHECK(diagnostics.dynamic_particle_count == 1U);
+    CHECK(diagnostics.constraint_count == 2U);
+    CHECK(diagnostics.maximum_constraint_error == 1.0F);
+    CHECK(diagnostics.rms_constraint_error == 1.0F);
+    CHECK(diagnostics.compliant_energy == 2.0F);
+}

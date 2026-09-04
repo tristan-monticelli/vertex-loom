@@ -76,7 +76,10 @@ C4Component
   de courbe, ce qui invalide automatiquement une version modifiée ; l’import
   opaque reste fonctionnel. Chaque draw packet porte soit une couleur solide,
   soit la référence texture et les UV transformées du fill image, ainsi que la
-  même triangulation de silhouette ; aucun atlas ni bitmap dérivé n’est créé.
+  même triangulation de silhouette ; le compositing applique le ratio réel de
+  la texture selon `fit`, tandis que `deformWithShape` choisit entre mapping
+  local à la silhouette et ancrage dans l’espace projet ; aucun atlas ni bitmap
+  dérivé n’est créé.
   Les sommets sont exprimés dans l’espace monde après application du transform
   du nœud et de ses parents dans l’ordre stable de la hiérarchie.
   Le backend OpenGL compile ses shaders et possède ses buffers via les
@@ -86,5 +89,7 @@ C4Component
   explicitement les fills image tant
   qu’aucun résolveur de textures n’est fourni, mais dessine les contours
   ouverts et fermés avec le même packet. Un `clipNodeId` applique un masque
-  stencil de premier niveau au fill et au contour ; les clips imbriqués ou les
-  contextes sans stencil sont diagnostiqués.
+  stencil de premier niveau au fill et au contour ; les clips imbriqués sont
+  résolus par la chaîne complète. En l’absence de stencil, les clips convexes
+  passent par le fallback CPU avec interpolation des UV ; les silhouettes de
+  clip non convexes sont diagnostiquées au lieu d’être dessinées sans masque.

@@ -2,9 +2,28 @@ cmake_minimum_required(VERSION 3.24)
 
 project(VertexLoom VERSION 0.1.0 LANGUAGES C CXX)
 
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/package.json" VERTEX_LOOM_PACKAGE_JSON)
+string(JSON VERTEX_LOOM_NPM_VERSION GET "${VERTEX_LOOM_PACKAGE_JSON}" version)
+if(NOT VERTEX_LOOM_NPM_VERSION STREQUAL PROJECT_VERSION)
+    message(FATAL_ERROR
+        "Version mismatch: CMake=${PROJECT_VERSION}, npm=${VERTEX_LOOM_NPM_VERSION}")
+endif()
+
+set(VERTEX_LOOM_GENERATED_INCLUDE_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/include")
+file(MAKE_DIRECTORY "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}/fabric/core")
+configure_file(
+    engine/fabric_core/include/fabric/core/version_config.hpp.in
+    "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}/fabric/core/version_config.hpp"
+    @ONLY
+)
+
+include(GNUInstallDirs)
+
 option(FABRIC_BUILD_EDITORS "Build Asset Studio and Map Studio" ON)
 option(FABRIC_BUILD_RUNTIME "Build the preview game runtime" ON)
 option(FABRIC_BUILD_TESTS "Build the C++ test suite" ON)
+option(FABRIC_ENABLE_SOURCE_ASSET_FALLBACK
+       "Allow Studio defaults to resolve from the source tree" ON)
 
 include(CTest)
 
@@ -26,7 +45,7 @@ set(BOX2D_BUILD_BENCHMARKS OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     box2d
     GIT_REPOSITORY https://github.com/erincatto/box2d.git
-    GIT_TAG v3.1.1
+    GIT_TAG 8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(box2d)
@@ -35,7 +54,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     FetchContent_Declare(
         Catch2
         GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG v3.15.3
+        GIT_TAG 95d8a61b089317bec800c7cc4c64064cbcb3802d
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(Catch2)
@@ -46,7 +65,10 @@ add_library(fabric_core STATIC
     engine/fabric_core/src/resource_id.cpp
     engine/fabric_core/src/version.cpp
 )
-target_include_directories(fabric_core PUBLIC engine/fabric_core/include)
+target_include_directories(fabric_core PUBLIC
+    engine/fabric_core/include
+    "${VERTEX_LOOM_GENERATED_INCLUDE_DIR}"
+)
 target_compile_features(fabric_core PUBLIC cxx_std_20)
 
 add_library(fabric_project STATIC
@@ -74,6 +96,7 @@ add_library(fabric_project STATIC
     engine/fabric_project/src/project_validator.cpp
     engine/fabric_project/src/progress_save.cpp
     engine/fabric_project/src/resource_registry.cpp
+    engine/fabric_project/src/shader_profile.cpp
     engine/fabric_project/src/replay.cpp
     engine/fabric_project/src/scene.cpp
     engine/fabric_project/src/texture_asset.cpp
@@ -112,7 +135,7 @@ set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     SDL2
     GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG release-2.32.10
+    GIT_TAG 5d249570393f7a37e037abf22cd6012a4cc56a71
     GIT_SHALLOW TRUE
 )
 set(SDL2IMAGE_INSTALL OFF CACHE BOOL "" FORCE)
@@ -143,7 +166,7 @@ set(SDL2IMAGE_XV OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     SDL2_image
     GIT_REPOSITORY https://github.com/libsdl-org/SDL_image.git
-    GIT_TAG release-2.8.12
+    GIT_TAG 12cb2e40330d256d9b1329647be8f366546d715c
     GIT_SHALLOW TRUE
 )
 FetchContent_MakeAvailable(SDL2 SDL2_image)
@@ -194,10 +217,16 @@ target_link_libraries(fabric_asset_preview PRIVATE
 add_executable(fabric_render_benchmark tools/render_benchmark/main.cpp)
 target_link_libraries(fabric_render_benchmark PRIVATE
     fabric_render SDL2::SDL2-static)
+if(WIN32)
+    target_link_libraries(fabric_render_benchmark PRIVATE psapi)
+endif()
 
 if(FABRIC_BUILD_RUNTIME)
     add_executable(fabric_runtime_benchmark tools/runtime_benchmark/main.cpp)
     target_link_libraries(fabric_runtime_benchmark PRIVATE fabric_runtime)
+    if(WIN32)
+        target_link_libraries(fabric_runtime_benchmark PRIVATE psapi)
+    endif()
 endif()
 
 add_library(fabric_editor STATIC
@@ -227,13 +256,13 @@ if(FABRIC_BUILD_EDITORS)
     FetchContent_Declare(
         native_file_dialog
         GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
-        GIT_TAG v1.3.0
+        GIT_TAG 86f742bab39f1b253ad111e8ce776b46dd1ccdbe
         GIT_SHALLOW TRUE
     )
     FetchContent_Declare(
         imgui_source
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.92.9
+        GIT_TAG 01380c579715e62fb9a8d6ec0502c4ea83bfde6e
         GIT_SHALLOW TRUE
     )
     FetchContent_MakeAvailable(native_file_dialog imgui_source)
@@ -256,18 +285,40 @@ if(FABRIC_BUILD_EDITORS)
 
     add_executable(asset_studio
         editors/asset_studio/main.cpp
+        editors/asset_studio/vector_canvas.cpp
+        editors/asset_studio/preview_canvas.cpp
         editors/asset_studio/import_workflow.cpp
     )
     target_compile_definitions(asset_studio PRIVATE SDL_MAIN_HANDLED)
+    if(FABRIC_ENABLE_SOURCE_ASSET_FALLBACK)
+        target_compile_definitions(asset_studio PRIVATE
+            FABRIC_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    endif()
     target_link_libraries(asset_studio PRIVATE
         fabric_editor
         fabric_imgui
         fabric_render
         nfd
     )
+    if(APPLE)
+        set_target_properties(asset_studio PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.vertexloom.assetstudio"
+            MACOSX_BUNDLE_BUNDLE_NAME "Vertex Loom Asset Studio"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+    endif()
     add_executable(map_studio editors/map_studio/main.cpp)
     target_compile_definitions(map_studio PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(map_studio PRIVATE fabric_editor fabric_imgui nfd)
+    if(APPLE)
+        set_target_properties(map_studio PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_GUI_IDENTIFIER "com.vertexloom.mapstudio"
+            MACOSX_BUNDLE_BUNDLE_NAME "Vertex Loom Map Studio"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}")
+    endif()
 endif()
 
 if(FABRIC_BUILD_RUNTIME)
@@ -275,6 +326,46 @@ if(FABRIC_BUILD_RUNTIME)
     target_compile_definitions(game_runtime PRIVATE SDL_MAIN_HANDLED)
     target_link_libraries(game_runtime PRIVATE fabric_runtime)
 endif()
+
+install(TARGETS fabric_project_validate fabric_map_package_export fabric_asset_preview
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(FABRIC_BUILD_EDITORS)
+    if(APPLE)
+        install(TARGETS asset_studio map_studio
+                BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR}
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    else()
+        install(TARGETS asset_studio map_studio
+                RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+    endif()
+    install(FILES editors/asset_studio/assets/beam-thread.png
+                  editors/asset_studio/assets/button-primary.png
+                  editors/asset_studio/assets/button-secondary.png
+                  editors/asset_studio/assets/manifest.json
+                  editors/asset_studio/assets/README.md
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/asset-studio-defaults)
+endif()
+if(FABRIC_BUILD_RUNTIME)
+    install(TARGETS game_runtime
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif()
+install(DIRECTORY tests/fixtures/studio-textile-head/
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/examples/studio-textile-head)
+install(FILES LICENSE NOTICE THIRD_PARTY_NOTICES.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom/licenses)
+install(FILES docs/release/README.md
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/vertex-loom)
+
+set(CPACK_PACKAGE_NAME "vertex-loom")
+set(CPACK_PACKAGE_VENDOR "Vertex Loom")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Cross-platform 2D engine and authoring tools for textile and vector worlds")
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(VERTEX_LOOM_PACKAGE_CONTACT "" CACHE STRING
+    "Official public contact embedded in release packages")
+set(CPACK_PACKAGE_CONTACT "${VERTEX_LOOM_PACKAGE_CONTACT}")
+set(CPACK_GENERATOR "TGZ;ZIP")
+include(CPack)
 
 if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_executable(fabric_core_smoke tests/cpp/core_smoke.cpp)
@@ -511,6 +602,61 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         )
     endif()
 
+    add_test(
+        NAME package_install_smoke
+        COMMAND ${CMAKE_COMMAND}
+            -DBUILD_DIR=${CMAKE_BINARY_DIR}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -DTEST_ROOT=${CMAKE_BINARY_DIR}/package-install-smoke
+            -P ${CMAKE_SOURCE_DIR}/tests/cmake/package_install_smoke.cmake
+    )
+
+    if(FABRIC_BUILD_RUNTIME)
+        add_test(
+            NAME release_product_recipe
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DPROJECT_VALIDATOR=$<TARGET_FILE:fabric_project_validate>
+                "-DGAME_RUNTIME=$<TARGET_FILE:game_runtime>"
+                "-DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head"
+                "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-product-recipe"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_product_recipe.cmake
+        )
+        set_tests_properties(release_product_recipe PROPERTIES TIMEOUT 180)
+    endif()
+
+    add_test(
+        NAME release_data_robustness
+        COMMAND ${CMAKE_COMMAND}
+            "-DVALIDATOR=$<TARGET_FILE:fabric_project_validate>"
+            "-DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head"
+            "-DINVALID_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/invalid-project"
+            "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-data-robustness"
+            -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_data_robustness.cmake
+    )
+
+    if(FABRIC_BUILD_EDITORS)
+        add_executable(fabric_release_recovery_smoke
+            tests/cpp/release_recovery_smoke.cpp)
+        target_link_libraries(fabric_release_recovery_smoke PRIVATE fabric_editor)
+        add_test(NAME release_recovery_smoke
+            COMMAND fabric_release_recovery_smoke
+                ${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                ${CMAKE_BINARY_DIR}/release-recovery-smoke)
+    endif()
+
+    if(FABRIC_BUILD_RUNTIME)
+        add_test(
+            NAME release_performance_smoke
+            COMMAND ${CMAKE_COMMAND}
+                "-DRENDER_BENCH=$<TARGET_FILE:fabric_render_benchmark>"
+                "-DRUNTIME_BENCH=$<TARGET_FILE:fabric_runtime_benchmark>"
+                "-DTEST_ROOT=${CMAKE_BINARY_DIR}/release-performance-smoke"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/release_performance_smoke.cmake
+        )
+        set_tests_properties(release_performance_smoke PROPERTIES TIMEOUT 180)
+    endif()
+
     if(FABRIC_BUILD_EDITORS)
         add_test(
             NAME asset_studio_ui_registry_e2e
@@ -548,6 +694,14 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DUI_ARGUMENT=--ui-accessibility-test
                 -DACCESSIBILITY_ARTIFACT=asset-studio-ui-accessibility.json
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
+            NAME map_studio_ui_accessibility_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DMAP_STUDIO=$<TARGET_FILE:map_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/map-studio-ui-accessibility-e2e
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/map_studio_ui_accessibility_e2e.cmake
         )
         add_test(
             NAME asset_studio_ui_drag_e2e
@@ -616,6 +770,39 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
         )
         add_test(
+            NAME asset_studio_ui_beam_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-beam-e2e
+                -DUI_ARGUMENT=--ui-beam-test
+                -DBEAM_ARTIFACT=asset-studio-ui-beam.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-beam-thread;resource-row-beam-border;resource-row-beam-entity;entity-node-root"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
+            NAME asset_studio_ui_beam_holography_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-beam-holography-e2e
+                -DUI_ARGUMENT=--ui-beam-holography-test
+                -DBEAM_ARTIFACT=asset-studio-ui-beam.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-beam-thread;resource-row-beam-border;resource-row-beam-entity;entity-node-root"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
+            NAME asset_studio_ui_button_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-ui-button-e2e
+                -DUI_ARGUMENT=--ui-button-test
+                -DBUTTON_ARTIFACT=asset-studio-ui-button.json
+                "-DREGISTRY_REQUIRED_IDS=resource-row-button-primary;resource-row-button-secondary"
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_ui_registry_e2e.cmake
+        )
+        add_test(
             NAME asset_studio_behavior_e2e
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
@@ -638,7 +825,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
-                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-entity-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_entity_e2e.cmake
         )
@@ -647,7 +834,7 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             COMMAND ${CMAKE_COMMAND}
                 -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
-                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-animation-e2e
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_animation_e2e.cmake
         )
@@ -676,6 +863,17 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
                 -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
                 -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-textile-head
                 -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-vector-canvas-e2e
+                -DVISUAL_BASELINE=${CMAKE_SOURCE_DIR}/tests/fixtures/visual-baselines/asset-studio-vector-canvas-visual.json
+                -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_vector_canvas_e2e.cmake
+        )
+        add_test(
+            NAME asset_studio_beam_vector_canvas_e2e
+            COMMAND ${CMAKE_COMMAND}
+                -DASSET_STUDIO=$<TARGET_FILE:asset_studio>
+                -DPROJECT_VALIDATE=$<TARGET_FILE:fabric_project_validate>
+                -DSOURCE_FIXTURE=${CMAKE_SOURCE_DIR}/tests/fixtures/studio-beam
+                -DTEST_ROOT=${CMAKE_BINARY_DIR}/asset-studio-beam-vector-canvas-e2e
+                -DVISUAL_BASELINE=${CMAKE_SOURCE_DIR}/tests/fixtures/visual-baselines/asset-studio-beam-vector-canvas-visual.json
                 -P ${CMAKE_SOURCE_DIR}/tests/cmake/asset_studio_vector_canvas_e2e.cmake
         )
         add_test(
@@ -705,6 +903,16 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
         )
         set_tests_properties(
             asset_studio_ui_registry_e2e
+            asset_studio_ui_min_window_e2e
+            asset_studio_ui_focus_e2e
+            asset_studio_ui_accessibility_e2e
+            map_studio_ui_accessibility_e2e
+            asset_studio_ui_drag_e2e
+            asset_studio_ui_drag_root_e2e
+            asset_studio_ui_drag_child_e2e
+            asset_studio_ui_overrides_e2e
+            asset_studio_ui_texture_e2e
+            asset_studio_ui_input_e2e
             asset_studio_behavior_e2e
             asset_studio_transformation_e2e
             asset_studio_entity_e2e
@@ -712,10 +920,13 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             asset_studio_texture_e2e
             asset_studio_vector_e2e
             asset_studio_vector_canvas_e2e
+            asset_studio_beam_vector_canvas_e2e
             map_studio_close_e2e
             map_studio_scene_e2e
             map_studio_transformation_e2e
-            PROPERTIES SKIP_REGULAR_EXPRESSION "SKIP:"
+            PROPERTIES
+                SKIP_REGULAR_EXPRESSION "SKIP:"
+                TIMEOUT 180
         )
     endif()
 
@@ -872,7 +1083,10 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
     add_test(NAME fabric_render_tests COMMAND fabric_render_tests)
 
     add_executable(fabric_render_gl_smoke tests/cpp/opengl_vector_smoke.cpp)
-    target_compile_definitions(fabric_render_gl_smoke PRIVATE SDL_MAIN_HANDLED)
+    file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/test-artifacts")
+    target_compile_definitions(fabric_render_gl_smoke PRIVATE
+        SDL_MAIN_HANDLED
+        FABRIC_TEST_ARTIFACT_DIR="${CMAKE_BINARY_DIR}/test-artifacts")
     target_link_libraries(fabric_render_gl_smoke PRIVATE
         fabric_render
         SDL2::SDL2-static
@@ -903,5 +1117,11 @@ if(BUILD_TESTING AND FABRIC_BUILD_TESTS)
             -DVALIDATOR=$<TARGET_FILE:fabric_project_validate>
             -DPROJECT=${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/invalid-project
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/expect_validator_json_failure.cmake
+    )
+    add_test(
+        NAME no_legacy_sprite_contracts
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cmake/no_legacy_sprite_contracts.cmake
     )
 endif()

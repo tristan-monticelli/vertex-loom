@@ -5,6 +5,7 @@
 
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <span>
@@ -210,7 +211,7 @@ void raster_views_produce_shared_deterministic_packets() {
     const fabric::project::ResourceReference texture{
         {.value = "woven-source"}, "texture"};
     const fabric::project::RasterView view{
-        .crop = {{2.0F, 0.0F}, {2.0F, 2.0F}},
+        .crop = {{2.0F, 1.0F}, {2.0F, 2.0F}},
         .pivot = {0.25F, 0.5F},
         .transform = {.position = {1.0F, 2.0F}, .scale = {2.0F, 1.0F}},
         .filter = fabric::project::RasterFilter::nearest,
@@ -219,7 +220,7 @@ void raster_views_produce_shared_deterministic_packets() {
         .node_id = "cropped",
         .texture = texture,
         .source_width = 4U,
-        .source_height = 2U,
+        .source_height = 4U,
         .pixels_per_unit = 2.0F,
         .view = view,
     };
@@ -233,8 +234,8 @@ void raster_views_produce_shared_deterministic_packets() {
                 {0.5F, 1.5F}, {2.5F, 1.5F},
                 {2.5F, 2.5F}, {0.5F, 2.5F}} &&
                 packet.fill_uv == std::vector<fabric::core::Vec2>{
-                    {0.5F, 0.0F}, {1.0F, 0.0F},
-                    {1.0F, 1.0F}, {0.5F, 1.0F}},
+                    {0.5F, 0.25F}, {1.0F, 0.25F},
+                    {1.0F, 0.75F}, {0.5F, 0.75F}},
             "raster crop geometry or UV coordinates changed");
 
     const auto historical = fabric::render::build_raster_view_draw_packets({
@@ -296,6 +297,70 @@ void native_geometry_preserves_image_fill_payload() {
     require(std::abs(packet.fill_uv.front().x - 0.124F) < 0.002F &&
                 std::abs(packet.fill_uv.front().y + 0.243F) < 0.002F,
             "image fill transform was not applied independently to UVs");
+}
+
+void image_fill_mapping_distinguishes_deform_and_fit_modes() {
+    auto deforming = native_geometry_fixture();
+    auto& deforming_fill = deforming.native->nodes.front().fill;
+    deforming_fill.kind = fabric::project::VectorFillKind::image;
+    deforming_fill.color.reset();
+    deforming_fill.image = fabric::project::VectorImageFill{
+        .texture = {{.value = "fabric-photo"}, "texture"},
+        .fit = fabric::project::VectorImageFit::stretch,
+        .deform_with_shape = true,
+    };
+    auto anchored = deforming;
+    anchored.native->nodes.front().fill.image->deform_with_shape = false;
+    const auto deforming_packets = fabric::render::build_native_draw_packets(deforming);
+    const auto anchored_packets = fabric::render::build_native_draw_packets(anchored);
+    require(deforming_packets.ok() && anchored_packets.ok() &&
+                deforming_packets.packets.front().fill_uv !=
+                    anchored_packets.packets.front().fill_uv,
+            "deformWithShape did not change native image UV mapping");
+
+    const auto stretched = fabric::render::apply_image_fill_fit(
+        {0.0F, 0.25F}, fabric::project::VectorImageFit::stretch, 2.0F, 1.0F);
+    const auto covered = fabric::render::apply_image_fill_fit(
+        {0.0F, 0.25F}, fabric::project::VectorImageFit::cover, 2.0F, 1.0F);
+    require(stretched == fabric::core::Vec2{0.0F, 0.25F} &&
+                covered != stretched,
+            "image fit policy did not change normalized UVs");
+}
+
+void native_geometry_tessellates_concave_paths_without_losing_area() {
+    auto asset = native_geometry_fixture();
+    auto& shape = asset.native->nodes.front().shape;
+    shape.bounds = {{0.0F, 0.0F}, {4.0F, 4.0F}};
+    shape.path = {
+        {.kind = fabric::project::VectorPathCommandKind::move,
+         .point = {0.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {4.0F, 0.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {4.0F, 1.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {1.0F, 1.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {1.0F, 4.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::line,
+         .point = {0.0F, 4.0F}},
+        {.kind = fabric::project::VectorPathCommandKind::close},
+    };
+    const auto result = fabric::render::build_native_draw_packets(asset);
+    require(result.ok() && result.packets.size() == 1U &&
+                result.packets.front().fill_indices.size() == 12U,
+            "concave path was not triangulated into four triangles");
+    const auto& packet = result.packets.front();
+    float area = 0.0F;
+    for (std::size_t index = 0; index < packet.fill_indices.size(); index += 3U) {
+        const auto& a = packet.fill_vertices[packet.fill_indices[index]];
+        const auto& b = packet.fill_vertices[packet.fill_indices[index + 1U]];
+        const auto& c = packet.fill_vertices[packet.fill_indices[index + 2U]];
+        area += std::abs((b.x - a.x) * (c.y - a.y) -
+                         (b.y - a.y) * (c.x - a.x)) * 0.5F;
+    }
+    require(std::abs(area - 7.0F) < 0.0001F,
+            "concave tessellation changed the silhouette area");
 }
 
 void native_geometry_builds_textured_stroke_payload() {
@@ -454,6 +519,8 @@ int main() {
     raster_views_produce_shared_deterministic_packets();
     native_geometry_cache_invalidates_on_document_or_tolerance_change();
     native_geometry_preserves_image_fill_payload();
+    image_fill_mapping_distinguishes_deform_and_fit_modes();
+    native_geometry_tessellates_concave_paths_without_losing_area();
     native_geometry_builds_textured_stroke_payload();
     native_geometry_applies_node_and_parent_transforms();
     opengl_vector_renderer_reports_uninitialized_use();

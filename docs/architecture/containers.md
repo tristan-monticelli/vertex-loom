@@ -5,17 +5,18 @@ C4Container
     title Vertex Loom — conteneurs
     Person(creator, "Créateur", "Développe et compose le jeu")
     System_Boundary(fabric, "Vertex Loom") {
-        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, résout les réglages runtime persistants (personnage, spawn, caméra, limites et audio), normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre et applique actuellement mouvement et propriétés ; le mode smoke exécute explicitement la simulation sans fenêtre, tandis que le benchmark peut utiliser un fallback headless si l’initialisation vidéo échoue et que le rendu OpenGL reste obligatoire pour le mode interactif")
-        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Explorateur de ressources et rail droit : crée, édite, prévisualise et valide textures, vectoriels avec plume canvas, sélection multiple et transformations groupées des points, contours ouverts/fermés et conversions de segments, matériaux, entités, AudioDocument, InputDocument, BehaviorGraph, animations et transformations ; les champs de nom des ressources et des nœuds réutilisent le même composant d’édition, le focus d’erreur est mémorisé par prompt et les paramètres techniques Audio/Input/Animation exposent leur explication contextuelle")
-        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre une map ou scène, choisit les références par pickers typés, compose instances/prefabs/collisions/triggers, édite les paramètres par overrides, administre les transitions de fermeture propre ou avec sauvegarde, rafraîchit le catalogue après chaque création, partage les champs de nom et recentre une seule fois le focus sur le premier champ invalide de chaque formulaire, puis publie après preview")
+        Container(runtime, "Game Runtime", "C++20 / SDL2 / OpenGL", "Charge projet ou paquet, résout les réglages runtime persistants (personnage, spawn, caméra, limites et audio avec bus/panoramique), normalise actions physiques, décisions IA et événements en signaux sémantiques, évalue les BehaviorGraph attachés sans distinction joueur/monstre et applique actuellement mouvement et propriétés ; le mode smoke exécute explicitement la simulation sans fenêtre, le benchmark peut utiliser un fallback headless, et les diagnostics JSONL conservent la corrélation session/ressource reçue du Studio")
+        Container(asset, "Asset Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Coquille Project gauche, Viewer central pilotable et Inspector droit : crée, édite, prévisualise et valide textures, vectoriels avec plume canvas, démarrage de paths libres, ajout de points depuis un chemin vide, sélection multiple et transformations groupées des points, contours ouverts/fermés et conversions de segments ; le workspace Entity compose plusieurs visuels en une action puis synchronise arbre récursif, sélection multiple, reparentage, inspecteur et déplacement groupé canvas ; le parcours vectoriel capture aussi les pixels des ancres, coins et poignées Bézier pour empêcher une régression visuelle ; les champs de nom des ressources et des nœuds réutilisent le même composant d’édition, le focus d’erreur est mémorisé par prompt et les paramètres techniques Audio/Input/Animation exposent leur explication contextuelle ; les E2E Entity et Animation produisent une capture OpenGL dédiée après composition et rechargement")
+        Container(map, "Map Studio", "C++20 / SDL2 / OpenGL / Dear ImGui", "Ouvre une map ou scène dans un workspace Layers gauche, canvas central et Inspector droit, compose et sauvegarde même sans renderer, conserve dans sa passerelle de preview les erreurs document, PNG, upload GPU et draw, expose un smoke d'accessibilité clavier/contraste avec capture non uniforme, puis ne prévisualise ou publie qu'après rendu valide")
         Container(physics, "fabric_physics", "C++20 / Box2D v3.1.1", "Possède le monde physique, compile les graphes mécaniques validés, matérialise leurs capteurs, transporte le personnage de preview et expose un journal de debug borné")
-        Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources et journaux structurés locaux")
-        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
+        Container(core, "fabric_core", "C++20 static library", "Vec2, Color, Rect, Transform, identifiants de ressources, version générée par CMake et journaux structurés locaux")
+        Container(projectlib, "fabric_project", "C++20 / nlohmann-json", "Contrats JSON stricts, dont profils shader textiles/plastiques, texture de stroke par défaut du manifeste, classification de textures, collisions configurables, AnimationClip avec cues Audio typées, BehaviorGraph v1 et EntityTransformation v1, registre et fermeture transitive des paquets")
         Container(editorlib, "fabric_editor", "C++20 static library", "Sessions, index unifié de ressources et commandes partagées, dont édition BehaviorGraph avec historique, autosave, récupération, journal de preview borné et contraintes de poignées Bézier")
-        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés et batching stable")
+        Container(renderlib, "fabric_render", "C++20 / SDL2_image / OpenGL", "Décodage PNG/SVG, constructeur partagé des draw packets RasterView, compositions, maps, géométrie, chemins texturés avec métriques de bande U/V et raccords sans bouclage dans l'épaisseur, profils shader avec pile d'effets ordonnée sans plafond produit et batching stable")
         Container(projectcli, "fabric_project_validate / fabric_map_package_export", "C++20 CLI", "Valide un dossier projet et publie un paquet déterministe de map ou de campagne de scènes sans interface graphique")
-        Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : packets, draw calls, triangles et p95")
-        Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, charge une map dense et mesure culling, draw calls et p95 du runtime")
+    Container(renderbench, "fabric_render_benchmark", "C++20 / SDL2 / OpenGL", "Mesure le rendu d’une scène synthétique dense : initialisation, packets, draw calls, triangles, p95, pic mémoire et identité du driver OpenGL ; FABRIC_REQUIRE_NATIVE_GL=1 refuse Mesa/llvmpipe")
+    Container(runtimebench, "fabric_runtime_benchmark", "C++20 / Preview Runtime", "Crée un projet temporaire valide, mesure la préparation et le chargement d’une map dense, puis mesure culling, draw calls, p95 et pic mémoire du runtime")
+    Container(package, "Release Package", "CMake install / CPack TGZ + ZIP", "Construit depuis un checkout propre avec fallback source désactivé ; distribue exécutables signés, licences, manifeste d’assets, checksums, SBOM et projet exemple validé après gates juridiques et GPU")
         ContainerDb(project, "Project Files", "JSON + assets", "Projet versionné et ressources sur disque")
         ContainerDb(mapbundle, "Portable Map Package", "map-package.json + MapDocument + dépendances", "Unité versionnée de publication ; déclare map racine, runtime minimal et chemins relatifs ordonnés")
     }
@@ -38,6 +39,9 @@ C4Container
     Rel(projectcli, projectlib, "Utilise")
     Rel(renderbench, renderlib, "Mesure")
     Rel(runtimebench, runtime, "Charge et mesure")
+    Rel(package, runtime, "Installe")
+    Rel(package, asset, "Installe")
+    Rel(package, map, "Installe")
     Rel(projectlib, core, "Utilise les types communs")
     Rel(editorlib, projectlib, "Valide et charge")
     Rel(editorlib, renderlib, "Valide les sources raster et vectorielles")
@@ -72,6 +76,16 @@ même instant sans introduire un format de preview distinct.
 Le Preview Runtime expose au code de jeu les événements de trigger et payloads
 produits au dernier pas fixe, en complément de ses métriques de culling et de
 performance.
+
+Les apparences de surface peuvent porter une pile ordonnée d'effets (teinte,
+holographie et brillance). Les créations guidées Beam et Button choisissent par
+défaut la conservation exacte de la source avec toutes les intensités à zéro ;
+la recoloration est une action explicite mappée vers les profils existants, sans
+nouveau champ JSON. `fabric_project` persiste cette liste sans plafond
+fonctionnel et `fabric_render` la parcourt dans le fragment shader au moyen
+d'une texture de paramètres dimensionnée à l'exécution. La seule borne est la
+capacité de texture annoncée par le GPU ; elle produit une erreur de rendu
+explicite au lieu de tronquer silencieusement la pile.
 
 Les triggers ne sont plus liés au personnage CLI : Preview Runtime construit
 une liste d'acteurs à bounds monde pour chaque instance et pour le personnage,

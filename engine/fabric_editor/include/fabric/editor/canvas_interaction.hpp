@@ -27,6 +27,13 @@ enum class BezierHandleMode { linked, symmetric, free };
     project::VectorShape& shape, std::size_t index, bool first,
     core::Vec2 next, BezierHandleMode mode) noexcept;
 
+[[nodiscard]] bool create_bezier_segment(
+    project::VectorShape& shape, std::size_t index,
+    core::Vec2 end_point) noexcept;
+
+[[nodiscard]] bool remove_selected_path_points(
+    project::VectorShape& shape, std::span<const std::size_t> indices) noexcept;
+
 enum class RasterCropDrag {
     move,
     top_left,

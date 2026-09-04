@@ -18,11 +18,13 @@ struct VectorDrawPacket {
     std::optional<project::VectorImageFill> image_fill;
     std::optional<project::RasterFilter> raster_filter;
     bool repeat_texture_x{};
+    bool mirror_texture_x{};
     std::optional<project::VectorStroke> stroke;
     std::vector<core::Vec2> outline;
     std::vector<core::Vec2> stroke_vertices;
     std::vector<std::uint32_t> stroke_indices;
     std::optional<project::VectorImageFill> stroke_image;
+    std::optional<project::ShaderSurfaceSettings> shader;
     std::vector<core::Vec2> stroke_uv;
     bool stroke_repeat_texture_x{};
     std::vector<core::Vec2> fill_vertices;
@@ -56,6 +58,12 @@ struct RasterViewPacketInput {
 
 [[nodiscard]] VectorGeometryResult build_native_draw_packets(
     const project::VectorAsset& asset, float curve_tolerance = 0.25F);
+
+// Applies the aspect-ratio part of an image-fill fit policy to normalized UVs.
+// `geometry_aspect` and `texture_aspect` are width / height ratios.
+[[nodiscard]] core::Vec2 apply_image_fill_fit(
+    core::Vec2 uv, project::VectorImageFit fit, float geometry_aspect,
+    float texture_aspect) noexcept;
 
 class VectorGeometryCache {
 public:

@@ -5,7 +5,7 @@ C4Context
     title Vertex Loom — contexte système
     Person(creator, "Créateur", "Développe le jeu et crée les assets")
     Person(mapmaker, "Créateur de maps", "Compose, teste et publie du contenu depuis les outils intégrés au jeu")
-    System(fabric, "Vertex Loom", "Runtime 2D et outils de création textile")
+    System(fabric, "Vertex Loom", "Runtime 2D et outils de création textile, profils shader et marqueurs de collision")
     System_Ext(files, "Système de fichiers local", "Projets, textures, sons et exports")
     System_Ext(catalog, "Catalogue du jeu", "Référence des maps portables validées ; le transport en ligne reste hors périmètre")
     Rel(creator, fabric, "Crée assets, comportements et transformations, puis teste")
@@ -18,7 +18,8 @@ Rel(fabric, catalog, "Publie et charge des maps validées")
 
 Le premier écran doit répondre à une seule question : « que puis-je faire
 maintenant et sur quelle ressource ? ». Le créateur ouvre ou crée un projet,
-parcourt une ressource dans le rail droit, l'édite dans l'inspecteur, la
+parcourt une ressource dans le rail Project à gauche, l'édite dans l'Inspector
+à droite, la
 prévisualise immédiatement, puis compose une map avant validation et
 publication. Toute transition conserve le document actif jusqu'à `Save`,
 `Discard` ou `Cancel`.

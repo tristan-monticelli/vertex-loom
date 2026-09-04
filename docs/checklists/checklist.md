@@ -19,6 +19,92 @@ moteur n'est pas encore cohérent de bout en bout. Des fonctions déclarées dan
 les contrats ou les ADR ne sont pas consommées par le runtime, et plusieurs
 parcours d'édition peuvent bloquer ou perdre le contexte de travail.
 
+## Réouverture — audit utilisateur Asset Studio du 31 août 2026
+
+Le détail des chemins nominal, d'échec et de publication est suivi dans
+[l'audit des chemins utilisateur](asset-studio-user-path-audit-2026-08-31.md).
+
+### Verdict UX actuel
+
+**Note de départ : 2/10.** Cette note est volontairement sévère : le parcours
+normal ne permet pas encore de garantir qu'un utilisateur crée et retrouve le
+bon asset, avec le bon rendu, sans connaître les structures internes du moteur.
+
+Les cases Beam, Button, Entity composée et shader cochées dans les sections
+historiques ne valent plus preuve d'acceptation. Elles doivent être revalidées
+par un parcours utilisateur complet avec capture écran, sauvegarde, reload et
+publication.
+
+### Blocages fonctionnels à traiter avant toute amélioration cosmétique
+
+- [ ] **P0 — Button : sélectionner explicitement l'asset fourni.** Le parcours
+  ne doit jamais chercher le premier composant dont le nom contient `button`.
+  Il doit proposer un picker typé, afficher la miniature de l'asset choisi et
+  bloquer avec une erreur actionnable si l'asset n'existe pas.
+- [ ] **P0 — Button : interdire l'Entity vide silencieuse.** Une absence de
+  composant fourni doit empêcher la publication et expliquer comment importer
+  ou sélectionner l'original.
+- [ ] **P0 — Beam : définir le contrat utilisateur et le contrat interne.**
+  `Beam` ne doit pas être uniquement un alias d'affichage de `seam`. La
+  compatibilité avec les anciens contrats doit rester documentée et migrée sans
+  suppression automatique.
+- [ ] **P0 — Beam : garantir la texture de base réelle.** Un nouveau Beam doit
+  charger `defaultStrokeTexture`, vérifier que la ressource existe et afficher
+  clairement la texture effectivement utilisée. Une texture manquante doit
+  bloquer avec une correction proposée.
+- [ ] **P0 — Shader : prouver le rendu à l'écran.** Créer un Beam texturé avec
+  couleur principale, couleur d'effet, brillance et holographie, puis vérifier
+  par capture que le shader est visible dans Asset Studio, Preview Runtime et
+  runtime publié.
+- [ ] **P1 — Originales fournies : les utiliser réellement.** Les assets
+  originaux fournis par l'utilisateur doivent être importables, identifiables
+  et sélectionnables sans être remplacés par une forme ou un bouton généré.
+- [ ] **P1 — Zipper : modéliser la différence de comportement.** Zipper et Beam
+  peuvent rester deux parcours utilisateur, mais leur relation doit être
+  explicitement un même système de chemins/segments avec des comportements
+  distincts, et non deux presets techniques sans modèle commun compréhensible.
+- [ ] **P1 — Entity composée : assistant multi-blocs.** Ajouter un bloc, choisir
+  son artwork/image/Beam/composant, le positionner, le redimensionner, régler
+  l'ordre, puis ajouter le bloc suivant dans une preview unique.
+- [ ] **P1 — Déformations : portée explicite.** Le choix doit distinguer
+  `bloc sélectionné` et `structure entière`; une déformation locale ne doit
+  jamais modifier implicitement les autres blocs et la déformation globale doit
+  s'appliquer après composition.
+- [ ] **P1 — Parcours normal : retirer les détails moteur.** Les ressources
+  techniques et les groupes `Visual component`, `Visual composition`,
+  `Transformations`, `Behaviors`, `Maps` et autres doivent rester dans un espace
+  Avancé réellement séparé, pas seulement dans un sous-menu de création.
+
+### Deuxième analyse obligatoire — moyen terme et UX
+
+- [ ] Rejouer le parcours complet comme un nouvel utilisateur, sans connaître
+  les IDs, les types internes ni les noms de fichiers.
+- [ ] Mesurer chaque étape : objectif compris, action disponible, résultat
+  visible, erreur récupérable, sauvegarde, reload et publication.
+- [ ] Produire un diagramme UX versionné avec les chemins nominal, erreur,
+  annulation, retour arrière et asset manquant.
+- [ ] Classer les problèmes en impossibilité fonctionnelle, incohérence de
+  modèle, friction UX, défaut visuel et dette de preuve.
+- [ ] Refaire la note UX après correction des P0, avec captures dédiées Beam,
+  Button, Entity composée, déformation locale et déformation globale.
+- [ ] Définir les critères de sortie : un utilisateur externe doit réussir le
+  parcours sans documentation moteur et sans intervention manuelle dans les
+  fichiers du projet.
+
+### Preuves requises pour fermer cette réouverture
+
+- [ ] E2E isolé Beam : création → texture de base → répétition/orientation →
+  shader visible → sauvegarde → reload → publication.
+- [ ] E2E isolé Button : import/sélection de l'original fourni → Entity →
+  preview → sauvegarde → reload.
+- [ ] E2E Entity composée : au moins trois blocs visuels, ordre et transforms.
+- [ ] E2E déformation locale puis globale avec vérification des autres blocs.
+- [ ] Captures écran comparables entre Asset Studio, Preview Runtime et runtime
+  publié, avec la même fixture et les mêmes fichiers générés.
+- [ ] Test undo/redo et abandon de modification pour chaque parcours guidé.
+- [ ] Relancer le test `asset_studio_beam_vector_canvas_e2e` plusieurs fois et
+  supprimer sa flakiness avant de considérer la preuve fiable.
+
 ### Backlog restant — état de référence
 
 Cette section regroupe toutes les cases encore ouvertes. Une case ne doit être
@@ -52,14 +138,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   tests runtime couvrent le fill et le transform image.
 - [x] Input et comportements : décider par ADR les contextes/profils et afficher
   les BehaviorGraph consommateurs de chaque action.
-- [x] Vectoriel : contrat C4/ADR, conversion primitive→path, plume complète,
-  poignées liées/symétriques/libres, sélection et transform multi-points,
-  transform fill indépendante, clips imbriqués, registre animable, CommandStack,
-  géométrie de stroke réellement rendue (largeur, join round/bevel/miter,
-  cap), stroke image avec répétition/UV et preset pédagogique `beam` livré par
-  défaut, géométrie, E2E canvas et comparaison des draw packets. Vérifié par
-  les tests géométriques, `asset_studio_vector_canvas_e2e`,
-  `fabric_render_gl_smoke`, les tests de presets et les draw packets comparés.
+- [ ] Vectoriel : le socle natif, l’édition de chemins, la tessellation, le
+  stroke et le clipping simple sont partiellement livrés. Restent à prouver dans
+  l’éditeur et le renderer : la plume sur tous les coins et formes libres, les
+  poignées après reload, les clips imbriqués sur backend sans stencil et la
+  comparaison visuelle des draw packets. Les preuves actuelles sont
+  `asset_studio_vector_canvas_e2e`, `asset_studio_beam_vector_canvas_e2e`,
+  `fabric_render_gl_smoke`, les tests géométriques et
+  `no_legacy_sprite_contracts`.
 - [x] Inspecteur local : mêmes formulaires création/édition, raisons des boutons
   désactivés, focus premier champ invalide, tooltips, unités, raccourcis,
   tailles minimales, navigation clavier et contraste ; remplacer aussi les
@@ -74,12 +160,14 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `asset_studio_ui_input_e2e`; les parcours comportement monstre et path Bézier
   sont couverts par `asset_studio_behavior_e2e` et
   `asset_studio_vector_canvas_e2e`.
-- [x] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
-  Linux. Le run CI `33335758294` est vert sur les trois plateformes et les
-  parcours UI Windows passent avec le chargeur Mesa logiciel.
-- [x] Documentation et clôture : gates réconciliés et résultat confirmé sur
-  toutes les plateformes dans le run CI `33335758294`; la limite du stencil
-  imbriqué des rasterizers logiciels est documentée dans la stratégie qualité.
+- [ ] UX E2E multiplateforme : exécuter les parcours sur macOS, Windows et
+  Linux avec une preuve GPU native. Le run CI `33335758294` est vert sur les
+  trois plateformes avec Mesa logiciel sous Windows, mais ne constitue pas une
+  preuve Windows GPU native.
+- [ ] Documentation et clôture : réconcilier toutes les gates restantes,
+  produire la comparaison visuelle complète et confirmer les plateformes
+  supportées. La limite du stencil logiciel et le fallback CPU convexe sont
+  documentés, mais cela ne clôt pas le gate visuel.
 
 ### Différences UX/logiques observées à corriger
 
@@ -122,14 +210,23 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
 - [x] Ajouter clés A→B, sélection multiple, copier/coller, snapping,
   tangentes et easing selon un contrat versionné. Les commandes et le contrat
   v3 sont couverts par les tests de timeline et d’animation.
-- [x] Permettre l'édition Bézier directement sur le canvas : plume, insertion,
-  suppression, conversion ligne/courbe, ouverture/fermeture, poignées liées,
-  symétriques et libres.
-- [x] Rendre la géométrie de stroke effective : largeur, joins `round`,
-  `bevel`, `miter` et caps doivent modifier les draw packets et le rendu ; le
-  renderer les applique désormais dans les draw packets et les chemins OpenGL.
-- [x] Ajouter le stroke image avec texture, répétition, UV, offset, échelle et
-  déformation ; livrer un preset `beam` préexistant et visible comme exemple.
+- [x] Permettre l'édition Bézier directement sur le canvas sur tous les chemins :
+  la plume, l’insertion, la suppression, les poignées, les coins visibles et la
+  création de formes libres sont couverts par les parcours vectoriels, avec
+  persistance après reload dans `asset_studio_vector_canvas_e2e` et son fixture
+  Beam.
+- [x] Rendre la géométrie de stroke visible dans le viewport et le runtime :
+  le canvas consomme maintenant les triangles de `fabric_render`, avec blending
+  alpha OpenGL explicite ; le checker compare les captures `miter`, `round` et
+  `bevel` pour empêcher une régression vers une polyline unique.
+- [x] Ajouter une bordure vectorielle réellement visible au preset `beam` et
+  la couvrir par une capture dédiée du parcours Asset Studio. Le smoke OpenGL
+  prouve l’échantillonnage d’une texture de stroke non uniforme ; la répétition,
+  les UV et le crop restent à compléter dans le parcours visuel.
+- [x] Compléter et prouver dans l’éditeur les paramètres avancés du stroke image
+  (offset, échelle, opacité et déformation), avec captures distinctes et reload
+  vérifiés par les parcours `asset_studio_vector_canvas_e2e` et
+  `asset_studio_beam_vector_canvas_e2e`.
 - [x] Permettre une configuration projet complète du personnage, spawn,
   caméra, limites et audio, puis la charger dans Preview Runtime sans CLI.
 - [x] Ajouter des profils/contextes d'input seulement après ADR et afficher
@@ -141,7 +238,7 @@ détaillées plus bas restent la source de suivi par fichier et par parcours.
   `33335758294` vert sur les trois plateformes, E2E UI Windows exécutés.
 - [x] Vérifier localement aux tailles minimales de fenêtre le focus, le scroll
   automatique, la navigation clavier, les unités, tooltips, raccourcis et le
-  contraste via les tests UI Asset Studio ; la répétition multiplateforme reste
+  contraste via les tests UI Asset Studio et Map Studio ; la répétition multiplateforme reste
   ouverte.
 
 ### Défauts P0 — corriger avant toute nouvelle fonctionnalité
@@ -770,8 +867,13 @@ utilisées pour tous les types de ressources.
   - [x] programmer un comportement de joueur ;
   - [x] programmer un comportement de monstre ;
   - [x] transformer une entité A vers B ;
-  - [x] créer et éditer un path Bézier ;
-  - [x] changer fill, texture et stroke après création.
+- [x] créer et éditer un path Bézier ; l’insertion, la conversion par
+  cliquer-glisser, la sélection des coins/poignées et la suppression clavier
+  sont couvertes par `asset_studio_vector_canvas_e2e`, y compris la
+  persistance après reload ;
+  - [x] changer fill, texture et stroke après création avec preuve visuelle
+    complète dans l’éditeur ; le parcours Vector Canvas rend et capture le fill
+    image et le stroke image après mutation.
 - [x] Capturer diagnostics et screenshots lors d'un échec. Asset Studio et Map
   Studio écrivent un rapport texte et une capture PPM lorsque le parcours a
   créé une fenêtre SDL ; un échec avant création de fenêtre ne peut produire
@@ -821,5 +923,53 @@ automatiquement sur les trois plateformes.
   ; run CI `33335758294` vert sur macOS/Linux/Windows, avec Mesa logiciel sur
   Windows et limite de stencil imbriqué documentée.
 
-Le chantier est terminé uniquement lorsque les huit lots et tous leurs gates
-sont cochés avec preuves de tests et commits associés.
+## 14 — Fin de produit et recette release
+
+Ces contrôles complètent les gates techniques ; ils ne peuvent être cochés
+qu'avec une preuve reproductible et un résultat utilisable par une personne
+qui n'a pas connaissance de l'implémentation.
+
+- [ ] Recette produit complète : créer un projet, éditer une scène, sauvegarder,
+  fermer, rouvrir, modifier et lancer le runtime publié sans perte de contexte.
+  Le checker `release_product_recipe` automatise maintenant ce flux sur la
+  fixture textile ; la recette utilisateur interactive reste à faire.
+- [ ] Rendu GPU natif : valider OpenGL sur un vrai GPU/driver Windows ; Mesa
+  logiciel reste une couverture de secours et ne remplace pas cette recette.
+  Le workflow manuel `native_gpu=true` est prêt sur runner Windows
+  auto-hébergé `self-hosted/windows/gpu` ; il reste à l’exécuter.
+- [ ] Régression visuelle : comparer les screenshots de référence des écrans,
+  canvas, textures, fills, strokes, clips et transformations.
+  Le canvas vectoriel compare maintenant occupation et plage de canaux à une
+  baseline versionnée ; les références des autres écrans restent à constituer.
+- [ ] Robustesse des données : couvrir ressource manquante, fichier invalide,
+  sauvegarde interrompue, récupération et conservation des modifications.
+  Le checker `release_data_robustness` couvre maintenant les projets invalide
+  et valide ainsi qu’une ressource vectorielle manquante ; les scénarios
+  interruption/récupération sont rejoués par `release_recovery_smoke`, qui
+  accepte l’autosave dans une nouvelle session et vérifie le reload final.
+- [ ] Performance release : mesurer démarrage, FPS, mémoire et temps de chargement
+  sur un petit projet et un projet représentatif de production.
+  Le checker `release_performance_smoke` mesure maintenant les profils 100/10 000
+  pour le renderer et le runtime avec seuils FPS ; les rapports vérifient aussi
+  initialisation, chargement et pic mémoire par plateforme.
+- [ ] Packaging release : installer, lancer, mettre à jour et désinstaller le
+  produit sur macOS, Windows et Linux avec ses ressources et dépendances.
+  Le smoke CMake/CPack local vérifie déjà l’installation, la validation du
+  projet exemple, le lancement du runtime installé, une mise à jour par-dessus
+  l’installation et une suppression complète du staging, ainsi que la génération TGZ/ZIP ;
+  la recette update/uninstall reste à exécuter sur les trois OS.
+- [ ] Accessibilité réelle : vérifier clavier, souris, focus, raccourcis,
+  navigation, contraste et lisibilité sur chaque écran principal.
+- [ ] Recette utilisateur finale : faire valider les critères d'acceptation,
+  les parcours documentés et les messages d'erreur par un utilisateur externe.
+
+Le chantier est terminé uniquement lorsque les huit lots, leurs gates et ces
+huit contrôles de fin de produit sont cochés avec preuves associées.
+
+# Textures, shaders et collisions
+
+- [x] Persister la classification texture et les profils Thread/Plastic/Monochrome/Custom.
+- [x] Synchroniser la texture de stroke par défaut via le manifeste du projet et conserver les variantes dans le combo.
+- [x] Transporter les couleurs, brillance, holographie, intensité et opacité dans les draw packets et le shader OpenGL.
+- [x] Persister les configurations de collision par surface et les overrides par objet, avec huit positions déterministes.
+- [x] Couvrir les round-trips, la génération de marqueurs et la compatibilité des fixtures historiques.

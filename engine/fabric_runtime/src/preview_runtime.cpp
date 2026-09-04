@@ -39,6 +39,23 @@ struct RuntimePacketBounds {
     core::Vec2 maximum;
 };
 
+struct RuntimeTraceCompletion {
+    core::JsonLineLogger* logger{};
+    std::string_view category;
+    const std::vector<std::string>* errors{};
+    const PreviewRuntimeStats* stats{};
+    bool success{};
+
+    ~RuntimeTraceCompletion() {
+        if (!logger) return;
+        const auto error_count = std::to_string(errors ? errors->size() : 0U);
+        const auto frames = std::to_string(stats ? stats->frames : 0U);
+        logger->write(success ? core::LogLevel::info : core::LogLevel::error,
+                      category, success ? "completed" : "failed",
+                      {{"errorCount", error_count}, {"frames", frames}});
+    }
+};
+
 struct PreviewRuntime::Impl {
     struct TextureSource {
         std::filesystem::path path;
@@ -102,6 +119,11 @@ struct PreviewRuntime::Impl {
     PcmAudioMixer audio_mixer;
     PcmAudioDevice audio_device;
     std::optional<PcmWavClip> audio_clip;
+    std::string audio_bus{"master"};
+    float audio_bus_gain{1.0F};
+    float audio_gain{1.0F};
+    float audio_pan{};
+    bool audio_loop{};
     SDL_GameController* controller{};
     Camera2D camera;
     std::vector<render::VectorDrawPacket> packets;
@@ -142,6 +164,7 @@ struct PreviewRuntime::Impl {
     std::filesystem::path project_root;
     const project::ProjectManifest* manifest{};
     std::vector<std::string>* errors{};
+    std::unique_ptr<core::JsonLineLogger> logger;
 
     [[nodiscard]] bool transform_entity_instance(
         const std::string& instance_id,
@@ -631,7 +654,19 @@ bool PreviewRuntime::Impl::transform_entity_instance(
                                geometry.errors.end());
                 return false;
             }
-            append_packet(std::move(geometry.packets.front()), node, node_index,
+            auto packet = std::move(geometry.packets.front());
+            if (node.drawable.material) {
+                auto loaded = project::load_material(
+                    project_root, *manifest,
+                    project::material_document_path(
+                        *manifest, node.drawable.material->id));
+                if (!loaded.ok()) {
+                    append_errors(*errors, loaded.errors);
+                    return false;
+                }
+                apply_material(packet, *loaded.asset);
+            }
+            append_packet(std::move(packet), node, node_index,
                           destination_instance_id + ":" + node.id);
         }
     }
@@ -876,6 +911,7 @@ void apply_material(render::VectorDrawPacket& packet,
         color.alpha *= material.opacity;
         packet.fill_color = color;
     }
+    if (material.shader) packet.shader = *material.shader;
 }
 
 void generate_planar_uvs(render::VectorDrawPacket& packet) {
@@ -984,6 +1020,20 @@ PreviewRuntime::~PreviewRuntime() {
 
 bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     options_ = options;
+    if (options_.trace.session_id.empty())
+        options_.trace.session_id = core::make_trace_session_id("runtime");
+    if (options_.trace.resource_id.empty())
+        options_.trace.resource_id = options_.scene_id
+            ? options_.scene_id->value : options_.map_id.value;
+    impl_->logger.reset();
+    if (options_.log_output)
+        impl_->logger = std::make_unique<core::JsonLineLogger>(
+            *options_.log_output, options_.trace);
+    RuntimeTraceCompletion trace{
+        .logger = impl_->logger.get(), .category = "runtime.load",
+        .errors = &errors_, .stats = &stats_};
+    if (impl_->logger)
+        impl_->logger->write(core::LogLevel::info, "runtime.load", "started");
     manifest_.reset();
     scene_.reset();
     map_.reset();
@@ -1022,6 +1072,11 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
     impl_->packet_indices_by_instance.clear();
     impl_->chunk_index_ready = false;
     impl_->audio_clip.reset();
+    impl_->audio_bus = "master";
+    impl_->audio_bus_gain = 1.0F;
+    impl_->audio_gain = 1.0F;
+    impl_->audio_pan = 0.0F;
+    impl_->audio_loop = false;
 
     const bool valid_map_id = core::ResourceId::is_valid(options_.map_id.value);
     const bool valid_scene_id = options_.scene_id.has_value() &&
@@ -1172,8 +1227,24 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 errors_.push_back("runtime.audio: document has no events");
                 return false;
             }
+            const auto& event = audio.audio->events.front();
             options_.audio_wav = options_.project_root /
-                audio.audio->events.front().source;
+                event.source;
+            impl_->audio_bus = event.bus;
+            impl_->audio_gain = event.volume;
+            impl_->audio_loop = event.loop;
+            const auto bus = std::ranges::find(
+                audio.audio->buses, event.bus, &project::AudioBus::id);
+            impl_->audio_bus_gain = bus == audio.audio->buses.end()
+                ? 1.0F : bus->volume;
+            if (event.spatial) {
+                const auto spatial = resolve_spatial_audio(
+                    event.spatial->position.x, event.spatial->position.y,
+                    event.spatial->minimum_distance,
+                    event.spatial->maximum_distance);
+                impl_->audio_gain *= spatial.attenuation;
+                impl_->audio_pan = spatial.pan;
+            }
         }
     }
     std::optional<project::SceneDocument> loaded_scene;
@@ -1678,6 +1749,17 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                     return false;
                 }
                 auto packet = std::move(geometry.packets.front());
+                if (node.drawable.material) {
+                    auto loaded_material = project::load_material(
+                        options_.project_root, *manifest_,
+                        project::material_document_path(
+                            *manifest_, node.drawable.material->id));
+                    if (!loaded_material.ok()) {
+                        append_errors(errors_, loaded_material.errors);
+                        return false;
+                    }
+                    apply_material(packet, *loaded_material.asset);
+                }
                 transform_packet(packet, resolved_entity, node_index, instance.transform);
                 packet.node_id = instance.id + ":" + node.id;
                 impl_->packet_base_transforms.emplace(
@@ -1786,10 +1868,16 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                  instance.transform.position.y - 0.5F},
                 {1.0F, 1.0F}}));
     }
+    trace.success = true;
     return true;
 }
 
 bool PreviewRuntime::run() {
+    RuntimeTraceCompletion trace{
+        .logger = impl_->logger.get(), .category = "runtime.run",
+        .errors = &errors_, .stats = &stats_};
+    if (impl_->logger)
+        impl_->logger->write(core::LogLevel::info, "runtime.run", "started");
     if (!loaded()) return false;
     SDL_SetMainReady();
     const auto sdl_flags = SDL_INIT_VIDEO |
@@ -1868,11 +1956,14 @@ bool PreviewRuntime::run() {
     impl_->camera.set_viewport(options_.width, options_.height);
     impl_->camera.set_limits(options_.camera_limits);
     if (!headless && impl_->audio_clip) {
-        if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate,
-                                          impl_->audio_clip->channels) ||
+        if (!impl_->audio_mixer.configure(impl_->audio_clip->sample_rate, 2U) ||
+            !impl_->audio_mixer.set_bus_gain(impl_->audio_bus,
+                                             impl_->audio_bus_gain) ||
             !impl_->audio_device.open(impl_->audio_clip->sample_rate,
-                                      impl_->audio_clip->channels) ||
-            !impl_->audio_mixer.play(*impl_->audio_clip)) {
+                                      2U) ||
+            !impl_->audio_mixer.play(*impl_->audio_clip, impl_->audio_bus,
+                                     impl_->audio_gain, impl_->audio_pan,
+                                     impl_->audio_loop)) {
             errors_.push_back("audio: " + (impl_->audio_device.error().empty()
                 ? std::string("could not start PCM playback")
                 : impl_->audio_device.error()));
@@ -2483,6 +2574,7 @@ bool PreviewRuntime::run() {
                 static_cast<double>(frame_times_ms.size()) * 0.95)) - 1U);
         stats_.p95_frame_ms = frame_times_ms[index];
     }
+    trace.success = true;
     return true;
 }
 

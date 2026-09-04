@@ -33,9 +33,9 @@ fabric::project::VisualComponent component() {
     return {
         .document = {.schema_version = 1,
                      .type = "visualComponent",
-                     .id = {.value = "button-eye"},
-                     .name = "Button Eye"},
-        .composition = {{.value = "button-eye-base"}, "visualComposition"},
+                     .id = {.value = "sample-component"},
+                     .name = "Sample Component"},
+        .composition = {{.value = "sample-component-base"}, "visualComposition"},
         .bounds = {{-1.0F, -0.75F}, {2.0F, 1.5F}},
         .anchors = {{"center", "Center", {0.0F, 0.0F}},
                     {"thread", "Thread", {0.0F, 0.25F}}},
@@ -70,8 +70,8 @@ fabric::project::VisualComposition base_composition() {
     return {
         .document = {.schema_version = 1,
                      .type = "visualComposition",
-                     .id = {.value = "button-eye-base"},
-                     .name = "Button Eye Base"},
+                     .id = {.value = "sample-component-base"},
+                     .name = "Sample Component Base"},
         .size = {2.0F, 1.5F},
         .layers = {{.id = "face",
                     .name = "Face",
@@ -87,10 +87,10 @@ fabric::project::VisualComposition parent_composition() {
                      .id = {.value = "textile-face"},
                      .name = "Textile Face"},
         .size = {4.0F, 3.0F},
-        .layers = {{.id = "left-eye",
-                    .name = "Left Eye",
+        .layers = {{.id = "child-component",
+                    .name = "Child Component",
                     .kind = fabric::project::VisualLayerKind::component,
-                    .resource = {{.value = "button-eye"}, "visualComponent"},
+                    .resource = {{.value = "sample-component"}, "visualComponent"},
                     .component_instance = fabric::project::VisualComponentInstance{
                         .variant_id = "sleepy",
                         .anchor_id = "center",
@@ -103,14 +103,14 @@ fabric::project::EntityDefinition component_entity() {
         .document = {.schema_version =
                          fabric::project::current_entity_schema_version,
                      .type = "entity",
-                     .id = {.value = "button-eye-entity"},
-                     .name = "Button Eye Entity"},
+                     .id = {.value = "sample-component-entity"},
+                     .name = "Sample Component Entity"},
         .nodes = {{.id = "root",
                    .name = "Root",
                    .drawable = {
                        .kind = fabric::project::EntityDrawableKind::visual_component,
                        .resource = fabric::project::ResourceReference{
-                           {.value = "button-eye"}, "visualComponent"},
+                           {.value = "sample-component"}, "visualComponent"},
                        .component_instance =
                            fabric::project::VisualComponentInstance{
                                .variant_id = "sleepy",
@@ -162,7 +162,7 @@ TEST_CASE("visual component v1 round trips typed parameters and variants") {
     const auto references =
         fabric::project::visual_component_resource_references(source);
     CHECK(std::ranges::any_of(references, [](const auto& reference) {
-        return reference.id.value == "button-eye-base" &&
+        return reference.id.value == "sample-component-base" &&
             reference.expected_type == "visualComposition";
     }));
     CHECK(std::ranges::any_of(references, [](const auto& reference) {
@@ -288,10 +288,10 @@ TEST_CASE("headless validation checks component bindings instances and cycles") 
     REQUIRE(fabric::project::publish_visual_component(
                 root, manifest(), source).ok());
     base.layers.push_back({
-        .id = "recursive-eye",
-        .name = "Recursive Eye",
+        .id = "recursive-component",
+        .name = "Recursive Component",
         .kind = fabric::project::VisualLayerKind::component,
-        .resource = {{.value = "button-eye"}, "visualComponent"},
+        .resource = {{.value = "sample-component"}, "visualComponent"},
         .component_instance = fabric::project::VisualComponentInstance{},
     });
     REQUIRE(fabric::project::publish_visual_composition(

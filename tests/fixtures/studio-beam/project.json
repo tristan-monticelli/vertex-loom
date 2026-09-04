@@ -6,6 +6,7 @@
     "scenes": "scenes",
     "schemas": "schemas"
   },
+  "defaultStrokeTexture": "beam-thread",
   "id": "studio-beam",
   "name": "Studio Beam",
   "pixelsPerUnit": 100.0,

@@ -1,4 +1,5 @@
 #include "fabric/editor/map_session.hpp"
+#include "fabric/editor/creation_prompts.hpp"
 #include "fabric/editor/mechanic_presets.hpp"
 #include "fabric/editor/mechanic_session.hpp"
 #include "fabric/editor/project_session.hpp"
@@ -44,6 +45,12 @@
 #include <vector>
 
 namespace {
+
+bool ui_map_workspace_seen = false;
+float ui_map_layers_x = 0.0F;
+float ui_map_canvas_x = 0.0F;
+float ui_map_inspector_x = 0.0F;
+float ui_map_canvas_width = 0.0F;
 
 std::vector<fabric::project::EntityTransformation> load_transformations(
     const std::filesystem::path& root,
@@ -172,6 +179,7 @@ void write_e2e_failure_artifacts(
     std::vector<unsigned char> pixels(
         static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_FRONT);
     glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
     std::ofstream image(project_path / "map_studio-e2e-failure.ppm",
                         std::ios::binary);
@@ -184,6 +192,70 @@ void write_e2e_failure_artifacts(
                                                        row_size),
                     static_cast<std::streamsize>(row_size));
     }
+}
+
+float relative_luminance(const ImVec4 color) {
+    const auto linear = [](const float channel) {
+        return channel <= 0.03928F ? channel / 12.92F
+            : std::pow((channel + 0.055F) / 1.055F, 2.4F);
+    };
+    return 0.2126F * linear(color.x) + 0.7152F * linear(color.y) +
+        0.0722F * linear(color.z);
+}
+
+void write_ui_accessibility_probe(const std::filesystem::path& project_path,
+                                  SDL_Window* window,
+                                  const bool keyboard_navigation_enabled) {
+    if (project_path.empty() || window == nullptr) return;
+    const auto& colors = ImGui::GetStyle().Colors;
+    const float background = relative_luminance(colors[ImGuiCol_WindowBg]);
+    const float text = relative_luminance(colors[ImGuiCol_Text]);
+    const float contrast = (std::max(background, text) + 0.05F) /
+        (std::min(background, text) + 0.05F);
+    int width = 0;
+    int height = 0;
+    SDL_GL_GetDrawableSize(window, &width, &height);
+    if (width <= 0 || height <= 0) return;
+    std::vector<unsigned char> pixels(
+        static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 3U);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadBuffer(GL_BACK);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    const auto [minimum, maximum] = std::minmax_element(pixels.begin(), pixels.end());
+    const bool visual_valid = width >= 960 && height >= 640 &&
+        minimum != pixels.end() && maximum != pixels.end() &&
+        *minimum != *maximum;
+    std::ofstream output(project_path / "map-studio-ui-accessibility.json");
+    if (output) {
+        output << "{\n  \"schema\": \"map-studio-ui-accessibility-test-v1\",\n"
+               << "  \"keyboard_navigation_enabled\": "
+               << (keyboard_navigation_enabled ? "true" : "false") << ",\n"
+               << "  \"text_window_contrast\": " << contrast << ",\n"
+               << "  \"text_window_contrast_ok\": "
+               << (contrast >= 4.5F ? "true" : "false") << ",\n"
+               << "  \"capture_width\": " << width << ",\n"
+               << "  \"capture_height\": " << height << ",\n"
+               << "  \"workspace_rendered\": "
+               << (ui_map_workspace_seen ? "true" : "false") << ",\n"
+               << "  \"layers_canvas_inspector_order\": "
+               << (ui_map_layers_x < ui_map_canvas_x &&
+                           ui_map_canvas_x < ui_map_inspector_x
+                       ? "true" : "false") << ",\n"
+               << "  \"canvas_width\": " << ui_map_canvas_width << ",\n"
+               << "  \"canvas_minimum_width_ok\": "
+               << (ui_map_canvas_width >= 320.0F ? "true" : "false") << ",\n"
+               << "  \"visual_valid\": "
+               << (visual_valid ? "true" : "false") << "\n}\n";
+    }
+    std::ofstream image(project_path / "map_studio-ui-accessibility.ppm",
+                        std::ios::binary);
+    if (!image) return;
+    image << "P6\n" << width << ' ' << height << "\n255\n";
+    const auto row_size = static_cast<std::size_t>(width) * 3U;
+    for (int row = height - 1; row >= 0; --row)
+        image.write(reinterpret_cast<const char*>(pixels.data() +
+                                                   static_cast<std::size_t>(row) * row_size),
+                    static_cast<std::streamsize>(row_size));
 }
 
 void draw_scene_errors(const fabric::editor::SceneSession& session) {
@@ -1583,20 +1655,28 @@ struct MapTexture {
     std::uint32_t height{};
 };
 
-struct MapPreviewRenderState {
+struct MapPreviewRenderer {
     fabric::render::OpenGLVectorRenderer* renderer{};
     const fabric::render::MapPreviewResult* preview{};
     const std::filesystem::path* project_root{};
     const fabric::project::ProjectManifest* manifest{};
     std::unordered_map<std::string, MapTexture>* textures{};
     fabric::render::OpenGLVectorViewport viewport{};
+    std::vector<std::string> errors;
 };
 
 void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
-    auto* state = static_cast<MapPreviewRenderState*>(command->UserCallbackData);
+    auto* state = static_cast<MapPreviewRenderer*>(command->UserCallbackData);
     if (state == nullptr || state->renderer == nullptr || state->preview == nullptr ||
         state->project_root == nullptr || state->manifest == nullptr ||
-        state->textures == nullptr || state->preview->packets.empty()) return;
+        state->textures == nullptr) return;
+    state->errors = state->preview->errors;
+    if (!state->renderer->ready()) {
+        state->errors.push_back("OpenGL initialization failed: " +
+                                state->renderer->initialization_error());
+        return;
+    }
+    if (state->preview->packets.empty()) return;
     const fabric::render::OpenGLTextureResolver resolver =
         [state](const fabric::core::ResourceId& id)
         -> std::optional<fabric::render::OpenGLTextureHandle> {
@@ -1608,10 +1688,18 @@ void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
         const auto loaded = fabric::project::load_texture_asset(
             *state->project_root, *state->manifest,
             fabric::project::texture_document_path(*state->manifest, id));
-        if (!loaded.ok()) return std::nullopt;
+        if (!loaded.ok()) {
+            state->errors.push_back("Texture document '" + id.value +
+                                    "' is missing or invalid");
+            return std::nullopt;
+        }
         const auto decoded = fabric::render::load_png(
             *state->project_root / loaded.asset->source);
-        if (!decoded.ok()) return std::nullopt;
+        if (!decoded.ok()) {
+            state->errors.push_back("Texture PNG '" + id.value +
+                                    "' could not be decoded");
+            return std::nullopt;
+        }
         MapTexture texture{.width = decoded.image->width,
                            .height = decoded.image->height};
         glGenTextures(1, &texture.handle);
@@ -1621,17 +1709,28 @@ void render_map_preview_callback(const ImDrawList*, const ImDrawCmd* command) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        while (glGetError() != GL_NO_ERROR) {}
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
                      static_cast<GLsizei>(texture.width),
                      static_cast<GLsizei>(texture.height), 0, GL_RGBA,
                      GL_UNSIGNED_BYTE, decoded.image->rgba8.data());
+        const auto upload_error = glGetError();
         glBindTexture(GL_TEXTURE_2D, 0);
+        if (upload_error != GL_NO_ERROR) {
+            glDeleteTextures(1, &texture.handle);
+            state->errors.push_back("GPU rejected texture upload for '" +
+                                    id.value + "' (OpenGL error " +
+                                    std::to_string(upload_error) + ")");
+            return std::nullopt;
+        }
         const auto [inserted, _] = state->textures->emplace(id.value, texture);
         return fabric::render::OpenGLTextureHandle{
             inserted->second.handle, inserted->second.width, inserted->second.height};
     };
-    static_cast<void>(state->renderer->draw(
-        state->preview->packets, state->viewport, resolver));
+    const auto stats = state->renderer->draw(
+        state->preview->packets, state->viewport, resolver);
+    state->errors.insert(state->errors.end(), stats.errors.begin(),
+                         stats.errors.end());
 }
 
 void draw_transform_editor(fabric::editor::MapSession& session,
@@ -1686,6 +1785,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      std::vector<std::string>& selected_instances,
                      ImVec2& pan,
                      float& zoom,
+                     bool& grid_visible,
                      CanvasGizmoState& gizmo,
                      int selected_collision_index,
                      CollisionPointGizmoState& point_gizmo,
@@ -1697,23 +1797,17 @@ void draw_map_canvas(fabric::editor::MapSession& session,
                      std::string& placement_resource_id,
                      int& placement_kind,
                      fabric::editor::MapSnapSettings& snapping,
-                     MapPreviewRenderState& preview_render_state,
+                     MapPreviewRenderer& preview_render_state,
                      const fabric::physics::MechanicSimulation& mechanic_preview,
                      std::string& status) {
     if (!session.map()) return;
     const auto& map = *session.map();
     ImGui::SeparatorText("Canvas");
     ImGui::TextDisabled("Active layer: %s", active_layer_id.c_str());
-    ImGui::Checkbox("Snap translation", &snapping.enabled);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(100.0F);
-    ImGui::DragFloat("Grid size (world units)", &snapping.grid_size, 0.1F, 0.01F, 1024.0F);
-    draw_technical_tooltip("Distance between snap grid lines.");
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(150.0F);
-    ImGui::DragFloat2("Origin (world units)", &snapping.origin.x, 0.1F);
-    draw_technical_tooltip("World-space origin used by the snap grid.");
-    const ImVec2 canvas_size{ImGui::GetContentRegionAvail().x, 380.0F};
+    const auto canvas_available = ImGui::GetContentRegionAvail();
+    const ImVec2 canvas_size{
+        canvas_available.x,
+        std::clamp(canvas_available.y - 110.0F, 260.0F, 520.0F)};
     auto frame_instances = [&](const bool selected_only) {
         float min_x = std::numeric_limits<float>::max();
         float min_y = std::numeric_limits<float>::max();
@@ -1749,6 +1843,26 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     ImGui::SameLine();
     if (ImGui::Button("Frame all"))
         status = frame_instances(false) ? "Map framed" : "No visible instance to frame";
+    ImGui::SameLine();
+    if (ImGui::Button("-##map-zoom"))
+        zoom = std::clamp(zoom / 1.25F, 0.1F, 32.0F);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%.0f%%", zoom * 100.0F);
+    ImGui::SameLine();
+    if (ImGui::Button("+##map-zoom"))
+        zoom = std::clamp(zoom * 1.25F, 0.1F, 32.0F);
+    ImGui::SameLine();
+    ImGui::Checkbox("Grid##map-canvas", &grid_visible);
+    if (ImGui::CollapsingHeader("Snapping")) {
+        ImGui::Checkbox("Snap translation", &snapping.enabled);
+        ImGui::SetNextItemWidth(140.0F);
+        ImGui::DragFloat("Grid size (world units)", &snapping.grid_size,
+                         0.1F, 0.01F, 1024.0F);
+        draw_technical_tooltip("Distance between snap grid lines.");
+        ImGui::SetNextItemWidth(180.0F);
+        ImGui::DragFloat2("Origin (world units)", &snapping.origin.x, 0.1F);
+        draw_technical_tooltip("World-space origin used by the snap grid.");
+    }
     const ImVec2 canvas_pos = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton("##map-canvas", canvas_size);
     const bool hovered = ImGui::IsItemHovered();
@@ -1798,6 +1912,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
     const auto last_x = static_cast<int>(std::ceil(bottom_right.x / grid_step)) + 1;
     const auto first_y = static_cast<int>(std::floor(bottom_right.y / grid_step)) - 1;
     const auto last_y = static_cast<int>(std::ceil(top_left.y / grid_step)) + 1;
+    if (grid_visible) {
     for (int x = first_x; x <= last_x; ++x) {
         const auto line = world_to_screen({static_cast<float>(x) * grid_step, 0.0F});
         draw->AddLine({line.x, canvas_pos.y},
@@ -1809,6 +1924,7 @@ void draw_map_canvas(fabric::editor::MapSession& session,
         draw->AddLine({canvas_pos.x, line.y},
                       {canvas_pos.x + canvas_size.x, line.y},
                       y == 0 ? IM_COL32(105, 115, 130, 220) : IM_COL32(48, 54, 64, 180));
+    }
     }
     const auto framebuffer_scale = ImGui::GetIO().DisplayFramebufferScale;
     preview_render_state.viewport = {
@@ -2332,9 +2448,13 @@ int run(const std::filesystem::path& project_root,
         const fabric::core::ResourceId& map_id,
         const std::optional<CloseE2eMode> e2e_mode = std::nullopt,
         const bool scene_e2e = false,
-        const bool transformation_e2e = false) {
+        const bool transformation_e2e = false,
+        const bool ui_accessibility_test = false) {
+    const auto trace_session_id =
+        fabric::core::make_trace_session_id("map-studio");
     const int graphical_failure =
-        (e2e_mode || scene_e2e || transformation_e2e) ? 77 : 1;
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test)
+            ? 77 : 1;
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         std::cerr << SDL_GetError() << '\n';
@@ -2359,7 +2479,8 @@ int run(const std::filesystem::path& project_root,
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     const auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE |
-        (e2e_mode || scene_e2e || transformation_e2e ? SDL_WINDOW_HIDDEN : 0U);
+        (e2e_mode || scene_e2e || transformation_e2e || ui_accessibility_test
+             ? SDL_WINDOW_HIDDEN : 0U);
     auto* window = SDL_CreateWindow("Vertex Loom Map Studio",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 1200, 760,
         window_flags);
@@ -2521,7 +2642,10 @@ int run(const std::filesystem::path& project_root,
             const bool loaded = authored && preview_runtime.load({
                 .project_root = project_root,
                 .map_id = map_id,
-                .mode = fabric::runtime::RuntimeMode::smoke_test});
+                .mode = fabric::runtime::RuntimeMode::smoke_test,
+                .trace = {.session_id = trace_session_id,
+                          .resource_id = map_id.value},
+                .log_output = &std::clog});
             const bool transformed = loaded && preview_runtime.transform_instance(
                 "rotating-platform-instance", transformation.document.id);
             const auto destination = transformed
@@ -2624,6 +2748,7 @@ int run(const std::filesystem::path& project_root,
     std::string transformation_preview_result;
     ImVec2 canvas_pan{0.0F, 0.0F};
     float canvas_zoom = 1.0F;
+    bool canvas_grid_visible = true;
     CanvasGizmoState canvas_gizmo;
     CollisionPointGizmoState collision_point_gizmo;
     SelectionBoxState selection_box;
@@ -2631,9 +2756,10 @@ int run(const std::filesystem::path& project_root,
     TransformEditorState transform_editor;
     float preview_time = 0.0F;
     bool preview_playing = true;
-    float layers_pane_width = 360.0F;
+    float layers_pane_width = 260.0F;
+    float selection_pane_width = 340.0F;
     fabric::render::MapPreviewResult map_preview;
-    MapPreviewRenderState preview_render_state{
+    MapPreviewRenderer preview_render_state{
         .renderer = &map_renderer,
         .textures = &map_textures,
     };
@@ -2745,32 +2871,38 @@ int run(const std::filesystem::path& project_root,
             ImGui::EndMenuBar();
         }
         if (!session.has_map()) {
+            const float start_width = std::min(640.0F, ImGui::GetContentRegionAvail().x);
+            ImGui::SetCursorPosX(std::max(
+                ImGui::GetCursorPosX(),
+                (ImGui::GetWindowContentRegionMax().x - start_width) * 0.5F));
+            ImGui::BeginChild("map-start-workspace", {start_width, 0.0F}, false);
             ImGui::TextUnformatted("Map Studio");
-            ImGui::TextDisabled("Select a map or create one without restarting the studio.");
+            ImGui::TextDisabled("Open a map or create one from a visible name.");
             const auto manifest = fabric::project::load_manifest(project_root);
             if (manifest.ok()) {
+                ImGui::SeparatorText("Open an existing map");
                 const auto maps_directory = project_root / manifest.manifest->directories.maps;
                 draw_resource_picker("Open map:", maps_directory, ".map.json",
                                      open_map_id, &resource_catalog);
-                ImGui::SameLine();
                 ImGui::BeginDisabled(open_map_id.empty());
-                if (ImGui::Button("Open selected")) {
+                if (ImGui::Button("Open selected", {-1.0F, 0.0F})) {
                     status = session.open(project_root, {.value = open_map_id})
                         ? "Map opened" : "Map could not be opened";
                 }
                 ImGui::EndDisabled();
                 draw_disabled_reason(open_map_id.empty(),
                                      "Choose an existing map first.");
-                ImGui::InputText("New map id", &new_map_id);
-                focus_first_field_error(session.errors(), "id", "map-create");
-                draw_field_errors(session.errors(), "id",
-                                  "Use a unique non-empty resource id.");
-                draw_resource_name_field("New map name", new_map_name, 180.0F);
+                ImGui::SeparatorText("Create a new map");
+                ImGui::SetNextItemWidth(-1.0F);
+                ImGui::InputText("Visible name", &new_map_name);
                 focus_first_field_error(session.errors(), "name", "map-create");
                 draw_field_errors(session.errors(), "name",
                                   "Enter a visible non-empty map name.");
-                ImGui::BeginDisabled(new_map_id.empty() || new_map_name.empty());
-                if (ImGui::Button("Create map")) {
+                new_map_id = fabric::editor::generated_resource_id(
+                    new_map_name, "map").value;
+                ImGui::TextDisabled("File id: %s", new_map_id.c_str());
+                ImGui::BeginDisabled(new_map_name.empty());
+                if (ImGui::Button("Create and open map", {-1.0F, 0.0F})) {
                     const fabric::project::MapDocument map{
                         .document = {.schema_version = 1, .type = "map",
                                      .id = {.value = new_map_id}, .name = new_map_name}};
@@ -2780,10 +2912,11 @@ int run(const std::filesystem::path& project_root,
                         static_cast<void>(resource_catalog.refresh_resources());
                 }
                 ImGui::EndDisabled();
-                draw_disabled_reason(new_map_id.empty() || new_map_name.empty(),
-                                     "Enter both a map id and a map name.");
+                draw_disabled_reason(new_map_name.empty(),
+                                     "Enter a visible map name first.");
             }
             draw_errors(session);
+            ImGui::EndChild();
         } else {
             if (session.has_recovery()) {
                 ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
@@ -2811,11 +2944,21 @@ int run(const std::filesystem::path& project_root,
                                session.dirty() ? "dirty" : "saved");
             if (ImGui::Button("Save")) status = session.save() ? "Map saved" : "Save failed";
             ImGui::SameLine();
+            const bool renderer_blocked = !map_renderer.ready() ||
+                !preview_render_state.errors.empty();
+            const std::string renderer_block_reason = !map_renderer.ready()
+                ? "Preview renderer unavailable: " + map_renderer.initialization_error()
+                : (!preview_render_state.errors.empty()
+                    ? "Resolve render diagnostics before preview or publication."
+                    : std::string{});
+            ImGui::BeginDisabled(renderer_blocked);
             if (ImGui::Button("Preview")) {
                 preview_time = 0.0F;
                 preview_playing = true;
                 status = "Map preview restarted";
             }
+            ImGui::EndDisabled();
+            draw_disabled_reason(renderer_blocked, renderer_block_reason);
             ImGui::SameLine();
             if (ImGui::Button("Validate")) {
                 if (prepare_package()) {
@@ -2827,6 +2970,7 @@ int run(const std::filesystem::path& project_root,
                 }
             }
             ImGui::SameLine();
+            ImGui::BeginDisabled(renderer_blocked);
             if (ImGui::Button("Publish")) {
                 if (prepare_package()) {
                     const auto parent = choose_folder(window, status);
@@ -2842,6 +2986,8 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
             }
+            ImGui::EndDisabled();
+            draw_disabled_reason(renderer_blocked, renderer_block_reason);
             ImGui::SameLine();
             ImGui::BeginDisabled(!session.can_undo());
             if (ImGui::Button("Undo")) static_cast<void>(session.undo());
@@ -2858,10 +3004,20 @@ int run(const std::filesystem::path& project_root,
             const auto available_width = ImGui::GetContentRegionAvail().x;
             layers_pane_width = std::clamp(
                 layers_pane_width, 220.0F,
-                std::max(220.0F, available_width - 260.0F));
+                std::max(220.0F,
+                         available_width - selection_pane_width - 336.0F));
+            selection_pane_width = std::clamp(
+                selection_pane_width, 300.0F,
+                std::max(300.0F,
+                         available_width - layers_pane_width - 336.0F));
+            const float canvas_pane_width = std::max(
+                320.0F,
+                available_width - layers_pane_width - selection_pane_width - 16.0F);
             ImGui::BeginChild("map-layers-pane",
                               ImVec2{layers_pane_width, 0.0F}, true,
                               ImGuiWindowFlags_HorizontalScrollbar);
+            ui_map_workspace_seen = true;
+            ui_map_layers_x = ImGui::GetWindowPos().x;
             const bool layers_open = ImGui::CollapsingHeader(
                 ("Layers (" + std::to_string(map.layers.size()) + ")##map-layers-tree").c_str(),
                 ImGuiTreeNodeFlags_DefaultOpen);
@@ -2977,9 +3133,26 @@ int run(const std::filesystem::path& project_root,
             ImGui::EndDisabled();
             draw_disabled_reason(selected_instances.empty() || active_layer_id.empty(),
                                  "Select an instance and an active layer first.");
+            ImGui::EndChild();
+            ImGui::SameLine(0.0F, 2.0F);
+            ImGui::InvisibleButton("##map-layers-splitter", {6.0F, -1.0F});
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                if (ImGui::IsItemActive())
+                    layers_pane_width = std::clamp(
+                        layers_pane_width + ImGui::GetIO().MouseDelta.x,
+                        220.0F,
+                        std::max(220.0F,
+                                 available_width - selection_pane_width - 336.0F));
+            }
+            ImGui::SameLine(0.0F, 2.0F);
+            ImGui::BeginChild("map-canvas-pane", {canvas_pane_width, 0.0F}, true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
+            ui_map_canvas_x = ImGui::GetWindowPos().x;
+            ui_map_canvas_width = ImGui::GetWindowSize().x;
             ImGui::SeparatorText("Placement");
             ImGui::SetNextItemWidth(180.0F);
-            ImGui::InputText("New instance id", &placement_id);
+            ImGui::InputText("Instance id (auto)", &placement_id);
             ImGui::SetNextItemWidth(180.0F);
             ImGui::SetNextItemWidth(180.0F);
             ImGui::Combo("Resource kind", &placement_kind, "entity\0prefab\0");
@@ -2994,6 +3167,16 @@ int run(const std::filesystem::path& project_root,
                 for (const auto& prefab : map.prefabs) prefab_ids.push_back(prefab.id);
                 draw_id_picker("Prefab resources", prefab_ids, placement_resource_id,
                                "Choose a prefab...");
+            }
+            if (!placement_resource_id.empty() && placement_id.empty()) {
+                const auto base = fabric::editor::generated_resource_id(
+                    placement_resource_id + " instance", "instance").value;
+                placement_id = base;
+                for (std::size_t suffix = 2U; std::ranges::any_of(
+                         map.instances, [&](const auto& instance) {
+                             return instance.id == placement_id;
+                         }); ++suffix)
+                    placement_id = base + "-" + std::to_string(suffix);
             }
             ImGui::BeginDisabled(placement_id.empty() || placement_resource_id.empty() ||
                                  active_layer_id.empty());
@@ -3014,7 +3197,8 @@ int run(const std::filesystem::path& project_root,
             preview_render_state.preview = &map_preview;
             preview_render_state.project_root = &session.project_root();
             preview_render_state.manifest = &*session.manifest();
-            draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom, canvas_gizmo,
+            draw_map_canvas(session, selected_instances, canvas_pan, canvas_zoom,
+                            canvas_grid_visible, canvas_gizmo,
                             selected_collision_index, collision_point_gizmo,
                             selected_trigger_index, active_layer_id, selection_box,
                             placement_mode,
@@ -3023,7 +3207,30 @@ int run(const std::filesystem::path& project_root,
                             mechanic_session.simulation(), status);
             for (const auto& error : map_preview.errors)
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
+            for (const auto& error : preview_render_state.errors)
+                ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s", error.c_str());
             draw_transform_editor(session, selected_instances, transform_editor, status);
+            ImGui::EndChild();
+            ImGui::SameLine(0.0F, 2.0F);
+            ImGui::InvisibleButton("##map-inspector-splitter", {6.0F, -1.0F});
+            if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
+                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+                if (ImGui::IsItemActive())
+                    selection_pane_width = std::clamp(
+                        selection_pane_width - ImGui::GetIO().MouseDelta.x,
+                        300.0F,
+                        std::max(300.0F,
+                                 available_width - layers_pane_width - 336.0F));
+            }
+            ImGui::SameLine(0.0F, 2.0F);
+            ImGui::BeginChild("map-selection-pane", {0.0F, 0.0F}, true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
+            ui_map_inspector_x = ImGui::GetWindowPos().x;
+            ImGui::SeparatorText("Inspector");
+            const auto collisions_label = "Collisions (" +
+                std::to_string(map.collisions.size()) + ")";
+            if (ImGui::CollapsingHeader(
+                    collisions_label.c_str(), ImGuiTreeNodeFlags_DefaultOpen)) {
             ImGui::Text("Collisions: %zu", map.collisions.size());
             ImGui::SetNextItemWidth(150.0F);
             ImGui::Combo("New collision kind", &new_collision_kind,
@@ -3216,23 +3423,10 @@ int run(const std::filesystem::path& project_root,
                 }
                 ImGui::EndPopup();
             }
-            ImGui::Text("Triggers: %zu", map.triggers.size());
-            ImGui::Text("Events: %zu", map.events.size());
-            ImGui::EndChild();
-            ImGui::SameLine(0.0F, 2.0F);
-            ImGui::Button("##map-pane-splitter", ImVec2{6.0F, -1.0F});
-            if (ImGui::IsItemHovered() || ImGui::IsItemActive()) {
-                ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
-                if (ImGui::IsItemActive())
-                    layers_pane_width = ImGui::GetMousePos().x -
-                        ImGui::GetWindowPos().x - 8.0F;
             }
-            ImGui::SameLine(0.0F, 2.0F);
-            ImGui::BeginChild("map-selection-pane", ImVec2{0.0F, 0.0F}, true,
-                              ImGuiWindowFlags_HorizontalScrollbar);
             const bool events_open = ImGui::CollapsingHeader(
-                "Events##map-events-tree",
-                ImGuiTreeNodeFlags_DefaultOpen);
+                ("Events (" + std::to_string(map.events.size()) +
+                 ")##map-events-tree").c_str());
             if (events_open) {
             ImGui::SetNextItemWidth(250.0F);
             ImGui::InputText("New event id", &event_id);
@@ -3375,7 +3569,9 @@ int run(const std::filesystem::path& project_root,
                 ImGui::EndPopup();
             }
             }
-            ImGui::SeparatorText("Triggers");
+            const auto triggers_label = "Triggers (" +
+                std::to_string(map.triggers.size()) + ")";
+            if (ImGui::CollapsingHeader(triggers_label.c_str())) {
             for (std::size_t trigger_index = 0; trigger_index < map.triggers.size();
                  ++trigger_index) {
                 const auto& trigger = map.triggers[trigger_index];
@@ -3649,7 +3845,10 @@ int run(const std::filesystem::path& project_root,
                     const bool loaded = preview_runtime.load({
                         .project_root = session.project_root(),
                         .map_id = map.document.id,
-                        .mode = fabric::runtime::RuntimeMode::smoke_test});
+                        .mode = fabric::runtime::RuntimeMode::smoke_test,
+                        .trace = {.session_id = trace_session_id,
+                                  .resource_id = map.document.id.value},
+                        .log_output = &std::clog});
                     const bool transformed = loaded &&
                         preview_runtime.transform_instance(
                             selected_id.value,
@@ -3724,7 +3923,10 @@ int run(const std::filesystem::path& project_root,
                 draw_disabled_reason(instance_property_id.empty() || instance_property_value.empty(),
                                      "Enter an instance property id and value before applying it.");
             }
-            ImGui::SeparatorText("Prefabs");
+            }
+            const auto prefabs_label = "Prefabs (" +
+                std::to_string(map.prefabs.size()) + ")";
+            if (ImGui::CollapsingHeader(prefabs_label.c_str())) {
             ImGui::SetNextItemWidth(160.0F);
             ImGui::InputText("New prefab id", &new_prefab_id);
             if (session.manifest()) {
@@ -3914,6 +4116,7 @@ int run(const std::filesystem::path& project_root,
                 draw_disabled_reason(override_id.empty() || override_value.empty(),
                                      "Enter an override property id and value before applying it.");
             }
+            }
             ImGui::EndChild();
             if (!status.empty()) ImGui::TextDisabled("%s", status.c_str());
             draw_package_errors(package_errors);
@@ -4058,8 +4261,14 @@ int run(const std::filesystem::path& project_root,
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
         if (scene_e2e || transformation_e2e) running = false;
+        if (ui_accessibility_test) {
+            write_ui_accessibility_probe(
+                project_root, window,
+                (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_NavEnableKeyboard) != 0);
+            running = false;
+        }
+        SDL_GL_SwapWindow(window);
     }
 
     const bool e2e_incomplete = e2e_failed ||
@@ -4090,25 +4299,31 @@ int main(int argc, char** argv) {
         std::string_view{argv[1]} == "--e2e-scene";
     const bool transformation_e2e = argc == 4 &&
         std::string_view{argv[1]} == "--e2e-transformation";
+    const bool ui_accessibility_test = argc == 3 &&
+        std::string_view{argv[1]} == "--ui-accessibility-test";
     const auto e2e_mode = e2e ? close_e2e_mode(argv[2]) : std::nullopt;
     if ((argc != 1 && argc != 3 && !e2e && !scene_e2e &&
-         !transformation_e2e) ||
+         !transformation_e2e && !ui_accessibility_test) ||
         (e2e && !e2e_mode)) {
         std::cerr << "usage: map_studio [project-directory map-id]\n"
                      "       map_studio --e2e-close "
                      "<clean|window|shortcut|save|save-failure> project-directory map-id\n"
                      "       map_studio --e2e-scene project-directory map-id\n"
                      "       map_studio --e2e-transformation "
-                     "project-directory map-id\n";
+                     "project-directory map-id\n"
+                     "       map_studio --ui-accessibility-test project-directory\n";
         return 64;
     }
     const std::filesystem::path project = e2e ? argv[3]
         : scene_e2e ? argv[2]
         : transformation_e2e ? argv[2]
+        : ui_accessibility_test ? argv[2]
         : argc == 3 ? argv[1] : std::filesystem::path{};
     const fabric::core::ResourceId map_id{
         e2e ? argv[4]
         : scene_e2e || transformation_e2e ? argv[3]
+        : ui_accessibility_test ? "textile-head-preview"
         : argc == 3 ? argv[2] : ""};
-    return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e);
+    return run(project, map_id, e2e_mode, scene_e2e, transformation_e2e,
+               ui_accessibility_test);
 }

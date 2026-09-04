@@ -32,6 +32,21 @@ endif()
 if(NOT EXISTS "${TEST_ROOT}/project/asset_studio-ui-test.ppm")
     message(FATAL_ERROR "Asset Studio UI test did not produce its screenshot")
 endif()
+file(READ "${REGISTRY}" REGISTRY_RESULT)
+foreach(REQUIRED_WORKSPACE_RESULT
+        "\"rendered\": true"
+        "\"project_viewer_inspector_order\": true"
+        "\"viewer_minimum_width_ok\": true"
+        "\"fit_control\": true"
+        "\"grid_control\": true"
+        "\"background_control\": true")
+    string(FIND "${REGISTRY_RESULT}" "${REQUIRED_WORKSPACE_RESULT}"
+           WORKSPACE_RESULT_POSITION)
+    if(WORKSPACE_RESULT_POSITION LESS 0)
+        message(FATAL_ERROR
+            "Asset Studio workspace probe is missing ${REQUIRED_WORKSPACE_RESULT}")
+    endif()
+endforeach()
 if(DEFINED FOCUS_ARTIFACT)
     if(NOT EXISTS "${TEST_ROOT}/project/${FOCUS_ARTIFACT}")
         message(FATAL_ERROR "Asset Studio UI test did not produce ${FOCUS_ARTIFACT}")
@@ -117,12 +132,51 @@ if(DEFINED INPUT_ARTIFACT)
         endif()
     endforeach()
 endif()
+if(DEFINED BEAM_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${BEAM_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${BEAM_ARTIFACT}")
+    endif()
+    if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-beam-create.ppm")
+        message(FATAL_ERROR "Asset Studio Beam test did not capture its creation form")
+    endif()
+    file(READ "${TEST_ROOT}/project/${BEAM_ARTIFACT}" BEAM_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"create_button_seen\": true"
+            "\"created_by_click\": true"
+            "\"reloaded_with_default_texture\": true")
+        string(FIND "${BEAM_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio Beam probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
+if(DEFINED BUTTON_ARTIFACT)
+    if(NOT EXISTS "${TEST_ROOT}/project/${BUTTON_ARTIFACT}")
+        message(FATAL_ERROR "Asset Studio UI test did not produce ${BUTTON_ARTIFACT}")
+    endif()
+    if(NOT EXISTS "${TEST_ROOT}/project/asset-studio-button-create.ppm")
+        message(FATAL_ERROR "Asset Studio Button test did not capture its creation form")
+    endif()
+    file(READ "${TEST_ROOT}/project/${BUTTON_ARTIFACT}" BUTTON_RESULT)
+    foreach(REQUIRED_RESULT
+            "\"create_button_seen\": true"
+            "\"created_by_click\": true"
+            "\"reloaded_with_original_texture_and_shader\": true")
+        string(FIND "${BUTTON_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
+        if(RESULT_POSITION LESS 0)
+            message(FATAL_ERROR "Asset Studio Button probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+endif()
 file(READ "${REGISTRY}" FIRST_REGISTRY)
-foreach(REQUIRED_ID
+if(NOT DEFINED REGISTRY_REQUIRED_IDS)
+    set(REGISTRY_REQUIRED_IDS
         "resource-row-head-face"
-        "resource-row-head-button-artwork"
+        "resource-row-beam-border"
         "resource-row-textile-head-entity"
         "entity-node-root")
+endif()
+foreach(REQUIRED_ID IN LISTS REGISTRY_REQUIRED_IDS)
     string(FIND "${FIRST_REGISTRY}" "${REQUIRED_ID}" ID_POSITION)
     if(ID_POSITION LESS 0)
         message(FATAL_ERROR "UI registry is missing stable ID ${REQUIRED_ID}")
@@ -130,7 +184,8 @@ foreach(REQUIRED_ID
 endforeach()
 
 if(NOT DEFINED DRAG_ARTIFACT AND NOT DEFINED OVERRIDE_ARTIFACT AND
-   NOT DEFINED TEXTURE_ARTIFACT AND NOT DEFINED INPUT_ARTIFACT)
+   NOT DEFINED TEXTURE_ARTIFACT AND NOT DEFINED INPUT_ARTIFACT AND
+   NOT DEFINED BEAM_ARTIFACT AND NOT DEFINED BUTTON_ARTIFACT)
 execute_process(
     COMMAND "${ASSET_STUDIO}" "${UI_ARGUMENT}" "${TEST_ROOT}/project"
     RESULT_VARIABLE SECOND_RESULT

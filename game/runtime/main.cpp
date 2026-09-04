@@ -64,6 +64,9 @@ std::optional<fabric::runtime::InputDevice> parse_input_device(
 
 int main(int argc, char** argv) {
     fabric::runtime::PreviewRuntimeOptions options;
+    options.trace.session_id =
+        fabric::core::make_trace_session_id("published-runtime");
+    options.log_output = &std::clog;
     std::optional<fabric::core::ResourceId> scene_id;
     std::optional<std::string> save_slot;
     std::optional<std::filesystem::path> save_path;
@@ -229,6 +232,8 @@ int main(int argc, char** argv) {
         options.scene_id = !scene_campaign && scene_id
             ? std::optional<fabric::core::ResourceId>{scene_session.scene()->document.id}
             : std::nullopt;
+        options.trace.resource_id = scene_id
+            ? scene_id->value : options.map_id.value;
         options.character_spawn = scene_id && scene_session.entry_point()
             ? std::optional<fabric::core::Vec2>{
                   scene_session.entry_point()->position}

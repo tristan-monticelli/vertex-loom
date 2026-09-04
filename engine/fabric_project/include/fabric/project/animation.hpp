@@ -12,7 +12,7 @@
 
 namespace fabric::project {
 
-inline constexpr std::uint32_t current_animation_schema_version = 3;
+inline constexpr std::uint32_t current_animation_schema_version = 4;
 
 using AnimationValue = std::variant<float, core::Vec2, core::Color, bool,
                                      ResourceReference>;
@@ -50,9 +50,17 @@ struct AnimationTrack {
     friend bool operator==(const AnimationTrack&, const AnimationTrack&) = default;
 };
 
+struct AnimationAudioCue {
+    ResourceReference audio;
+    std::string event_id;
+    friend bool operator==(const AnimationAudioCue&,
+                           const AnimationAudioCue&) = default;
+};
+
 struct AnimationMarker {
     std::string id;
     float time{};
+    std::optional<AnimationAudioCue> audio;
     friend bool operator==(const AnimationMarker&, const AnimationMarker&) = default;
 };
 
@@ -61,6 +69,7 @@ struct AnimationMarkerHit {
     float time{};
     float local_time{};
     std::int64_t loop_index{};
+    std::optional<AnimationAudioCue> audio;
     friend bool operator==(const AnimationMarkerHit&, const AnimationMarkerHit&) = default;
 };
 

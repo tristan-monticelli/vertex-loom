@@ -10,11 +10,12 @@ et historique, `Retry` recommence l'écriture, `Discard` exige une confirmation.
 | Créer | document actif clean/dirty | nouvelle ressource sélectionnée | validation/écriture ; Retry, Discard, Cancel | ancien document sauvegardé atomiquement |
 | Dupliquer | ressource + dépendances choisies | nouvel ID et chemin, références choisies réécrites | collision, cycle, écriture ; annulation sans publication | copie rechargeable et originale intacte |
 | Supprimer | ressource + analyse entrante | suppression ou remplacement explicite | références bloquantes ; Cancel par défaut | aucune référence cassée, source partagée conservée |
-| Entité multi-artworks | entité + ressources visuelles | arbre de nœuds combinant texture/vector/component | incompatibilité signalée avant mutation | Add/Replace/Clear restent éditables après création |
-| Animation ciblée | entité explicite ou choix générique | clip prévisualisé sur la cible choisie | cible/binding absent, réparation proposée | aucune dépendance à l'ancienne sélection |
+| Entité multi-artworks | un ou plusieurs visuels sélectionnés, ou Entity vide explicite | workspace Entity ouvert ; nœuds précréés, arbre/canvas/inspecteur synchronisés | incompatibilité signalée avant mutation ; retour à la sélection intacte | aucun ID ressaisi ; premier rendu avant les réglages avancés ; drop parent/position explicites |
+| Animation ciblée | `Animer…` depuis l'Entity et le nœud courants, ou clip générique explicite | workspace Animation ouvert sur cible, playhead et timeline | cible/binding absent, réparation proposée sans quitter le clip | une propriété crée piste + clé en une action ; scrub et auto-key mettent à jour le même canvas |
 | Joueur et monstre | BehaviorGraph + signal action/IA | mêmes actions runtime et même trace | port/type/source invalide | aucun code dédié au rôle de l'instance |
 | Transformation | instance source + politique A→B | instance B valide dans la même frame | destination absente, mapping invalide, cycle interdit | état transféré exactement selon la politique |
 | Vectoriel natif | arbre + outils de points/fill/stroke | draw packet identique dans les trois surfaces | géométrie/fill invalide annulable | édition complète sans JSON ou SVG externe |
+| Beam ou Button | PNG choisi + `Source intacte` par défaut | source inchangée dans Studio, Preview et runtime | recoloration uniquement après choix explicite | reset neutre, intensités nulles, ancien JSON inchangé |
 
 Vocabulaire normatif : `Input bindings` désigne uniquement les périphériques ;
 `Behavior` désigne la logique d'une entité humaine ou non ; `Transformation`

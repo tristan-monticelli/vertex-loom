@@ -333,6 +333,129 @@ TEST_CASE("resource duplication rewrites only selected dependencies") {
         project.path() / "assets/vectors/source-art-copy.vector.json"));
 }
 
+TEST_CASE("composed entity prompt publishes explicit visual blocks") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Composed artwork";
+    REQUIRE(session.create_vector_artwork(artwork));
+
+    fabric::editor::CreateEntityPrompt entity;
+    entity.name = "Composed entity";
+    entity.node_name = "Root";
+    entity.blocks = {
+        {.name = "Body", .drawable = fabric::project::EntityDrawableKind::vector,
+         .resource_id = "composed-artwork", .z_order = 0.0F},
+        {.name = "Overlay", .drawable = fabric::project::EntityDrawableKind::vector,
+         .resource_id = "composed-artwork", .z_order = 1.0F}};
+    REQUIRE(session.create_entity(entity));
+    REQUIRE(session.selected_entity());
+    REQUIRE(session.selected_entity()->nodes.size() == 3U);
+    CHECK(session.selected_entity()->nodes[1].parent == "root");
+    CHECK(session.selected_entity()->nodes[1].drawable.resource->id.value ==
+          "composed-artwork");
+    CHECK(session.selected_entity()->nodes[2].name == "Overlay");
+
+    fabric::editor::ProjectSession reloaded;
+    REQUIRE(reloaded.open(project.path()));
+    REQUIRE(reloaded.select_resource(
+        fabric::editor::StudioResourceKind::entity,
+        {.value = "composed-entity"}));
+    REQUIRE(reloaded.selected_entity());
+    CHECK(reloaded.selected_entity()->nodes.size() == 3U);
+    CHECK(reloaded.selected_entity()->nodes[2].z_order == 1.0F);
+}
+
+TEST_CASE("guided Button entity preserves its PNG and reloads shader appearance") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+
+    const auto source = project.path() / "original-button.png";
+    std::ofstream{source, std::ios::binary} << "original-png-source";
+    REQUIRE(fabric::project::publish_texture_asset(
+        project.path(), *session.manifest(),
+        {.document = {.schema_version = 1,
+                      .type = "texture",
+                      .id = {.value = "original-button"},
+                      .name = "Original Button"},
+         .source = "assets/textures/original-button.png",
+         .width = 16U,
+         .height = 16U},
+        source).ok());
+    REQUIRE(session.refresh_resources());
+
+    fabric::editor::CreateEntityPrompt button;
+    button.name = "Play Button";
+    button.node_name = "Button";
+    button.drawable = fabric::project::EntityDrawableKind::texture;
+    button.resource_id = "original-button";
+    button.appearance_shader = fabric::project::ShaderSurfaceSettings{
+        .profile = fabric::project::SurfaceShaderProfile::custom,
+        .classification = fabric::project::TextureClassification::button_eye,
+        .primary_color = {0.2F, 0.7F, 1.0F, 1.0F},
+        .effect_color = {1.0F, 0.2F, 0.8F, 1.0F},
+        .shine = 0.4F,
+        .holography = 0.3F,
+        .effects = {
+            {.kind = fabric::project::SurfaceEffectKind::tint,
+             .color = {0.2F, 0.7F, 1.0F, 1.0F}},
+            {.kind = fabric::project::SurfaceEffectKind::holography,
+             .color = {1.0F, 0.2F, 0.8F, 1.0F}, .amount = 0.3F},
+            {.kind = fabric::project::SurfaceEffectKind::shine,
+             .amount = 0.4F}},
+    };
+    REQUIRE(session.create_entity(button));
+    REQUIRE(session.selected_entity());
+    const auto& drawable = session.selected_entity()->nodes.front().drawable;
+    REQUIRE(drawable.resource);
+    CHECK(drawable.resource->id.value == "original-button");
+    REQUIRE(drawable.material);
+    CHECK(drawable.material->id.value == "play-button-appearance");
+
+    const auto loaded = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(loaded.ok());
+    REQUIRE(loaded.asset->shader);
+    CHECK(*loaded.asset->shader == *button.appearance_shader);
+    auto edited = *loaded.asset;
+    edited.shader->effects.push_back({
+        .kind = fabric::project::SurfaceEffectKind::shine,
+        .color = {0.2F, 1.0F, 0.4F, 1.0F}, .amount = 0.2F});
+    REQUIRE(session.set_referenced_material(drawable.material->id, edited));
+    const auto edited_reload = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(edited_reload.ok());
+    REQUIRE(edited_reload.asset->shader);
+    CHECK(edited_reload.asset->shader->effects.size() == 4U);
+    REQUIRE(session.undo());
+    const auto undone = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(undone.ok());
+    REQUIRE(undone.asset->shader);
+    CHECK(undone.asset->shader->effects.size() == 3U);
+    REQUIRE(session.redo());
+    const auto redone = fabric::project::load_material(
+        project.path(), *session.manifest(),
+        fabric::project::material_document_path(
+            *session.manifest(), drawable.material->id));
+    REQUIRE(redone.ok());
+    REQUIRE(redone.asset->shader);
+    CHECK(redone.asset->shader->effects.size() == 4U);
+    CHECK(std::filesystem::is_regular_file(
+        project.path() / "assets/textures/original-button.png"));
+}
+
 TEST_CASE("selection preserves an invalid dirty document") {
     const TemporaryDirectory project;
     write_project(project.path());
@@ -432,6 +555,61 @@ TEST_CASE("runtime settings are editable and survive save and reload") {
     REQUIRE(reloaded.open(project.path()));
     REQUIRE(reloaded.manifest()->runtime.has_value());
     CHECK(*reloaded.manifest()->runtime == settings);
+}
+
+TEST_CASE("audio buses and spatial events survive Studio editing") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    const auto manifest = load_manifest_or_fail(project.path());
+    REQUIRE(fabric::project::publish_audio(
+        project.path(), manifest,
+        {.document = {.schema_version = 1,
+                      .type = "audio",
+                      .id = {.value = "studio-audio"},
+                      .name = "Studio Audio"},
+         .events = {{.id = "impact",
+                     .source = "assets/audio/impact.wav"}}}).ok());
+
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    REQUIRE(session.select_resource(
+        fabric::editor::StudioResourceKind::audio,
+        fabric::core::ResourceId{.value = "studio-audio"}));
+
+    const fabric::project::AudioDocument edited{
+        .document = {.schema_version = fabric::project::current_audio_schema_version,
+                     .type = "audio",
+                     .id = {.value = "studio-audio"},
+                     .name = "Studio Audio"},
+        .buses = {{.id = "effects", .volume = 0.6F}},
+        .events = {{.id = "impact",
+                    .source = "assets/audio/impact.wav",
+                    .volume = 0.75F,
+                    .loop = true,
+                    .bus = "effects",
+                    .spatial = fabric::project::AudioSpatialSettings{
+                        .position = {6.0F, -2.0F},
+                        .minimum_distance = 2.0F,
+                        .maximum_distance = 14.0F}}},
+    };
+    REQUIRE(session.set_selected_audio_document(edited));
+
+    const auto reloaded = fabric::project::load_audio(
+        project.path(), *session.manifest(),
+        fabric::project::audio_document_path(
+            *session.manifest(), {.value = "studio-audio"}));
+    REQUIRE(reloaded.ok());
+    CHECK(*reloaded.audio == edited);
+
+    auto invalid = edited;
+    invalid.events.front().bus = "missing";
+    CHECK_FALSE(session.set_selected_audio_document(std::move(invalid)));
+    const auto unchanged = fabric::project::load_audio(
+        project.path(), *session.manifest(),
+        fabric::project::audio_document_path(
+            *session.manifest(), {.value = "studio-audio"}));
+    REQUIRE(unchanged.ok());
+    CHECK(*unchanged.audio == edited);
 }
 
 TEST_CASE("resource index administers every directly creatable resource") {
@@ -974,14 +1152,14 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     fabric::editor::ProjectSession session;
     REQUIRE(session.open(project.path()));
     REQUIRE(session.create_visual_preset({
-        .kind = fabric::editor::VisualPresetKind::eye,
-        .id = {.value = "editable-eye"},
-        .name = "Editable eye",
+        .kind = fabric::editor::VisualPresetKind::seam,
+        .id = {.value = "editable-path"},
+        .name = "Editable path",
         .thread_texture = fabric::project::ResourceReference{
             {.value = "cotton-thread"}, "texture"}}));
     REQUIRE(session.select_resource(
         fabric::editor::StudioResourceKind::visual_composition,
-        {.value = "editable-eye-composition"}));
+        {.value = "editable-path-composition"}));
 
     const fabric::editor::AutosaveScheduler::Clock::time_point start{};
     auto composition = *session.selected_visual_composition();
@@ -990,15 +1168,15 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     composition.layers.front().z_order = 3.0F;
     composition.layers.front().visible = false;
     auto duplicate = composition.layers.front();
-    duplicate.id = "eye-copy";
-    duplicate.name = "Eye copy";
+    duplicate.id = "path-copy";
+    duplicate.name = "Path copy";
     duplicate.visible = true;
     composition.layers.push_back(duplicate);
     REQUIRE(session.set_selected_visual_composition(composition, start));
     REQUIRE(session.undo(start));
-    CHECK(session.selected_visual_composition()->layers.size() == 1U);
-    REQUIRE(session.redo(start));
     CHECK(session.selected_visual_composition()->layers.size() == 2U);
+    REQUIRE(session.redo(start));
+    CHECK(session.selected_visual_composition()->layers.size() == 3U);
     CHECK(session.update_autosave(start + std::chrono::seconds{2}) ==
           fabric::editor::AutosaveStatus::saved);
 
@@ -1006,23 +1184,22 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(recovered_composition.open(project.path()));
     REQUIRE(recovered_composition.select_resource(
         fabric::editor::StudioResourceKind::visual_composition,
-        {.value = "editable-eye-composition"}));
+        {.value = "editable-path-composition"}));
     REQUIRE(recovered_composition.has_recovery());
     REQUIRE(recovered_composition.accept_recovery(
         start + std::chrono::seconds{3}));
     CHECK(recovered_composition.selected_visual_composition()->layers.size() ==
-          2U);
+          3U);
     REQUIRE(recovered_composition.save());
 
     REQUIRE(session.undo(start + std::chrono::seconds{3}));
     REQUIRE(session.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     auto component = *session.selected_visual_component();
     component.anchors.front().position = {0.5F, -0.25F};
-    component.parameters.front().name = "Eye scale";
-    component.parameters.front().default_value =
-        fabric::core::Vec2{1.25F, 0.8F};
+    component.parameters.front().name = "Path width";
+    component.parameters.front().default_value = 1.25F;
     REQUIRE(session.set_selected_visual_component(
         component, start + std::chrono::seconds{4}));
     REQUIRE(session.undo(start + std::chrono::seconds{4}));
@@ -1036,7 +1213,7 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(recovered_component.open(project.path()));
     REQUIRE(recovered_component.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     REQUIRE(recovered_component.has_recovery());
     REQUIRE(recovered_component.accept_recovery(
         start + std::chrono::seconds{7}));
@@ -1049,9 +1226,9 @@ TEST_CASE("visual composition and component edits undo autosave and recover") {
     REQUIRE(reloaded.open(project.path()));
     REQUIRE(reloaded.select_resource(
         fabric::editor::StudioResourceKind::visual_component,
-        {.value = "editable-eye"}));
+        {.value = "editable-path"}));
     CHECK(reloaded.selected_visual_component()->parameters.front().name ==
-          "Eye scale");
+          "Path width");
 }
 
 TEST_CASE("textured path edits undo autosave recover and reload") {
@@ -1271,6 +1448,22 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
         .id = "child", .name = "Child", .parent = "root"};
     REQUIRE(session.add_selected_entity_node(child, start));
     REQUIRE(session.selected_entity()->nodes.size() == 2U);
+    auto moved_root = session.selected_entity()->nodes[0];
+    auto moved_child = session.selected_entity()->nodes[1];
+    moved_root.transform.position.x += 3.0F;
+    moved_child.transform.position.x += 3.0F;
+    REQUIRE(session.set_selected_entity_nodes(
+        {{0U, moved_root}, {1U, moved_child}}, start));
+    CHECK(session.selected_entity()->nodes[0].transform.position.x == 5.0F);
+    CHECK(session.selected_entity()->nodes[1].transform.position.x == 3.0F);
+    REQUIRE(session.undo(start));
+    CHECK(session.selected_entity()->nodes[0].transform.position.x == 2.0F);
+    CHECK(session.selected_entity()->nodes[1].transform.position.x == 0.0F);
+    REQUIRE(session.redo(start));
+    auto invalid_group = moved_child;
+    invalid_group.parent = "child";
+    CHECK_FALSE(session.set_selected_entity_nodes(
+        {{1U, invalid_group}, {1U, moved_child}}, start));
     CHECK_FALSE(session.remove_selected_entity_node(0, start));
     REQUIRE(session.duplicate_selected_entity_node(0, start));
     REQUIRE(session.selected_entity()->nodes.size() == 3U);
@@ -1302,6 +1495,37 @@ TEST_CASE("entity prompt publishes and indexes a one-node entity") {
             *session.manifest(), session.selected_entity()->document.id));
     REQUIRE(loaded.ok());
     CHECK(*loaded.entity == *session.selected_entity());
+}
+
+TEST_CASE("entity prompt composes several selected visuals in one action") {
+    const TemporaryDirectory project;
+    write_project(project.path());
+    fabric::editor::ProjectSession session;
+    REQUIRE(session.open(project.path()));
+    fabric::editor::CreateVectorArtworkPrompt artwork;
+    artwork.name = "Body visual";
+    REQUIRE(session.create_vector_artwork(artwork));
+    artwork.name = "Shadow visual";
+    REQUIRE(session.create_vector_artwork(artwork));
+
+    fabric::editor::CreateEntityPrompt prompt;
+    prompt.name = "Composed character";
+    prompt.node_name = "Body visual";
+    prompt.drawable = fabric::project::EntityDrawableKind::vector;
+    prompt.resource_id = "body-visual";
+    prompt.blocks = {{.name = "Shadow visual",
+                      .drawable = fabric::project::EntityDrawableKind::vector,
+                      .resource_id = "shadow-visual",
+                      .z_order = 1.0F}};
+    REQUIRE(session.create_entity(prompt));
+
+    REQUIRE(session.selected_entity()->nodes.size() == 2U);
+    CHECK(session.selected_entity()->nodes[0].drawable.resource->id.value ==
+          "body-visual");
+    REQUIRE(session.selected_entity()->nodes[1].parent.has_value());
+    CHECK(*session.selected_entity()->nodes[1].parent == "root");
+    CHECK(session.selected_entity()->nodes[1].drawable.resource->id.value ==
+          "shadow-visual");
 }
 
 TEST_CASE("entity artwork destinations cover existing root and new root or child nodes") {

@@ -26,6 +26,7 @@ failures.push(...configFailures);
 try {
   rejectStarterGuidesWhenInitialized(targets);
   validateRequiredArchitecture();
+  validateUniqueAdrIdentifiers();
   for (const file of targets) {
     const source = readSource(file);
     if (file.endsWith('.md')) validateLinks(file, source);
@@ -35,6 +36,19 @@ try {
   }
 } finally {
   rmSync(temporary, { recursive: true, force: true });
+}
+
+function validateUniqueAdrIdentifiers() {
+  const candidates = (indexMode ? indexFiles() : repositoryDocs())
+    .filter(file => /^docs\/decisions\/ADR-\d{4}-.+\.md$/u.test(file));
+  const byIdentifier = new Map();
+  for (const file of candidates) {
+    const identifier = file.match(/^docs\/decisions\/(ADR-\d{4})-/u)?.[1];
+    if (!identifier) continue;
+    const previous = byIdentifier.get(identifier);
+    if (previous) failures.push(`${identifier}: duplicate decision identifiers in ${previous} and ${file}`);
+    else byIdentifier.set(identifier, file);
+  }
 }
 
 function validateRequiredArchitecture() {

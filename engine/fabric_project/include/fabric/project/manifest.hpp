@@ -81,6 +81,7 @@ struct ProjectManifest {
     std::string name;
     double pixels_per_unit{default_pixels_per_unit};
     ProjectDirectories directories;
+    std::optional<core::ResourceId> default_stroke_texture;
     std::optional<RuntimeSettings> runtime;
 
     friend bool operator==(const ProjectManifest&, const ProjectManifest&) = default;

@@ -20,10 +20,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 22
           cache: npm
@@ -32,8 +32,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev
 
-      - name: Set up and validate starter
-        run: npm run setup
+      - name: Install locked Node dependencies
+        run: npm ci
+
+      - name: Validate product
+        run: npm run validate
 
       - name: Check whitespace
         run: git diff --check
@@ -53,7 +56,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Install Linux OpenGL and virtual display dependencies
         if: runner.os == 'Linux'
@@ -92,7 +95,7 @@ jobs:
         run: .\build\Release\fabric_render_benchmark.exe --packets 10000 --frames 600 --report render-benchmark-windows.json
 
       - name: Archive benchmark reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: runtime-benchmark-${{ runner.os }}
           path: '*-benchmark-*.json'
@@ -109,7 +112,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Install Linux OpenGL and virtual display dependencies
         if: runner.os == 'Linux'
@@ -135,7 +138,7 @@ jobs:
         run: .\build\Release\fabric_runtime_benchmark.exe --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60 --report textile-reference-benchmark-windows.json
 
       - name: Archive textile reference report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: textile-reference-benchmark-${{ runner.os }}
           path: textile-reference-benchmark-*.json
@@ -148,7 +151,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Install Linux desktop development files
         run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libgtk-3-dev libsdl2-dev
@@ -163,7 +166,7 @@ jobs:
         run: ./build/fabric_map_package_export --map textile-head-preview tests/fixtures/studio-textile-head "$RUNNER_TEMP/studio-package"
 
       - name: Upload package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: portable-map-package
           path: ${{ runner.temp }}/studio-package
@@ -181,7 +184,7 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
       - name: Install Linux desktop development files
         if: runner.os == 'Linux'
@@ -194,7 +197,7 @@ jobs:
         run: cmake --build build --config Release --target game_runtime --parallel
 
       - name: Download package produced on Linux
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
         with:
           name: portable-map-package
           path: portable-package

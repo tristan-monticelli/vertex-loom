@@ -7,8 +7,10 @@ C4Component
         Component(shell, "Desktop shell", "SDL2 / OpenGL / Dear ImGui", "Fenêtre, événements, frames et panneaux de l'atelier")
         Component(project_ui, "Creation hub", "Dear ImGui + NFD", "Route Create, Import et Add existing vers des prompts propres à chaque type")
         Component(imports, "Import workflow", "C++20 + SDL2_image / OpenGL", "Valide, prévisualise et publie les sources PNG et SVG")
-        Component(browser, "Resource Explorer", "Dear ImGui", "Indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
-        Component(customizer, "Vector customizer", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
+        Component(browser, "Resource Explorer", "Dear ImGui", "Rail gauche qui indexe, filtre et sélectionne assets, entités, maps, scènes, mécaniques et replays ; analyse les références avant renommage ou déplacement confirmé vers la corbeille récupérable")
+        Component(customizer, "Vector inspector", "Dear ImGui + OpenGL", "Édite une hiérarchie de nœuds vectoriels avec Add/Duplicate/Reorder/Delete, bounds, fill none/couleur/image, texture et transform d'image, contour et propriétés animables")
+        Component(canvas, "Viewer et vector canvas", "C++20 + Dear ImGui + OpenGL", "Zone centrale avec Fit, zoom, grille et fond ; prévisualise les paths natifs, sélectionne les coins, édite les poignées Bézier et applique les outils Pen/Move/Rotate/Scale/Pivot")
+        Component(preview_canvas, "Entity preview canvas", "C++20 + Dear ImGui + OpenGL", "Affiche les draw packets d'entité et permet le déplacement du nœud sélectionné")
         Component(composer, "Visual composer", "Dear ImGui + OpenGL", "Cadre une texture sans altérer sa source et compose overlays, composants paramétriques et chemins texturés")
     }
     Container_Boundary(editor, "fabric_editor") {
@@ -21,6 +23,8 @@ C4Component
         Component(scheduler, "AutosaveScheduler", "C++20", "Déclenche après 2 s d’inactivité ou 30 s au maximum")
         Component(transition, "SessionTransitionGuard", "C++20", "Exige une décision testable avant de remplacer ou fermer une ou plusieurs sessions dirty")
     }
+    Rel(customizer, canvas, "Délègue l’authoring direct du path")
+    Rel(shell, preview_canvas, "Affiche")
     Container(project, "fabric_project", "C++20", "Crée, valide et charge le manifeste partagé")
     System_Ext(dialogs, "Dialogues natifs", "Cocoa, Win32 ou GTK via NFD Extended")
     ContainerDb(files, "Project Files", "JSON + assets", "Dossier projet local")
@@ -101,28 +105,39 @@ C4Component
   sélecteur dédié.
   Les actions matériau, entité et animation utilisent leurs prompts typés et
   publient des documents validés avant réindexation.
-- Le rail droit liste les ressources réellement présentes, conserve une
+- Le rail gauche liste les ressources réellement présentes, conserve une
   sélection explicite et n'affiche pas de faux nœuds de dossier interactifs.
   L'index est reconstruit à l'ouverture et après publication ; sélectionner
   recharge le document validé et son aperçu depuis le projet.
-- Le rail droit du Resource Explorer regroupe dossiers logiques, recherche,
+- Le rail gauche du Resource Explorer regroupe dossiers logiques, recherche,
   filtre de type et actions contextuelles. Une duplication conserve les
   dépendances partagées et génère un identifiant et un chemin uniques. Rename
   ne modifie que le nom visible. Delete analyse d'abord toutes les références
   entrantes, refuse une rupture, exige confirmation puis déplace uniquement le
   document dans `.vertex-loom-trash`; Undo le restaure sans supprimer les
   sources PNG ou SVG partagées.
-- Les rails Project et Inspector d’Asset Studio sont séparés du preview par
+- Les rails Project à gauche et Inspector à droite d’Asset Studio sont séparés du Viewer par
   deux splitters `left-panel-splitter` et `right-panel-splitter`, bornés pour
   préserver une zone centrale minimale et redimensionnables au glisser. Les
   actions du Resource Explorer se réorganisent sur plusieurs lignes lorsque la
-  largeur du rail ne permet plus de les afficher côte à côte.
-- Map Studio conserve ses deux panneaux `map-layers-pane` et
-  `map-selection-pane`, avec splitter borné ; les sous-zones `Layers` et
+  largeur du rail ne permet plus de les afficher côte à côte ; les opérations
+  secondaires de la sélection sont regroupées dans `Actions...` pour éviter
+  toute rangée tronquée à 900 × 600.
+- Le Viewer expose une barre commune `Fit`, zoom, `Grid` et fond `Dark/Light`.
+  Son état est éphémère et partagé par les previews raster, vectorielles,
+  Entity, Animation et composition. La Timeline Animation reste dockée sous le
+  Viewer et ne déplace jamais l'Inspector.
+- Map Studio utilise `map-layers-pane` à gauche, `map-canvas-pane` au centre et
+  `map-selection-pane` à droite, avec deux splitters bornés ; les sous-zones `Layers` et
   `Events` sont repliables et portent des IDs stables pour la navigation clavier
   dans les cartes volumineuses. Ses pickers de dossiers trient les ressources,
   affichent une hiérarchie logique repliable et restaurent le focus sur la
   sélection active.
+- L'accueil de Map Studio sépare ouverture et création. Le nom visible suffit à
+  créer une map ; son identifiant de fichier est généré et prévisualisé.
+- Le canvas Map expose cadrage de la sélection ou de toute la map, zoom et grille
+  dans sa barre principale ; le snapping reste un réglage repliable. Choisir une
+  ressource de placement préremplit un identifiant d'instance unique.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
@@ -150,7 +165,7 @@ C4Component
   la taille en octets et indiquent explicitement lorsqu’une miniature ne
   s’applique pas ; leur action `Open` ouvre le document sélectionné sur disque.
 - Le hub de création sépare maintenant `New material / fill` des imports et
-  artworks. Le prompt produit un `MaterialDefinition v1` validé, publié
+  artworks. Le prompt produit un `MaterialDefinition v2` validé, publié
   atomiquement dans `assets/materials` puis réindexé comme ressource
   sélectionnable.
 - Les prompts Behavior, Transformation, preset visuel, composition, composant,
@@ -263,10 +278,25 @@ C4Component
   puis applique la mutation via `ProjectSession`. Un composant visuel portant
   des overrides est refusé par ce chemin tant que la confirmation de perte n’est
   pas explicitement réutilisée.
+- Le preview vectoriel garde les strokes image visibles même quand la texture
+  n’est pas chargée dans l’atlas ImGui : il dessine le stroke avec une trame
+  déterministe de secours. Le renderer OpenGL reste responsable du rendu texturé
+  final ; le fallback est uniquement destiné à rendre l’édition inspectable.
 - Les modes E2E SDL écrivent, en cas d’échec, un rapport de diagnostics et une
   capture PPM du framebuffer dans le projet de test pour rendre l’échec
   reproductible et inspectable. Le test de registre répète aussi le shell à la
   taille minimale SDL 900×600 et exige une capture de cette frame.
+- Le scénario `asset_studio_vector_canvas_e2e` configure aussi un stroke image
+  `head-thread`, capture les frames Pen et poignées après le rendu OpenGL et
+  ImGui, puis écrit un probe JSON comptant les pixels non issus du fond dans la
+  zone native du canvas. La présence et la variation de pixels sont des
+  assertions du test, pas seulement des artefacts manuels.
+- En mode `Pen`, le canvas distingue désormais le clic sur un coin ou une
+  poignée existante du clic d’insertion sur un segment. Les coins sélectionnés
+  sont cyan, les coins disponibles ambre et le coin survolé reçoit un anneau
+  blanc ; les poignées restent violettes avec leurs lignes de construction
+  visibles et éditables selon le mode choisi. `Delete`/`Backspace` retire les
+  coins sélectionnés sans supprimer le point `move` initial.
   Le scénario de focus ouvre un prompt invalide et vérifie que le premier champ
   en erreur reçoit le focus clavier ainsi qu’une demande de repositionnement du
   scroll.
@@ -414,7 +444,9 @@ C4Component
 - Le canvas natif envoie les draw packets validés au backend OpenGL 3 dans le
   viewport courant. Le resolver charge à la demande les `TextureAsset` locaux,
   les met en cache GPU pendant la session et les fournit au sampler image ; le
-  fallback ImGui reste disponible si une texture ne peut pas être résolue.
+  fallback ImGui reste disponible si une texture ne peut pas être résolue. Le
+  canvas n'écrase pas ensuite les fills ou strokes image par un overlay opaque :
+  les repères d'édition sont superposés au rendu GPU réel.
 - Les formes `line` et `path` sont des géométries natives. Un chemin conserve
   ses commandes `move`, `line`, `cubic` et `close`; son aperçu aplatit les
   Bézier en mémoire sans persister une rasterisation.

@@ -423,15 +423,19 @@ VectorGeometryResult build_raster_view_draw_packets(
     }
     const auto uv_min = core::Vec2{
         crop.origin.x / static_cast<float>(input.source_width),
-        crop.origin.y / static_cast<float>(input.source_height)};
+        1.0F - (crop.origin.y + crop.size.y) /
+            static_cast<float>(input.source_height)};
     const auto uv_max = core::Vec2{
         (crop.origin.x + crop.size.x) / static_cast<float>(input.source_width),
-        (crop.origin.y + crop.size.y) / static_cast<float>(input.source_height)};
+        1.0F - crop.origin.y / static_cast<float>(input.source_height)};
 
     result.packets.push_back({
         .node_id = input.node_id,
         .image_fill = project::VectorImageFill{
             .texture = input.texture,
+            // RasterView already supplies explicit crop UVs; do not apply the
+            // vector shape fit policy a second time in the OpenGL compositor.
+            .fit = project::VectorImageFit::stretch,
             .transform = input.view ? input.view->transform : core::Transform{}},
         .raster_filter = input.view
             ? input.view->filter : project::RasterFilter::linear,
@@ -480,6 +484,7 @@ VectorGeometryResult build_native_draw_packets(
             continue;
         }
         if (packet.stroke) {
+            if (!(packet.stroke->shader == project::ShaderSurfaceSettings{})) packet.shader = packet.stroke->shader;
             build_stroke_geometry(packet.outline, *packet.stroke,
                                   packet.closed_outline,
                                   packet.stroke_vertices,
@@ -497,10 +502,20 @@ VectorGeometryResult build_native_draw_packets(
                 const float width = bounds.size.x;
                 const float height = bounds.size.y;
                 packet.fill_uv.reserve(local_outline.size());
-                for (const auto point : local_outline) {
-                    core::Vec2 uv{
-                        (point.x - bounds.origin.x) / width,
-                        (point.y - bounds.origin.y) / height};
+                for (std::size_t index = 0; index < local_outline.size(); ++index) {
+                    const auto point = local_outline[index];
+                    core::Vec2 uv{};
+                    if (node.fill.image->deform_with_shape) {
+                        uv = {(point.x - bounds.origin.x) / width,
+                              (point.y - bounds.origin.y) / height};
+                    } else {
+                        // A non-deforming fill is anchored in project space and
+                        // is clipped by the silhouette instead of following the
+                        // node's local shape coordinates.
+                        const auto world = packet.outline[index];
+                        uv = {(world.x / std::max(asset.native->size.x, 0.0001F)) + 0.5F,
+                              (world.y / std::max(asset.native->size.y, 0.0001F)) + 0.5F};
+                    }
                     uv = apply_transform(uv, node.fill.image->transform);
                     packet.fill_uv.push_back(uv);
                 }
@@ -511,6 +526,32 @@ VectorGeometryResult build_native_draw_packets(
             }
         }
         result.packets.push_back(std::move(packet));
+    }
+    return result;
+}
+
+core::Vec2 apply_image_fill_fit(const core::Vec2 uv,
+                                const project::VectorImageFit fit,
+                                const float geometry_aspect,
+                                const float texture_aspect) noexcept {
+    if (fit == project::VectorImageFit::stretch ||
+        fit == project::VectorImageFit::free ||
+        !std::isfinite(geometry_aspect) || !std::isfinite(texture_aspect) ||
+        geometry_aspect <= 0.0F || texture_aspect <= 0.0F) {
+        return uv;
+    }
+    const bool cover = fit == project::VectorImageFit::cover;
+    core::Vec2 result = uv;
+    if (geometry_aspect > texture_aspect) {
+        const float factor = cover
+            ? texture_aspect / geometry_aspect
+            : geometry_aspect / texture_aspect;
+        result.y = 0.5F + (uv.y - 0.5F) * factor;
+    } else {
+        const float factor = cover
+            ? geometry_aspect / texture_aspect
+            : texture_aspect / geometry_aspect;
+        result.x = 0.5F + (uv.x - 0.5F) * factor;
     }
     return result;
 }

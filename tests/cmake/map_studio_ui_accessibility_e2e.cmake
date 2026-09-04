@@ -1,0 +1,37 @@
+if(NOT DEFINED MAP_STUDIO OR NOT DEFINED SOURCE_FIXTURE OR NOT DEFINED TEST_ROOT)
+    message(FATAL_ERROR "Map Studio UI accessibility E2E arguments are required")
+endif()
+file(REMOVE_RECURSE "${TEST_ROOT}")
+file(MAKE_DIRECTORY "${TEST_ROOT}")
+file(COPY "${SOURCE_FIXTURE}/" DESTINATION "${TEST_ROOT}/project")
+execute_process(
+    COMMAND "${MAP_STUDIO}" --ui-accessibility-test "${TEST_ROOT}/project"
+    RESULT_VARIABLE STUDIO_RESULT OUTPUT_VARIABLE STUDIO_OUTPUT
+    ERROR_VARIABLE STUDIO_ERROR)
+if(STUDIO_RESULT EQUAL 77)
+    message("SKIP: Map Studio UI accessibility E2E requires a display")
+elseif(NOT STUDIO_RESULT EQUAL 0)
+    message(FATAL_ERROR "Map Studio UI accessibility E2E failed (${STUDIO_RESULT})\n${STUDIO_OUTPUT}\n${STUDIO_ERROR}")
+endif()
+if(STUDIO_RESULT EQUAL 0)
+    set(ARTIFACT "${TEST_ROOT}/project/map-studio-ui-accessibility.json")
+    if(NOT EXISTS "${ARTIFACT}")
+        message(FATAL_ERROR "Map Studio accessibility probe was not produced")
+    endif()
+    file(READ "${ARTIFACT}" RESULT)
+    foreach(REQUIRED_RESULT
+            "\"keyboard_navigation_enabled\": true"
+            "\"text_window_contrast_ok\": true"
+            "\"workspace_rendered\": true"
+            "\"layers_canvas_inspector_order\": true"
+            "\"canvas_minimum_width_ok\": true"
+            "\"visual_valid\": true")
+        string(FIND "${RESULT}" "${REQUIRED_RESULT}" POSITION)
+        if(POSITION LESS 0)
+            message(FATAL_ERROR "Map Studio accessibility probe is missing ${REQUIRED_RESULT}")
+        endif()
+    endforeach()
+    if(NOT EXISTS "${TEST_ROOT}/project/map_studio-ui-accessibility.ppm")
+        message(FATAL_ERROR "Map Studio accessibility screenshot was not produced")
+    endif()
+endif()

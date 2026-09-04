@@ -23,6 +23,9 @@ les temps local/absolu du marker.
 ## Conséquences
 
 - Les références de clips font partie du graphe de ressources de l’entité.
+- Le `previewEntity` facultatif de chacun de ces clips est un contexte Studio
+  souple, pas une dépendance runtime inverse ; une entité peut donc jouer un
+  clip créé depuis elle-même sans former de cycle de packaging.
 - Le format reste déterministe et ne nécessite aucun script.
 - Une entité ne doit pas mélanger une state machine et une intention différente
   portée par la propriété `animation` ; si les deux sont présents, la state

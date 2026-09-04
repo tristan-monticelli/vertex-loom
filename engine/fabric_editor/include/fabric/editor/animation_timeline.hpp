@@ -23,10 +23,10 @@ public:
                                   project::AnimationInterpolation interpolation,
                                   project::AnimationComposition composition =
                                       project::AnimationComposition::replace,
-                                  project::AnimationEasing easing =
-                                      project::AnimationEasing::linear,
-                                  std::optional<project::AnimationValue> in_tangent = {},
-                                  std::optional<project::AnimationValue> out_tangent = {});
+                                project::AnimationEasing easing =
+                                    project::AnimationEasing::linear,
+                                std::optional<project::AnimationValue> in_tangent = {},
+                                std::optional<project::AnimationValue> out_tangent = {});
     [[nodiscard]] bool set_key(const project::PropertyBinding& binding,
                                float time, project::AnimationValue value,
                                project::AnimationInterpolation interpolation,
@@ -35,7 +35,8 @@ public:
                                project::AnimationEasing easing =
                                    project::AnimationEasing::linear,
                                std::optional<project::AnimationValue> in_tangent = {},
-                               std::optional<project::AnimationValue> out_tangent = {});
+                               std::optional<project::AnimationValue> out_tangent = {},
+                               bool mergeable = false);
     [[nodiscard]] bool set_segment(const project::PropertyBinding& binding,
                                    float start_time,
                                    project::AnimationValue start_value,
@@ -48,9 +49,15 @@ public:
                                        project::AnimationEasing::linear);
     [[nodiscard]] bool move_key(const project::PropertyBinding& binding,
                                 std::size_t key_index, float time);
+    [[nodiscard]] bool set_track_curve(
+        const project::PropertyBinding& binding,
+        project::AnimationInterpolation interpolation,
+        project::AnimationEasing easing);
     [[nodiscard]] bool remove_key(const project::PropertyBinding& binding,
                                   std::size_t key_index);
-    [[nodiscard]] bool insert_marker(std::string id, float time);
+    [[nodiscard]] bool insert_marker(
+        std::string id, float time,
+        std::optional<project::AnimationAudioCue> audio = std::nullopt);
     [[nodiscard]] bool remove_marker(std::string_view id);
     [[nodiscard]] bool set_duration(float duration);
     [[nodiscard]] bool set_loop(bool loop);

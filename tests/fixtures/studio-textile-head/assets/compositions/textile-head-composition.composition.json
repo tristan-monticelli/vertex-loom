@@ -73,142 +73,6 @@
       "componentInstance": {
         "overrides": []
       },
-      "id": "left-eye",
-      "kind": "component",
-      "name": "Left eye",
-      "opacity": 1.0,
-      "resource": {
-        "expectedType": "visualComponent",
-        "id": "head-eye"
-      },
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": -1.399999976158142,
-          "y": 0.6000000238418579
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 0.6000000238418579,
-          "y": 0.6000000238418579
-        }
-      },
-      "visible": true,
-      "zOrder": 1.0
-    },
-    {
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "componentInstance": {
-        "overrides": []
-      },
-      "id": "right-eye",
-      "kind": "component",
-      "name": "Right eye",
-      "opacity": 1.0,
-      "resource": {
-        "expectedType": "visualComponent",
-        "id": "head-eye"
-      },
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": 1.399999976158142,
-          "y": 0.6000000238418579
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 0.6000000238418579,
-          "y": 0.6000000238418579
-        }
-      },
-      "visible": true,
-      "zOrder": 2.0
-    },
-    {
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "componentInstance": {
-        "overrides": []
-      },
-      "id": "left-button",
-      "kind": "component",
-      "name": "Left button",
-      "opacity": 1.0,
-      "resource": {
-        "expectedType": "visualComponent",
-        "id": "head-button"
-      },
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": -1.0,
-          "y": -1.0
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 0.3499999940395355,
-          "y": 0.3499999940395355
-        }
-      },
-      "visible": true,
-      "zOrder": 3.0
-    },
-    {
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "componentInstance": {
-        "overrides": []
-      },
-      "id": "right-button",
-      "kind": "component",
-      "name": "Right button",
-      "opacity": 1.0,
-      "resource": {
-        "expectedType": "visualComponent",
-        "id": "head-button"
-      },
-      "transform": {
-        "pivot": {
-          "x": 0.0,
-          "y": 0.0
-        },
-        "position": {
-          "x": 1.0,
-          "y": -1.0
-        },
-        "rotationDegrees": 0.0,
-        "scale": {
-          "x": 0.3499999940395355,
-          "y": 0.3499999940395355
-        }
-      },
-      "visible": true,
-      "zOrder": 4.0
-    },
-    {
-      "anchor": {
-        "x": 0.5,
-        "y": 0.5
-      },
-      "componentInstance": {
-        "overrides": []
-      },
       "id": "mouth-seam",
       "kind": "component",
       "name": "Mouth seam",
@@ -233,7 +97,7 @@
         }
       },
       "visible": true,
-      "zOrder": 5.0
+      "zOrder": 1.0
     },
     {
       "anchor": {
@@ -267,7 +131,7 @@
         }
       },
       "visible": true,
-      "zOrder": 6.0
+      "zOrder": 2.0
     }
   ],
   "name": "Textile Head Composition",

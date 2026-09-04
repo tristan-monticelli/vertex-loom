@@ -459,13 +459,19 @@ TEST_CASE("Studio regenerates the rotating platform fixture byte for byte") {
     const auto rendered = fabric::render::resolve_visual_component(
         fixture, *loaded_manifest.manifest, *component.asset);
     REQUIRE(rendered.ok());
-    REQUIRE(rendered.packets.size() == 1U);
+    REQUIRE(rendered.packets.size() == 2U);
     CHECK(rendered.packets.front().image_fill.has_value());
+    REQUIRE(rendered.packets.back().stroke.has_value());
     const auto map_preview = fabric::render::resolve_map_preview(
         fixture, *loaded_manifest.manifest, *loaded_map.asset);
     REQUIRE(map_preview.ok());
-    REQUIRE(map_preview.packets.size() == 1U);
-    CHECK(map_preview.packets.front().image_fill.has_value());
+    REQUIRE(map_preview.packets.size() == 2U);
+    CHECK(std::ranges::any_of(map_preview.packets, [](const auto& packet) {
+        return packet.image_fill.has_value();
+    }));
+    CHECK(std::ranges::any_of(map_preview.packets, [](const auto& packet) {
+        return packet.stroke.has_value();
+    }));
     auto invalid_map = *loaded_map.asset;
     invalid_map.prefabs.front().mechanic_overrides.push_back(
         {"unknown", 1.0F});

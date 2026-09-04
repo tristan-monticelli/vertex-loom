@@ -2,6 +2,6 @@
 
 namespace fabric::core {
 
-static_assert(version() == "0.1.0");
+static_assert(!version().empty());
 
 } // namespace fabric::core

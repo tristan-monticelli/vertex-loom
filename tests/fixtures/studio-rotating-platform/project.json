@@ -1,4 +1,5 @@
 {
+  "defaultStrokeTexture": "platform-thread",
   "directories": {
     "assets": "assets",
     "entities": "entities",
