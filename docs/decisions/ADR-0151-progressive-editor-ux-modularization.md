@@ -108,6 +108,11 @@ matériau, l'apparence, les variantes, ancres et valeurs typées. Il reçoit les
 adaptateurs de sélection et d'ouverture de ressource sans posséder la preview
 GPU ni l'état du shell.
 
+`EntityWorkflowPanel` possède enfin l'état guidé/avancé et la tête de parcours
+Entity → Animation/Logic. Il invoque les actions enregistrées au lieu de
+dupliquer leurs mutations, et délègue le raccord Behavior à `ProjectSession`.
+Le shell ne conserve que les adaptateurs de probe nécessaires aux E2E.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

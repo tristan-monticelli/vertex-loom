@@ -23,6 +23,7 @@
 #include "entity_hierarchy_workspace.hpp"
 #include "entity_node_properties.hpp"
 #include "entity_rig_inspector.hpp"
+#include "entity_workflow_panel.hpp"
 #include "import_workflow.hpp"
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
@@ -72,6 +73,8 @@ using fabric::asset_studio::BehaviorWorkspaceState;
 using fabric::asset_studio::EntityArtworkInspectorProbe;
 using fabric::asset_studio::EntityArtworkInspectorState;
 using fabric::asset_studio::EntityRigInspectorProbe;
+using fabric::asset_studio::EntityWorkflowProbe;
+using fabric::asset_studio::EntityWorkflowState;
 using fabric::asset_studio::EntityHierarchyProbe;
 using fabric::asset_studio::ResourceDragPayload;
 using fabric::asset_studio::draw_entity_hierarchy_workspace;
@@ -2843,6 +2846,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     AnimationInspectorProbe& animation_inspector_probe,
                     AnimationGraphWorkspaceState& animation_graph_ui,
                     AnimationGraphWorkspaceProbe& animation_graph_probe,
+                    EntityWorkflowState& entity_workflow_state,
                     EntityRigInspectorProbe& entity_rig_probe,
                     TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
@@ -2969,7 +2973,6 @@ void draw_workspace(fabric::editor::ProjectSession& session,
     const float status_height = 34.0F;
     float& left_width = layout.primary_panel_width;
     float& right_width = layout.secondary_panel_width;
-    static bool entity_advanced_mode = false;
     left_width = std::clamp(left_width, 240.0F,
                             std::max(240.0F, viewport->Size.x - right_width - 320.0F));
     right_width = std::clamp(right_width, 300.0F,
@@ -3478,7 +3481,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
              fabric::editor::StudioResourceKind::animation ||
          (inspector_resource->kind ==
               fabric::editor::StudioResourceKind::entity &&
-          !entity_advanced_mode));
+          !entity_workflow_state.advanced_mode));
     ImGui::Begin("Inspector", nullptr, fixed_panel_flags |
         (responsive_inspector ? ImGuiWindowFlags_None
                               : ImGuiWindowFlags_HorizontalScrollbar));
@@ -5292,86 +5295,35 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         draw_entity_rig_inspector(
-            session, entity_advanced_mode, status, draw_entity_node_picker,
+            session, entity_workflow_state.advanced_mode, status,
+            draw_entity_node_picker,
             &entity_rig_probe);
         if (selected != nullptr &&
             selected->kind == fabric::editor::StudioResourceKind::entity &&
             session.selected_entity()) {
-            const auto& entity = *session.selected_entity();
-            ImGui::SeparatorText("Entity");
-            ImGui::TextWrapped(
-                "Select a node, adjust it in Transform, then animate it when the pose is ready.");
-            ImGui::Checkbox("Show advanced controls", &entity_advanced_mode);
-            if (entity_advanced_mode && entity.xpbd) {
-                const auto diagnostics =
-                    fabric::project::measure_xpbd_system(*entity.xpbd);
-                ImGui::Text("XPBD · %zu particles · %zu constraints",
-                            diagnostics.particle_count,
-                            diagnostics.constraint_count);
-                ImGui::TextDisabled("error %.4f max / %.4f RMS · energy %.4f",
-                                    diagnostics.maximum_constraint_error,
-                                    diagnostics.rms_constraint_error,
-                                    diagnostics.compliant_energy);
-            }
-            const auto animate_availability = actions.availability(
-                fabric::editor::editor_action_ids::animate_selection);
-            ImGui::BeginDisabled(!animate_availability.enabled);
-            const bool animate_selected_clicked = ImGui::Button(
-                "Animate selected node...", {-1.0F, 0.0F});
-            ImGui::EndDisabled();
-            if (ui_entity_animation_workflow_probe_enabled) {
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_entity_animate_screen = {
-                    (minimum.x + maximum.x) * 0.5F,
-                    (minimum.y + maximum.y) * 0.5F};
-                ui_entity_animate_seen = true;
-            }
-            if (animate_selected_clicked) {
-                if (ui_entity_animation_workflow_probe_enabled)
+            const EntityWorkflowProbe workflow_probe{
+                .enabled = ui_entity_animation_workflow_probe_enabled ||
+                    ui_override_probe_enabled,
+                .action_probe_enabled = animation_graph_probe.enabled,
+                .record_animate_widget = [&](const float x, const float y) {
+                    ui_entity_animate_screen = {x, y};
+                    ui_entity_animate_seen = true;
+                },
+                .record_animate_click = [&] {
                     ui_entity_animate_clicked = true;
-                static_cast<void>(actions.invoke(
-                    fabric::editor::editor_action_ids::animate_selection));
-            }
-            draw_disabled_reason(!animate_availability.enabled,
-                                 animate_availability.disabled_reason);
-            if (animation_graph_probe.enabled)
-                ui_entity_animate_action_seen = true;
-            const auto graph_action_state = actions.availability(
-                fabric::editor::editor_action_ids::toggle_animation_graph);
-            ImGui::BeginDisabled(!graph_action_state.enabled);
-            const bool toggle_graph_clicked = ImGui::Button(
-                    animation_graph_ui.open
-                        ? "Close Animation Graph"
-                        : "Open Animation Graph",
-                    {-1.0F, 0.0F});
-            ImGui::EndDisabled();
-            if (toggle_graph_clicked)
-                static_cast<void>(actions.invoke(
-                    fabric::editor::editor_action_ids::
-                        toggle_animation_graph));
-            draw_disabled_reason(!graph_action_state.enabled,
-                                 graph_action_state.disabled_reason);
-            ImGui::SeparatorText("Logic");
-            ImGui::TextDisabled(
-                "Optional behavior graph evaluated by this Entity.");
-            std::string behavior_id = entity.behavior
-                ? entity.behavior->id.value : std::string{};
-            if (draw_project_resource_picker(
-                    "Behavior", session.resources(),
-                    fabric::editor::StudioResourceKind::behavior,
-                    behavior_id, true)) {
-                const auto reference = behavior_id.empty()
-                    ? std::optional<fabric::project::ResourceReference>{}
-                    : std::optional<fabric::project::ResourceReference>{
-                        fabric::project::ResourceReference{
-                            {.value = behavior_id}, "behavior"}};
-                status = session.set_selected_entity_behavior(reference)
-                    ? "Entity behavior changed."
-                    : "Behavior attachment rejected; inspect diagnostics.";
-            }
-            if (ui_override_probe_enabled && !entity_advanced_mode)
-                ui_override_behavior_picker_seen = true;
+                },
+                .record_animate_action = [&] {
+                    ui_entity_animate_action_seen = true;
+                },
+                .record_behavior_picker = [&](const bool guided) {
+                    if (ui_override_probe_enabled)
+                        ui_override_behavior_picker_seen = guided;
+                },
+            };
+            fabric::asset_studio::draw_entity_workflow_panel(
+                session, actions, entity_workflow_state,
+                animation_graph_ui.open, status, draw_project_resource_picker,
+                &workflow_probe);
             const EntityHierarchyProbe hierarchy_probe{
                 .enabled = ui_drag_probe_enabled,
                 .target_mode = ui_drag_target_mode,
@@ -5382,7 +5334,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 .record_applied = [&] { ui_drag_probe_applied = true; },
             };
             draw_entity_hierarchy_workspace(
-                session, canvas, entity_advanced_mode, status,
+                session, canvas, entity_workflow_state.advanced_mode, status,
                 &hierarchy_probe);
             if (!session.selected_entity()->nodes.empty()) {
             const auto& entity = *session.selected_entity();
@@ -5396,14 +5348,16 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     },
                 };
             fabric::asset_studio::draw_entity_node_properties(
-                session, canvas.selected_node, node, entity_advanced_mode,
+                session, canvas.selected_node, node,
+                entity_workflow_state.advanced_mode,
                 status, &properties_probe);
             const EntityArtworkInspectorProbe artwork_probe{
                 .enabled = ui_override_probe_enabled,
                 .record_kind = [&](const float x, const float y) {
                     ui_override_kind_screen = {x, y};
                     ui_override_kind_seen = true;
-                    ui_override_guided_mode_seen = !entity_advanced_mode;
+                    ui_override_guided_mode_seen =
+                        !entity_workflow_state.advanced_mode;
                 },
                 .record_texture = [&](const float x, const float y) {
                     ui_override_texture_screen = {x, y};
@@ -5420,7 +5374,8 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                 .record_modal = [&] { ui_override_modal_seen = true; },
             };
             fabric::asset_studio::draw_entity_artwork_inspector(
-                session, canvas.selected_node, node, entity_advanced_mode,
+                session, canvas.selected_node, node,
+                entity_workflow_state.advanced_mode,
                 entity_artwork_state, status, draw_project_resource_picker,
                 studio_resource_kind_label, resource_kind_for_contract,
                 draw_surface_effect_stack,
@@ -5647,7 +5602,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }
         }
         draw_animation_inspector(
-            session, animation_ui, entity_advanced_mode, status,
+            session, animation_ui, entity_workflow_state.advanced_mode, status,
             draw_project_resource_picker, studio_resource_kind_label,
             &animation_inspector_probe);
     } else {
@@ -7137,6 +7092,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     AnimationInspectorProbe animation_inspector_probe;
     AnimationGraphWorkspaceState animation_graph_ui;
     AnimationGraphWorkspaceProbe animation_graph_probe;
+    EntityWorkflowState entity_workflow_state;
     EntityRigInspectorProbe entity_rig_probe;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
@@ -9123,6 +9079,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,
+                       entity_workflow_state,
                        entity_rig_probe,
                        textured_path_ui,
                        project_settings,

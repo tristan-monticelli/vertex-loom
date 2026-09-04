@@ -122,6 +122,11 @@ visible de l'Entity. Le mode avancé est réservé aux diagnostics XPBD, variant
 ancres et paramètres techniques ; il ne masque plus une étape nécessaire du
 parcours Entity → Logic.
 
+La tête du parcours rejoint `EntityWorkflowPanel` : état guidé/avancé,
+intentions Animate/Open Graph et raccord Behavior ne sont plus orchestrés dans
+le bootstrap. Hiérarchie, propriétés, artwork et Rig restent des modules
+frères, sans inspecteur Entity universel.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

@@ -300,6 +300,7 @@ if(FABRIC_BUILD_EDITORS)
         editors/asset_studio/entity_hierarchy_workspace.cpp
         editors/asset_studio/entity_node_properties.cpp
         editors/asset_studio/entity_rig_inspector.cpp
+        editors/asset_studio/entity_workflow_panel.cpp
         editors/asset_studio/vector_canvas.cpp
         editors/asset_studio/preview_canvas.cpp
         editors/asset_studio/import_workflow.cpp
