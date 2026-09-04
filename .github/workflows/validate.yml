@@ -95,7 +95,7 @@ jobs:
         run: .\build\Release\fabric_render_benchmark.exe --packets 10000 --frames 600 --report render-benchmark-windows.json
 
       - name: Archive benchmark reports
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: runtime-benchmark-${{ runner.os }}
           path: '*-benchmark-*.json'
@@ -138,7 +138,7 @@ jobs:
         run: .\build\Release\fabric_runtime_benchmark.exe --project tests/fixtures/studio-textile-head --map textile-head-preview --frames 600 --min-fps 60 --report textile-reference-benchmark-windows.json
 
       - name: Archive textile reference report
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: textile-reference-benchmark-${{ runner.os }}
           path: textile-reference-benchmark-*.json
@@ -166,7 +166,7 @@ jobs:
         run: ./build/fabric_map_package_export --map textile-head-preview tests/fixtures/studio-textile-head "$RUNNER_TEMP/studio-package"
 
       - name: Upload package
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: portable-map-package
           path: ${{ runner.temp }}/studio-package

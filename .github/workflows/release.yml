@@ -114,7 +114,7 @@ jobs:
         run: xcrun notarytool submit build/release-artifacts/*.tar.gz --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
       - name: Generate checksums and SBOM
         run: node .github/scripts/generate-release-metadata.mjs build/release-artifacts
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: vertex-loom-${{ matrix.platform }}-${{ github.ref_name }}
           path: build/release-artifacts/*
