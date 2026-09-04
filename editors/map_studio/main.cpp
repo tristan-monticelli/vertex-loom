@@ -974,6 +974,13 @@ int run(const std::filesystem::path& project_root,
                 return fabric::editor::EditorActionAvailability{
                     .enabled = false,
                     .disabled_reason = "The selected instance must reference an entity or prefab."};
+            const auto layer = std::ranges::find(
+                session.map()->layers, instance->layer_id,
+                &fabric::project::LayerDefinition::id);
+            if (layer != session.map()->layers.end() && layer->locked)
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "Unlock the instance layer before creating a path animation."};
             if (!instance->path_follower || instance->path_follower->path.id.value.empty())
                 return fabric::editor::EditorActionAvailability{
                     .enabled = false,
