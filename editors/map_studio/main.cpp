@@ -957,10 +957,27 @@ int run(const std::filesystem::path& project_root,
         .label = "Create path animation",
         .shortcut = "",
         .availability = [&] {
-            return fabric::editor::EditorActionAvailability{
-                .enabled = selected_instances.size() == 1U,
-                .disabled_reason = "Select one map instance before creating a path animation.",
-            };
+            if (selected_instances.size() != 1U)
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "Select one map instance before creating a path animation."};
+            if (!session.map())
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "Open a map before creating a path animation."};
+            const auto instance = std::ranges::find(
+                session.map()->instances, selected_instances.front(),
+                &fabric::project::MapInstance::id);
+            if (instance == session.map()->instances.end() ||
+                (!instance->entity && !instance->prefab))
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "The selected instance must reference an entity or prefab."};
+            if (!instance->path_follower || instance->path_follower->path.id.value.empty())
+                return fabric::editor::EditorActionAvailability{
+                    .enabled = false,
+                    .disabled_reason = "Configure a valid PathFollower before creating its animation."};
+            return fabric::editor::EditorActionAvailability{};
         },
         .execute = [&] {
             create_path_animation_request = true;
