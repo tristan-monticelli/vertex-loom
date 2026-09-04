@@ -42,6 +42,10 @@ validation existante. Les listes de propriétés et le formulaire de connexion
 restent des inspecteurs avancés. Le layout du canevas est éphémère et ne change
 pas `BehaviorGraph v1`.
 
+Une palette recherchable expose les types de nœuds au-dessus du canevas. Un
+clic crée le type choisi avec un identifiant lisible dérivé du type et rendu
+unique ; le champ d'identifiant libre n'appartient plus au parcours nominal.
+
 ## Conséquences
 
 - Une action identique peut provenir du joueur, d'une IA ou d'une map.
@@ -53,7 +57,8 @@ pas `BehaviorGraph v1`.
   d'auteur ; replay et pas fixe fournissent leur déterminisme.
 - Une migration future doit augmenter `schemaVersion`; les champs inconnus ou
   versions non supportées sont refusés.
-- Un scénario E2E doit partir de nœuds non reliés, utiliser les coordonnées des
-  widgets du canevas, sauvegarder/recharger, puis exécuter le signal attendu.
-  Une connexion injectée par `BehaviorSession` avant affichage ne prouve pas le
+- Un scénario E2E doit partir d'un seul nœud, ajouter la cible depuis la palette,
+  utiliser les coordonnées des widgets du canevas pour les relier,
+  sauvegarder/recharger, puis exécuter le signal attendu. Un nœud cible ou une
+  connexion injectés par `BehaviorSession` avant affichage ne prouvent pas le
   parcours d'auteur.

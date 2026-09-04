@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cctype>
 #include <cstdio>
 #include <cstddef>
 #include <filesystem>
@@ -129,12 +130,15 @@ ImVec2 ui_animation_graph_add_screen{};
 bool ui_behavior_graph_probe_enabled = false;
 bool ui_behavior_graph_canvas_seen = false;
 bool ui_behavior_graph_link_seen = false;
+bool ui_behavior_graph_add_seen = false;
+bool ui_behavior_graph_add_clicked = false;
 bool ui_behavior_graph_connect_seen = false;
 bool ui_behavior_graph_target_seen = false;
 bool ui_behavior_graph_connect_clicked = false;
 bool ui_behavior_graph_target_clicked = false;
 ImVec2 ui_behavior_graph_connect_screen{};
 ImVec2 ui_behavior_graph_target_screen{};
+ImVec2 ui_behavior_graph_add_screen{};
 bool ui_entity_animate_action_seen = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_animation_workflow_probe_enabled = false;
@@ -2620,6 +2624,9 @@ void write_entity_animation_workflow_probe(
     if (output) output << probe.dump(2) << '\n';
 }
 
+bool text_contains_ascii_insensitive(std::string_view text,
+                                     std::string_view query);
+
 void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
                           fabric::editor::BehaviorSession& behavior_session,
                           CreationUiState& creation, std::string& status) {
@@ -2698,6 +2705,59 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
         "emit_event", "play_animation", "move", "activate_mechanic",
         "transform_entity"};
     static std::string canvas_connection_source;
+    static std::string node_search;
+    if (ui_behavior_graph_probe_enabled && node_search.empty())
+        node_search = "emit_event";
+    ImGui::SetNextItemWidth(220.0F);
+    ImGui::InputTextWithHint("##behavior-node-search",
+                             "Search node type...", &node_search);
+    ImGui::SameLine();
+    bool any_matching_type = false;
+    for (const auto* type : node_types) {
+        std::string display_type = type;
+        std::ranges::replace(display_type, '_', ' ');
+        if (!display_type.empty())
+            display_type.front() = static_cast<char>(
+                std::toupper(static_cast<unsigned char>(display_type.front())));
+        if (!text_contains_ascii_insensitive(type, node_search) &&
+            !text_contains_ascii_insensitive(display_type, node_search))
+            continue;
+        any_matching_type = true;
+        ImGui::PushID(type);
+        const std::string label = "Add " + display_type;
+        if (ImGui::Button(label.c_str())) {
+            std::string id = type;
+            std::ranges::replace(id, '_', '-');
+            const std::string base = id;
+            std::size_t suffix = 2U;
+            while (std::ranges::any_of(graph.nodes, [&](const auto& node) {
+                return node.id == id;
+            })) id = base + "-" + std::to_string(suffix++);
+            if (behavior_session.add_node(type, id)) {
+                selected_node = static_cast<int>(
+                    behavior_session.graph()->nodes.size() - 1U);
+                status = "Behavior node added from palette.";
+                if (ui_behavior_graph_probe_enabled &&
+                    std::string_view{type} == "emit_event")
+                    ui_behavior_graph_add_clicked = true;
+            } else {
+                status = "Node rejected; inspect Behavior diagnostics.";
+            }
+        }
+        if (ui_behavior_graph_probe_enabled &&
+            std::string_view{type} == "emit_event") {
+            const auto minimum = ImGui::GetItemRectMin();
+            const auto maximum = ImGui::GetItemRectMax();
+            ui_behavior_graph_add_screen = {
+                (minimum.x + maximum.x) * 0.5F,
+                (minimum.y + maximum.y) * 0.5F};
+            ui_behavior_graph_add_seen = true;
+        }
+        ImGui::PopID();
+        break;
+    }
+    if (!any_matching_type)
+        ImGui::TextDisabled("No matching behavior node type.");
     ImGui::SeparatorText("Behavior canvas");
     ImGui::TextDisabled(
         "Choose Connect from output, then click a compatible destination.");
@@ -2854,18 +2914,23 @@ void draw_behavior_editor(fabric::editor::ProjectSession& project_session,
     }
     ImGui::EndChild();
     ImGui::SeparatorText("Nodes");
-    ImGui::SetNextItemWidth(190.0F);
-    ImGui::Combo("Type", &node_type, node_types,
-                 static_cast<int>(std::size(node_types)));
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(170.0F);
-    ImGui::InputText("Id", &new_node_id);
-    ImGui::SameLine();
-    if (ImGui::Button("Add node")) {
-        if (behavior_session.add_node(node_types[node_type], new_node_id)) {
-            selected_node = static_cast<int>(behavior_session.graph()->nodes.size() - 1U);
-            status = "Behavior node added.";
-        } else status = "Node rejected; inspect Behavior diagnostics.";
+    if (ImGui::CollapsingHeader("Advanced node creation")) {
+        ImGui::SetNextItemWidth(190.0F);
+        ImGui::Combo("Type", &node_type, node_types,
+                     static_cast<int>(std::size(node_types)));
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(170.0F);
+        ImGui::InputText("Id", &new_node_id);
+        ImGui::SameLine();
+        if (ImGui::Button("Add node with custom id")) {
+            if (behavior_session.add_node(node_types[node_type], new_node_id)) {
+                selected_node = static_cast<int>(
+                    behavior_session.graph()->nodes.size() - 1U);
+                status = "Behavior node added.";
+            } else {
+                status = "Node rejected; inspect Behavior diagnostics.";
+            }
+        }
     }
     if (ImGui::BeginChild("Behavior node list", {260.0F, 230.0F}, true)) {
         for (std::size_t index = 0; index < behavior_session.graph()->nodes.size(); ++index) {
@@ -10453,6 +10518,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_behavior_graph_probe_enabled = true;
         ui_behavior_graph_canvas_seen = false;
         ui_behavior_graph_link_seen = false;
+        ui_behavior_graph_add_seen = false;
+        ui_behavior_graph_add_clicked = false;
         ui_behavior_graph_connect_seen = false;
         ui_behavior_graph_target_seen = false;
         ui_behavior_graph_connect_clicked = false;
@@ -10491,12 +10558,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             behavior_session.add_node("ai_source", "monster-ai") &&
             behavior_session.set_node_property(
                 {.value = "monster-ai"}, "semantic_id", std::string{"attack"}) &&
-            behavior_session.add_node("emit_event", "emit-attack") &&
             behavior_session.save();
         fabric::editor::BehaviorSession reloaded;
         const bool reloaded_ok = authored &&
             reloaded.open(initial_project, {.value = "behavior-studio-e2e"}) &&
-            reloaded.graph()->nodes.size() == 2U &&
+            reloaded.graph()->nodes.size() == 1U &&
             reloaded.graph()->connections.empty();
         const auto entity_resource = std::ranges::find_if(
             session.resources(), [](const auto& resource) {
@@ -11414,10 +11480,28 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 static_cast<void>(SDL_PushEvent(&button));
             }
         }
+        if (behavior_e2e && behavior_ui_e2e_frame >= 1U &&
+            behavior_ui_e2e_frame <= 2U && ui_behavior_graph_add_seen) {
+            const ImVec2 target = ui_behavior_graph_add_screen;
+            SDL_Event motion{};
+            motion.type = SDL_MOUSEMOTION;
+            motion.motion.windowID = SDL_GetWindowID(window);
+            motion.motion.x = static_cast<int>(std::lround(target.x));
+            motion.motion.y = static_cast<int>(std::lround(target.y));
+            static_cast<void>(SDL_PushEvent(&motion));
+            SDL_Event button{};
+            button.type = behavior_ui_e2e_frame == 1U
+                ? SDL_MOUSEBUTTONDOWN : SDL_MOUSEBUTTONUP;
+            button.button.button = SDL_BUTTON_LEFT;
+            button.button.windowID = SDL_GetWindowID(window);
+            button.button.x = motion.motion.x;
+            button.button.y = motion.motion.y;
+            static_cast<void>(SDL_PushEvent(&button));
+        }
         if (behavior_e2e &&
-            (behavior_ui_e2e_frame == 1U || behavior_ui_e2e_frame == 3U) &&
+            (behavior_ui_e2e_frame == 4U || behavior_ui_e2e_frame == 6U) &&
             ui_behavior_graph_connect_seen && ui_behavior_graph_target_seen) {
-            const ImVec2 target = behavior_ui_e2e_frame == 1U
+            const ImVec2 target = behavior_ui_e2e_frame == 4U
                 ? ui_behavior_graph_connect_screen
                 : ui_behavior_graph_target_screen;
             SDL_Event motion{};
@@ -12517,7 +12601,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         }
         if (behavior_e2e) {
             ++behavior_ui_e2e_frame;
-            if (behavior_ui_e2e_frame == 6U) {
+            if (behavior_ui_e2e_frame == 9U) {
                 const bool saved = behavior_session.save();
                 fabric::editor::BehaviorSession reloaded;
                 const bool reopened = saved && reloaded.open(
@@ -12527,11 +12611,14 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                      "attack", {}}, 1.0F / 60.0F)
                     : std::vector<fabric::runtime::BehaviorAction>{};
                 behavior_e2e_complete = behavior_e2e_complete && reopened &&
+                    ui_behavior_graph_add_seen &&
+                    ui_behavior_graph_add_clicked &&
                     ui_behavior_graph_canvas_seen &&
                     ui_behavior_graph_link_seen &&
+                    reloaded.graph()->nodes.size() == 2U &&
                     reloaded.graph()->connections.size() == 1U &&
                     reloaded.graph()->connections.front().id ==
-                        "monster-ai-to-emit-attack" &&
+                        "monster-ai-to-emit-event" &&
                     actions.size() == 1U;
                 if (!behavior_e2e_complete)
                     std::cerr << "Asset Studio Behavior Graph UI E2E failed: "

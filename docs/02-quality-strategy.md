@@ -203,9 +203,10 @@ la transition `idle-to-beam-scroll` et produit
 `asset-studio-animation-graph-e2e.ppm` avec les deux cartes et leur flèche. Un
 état ou une transition injectés par la session avant l'affichage ne satisfont
 pas cette recette.
-Le test `asset_studio_behavior_e2e` crée deux nœuds sans connexion, ouvre la
-ressource Behavior, clique `Connect from output` puis la carte cible, sauvegarde
-et recharge. Il exige la connexion `monster-ai-to-emit-attack`, exécute le
+Le test `asset_studio_behavior_e2e` crée seulement la source IA, ouvre la
+ressource Behavior, recherche puis ajoute `Emit event` depuis la palette, et
+clique `Connect from output` puis la carte cible. Il sauvegarde et recharge,
+exige la connexion `monster-ai-to-emit-event`, exécute le
 signal IA `attack`, attend une action et conserve le canevas final dans
 `asset-studio-behavior-graph-e2e.ppm`.
 Le test `map_studio_mechanic_e2e` retire la liaison `platform.body` vers
