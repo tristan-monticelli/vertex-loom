@@ -1673,7 +1673,8 @@ TEST_CASE("preview runtime advances map path followers") {
     REQUIRE(fabric::project::create_project(root, manifest()).ok());
     REQUIRE(fabric::project::publish_native_vector_asset(root, manifest(), vector_asset()).ok());
     REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
-    const auto source = std::filesystem::path{"tests/fixtures/valid-project/assets/textures/beam-thread.png"};
+    const auto source = std::filesystem::path{__FILE__}.parent_path().parent_path() /
+        "fixtures/valid-project/assets/textures/beam-thread.png";
     REQUIRE(fabric::project::publish_texture_asset(
         root, manifest(), {.document = {.schema_version = 1,
                                         .type = "texture",
