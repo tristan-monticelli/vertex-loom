@@ -131,6 +131,7 @@ bool ui_button_created = false;
 bool ui_button_reloaded = false;
 ImVec2 ui_button_create_screen{};
 bool ui_entity_animate_action_seen = false;
+bool ui_animation_graph_action_invoked = false;
 bool ui_entity_transform_seen = false;
 bool ui_entity_ik_create_seen = false;
 bool ui_entity_ik_create_clicked = false;
@@ -5403,16 +5404,21 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                  animate_availability.disabled_reason);
             if (animation_graph_probe.enabled)
                 ui_entity_animate_action_seen = true;
-            if (ImGui::Button(
+            const auto graph_action_state = actions.availability(
+                fabric::editor::editor_action_ids::toggle_animation_graph);
+            ImGui::BeginDisabled(!graph_action_state.enabled);
+            const bool toggle_graph_clicked = ImGui::Button(
                     animation_graph_ui.open
                         ? "Close Animation Graph"
                         : "Open Animation Graph",
-                    {-1.0F, 0.0F})) {
-                animation_graph_ui.open = !animation_graph_ui.open;
-                if (animation_graph_ui.open && entity.animation_state_machine)
-                    animation_graph_ui.current_state =
-                        entity.animation_state_machine->initial_state;
-            }
+                    {-1.0F, 0.0F});
+            ImGui::EndDisabled();
+            if (toggle_graph_clicked)
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::
+                        toggle_animation_graph));
+            draw_disabled_reason(!graph_action_state.enabled,
+                                 graph_action_state.disabled_reason);
             if (entity_advanced_mode &&
                 ImGui::CollapsingHeader("Logic and animation graph")) {
                 std::string behavior_id = entity.behavior
@@ -8258,6 +8264,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         entity_rig_probe.starter_cloth_seen = false;
         entity_rig_probe.starter_cloth_clicked = false;
         ui_entity_animate_action_seen = false;
+        ui_animation_graph_action_invoked = false;
         ui_entity_transform_seen = false;
         ui_entity_ik_create_seen = false;
         ui_entity_ik_create_clicked = false;
@@ -8313,7 +8320,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                         {"idle", {{.value = "beam-scroll"}, "animation"}}}};
             authored = session.set_selected_entity_definition(
                 std::move(with_graph)) && session.save();
-            animation_graph_ui.open = authored;
+            animation_graph_ui.open = false;
             animation_graph_ui.current_state = "idle";
             animation_graph_ui.parameters = {{"enabled", true}};
         }
@@ -8725,6 +8732,36 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             return true;
         },
     }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{
+            fabric::editor::editor_action_ids::toggle_animation_graph},
+        .label = "Toggle Animation Graph",
+        .availability = [&] {
+            const auto* resource = session.selected_resource();
+            const bool entity_selected = resource != nullptr &&
+                resource->kind == fabric::editor::StudioResourceKind::entity &&
+                session.selected_entity().has_value();
+            return fabric::editor::EditorActionAvailability{
+                .enabled = entity_selected,
+                .disabled_reason =
+                    "Select an Entity before opening Animation Graph.",
+            };
+        },
+        .execute = [&] {
+            const auto& entity = session.selected_entity();
+            if (!entity) return false;
+            animation_graph_ui.open = !animation_graph_ui.open;
+            if (animation_graph_ui.open && entity->animation_state_machine)
+                animation_graph_ui.current_state =
+                    entity->animation_state_machine->initial_state;
+            if (animation_graph_probe.enabled)
+                ui_animation_graph_action_invoked = true;
+            return true;
+        },
+    }));
+    if (animation_graph_probe.enabled)
+        static_cast<void>(actions.invoke(
+            fabric::editor::editor_action_ids::toggle_animation_graph));
     bool command_palette_open = ui_accessibility_test;
     bool command_palette_rendered = false;
     while (running) {
@@ -10518,6 +10555,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     animation_graph_probe.add_seen &&
                     animation_graph_probe.link_seen &&
                     ui_entity_animate_action_seen &&
+                    ui_animation_graph_action_invoked &&
                     ui_entity_transform_seen &&
                     canvas.xpbd_overlay_visible &&
                     canvas.ik_overlay_visible &&

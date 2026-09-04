@@ -23,6 +23,8 @@ inline constexpr std::string_view navigate_forward = "navigate_forward";
 inline constexpr std::string_view create_entity_from_visuals =
     "create_entity_from_visuals";
 inline constexpr std::string_view animate_selection = "animate_selection";
+inline constexpr std::string_view toggle_animation_graph =
+    "toggle_animation_graph";
 } // namespace editor_action_ids
 
 struct EditorActionAvailability {

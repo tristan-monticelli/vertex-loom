@@ -66,6 +66,9 @@ calculées au moment de l'invocation. La création d'une Animation depuis le
 ou des visuels sélectionnés vers une Entity sont les premières actions métier
 portées sur ce contrat. Elles résolvent la sélection courante, ouvrent les
 parcours de création existants et ne dupliquent aucune mutation de session.
+L'ouverture et la fermeture d'Animation Graph suivent le même contrat : le
+workspace ne conserve que son état ouvert et son état courant, tandis que
+`toggle_animation_graph` porte l'intention et sa disponibilité.
 
 `EditorContext` conserve pour chaque document l'identifiant de sélection
 primaire et, lorsqu'elle existe, la sélection multiple ordonnée. Les indices de

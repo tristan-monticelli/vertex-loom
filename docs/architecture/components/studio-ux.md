@@ -66,7 +66,9 @@ garde visibles le choix du nœud, le playhead, l'auto-key et les quatre clés de
 transform. Une propriété animable fournit une icône de
 clé qui crée la piste typée si nécessaire. Les paramètres de binding brut,
 tangentes, composition additive et segment A→B sont avancés, jamais requis pour
-la première animation. Voir ADR-0147 et ADR-0150.
+la première animation. `toggle_animation_graph` partage enfin l'ouverture du
+graphe entre le bouton Entity et la palette, sans seconde branche de
+navigation. Voir ADR-0147 et ADR-0150.
 
 La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
 vectoriels ou composants. Elle appartient au workspace, pas à une variable

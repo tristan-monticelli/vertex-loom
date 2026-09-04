@@ -86,6 +86,10 @@ invocations enregistrées déclenchent les parcours de création avec les
 sélections courantes. Les autres commandes métier seront migrées par parcours,
 sans multiplier de nouvelles branches directes.
 
+`toggle_animation_graph` porte également l'ouverture et la fermeture du graphe
+depuis le bouton Entity ou la palette, avec une indisponibilité explicite hors
+d'une Entity sélectionnée.
+
 ## Tranche 3 — migration des workspaces de production
 
 ### Portée
