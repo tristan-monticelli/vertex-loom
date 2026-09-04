@@ -132,6 +132,12 @@ Behavior...` prépare, crée, attache puis ouvre le graphe sans trajet par le me
 global. Cette intention est enregistrée afin que bouton et palette restent
 équivalents.
 
+La migration Visual commence par `VisualComponentInspector` : les sélections
+d'ancre et de paramètre quittent les variables statiques du shell, les éditions
+continuent de passer par `ProjectSession` et le picker typé reste injecté. Les
+compositions, chemins texturés et surfaces raster restent les frontières
+Visual suivantes.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.

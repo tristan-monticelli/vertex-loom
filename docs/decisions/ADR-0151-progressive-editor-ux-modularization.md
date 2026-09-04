@@ -118,6 +118,12 @@ l'Entity cible, prépare un identifiant disponible, ouvre la création Behavior,
 puis attache la ressource validée avant d'ouvrir son graphe. Bouton et palette
 invoquent la même action ; une création manuelle reste indépendante.
 
+`VisualComponentInspector` constitue la première frontière du workspace
+Visual. Il possède les identifiants de sélection d'ancre et de paramètre ainsi
+que leur remise à zéro lors d'un changement de document. Il reçoit le picker
+typé partagé et ne persiste une modification qu'au travers de
+`ProjectSession`; le shell conserve le preview et le routage de document.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

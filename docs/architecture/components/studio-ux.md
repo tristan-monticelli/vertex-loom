@@ -197,6 +197,7 @@ flowchart LR
 | Entity Node Properties | nom, verrouillage, visibilité, transform, parent, pivot et ordre Z via `ProjectSession` | artwork, matériau, overrides, hiérarchie ou état global du shell |
 | Entity Artwork Inspector | choix toujours visible du drawable, ressource, matériau, apparence, variante, ancre et overrides typés via `ProjectSession` | propriétés de transform, hiérarchie, preview GPU ou état global du shell |
 | Entity Workflow Panel | mode guidé/avancé, actions Animation, ouverture du graphe, raccord ou création+attachement Behavior via registre et `ProjectSession` | hiérarchie, artwork, rig, timeline ou boucle SDL |
+| Visual Component Inspector | sélection stable des ancres/paramètres, apparence Beam et valeurs par défaut via `ProjectSession` | preview GPU, création de ressource, shell ou accès fichier |
 | Animation Timeline Command | déplacement atomique d'une ou plusieurs clés par delta temporel via `ProjectSession` | sélection UI, playhead ou copie persistante du clip |
 | Action Registry | libellé, raccourci, disponibilité, raison de blocage, invocation | mutation directe de fichier |
 | Widgets ImGui partagés | champs communs, tooltips, diagnostics/focus de champ, sélection recherchable par type et explication des actions bloquées | état métier ou sélection locale |

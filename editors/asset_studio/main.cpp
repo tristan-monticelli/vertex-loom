@@ -27,6 +27,7 @@
 #include "import_workflow.hpp"
 #include "preview_canvas.hpp"
 #include "vector_canvas.hpp"
+#include "visual_component_inspector.hpp"
 #include "editor_widgets.hpp"
 
 #include <SDL.h>
@@ -75,6 +76,7 @@ using fabric::asset_studio::EntityArtworkInspectorState;
 using fabric::asset_studio::EntityRigInspectorProbe;
 using fabric::asset_studio::EntityWorkflowProbe;
 using fabric::asset_studio::EntityWorkflowState;
+using fabric::asset_studio::VisualComponentInspectorState;
 using fabric::asset_studio::EntityHierarchyProbe;
 using fabric::asset_studio::ResourceDragPayload;
 using fabric::asset_studio::draw_entity_hierarchy_workspace;
@@ -88,6 +90,7 @@ using fabric::asset_studio::draw_animation_inspector;
 using fabric::asset_studio::draw_animation_timeline_workspace;
 using fabric::asset_studio::draw_behavior_workspace;
 using fabric::asset_studio::draw_entity_rig_inspector;
+using fabric::asset_studio::draw_visual_component_inspector;
 using fabric::asset_studio::upload_preview;
 using fabric::asset_studio::CanvasUiState;
 using fabric::asset_studio::draw_native_vector_canvas;
@@ -2900,6 +2903,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     const EntityPreviewResult& entity_preview,
                     const fabric::render::VisualCompositionDrawResult&
                         visual_preview,
+                    VisualComponentInspectorState& visual_component_ui,
                     AnimationWorkspaceState& animation_ui,
                     AnimationTimelineProbe& animation_timeline_probe,
                     AnimationInspectorProbe& animation_inspector_probe,
@@ -4267,202 +4271,9 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     }
                 }
             } else if (session.selected_visual_component()) {
-                const auto& component = *session.selected_visual_component();
-                static std::string selected_component_id;
-                static std::size_t selected_anchor{};
-                static std::size_t selected_parameter{};
-                if (selected_component_id != component.document.id.value) {
-                    selected_component_id = component.document.id.value;
-                    selected_anchor = 0U;
-                    selected_parameter = 0U;
-                }
-                const bool is_beam_component = std::ranges::any_of(
-                    component.parameters, [](const auto& parameter) {
-                        return parameter.target.node_id == "beam" &&
-                            parameter.target.component_id == "shader";
-                    });
-                if (!is_beam_component ||
-                    ImGui::CollapsingHeader("Advanced component structure")) {
-                    ImGui::SeparatorText("Anchors");
-                for (std::size_t index = 0; index < component.anchors.size();
-                     ++index) {
-                    const auto& anchor = component.anchors[index];
-                    if (ImGui::Selectable(anchor.name.c_str(),
-                                          selected_anchor == index))
-                        selected_anchor = index;
-                }
-                if (!component.anchors.empty() &&
-                    selected_anchor < component.anchors.size()) {
-                    if (ImGui::Button("Duplicate anchor")) {
-                        auto candidate = component;
-                        auto copy = candidate.anchors[selected_anchor];
-                        const auto base = copy.id + "-copy";
-                        copy.id = base;
-                        std::size_t suffix = 2U;
-                        while (std::ranges::any_of(
-                            candidate.anchors, [&](const auto& anchor) {
-                                return anchor.id == copy.id;
-                            })) {
-                            copy.id = base + "-" +
-                                std::to_string(suffix++);
-                        }
-                        copy.name += " copy";
-                        candidate.anchors.push_back(std::move(copy));
-                        if (session.set_selected_visual_component(
-                                std::move(candidate))) {
-                            selected_anchor = session.selected_visual_component()
-                                ->anchors.size() - 1U;
-                        }
-                    }
-                    auto anchor = session.selected_visual_component()
-                                      ->anchors[selected_anchor];
-                    if (ImGui::DragFloat2("Anchor position (world units)",
-                                          &anchor.position.x, 0.05F)) {
-                        auto candidate =
-                            *session.selected_visual_component();
-                        candidate.anchors[selected_anchor] = std::move(anchor);
-                        (void)session.set_selected_visual_component(
-                            std::move(candidate));
-                    }
-                    ImGui::SetItemTooltip("Position of the visual component anchor in project world units.");
-                }
-                }
-
-                const auto current_component =
-                    *session.selected_visual_component();
-                ImGui::SeparatorText(
-                    is_beam_component ? "Beam appearance" : "Parameters");
-                if (is_beam_component) {
-                    for (std::size_t index = 0;
-                         index < current_component.parameters.size(); ++index) {
-                        auto parameter = current_component.parameters[index];
-                        bool changed = false;
-                        ImGui::PushID(static_cast<int>(index));
-                        if (auto* reference = std::get_if<
-                                fabric::project::ResourceReference>(
-                                &parameter.default_value)) {
-                            std::string texture_id = reference->id.value;
-                            if (draw_project_resource_picker(
-                                    parameter.name.c_str(), session.resources(),
-                                    fabric::editor::StudioResourceKind::texture,
-                                    texture_id, false)) {
-                                *reference = {{.value = std::move(texture_id)},
-                                              "texture"};
-                                changed = true;
-                            }
-                        } else if (auto* color = std::get_if<fabric::core::Color>(
-                                       &parameter.default_value)) {
-                            changed = ImGui::ColorEdit4(
-                                parameter.name.c_str(), &color->red);
-                        } else if (auto* value = std::get_if<std::string>(
-                                       &parameter.default_value)) {
-                            if (parameter.id == "color-mode") {
-                                const char* label = *value == "preserve"
-                                    ? "Source intacte"
-                                    : "Recoloration";
-                                if (ImGui::BeginCombo(
-                                        "Traitement des couleurs", label)) {
-                                    if (ImGui::Selectable(
-                                            "Recoloration",
-                                            *value == "recolor")) {
-                                        *value = "recolor";
-                                        changed = true;
-                                    }
-                                    if (ImGui::Selectable(
-                                            "Source intacte",
-                                            *value == "preserve")) {
-                                        *value = "preserve";
-                                        changed = true;
-                                    }
-                                    ImGui::EndCombo();
-                                }
-                            }
-                        } else if (auto* value = std::get_if<float>(
-                                       &parameter.default_value)) {
-                            if (parameter.id == "shine" ||
-                                parameter.id == "holography" ||
-                                parameter.id == "opacity") {
-                                changed = ImGui::SliderFloat(
-                                    parameter.name.c_str(), value, 0.0F, 1.0F);
-                            } else {
-                                changed = ImGui::DragFloat(
-                                    parameter.name.c_str(), value, 0.01F,
-                                    parameter.id == "repeat" ? 0.01F : 0.001F,
-                                    1000.0F);
-                            }
-                        }
-                        if (changed) {
-                            auto candidate =
-                                *session.selected_visual_component();
-                            candidate.parameters[index] = std::move(parameter);
-                            (void)session.set_selected_visual_component(
-                                std::move(candidate));
-                        }
-                        ImGui::PopID();
-                    }
-                    ImGui::TextDisabled(
-                        "Orientation follows the path from start to end.");
-                } else {
-                    for (std::size_t index = 0;
-                         index < current_component.parameters.size(); ++index) {
-                        const auto& parameter =
-                            current_component.parameters[index];
-                        if (ImGui::Selectable(parameter.name.c_str(),
-                                              selected_parameter == index))
-                            selected_parameter = index;
-                    }
-                    if (!current_component.parameters.empty() &&
-                        selected_parameter < current_component.parameters.size()) {
-                        auto parameter =
-                            current_component.parameters[selected_parameter];
-                    bool changed = ImGui::Checkbox(
-                        "Animatable", &parameter.animatable);
-                    ImGui::TextDisabled("Target %s.%s.%s",
-                        parameter.target.node_id.c_str(),
-                        parameter.target.component_id.c_str(),
-                        parameter.target.property_id.c_str());
-                    if (auto* value = std::get_if<float>(
-                            &parameter.default_value)) {
-                        changed |= ImGui::DragFloat("Default", value, 0.05F);
-                        ImGui::SetItemTooltip("Default value used when this component parameter is not overridden; its unit follows the parameter schema.");
-                    } else if (auto* value = std::get_if<std::int64_t>(
-                                   &parameter.default_value)) {
-                        changed |= ImGui::InputScalar(
-                            "Default", ImGuiDataType_S64, value);
-                        ImGui::SetItemTooltip("Default integer used when this component parameter is not overridden; its unit follows the parameter schema.");
-                    } else if (auto* value = std::get_if<bool>(
-                                   &parameter.default_value)) {
-                        changed |= ImGui::Checkbox("Default", value);
-                    } else if (auto* value = std::get_if<std::string>(
-                                   &parameter.default_value)) {
-                        changed |= ImGui::InputText("Default", value);
-                    } else if (auto* value = std::get_if<fabric::core::Vec2>(
-                                   &parameter.default_value)) {
-                        changed |= ImGui::DragFloat2("Default", &value->x,
-                                                     0.05F);
-                        ImGui::SetItemTooltip("Default vector used when this component parameter is not overridden; its unit follows the parameter schema.");
-                    } else if (auto* value = std::get_if<fabric::core::Color>(
-                                   &parameter.default_value)) {
-                        changed |= ImGui::ColorEdit4("Default", &value->red);
-                    } else if (const auto* value = std::get_if<
-                                   fabric::project::ResourceReference>(
-                                   &parameter.default_value)) {
-                        ImGui::TextDisabled("Default %s (%s)",
-                                            value->id.value.c_str(),
-                                            value->expected_type.c_str());
-                    }
-                    if (changed) {
-                        auto candidate =
-                            *session.selected_visual_component();
-                        candidate.parameters[selected_parameter] =
-                            std::move(parameter);
-                        (void)session.set_selected_visual_component(
-                            std::move(candidate));
-                    }
-                    }
-                }
-                ImGui::TextDisabled("%zu variant(s)",
-                                    current_component.variants.size());
+                draw_visual_component_inspector(
+                    session, visual_component_ui, status,
+                    draw_project_resource_picker);
             }
             for (const auto& error : visual_preview.errors) {
                 ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s",
@@ -7158,6 +6969,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     AnimationGraphWorkspaceProbe animation_graph_probe;
     EntityWorkflowState entity_workflow_state;
     EntityRigInspectorProbe entity_rig_probe;
+    VisualComponentInspectorState visual_component_ui;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
     EntityArtworkInspectorState entity_artwork_state;
@@ -9218,6 +9030,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        imports, preview,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
+                       visual_component_ui,
                        animation_ui, animation_timeline_probe,
                        animation_inspector_probe,
                        animation_graph_ui, animation_graph_probe,

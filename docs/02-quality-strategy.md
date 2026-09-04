@@ -301,6 +301,9 @@ et invoque les mêmes actions du registre que la palette.
 L'E2E Entity guidé poursuit le parcours jusqu'à `Create and attach Behavior` :
 il exige le bouton, l'invocation de l'action, la création du document,
 l'attachement persistant à l'Entity d'origine et l'ouverture du Behavior.
+L'extraction de `VisualComponentInspector` doit préserver les E2E Beam,
+Vector canvas, Entity et le rechargement des ressources Visual Component ; son
+état de sélection est détenu par le workspace et non par un widget statique.
 Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
 pas directement leurs formulaires : ils doivent invoquer les actions
 contextuelles `create_entity_from_visuals` et `animate_selection` du registre
