@@ -1,5 +1,6 @@
 #include "fabric/project/map.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <limits>
@@ -69,6 +70,19 @@ TEST_CASE("map instance path follower is optional and round-trips") {
         manifest(), fabric::project::serialize_map(source));
     REQUIRE(parsed.ok());
     REQUIRE(*parsed.asset == source);
+}
+
+TEST_CASE("map validation rejects path followers on mechanic prefabs") {
+    auto invalid = map();
+    invalid.prefabs.front().mechanic =
+        fabric::project::ResourceReference{{.value = "hero-mechanic"}, "mechanic"};
+    invalid.instances.front().path_follower = fabric::project::PathFollowerState{
+        .path = {{.value = "hero-path"}, "texturedPath"}};
+    const auto report = fabric::project::validate_map(manifest(), invalid);
+    REQUIRE_FALSE(report.ok());
+    CHECK(std::any_of(report.errors.begin(), report.errors.end(), [](const auto& error) {
+        return error.field == "instances.pathFollower";
+    }));
 }
 
 TEST_CASE("map persists collision marker surfaces and derives eight positions") {

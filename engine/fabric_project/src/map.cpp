@@ -348,6 +348,11 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
             error(report.errors, ErrorCode::resource_type_mismatch, "instances.entity", "invalid entity reference");
         if (instance.prefab && (instance.prefab->expected_type != "prefab" || !core::ResourceId::is_valid(instance.prefab->id.value)))
             error(report.errors, ErrorCode::resource_type_mismatch, "instances.prefab", "invalid prefab reference");
+        const auto prefab_definition = instance.prefab
+            ? std::find_if(map.prefabs.begin(), map.prefabs.end(), [&](const auto& prefab) {
+                  return prefab.id == instance.prefab->id.value;
+              })
+            : map.prefabs.end();
         if (instance.path_follower) {
             const auto& follower = *instance.path_follower;
             if (follower.path.expected_type != "texturedPath" ||
@@ -360,6 +365,10 @@ ValidationReport validate_map(const ProjectManifest&, const MapDocument& map) {
                 !std::isfinite(follower.rotation_offset_degrees))
                 error(report.errors, ErrorCode::invalid_asset,
                       "instances.pathFollower", "progress and motion values must be finite");
+            if (prefab_definition != map.prefabs.end() && prefab_definition->mechanic)
+                error(report.errors, ErrorCode::invalid_asset,
+                      "instances.pathFollower",
+                      "an instance cannot combine a mechanic prefab with a path follower");
         }
         const auto& position = instance.transform.position;
         const auto& pivot = instance.transform.pivot;
