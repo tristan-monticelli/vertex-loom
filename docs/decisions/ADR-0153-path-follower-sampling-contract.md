@@ -16,11 +16,16 @@ Map/Scene, pas de la géométrie visuelle.
 La brique accepte les segments ligne et cubique, échantillonne les courbes avec
 une résolution bornée et ne modifie jamais le `TexturedPath` source. Le rail de
 déplacement, la spline géométrique et la contrainte physique restent donc des
-contrats distincts. L'attachement persistant à `MapInstance` sera optionnel et
-additif : les cartes existantes resteront équivalentes. La prochaine tranche
-branche ce champ au Preview Runtime (pas fixe, position et orientation) ; la
-prochaine tranche l'exposera dans Map Studio avec aperçu et validation avant
-publication. La géométrie source ne sera jamais modifiée.
+contrats distincts. L'attachement persistant à `MapInstance` est optionnel et
+additif : les cartes existantes restent équivalentes.
+
+Le Preview Runtime applique ce contrat à chaque pas fixe, puis accepte une
+piste d'animation liant `pathFollower.progress` pour piloter une progression
+artistique sans dupliquer la géométrie. Map Studio expose le même composant dans
+l'inspecteur, avec sélection de ressource, validation, aperçu du rail et
+repositionnement direct du marqueur ; les valeurs sont sauvegardées dans la
+carte et incluses dans le paquet publié. La géométrie source ne sera jamais
+modifiée.
 
 ## Conséquences
 
