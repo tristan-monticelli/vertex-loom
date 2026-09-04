@@ -62,6 +62,10 @@ ne contiennent plus l'arbre, les blocs ou les pistes.
   coordonnées de widgets et des événements SDL pour créer l'Entity, ouvrir la
   création d'animation et poser la première clé. Les appels directs de session
   vérifient le résultat après reload, mais ne préparent pas les documents.
+- Le même scénario active l'auto-key, déplace le playhead puis le gizmo par
+  événements SDL. La piste Position doit contenir les poses initiale et finale
+  après rechargement ; modifier directement l'état du document ou du playhead
+  depuis le harnais ne satisfait pas ce critère.
 
 ## Conséquences
 

@@ -90,6 +90,9 @@ La preuve transversale Entity→Animation part d'un visuel existant, clique les
 actions contextuelles réelles et ne prépare aucun document Entity ou Animation
 par `ProjectSession`. Le nom du clip est dérivé de la sélection visible et reste
 modifiable dans la modale courte avant validation.
+Le scénario continue dans le workspace Animation en cliquant `Key Position`,
+`Auto-key`, le playhead puis en déplaçant le gizmo. Les deux poses persistées
+doivent provenir de ces gestes et non d'un segment A→B préparé par la session.
 
 `Animation Graph` est un panneau dédié ouvert depuis l'Entity. Il édite des
 états toujours associés à un clip existant, leurs transitions, conditions,

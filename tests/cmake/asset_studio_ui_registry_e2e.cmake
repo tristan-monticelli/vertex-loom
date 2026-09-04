@@ -183,6 +183,9 @@ if(DEFINED WORKFLOW_ARTIFACT)
             "\"animation_create_button_seen\": true"
             "\"animation_created_by_click\": true"
             "\"quick_key_button_seen\": true"
+            "\"position_key_button_seen\": true"
+            "\"auto_key_button_seen\": true"
+            "\"playhead_seen\": true"
             "\"key_persisted_after_reload\": true")
         string(FIND "${WORKFLOW_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)

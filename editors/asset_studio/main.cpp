@@ -102,6 +102,12 @@ bool ui_animation_timeline_seen = false;
 bool ui_animation_quick_key_seen = false;
 bool ui_animation_node_picker_seen = false;
 ImVec2 ui_animation_quick_key_screen{};
+bool ui_workflow_position_key_seen = false;
+bool ui_animation_auto_key_seen = false;
+bool ui_animation_playhead_seen = false;
+ImVec2 ui_workflow_position_key_screen{};
+ImVec2 ui_animation_auto_key_screen{};
+ImVec2 ui_animation_playhead_target_screen{};
 bool ui_animation_graph_probe_enabled = false;
 bool ui_animation_graph_seen = false;
 bool ui_entity_animate_action_seen = false;
@@ -2521,6 +2527,9 @@ void write_entity_animation_workflow_probe(
         {"animation_create_button_seen", ui_animation_create_seen},
         {"animation_created_by_click", animation_created},
         {"quick_key_button_seen", ui_animation_quick_key_seen},
+        {"position_key_button_seen", ui_workflow_position_key_seen},
+        {"auto_key_button_seen", ui_animation_auto_key_seen},
+        {"playhead_seen", ui_animation_playhead_seen},
         {"key_persisted_after_reload", key_persisted},
     };
     std::ofstream output(
@@ -7443,9 +7452,25 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                                                   std::max(0.0F, clip.duration));
             ImGui::SliderFloat("Playhead", &animation_ui.scrub_time, 0.0F,
                                std::max(0.01F, clip.duration), "%.2f s");
+            if (ui_entity_animation_workflow_probe_enabled) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_animation_playhead_target_screen = {
+                    minimum.x + (maximum.x - minimum.x) * 0.75F,
+                    (minimum.y + maximum.y) * 0.5F};
+                ui_animation_playhead_seen = true;
+            }
             ImGui::SetItemTooltip("Preview time used to evaluate the animation clip.");
             ImGui::Checkbox("Auto-key while moving in the Viewer",
                             &animation_ui.auto_key);
+            if (ui_entity_animation_workflow_probe_enabled) {
+                const auto minimum = ImGui::GetItemRectMin();
+                const auto maximum = ImGui::GetItemRectMax();
+                ui_animation_auto_key_screen = {
+                    (minimum.x + maximum.x) * 0.5F,
+                    (minimum.y + maximum.y) * 0.5F};
+                ui_animation_auto_key_seen = true;
+            }
             ImGui::TextDisabled(animation_ui.auto_key
                 ? "Viewer edits now create keys at the playhead."
                 : "Turn this on to animate directly in the Viewer.");
@@ -7563,6 +7588,15 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                             .component_id = "transform",
                             .property_id = std::string{property}};
                         const bool clicked = ImGui::Button(label);
+                        if (ui_entity_animation_workflow_probe_enabled &&
+                            property == "position") {
+                            const auto minimum = ImGui::GetItemRectMin();
+                            const auto maximum = ImGui::GetItemRectMax();
+                            ui_workflow_position_key_screen = {
+                                (minimum.x + maximum.x) * 0.5F,
+                                (minimum.y + maximum.y) * 0.5F};
+                            ui_workflow_position_key_seen = true;
+                        }
                         if (ui_animation_probe_enabled &&
                             property == "rotationDegrees") {
                             const auto minimum = ImGui::GetItemRectMin();
@@ -9934,6 +9968,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_entity_animate_clicked = false;
         ui_animation_create_seen = false;
         ui_animation_quick_key_seen = false;
+        ui_workflow_position_key_seen = false;
+        ui_animation_auto_key_seen = false;
+        ui_animation_playhead_seen = false;
         ui_animation_probe_enabled = true;
         static_cast<void>(session.select_resource(
             fabric::editor::StudioResourceKind::visual_component,
@@ -10480,13 +10517,43 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 push_workflow_mouse(ui_animation_create_screen, type);
             } else if (entity_animation_workflow_frame >= 13U &&
                        entity_animation_workflow_frame <= 15U &&
-                       ui_animation_quick_key_seen) {
+                       ui_workflow_position_key_seen) {
                 const auto type = entity_animation_workflow_frame == 14U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
                     : entity_animation_workflow_frame == 15U
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
-                push_workflow_mouse(ui_animation_quick_key_screen, type);
+                push_workflow_mouse(ui_workflow_position_key_screen, type);
+            } else if (entity_animation_workflow_frame >= 17U &&
+                       entity_animation_workflow_frame <= 19U &&
+                       ui_animation_auto_key_seen) {
+                const auto type = entity_animation_workflow_frame == 18U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 19U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_auto_key_screen, type);
+            } else if (entity_animation_workflow_frame >= 21U &&
+                       entity_animation_workflow_frame <= 23U &&
+                       ui_animation_playhead_seen) {
+                const auto type = entity_animation_workflow_frame == 22U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 23U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_playhead_target_screen, type);
+            } else if (entity_animation_workflow_frame >= 25U &&
+                       entity_animation_workflow_frame <= 28U) {
+                const auto target = canvas.entity_gizmo_screen;
+                const bool moved = entity_animation_workflow_frame >= 27U;
+                const ImVec2 position{
+                    target.x + (moved ? 48.0F : 0.0F), target.y};
+                const auto type = entity_animation_workflow_frame == 26U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 28U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(position, type);
             }
         }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 21U &&
@@ -11778,7 +11845,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 workflow_animation_id = session.selected_resource()->id.value;
             }
             ++entity_animation_workflow_frame;
-            if (entity_animation_workflow_frame >= 18U) {
+            if (entity_animation_workflow_frame >= 31U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool entity_created = saved &&
@@ -11807,13 +11874,20 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     std::ranges::any_of(
                         reloaded.selected_animation()->tracks,
                         [](const auto& track) {
-                            return track.binding.component_id == "transform" &&
-                                track.binding.property_id == "rotationDegrees" &&
-                                !track.keys.empty();
+                            if (track.binding.component_id != "transform" ||
+                                track.binding.property_id != "position" ||
+                                track.keys.size() < 2U)
+                                return false;
+                            return track.keys.front().time == 0.0F &&
+                                std::ranges::any_of(
+                                    track.keys, [](const auto& key) {
+                                        return key.time > 0.5F;
+                                    });
                         });
                 entity_animation_workflow_complete =
                     ui_entity_from_visual_seen && ui_entity_animate_seen &&
-                    ui_animation_create_seen && ui_animation_quick_key_seen &&
+                    ui_animation_create_seen && ui_workflow_position_key_seen &&
+                    ui_animation_auto_key_seen && ui_animation_playhead_seen &&
                     entity_created && animation_created && key_persisted;
                 write_entity_animation_workflow_probe(
                     initial_project, entity_created, animation_created,
