@@ -19,7 +19,13 @@ if(STUDIO_RESULT EQUAL 0)
         message(FATAL_ERROR "Map Studio accessibility probe was not produced")
     endif()
     file(READ "${ARTIFACT}" RESULT)
-    foreach(REQUIRED_RESULT "\"keyboard_navigation_enabled\": true" "\"text_window_contrast_ok\": true" "\"visual_valid\": true")
+    foreach(REQUIRED_RESULT
+            "\"keyboard_navigation_enabled\": true"
+            "\"text_window_contrast_ok\": true"
+            "\"workspace_rendered\": true"
+            "\"layers_canvas_inspector_order\": true"
+            "\"canvas_minimum_width_ok\": true"
+            "\"visual_valid\": true")
         string(FIND "${RESULT}" "${REQUIRED_RESULT}" POSITION)
         if(POSITION LESS 0)
             message(FATAL_ERROR "Map Studio accessibility probe is missing ${REQUIRED_RESULT}")

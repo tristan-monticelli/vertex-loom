@@ -127,12 +127,17 @@ C4Component
   Son état est éphémère et partagé par les previews raster, vectorielles,
   Entity, Animation et composition. La Timeline Animation reste dockée sous le
   Viewer et ne déplace jamais l'Inspector.
-- Map Studio conserve ses deux panneaux `map-layers-pane` et
-  `map-selection-pane`, avec splitter borné ; les sous-zones `Layers` et
+- Map Studio utilise `map-layers-pane` à gauche, `map-canvas-pane` au centre et
+  `map-selection-pane` à droite, avec deux splitters bornés ; les sous-zones `Layers` et
   `Events` sont repliables et portent des IDs stables pour la navigation clavier
   dans les cartes volumineuses. Ses pickers de dossiers trient les ressources,
   affichent une hiérarchie logique repliable et restaurent le focus sur la
   sélection active.
+- L'accueil de Map Studio sépare ouverture et création. Le nom visible suffit à
+  créer une map ; son identifiant de fichier est généré et prévisualisé.
+- Le canvas Map expose cadrage de la sélection ou de toute la map, zoom et grille
+  dans sa barre principale ; le snapping reste un réglage repliable. Choisir une
+  ressource de placement préremplit un identifiant d'instance unique.
 - Les actions principales désactivées d’Asset Studio expliquent désormais leur
   précondition au survol pour les remplacements, suppressions, renommages,
   créations de comportements et transformations, ainsi que la pose de clés
