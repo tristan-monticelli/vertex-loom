@@ -179,6 +179,7 @@ if(DEFINED WORKFLOW_ARTIFACT)
     file(READ "${TEST_ROOT}/project/${WORKFLOW_ARTIFACT}" WORKFLOW_RESULT)
     foreach(REQUIRED_RESULT
             "\"entity_from_visual_button_seen\": true"
+            "\"create_entity_from_visuals_action_invoked\": true"
             "\"entity_created_by_click\": true"
             "\"child_added_by_drag\": true"
             "\"child_composed_after_reload\": true"

@@ -283,10 +283,12 @@ enfant, deux clés Position, le temps corrigé et le marqueur au même temps. So
 artefact JSON distingue chaque widget vu, chaque création par clic, l'avancée
 effective de la lecture et les données persistées ; une capture PPM conserve le
 workspace final.
-Le clic `Animate selected node...` n'appelle pas directement le formulaire :
-il doit invoquer l'action contextuelle `animate_selection` du registre partagé.
-Le rapport E2E distingue le widget vu, le clic physique et l'invocation réussie
-du registre, afin qu'un retour à une branche UI locale fasse échouer la preuve.
+Les clics `Create Entity from visual` et `Animate selected node...` n'appellent
+pas directement leurs formulaires : ils doivent invoquer les actions
+contextuelles `create_entity_from_visuals` et `animate_selection` du registre
+partagé. Le rapport E2E distingue les widgets vus, les clics physiques et les
+invocations réussies du registre, afin qu'un retour à une branche UI locale
+fasse échouer la preuve.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires

@@ -69,8 +69,10 @@ tangentes, composition additive et segment A→B sont avancés, jamais requis po
 la première animation. Voir ADR-0147 et ADR-0150.
 
 La sélection de ressources accepte Cmd/Ctrl pour regrouper plusieurs textures,
-vectoriels ou composants. `Create Entity from N visuals` publie alors la racine
-et ses blocs enfants en une seule transition. Dans l'Entity, l'arbre récursif,
+vectoriels ou composants. Elle appartient au workspace, pas à une variable
+statique cachée dans le widget. `create_entity_from_visuals`, invoquée par le
+bouton, le menu contextuel et la palette, prépare alors la racine et ses blocs
+enfants en une seule transition. Dans l'Entity, l'arbre récursif,
 le canvas et l'inspecteur partagent une sélection primaire et un groupe. Un
 drag de nœud change son parent après validation de cycle ; un drag du gizmo
 déplace atomiquement tous les nœuds sélectionnés non verrouillés. Changer

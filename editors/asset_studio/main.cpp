@@ -137,6 +137,7 @@ bool ui_entity_ik_create_clicked = false;
 ImVec2 ui_entity_ik_create_screen{};
 bool ui_entity_animation_workflow_probe_enabled = false;
 bool ui_entity_from_visual_seen = false;
+bool ui_entity_from_visual_action_invoked = false;
 bool ui_entity_animate_seen = false;
 bool ui_entity_animate_clicked = false;
 bool ui_entity_animate_action_invoked = false;
@@ -1158,9 +1159,78 @@ std::string_view studio_resource_kind_label(
     return "resource";
 }
 
+using VisualResourceSelection =
+    std::pair<fabric::editor::StudioResourceKind, fabric::core::ResourceId>;
+
+std::vector<fabric::editor::StudioResource> resolve_selected_visuals(
+    const fabric::editor::ProjectSession& session,
+    const std::vector<VisualResourceSelection>& selection) {
+    std::vector<fabric::editor::StudioResource> resources;
+    resources.reserve(selection.size());
+    for (const auto& [kind, id] : selection) {
+        const auto resource = std::ranges::find_if(
+            session.resources(), [&](const auto& candidate) {
+                return candidate.kind == kind && candidate.id == id;
+            });
+        if (resource != session.resources().end()) resources.push_back(*resource);
+    }
+    return resources;
+}
+
+bool prepare_entity_from_visuals(
+    fabric::editor::ProjectSession& session,
+    const std::vector<fabric::editor::StudioResource>& resources,
+    CreationUiState& creation, std::string& status) {
+    if (resources.empty()) return false;
+    const auto& resource = resources.front();
+    fabric::editor::CreateEntityPrompt prompt;
+    const auto base_name = resources.size() == 1U
+        ? resource.name + " Entity" : "Composed Entity";
+    prompt.name = base_name;
+    for (std::size_t suffix = 2U; std::ranges::any_of(
+             session.resources(), [&](const auto& candidate) {
+                 return candidate.id == fabric::editor::generated_resource_id(
+                     prompt.name, "entity");
+             }); ++suffix)
+        prompt.name = base_name + " " + std::to_string(suffix);
+    prompt.node_name = resource.name;
+    prompt.resource_id = resource.id.value;
+    prompt.drawable = resource.kind ==
+            fabric::editor::StudioResourceKind::texture
+        ? fabric::project::EntityDrawableKind::texture
+        : resource.kind ==
+              fabric::editor::StudioResourceKind::visual_component
+        ? fabric::project::EntityDrawableKind::visual_component
+        : fabric::project::EntityDrawableKind::vector;
+    for (std::size_t index = 1U; index < resources.size(); ++index) {
+        const auto& selected = resources[index];
+        prompt.blocks.push_back({
+            .name = selected.name,
+            .drawable = selected.kind ==
+                    fabric::editor::StudioResourceKind::texture
+                ? fabric::project::EntityDrawableKind::texture
+                : selected.kind ==
+                      fabric::editor::StudioResourceKind::visual_component
+                ? fabric::project::EntityDrawableKind::visual_component
+                : fabric::project::EntityDrawableKind::vector,
+            .resource_id = selected.id.value,
+            .z_order = static_cast<float>(index),
+        });
+    }
+    creation.prepared_entity = std::move(prompt);
+    creation.guided_contextual_entity = true;
+    creation.request_entity = true;
+    status = resources.size() == 1U
+        ? "Create an Entity from the selected visual."
+        : "Create an Entity from the selected visuals.";
+    return true;
+}
+
 void draw_project_tree(fabric::editor::ProjectSession& session,
-                       CreationUiState& creation,
-                       AssetPreview& preview, std::string& status) {
+                       AssetPreview& preview,
+                       std::vector<VisualResourceSelection>& selected_visuals,
+                       fabric::editor::EditorActionRegistry& actions,
+                       std::string& status) {
     if (!session.has_project()) {
         ImGui::TextDisabled("No project open");
         ImGui::Spacing();
@@ -1183,7 +1253,6 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     static std::optional<fabric::editor::StudioResource> duplicate_options_request;
     static std::vector<fabric::editor::StudioResource> duplicate_candidates;
     static std::vector<char> duplicate_candidate_selected;
-    static std::vector<fabric::editor::StudioResource> selected_visuals;
     bool open_delete_popup = false;
     bool open_rename_popup = false;
     bool open_duplicate_options_popup = false;
@@ -1213,54 +1282,10 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
         };
     std::erase_if(selected_visuals, [&](const auto& selected) {
         return std::ranges::none_of(session.resources(), [&](const auto& resource) {
-            return resource.kind == selected.kind && resource.id == selected.id;
+            return resource.kind == selected.first &&
+                resource.id == selected.second;
         });
     });
-    const auto request_entity_from_visuals =
-        [&](const std::vector<fabric::editor::StudioResource>& resources) {
-            if (resources.empty()) return;
-            const auto& resource = resources.front();
-            fabric::editor::CreateEntityPrompt prompt;
-            const auto base_name = resources.size() == 1U
-                ? resource.name + " Entity" : "Composed Entity";
-            prompt.name = base_name;
-            for (std::size_t suffix = 2U; std::ranges::any_of(
-                     session.resources(), [&](const auto& candidate) {
-                         return candidate.id == fabric::editor::generated_resource_id(
-                             prompt.name, "entity");
-                     }); ++suffix)
-                prompt.name = base_name + " " + std::to_string(suffix);
-            prompt.node_name = resource.name;
-            prompt.resource_id = resource.id.value;
-            prompt.drawable = resource.kind ==
-                    fabric::editor::StudioResourceKind::texture
-                ? fabric::project::EntityDrawableKind::texture
-                : resource.kind ==
-                      fabric::editor::StudioResourceKind::visual_component
-                ? fabric::project::EntityDrawableKind::visual_component
-                : fabric::project::EntityDrawableKind::vector;
-            for (std::size_t index = 1U; index < resources.size(); ++index) {
-                const auto& selected = resources[index];
-                prompt.blocks.push_back({
-                    .name = selected.name,
-                    .drawable = selected.kind ==
-                            fabric::editor::StudioResourceKind::texture
-                        ? fabric::project::EntityDrawableKind::texture
-                        : selected.kind ==
-                              fabric::editor::StudioResourceKind::visual_component
-                        ? fabric::project::EntityDrawableKind::visual_component
-                        : fabric::project::EntityDrawableKind::vector,
-                    .resource_id = selected.id.value,
-                    .z_order = static_cast<float>(index),
-                });
-            }
-            creation.prepared_entity = std::move(prompt);
-            creation.guided_contextual_entity = true;
-            creation.request_entity = true;
-            status = resources.size() == 1U
-                ? "Create an Entity from the selected visual."
-                : "Create an Entity from the selected visuals.";
-        };
     filter.Draw("Search", -1.0F);
     static int kind_filter{};
     const char* kind_filters[] = {
@@ -1277,13 +1302,18 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
     ImGui::TextDisabled("generated paths, borders and compositions");
     if (const auto* selected = session.selected_resource()) {
         if (is_entity_artwork_kind(selected->kind) && selected_visuals.empty())
-            selected_visuals.push_back(*selected);
+            selected_visuals.emplace_back(selected->kind, selected->id);
         if (!selected_visuals.empty()) {
             const auto label = selected_visuals.size() == 1U
                 ? std::string{"Create Entity from visual"}
                 : "Create Entity from " +
                       std::to_string(selected_visuals.size()) + " visuals";
+            const auto action_state = actions.availability(
+                fabric::editor::editor_action_ids::
+                    create_entity_from_visuals);
+            ImGui::BeginDisabled(!action_state.enabled);
             const bool create_entity_clicked = ImGui::Button(label.c_str());
+            ImGui::EndDisabled();
             if (ui_entity_animation_workflow_probe_enabled &&
                 selected->id.value == "beam") {
                 const auto minimum = ImGui::GetItemRectMin();
@@ -1294,7 +1324,11 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 ui_entity_from_visual_seen = true;
             }
             if (create_entity_clicked)
-                request_entity_from_visuals(selected_visuals);
+                static_cast<void>(actions.invoke(
+                    fabric::editor::editor_action_ids::
+                        create_entity_from_visuals));
+            draw_disabled_reason(!action_state.enabled,
+                                 action_state.disabled_reason);
         }
         if (is_entity_artwork_kind(selected->kind)) same_line_if_room(82.0F);
         if (ImGui::Button("Actions..."))
@@ -1363,8 +1397,8 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 selected->kind == resource.kind && selected->id == resource.id;
             const bool is_visual_selected = std::ranges::any_of(
                 selected_visuals, [&](const auto& candidate) {
-                    return candidate.kind == resource.kind &&
-                        candidate.id == resource.id;
+                    return candidate.first == resource.kind &&
+                        candidate.second == resource.id;
                 });
             const std::string item_label = resource.name + "##resource-row-" +
                 resource.id.value;
@@ -1376,14 +1410,15 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
                 if (is_entity_artwork_kind(resource.kind)) {
                     const auto found = std::ranges::find_if(
                         selected_visuals, [&](const auto& candidate) {
-                            return candidate.kind == resource.kind &&
-                                candidate.id == resource.id;
+                            return candidate.first == resource.kind &&
+                                candidate.second == resource.id;
                         });
                     if (!additive) selected_visuals.clear();
                     if (additive && found != selected_visuals.end())
                         selected_visuals.erase(found);
                     else
-                        selected_visuals.push_back(resource);
+                        selected_visuals.emplace_back(resource.kind,
+                                                      resource.id);
                 } else {
                     selected_visuals.clear();
                 }
@@ -1412,8 +1447,12 @@ void draw_project_tree(fabric::editor::ProjectSession& session,
             }
             if (ImGui::BeginPopupContextItem()) {
                 if (is_entity_artwork_kind(resource.kind) &&
-                    ImGui::MenuItem("Create Entity from this visual"))
-                    request_entity_from_visuals({resource});
+                    ImGui::MenuItem("Create Entity from this visual")) {
+                    selected_visuals = {{resource.kind, resource.id}};
+                    static_cast<void>(actions.invoke(
+                        fabric::editor::editor_action_ids::
+                            create_entity_from_visuals));
+                }
                 if (is_entity_artwork_kind(resource.kind)) ImGui::Separator();
                 if (ImGui::MenuItem("Duplicate")) {
                     duplicate_request = resource;
@@ -2109,6 +2148,8 @@ void write_entity_animation_workflow_probe(
     const nlohmann::json probe = {
         {"schema", "asset-studio-entity-animation-workflow-v1"},
         {"entity_from_visual_button_seen", ui_entity_from_visual_seen},
+        {"create_entity_from_visuals_action_invoked",
+         ui_entity_from_visual_action_invoked},
         {"entity_created_by_click", entity_created},
         {"child_added_by_drag", ui_drag_probe_applied},
         {"child_composed_after_reload", child_composed},
@@ -2780,6 +2821,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     SDL_Window* window,
                     std::array<char, 1024>& path_buffer,
                     CreationUiState& creation,
+                    std::vector<VisualResourceSelection>& selected_visuals,
                     ImportUiState& imports,
                     AssetPreview& preview,
                     AssetPreview& pending_import_preview,
@@ -2988,7 +3030,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             }));
         ImGui::Separator();
     }
-    draw_project_tree(session, creation, preview, status);
+    draw_project_tree(session, preview, selected_visuals, actions, status);
     if (!session.has_project()) {
         ImGui::Spacing();
         if (ImGui::Button("Create project", {-1.0F, 0.0F})) {
@@ -7869,6 +7911,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     }
     std::array<char, 1024> path_buffer{};
     CreationUiState creation;
+    std::vector<VisualResourceSelection> selected_visuals;
     ImportUiState imports;
     AssetPreview preview;
     AssetPreview pending_import_preview;
@@ -7992,6 +8035,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_entity_animation_workflow_probe_enabled = true;
         animation_inspector_probe.workflow_enabled = true;
         ui_entity_from_visual_seen = false;
+        ui_entity_from_visual_action_invoked = false;
         ui_entity_animate_seen = false;
         ui_entity_animate_clicked = false;
         ui_entity_animate_action_invoked = false;
@@ -8624,6 +8668,33 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             const bool redone = session.redo();
             if (redone) status = "Change redone.";
             return redone;
+        },
+    }));
+    static_cast<void>(actions.register_action({
+        .id = std::string{
+            fabric::editor::editor_action_ids::create_entity_from_visuals},
+        .label = "Create Entity from selected visuals...",
+        .availability = [&] {
+            const auto resources =
+                resolve_selected_visuals(session, selected_visuals);
+            const bool complete_selection = !resources.empty() &&
+                resources.size() == selected_visuals.size();
+            return fabric::editor::EditorActionAvailability{
+                .enabled = complete_selection,
+                .disabled_reason =
+                    "Select one or more visual resources first.",
+            };
+        },
+        .execute = [&] {
+            const auto resources =
+                resolve_selected_visuals(session, selected_visuals);
+            if (resources.empty() || resources.size() != selected_visuals.size())
+                return false;
+            const bool prepared = prepare_entity_from_visuals(
+                session, resources, creation, status);
+            if (prepared && ui_entity_animation_workflow_probe_enabled)
+                ui_entity_from_visual_action_invoked = true;
+            return prepared;
         },
     }));
     static_cast<void>(actions.register_action({
@@ -9797,7 +9868,8 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         draw_workspace(session, editor_context, behavior_session,
                        behavior_workspace_state, behavior_workspace_probe,
                        transformation_session,
-                       window, path_buffer, creation, imports, preview,
+                       window, path_buffer, creation, selected_visuals,
+                       imports, preview,
                        pending_import_preview, texture_cache, canvas, entity_preview,
                        visual_preview,
                        animation_ui, animation_timeline_probe,
@@ -10655,7 +10727,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                             child_id, *corrected_key_time);
                 }
                 entity_animation_workflow_complete =
-                    ui_entity_from_visual_seen && ui_entity_animate_seen &&
+                    ui_entity_from_visual_seen &&
+                    ui_entity_from_visual_action_invoked &&
+                    ui_entity_animate_seen &&
                     ui_entity_animate_clicked &&
                     ui_entity_animate_action_invoked &&
                     ui_animation_create_seen && animation_inspector_probe.workflow_position_key_seen &&

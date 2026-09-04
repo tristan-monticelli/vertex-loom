@@ -20,6 +20,8 @@ inline constexpr std::string_view undo = "undo";
 inline constexpr std::string_view redo = "redo";
 inline constexpr std::string_view navigate_back = "navigate_back";
 inline constexpr std::string_view navigate_forward = "navigate_forward";
+inline constexpr std::string_view create_entity_from_visuals =
+    "create_entity_from_visuals";
 inline constexpr std::string_view animate_selection = "animate_selection";
 } // namespace editor_action_ids
 
