@@ -135,6 +135,9 @@ l'inspecteur partagent cet état explicite sans recopier le clip persistant.
 L'inspecteur Animation rejoint ensuite ce module : preview Entity, propriétés
 de clip, raccourcis de clés, marqueurs, édition avancée et diagnostics restent
 des commandes `ProjectSession`, avec une sonde E2E explicitement injectée.
+La migration Entity commence par le sous-workspace Rig/Physics : contraintes,
+IK, déformation et XPBD quittent le shell, mais chaque édition remplace une
+`EntityDefinition` validée par la session existante.
 Publish est désormais un module Map Studio dédié : racine Map/Scene,
 fermeture et runtime minimal visibles, destination neuve obligatoire, puis
 chargement et smoke d'une frame sur le paquet exact. L'E2E Mechanics enchaîne

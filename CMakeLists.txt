@@ -295,6 +295,7 @@ if(FABRIC_BUILD_EDITORS)
         editors/asset_studio/animation_inspector.cpp
         editors/asset_studio/animation_timeline_workspace.cpp
         editors/asset_studio/behavior_workspace.cpp
+        editors/asset_studio/entity_rig_inspector.cpp
         editors/asset_studio/vector_canvas.cpp
         editors/asset_studio/preview_canvas.cpp
         editors/asset_studio/import_workflow.cpp
