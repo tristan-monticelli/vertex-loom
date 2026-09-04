@@ -186,7 +186,13 @@ if(DEFINED WORKFLOW_ARTIFACT)
             "\"position_key_button_seen\": true"
             "\"auto_key_button_seen\": true"
             "\"playhead_seen\": true"
-            "\"key_persisted_after_reload\": true")
+            "\"play_button_seen\": true"
+            "\"playback_advanced\": true"
+            "\"second_key_seen\": true"
+            "\"event_button_seen\": true"
+            "\"key_persisted_after_reload\": true"
+            "\"key_corrected_after_reload\": true"
+            "\"event_persisted_after_reload\": true")
         string(FIND "${WORKFLOW_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)
             message(FATAL_ERROR "Entity to Animation workflow probe is missing ${REQUIRED_RESULT}")

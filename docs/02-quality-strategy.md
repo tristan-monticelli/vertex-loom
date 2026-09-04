@@ -217,10 +217,13 @@ Le test `asset_studio_entity_animation_workflow_e2e` ne prépare aucun document
 Entity ou Animation. Il part du composant visuel `beam`, clique successivement
 `Create Entity from visual`, `Animate selected node...`, `Create animation` et
 `Key Position`, active `Auto-key`, déplace le playhead à travers son contrôle et
-fait glisser le gizmo pour créer la seconde pose. Après sauvegarde/rechargement,
-il exige la cible Entity et deux clés Position. Son artefact JSON distingue
-chaque widget vu, chaque création par clic et les clés persistées ; une capture
-PPM conserve le workspace final.
+fait glisser le gizmo pour créer la seconde pose. Il lance puis suspend la
+lecture, déplace le second losange sur la Timeline et ajoute un événement au
+playhead par l'action rapide. Après sauvegarde/rechargement, il exige la cible
+Entity, deux clés Position, le temps corrigé et le marqueur au même temps. Son
+artefact JSON distingue chaque widget vu, chaque création par clic, l'avancée
+effective de la lecture et les données persistées ; une capture PPM conserve le
+workspace final.
 Le workflow `platform-studio.yml` exécute l’ensemble CTest sur une matrice
 macOS/Windows/Linux et archive les artefacts UI et d’échec de chaque runner ;
 son runner Linux installe les headers X11, Wayland, GTK3 et audio nécessaires

@@ -93,6 +93,9 @@ modifiable dans la modale courte avant validation.
 Le scénario continue dans le workspace Animation en cliquant `Key Position`,
 `Auto-key`, le playhead puis en déplaçant le gizmo. Les deux poses persistées
 doivent provenir de ces gestes et non d'un segment A→B préparé par la session.
+Il poursuit par lecture/pause, drag du second losange et
+`Add event at playhead`. Le marqueur reçoit un nom unique automatiquement ; le
+volet avancé ne sert que pour son identité, son temps exact ou son cue audio.
 
 `Animation Graph` est un panneau dédié ouvert depuis l'Entity. Il édite des
 états toujours associés à un clip existant, leurs transitions, conditions,

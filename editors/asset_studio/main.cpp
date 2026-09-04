@@ -108,6 +108,14 @@ bool ui_animation_playhead_seen = false;
 ImVec2 ui_workflow_position_key_screen{};
 ImVec2 ui_animation_auto_key_screen{};
 ImVec2 ui_animation_playhead_target_screen{};
+bool ui_animation_play_seen = false;
+bool ui_animation_playback_advanced = false;
+bool ui_animation_marker_seen = false;
+bool ui_animation_second_key_seen = false;
+ImVec2 ui_animation_play_screen{};
+ImVec2 ui_animation_marker_screen{};
+ImVec2 ui_animation_second_key_screen{};
+std::optional<float> ui_animation_second_key_original_time;
 bool ui_animation_graph_probe_enabled = false;
 bool ui_animation_graph_seen = false;
 bool ui_animation_graph_canvas_seen = false;
@@ -655,7 +663,11 @@ void draw_animation_timeline_dock(
     if (ui_animation_probe_enabled) ui_animation_timeline_seen = true;
     auto& clip = *session.selected_animation();
     if (ui.playing) {
+        const float before = ui.scrub_time;
         ui.scrub_time += ImGui::GetIO().DeltaTime;
+        if (ui_entity_animation_workflow_probe_enabled &&
+            ui.scrub_time > before)
+            ui_animation_playback_advanced = true;
         if (ui.scrub_time > clip.duration) {
             if (clip.loop && clip.duration > 0.0F) {
                 ui.scrub_time = std::fmod(ui.scrub_time, clip.duration);
@@ -668,11 +680,34 @@ void draw_animation_timeline_dock(
 
     ImGui::TextUnformatted("Timeline");
     ImGui::SameLine();
+    std::optional<std::string> quick_marker;
     if (ImGui::Button(ui.playing ? "Pause" : "Play")) ui.playing = !ui.playing;
+    if (ui_entity_animation_workflow_probe_enabled) {
+        const auto minimum = ImGui::GetItemRectMin();
+        const auto maximum = ImGui::GetItemRectMax();
+        ui_animation_play_screen = {(minimum.x + maximum.x) * 0.5F,
+                                    (minimum.y + maximum.y) * 0.5F};
+        ui_animation_play_seen = true;
+    }
     ImGui::SameLine();
     if (ImGui::Button("Stop")) {
         ui.playing = false;
         ui.scrub_time = 0.0F;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add event at playhead")) {
+        std::string id = "event-" + std::to_string(clip.markers.size() + 1U);
+        while (std::ranges::any_of(clip.markers, [&](const auto& marker) {
+            return marker.id == id;
+        })) id += "-copy";
+        quick_marker = std::move(id);
+    }
+    if (ui_entity_animation_workflow_probe_enabled) {
+        const auto minimum = ImGui::GetItemRectMin();
+        const auto maximum = ImGui::GetItemRectMax();
+        ui_animation_marker_screen = {(minimum.x + maximum.x) * 0.5F,
+                                      (minimum.y + maximum.y) * 0.5F};
+        ui_animation_marker_seen = true;
     }
     ImGui::SameLine();
     ImGui::Text("%.2f / %.2f s", ui.scrub_time, clip.duration);
@@ -852,6 +887,14 @@ void draw_animation_timeline_dock(
             const float key_time = dragging ? ui.dragging_key_time
                                             : track.keys[key_index].time;
             const float x = x_for_time(key_time);
+            if (ui_entity_animation_workflow_probe_enabled &&
+                track.binding.property_id == "position" && key_index == 1U) {
+                ui_animation_second_key_screen = {x, center};
+                ui_animation_second_key_seen = true;
+                if (!ui_animation_second_key_original_time)
+                    ui_animation_second_key_original_time =
+                        track.keys[key_index].time;
+            }
             const bool selected = std::ranges::any_of(
                 ui.selected_keys, [&](const auto& value) {
                     return same_animation_key(value, candidate);
@@ -975,6 +1018,12 @@ void draw_animation_timeline_dock(
         ui.dragging_key.reset();
     }
     ImGui::EndChild();
+    if (quick_marker) {
+        status = session.insert_selected_animation_marker(
+            *quick_marker, ui.scrub_time, std::nullopt)
+            ? "Animation event added at playhead."
+            : "Animation event rejected; inspect diagnostics.";
+    }
 }
 
 struct TexturedPathUiState {
@@ -2533,7 +2582,8 @@ void write_ui_button_probe(const std::filesystem::path& project_path) {
 void write_entity_animation_workflow_probe(
     const std::filesystem::path& project_path,
     const bool entity_created, const bool animation_created,
-    const bool key_persisted) {
+    const bool key_persisted, const bool key_corrected,
+    const bool marker_persisted) {
     if (project_path.empty()) return;
     const nlohmann::json probe = {
         {"schema", "asset-studio-entity-animation-workflow-v1"},
@@ -2547,7 +2597,13 @@ void write_entity_animation_workflow_probe(
         {"position_key_button_seen", ui_workflow_position_key_seen},
         {"auto_key_button_seen", ui_animation_auto_key_seen},
         {"playhead_seen", ui_animation_playhead_seen},
+        {"play_button_seen", ui_animation_play_seen},
+        {"playback_advanced", ui_animation_playback_advanced},
+        {"second_key_seen", ui_animation_second_key_seen},
+        {"event_button_seen", ui_animation_marker_seen},
         {"key_persisted_after_reload", key_persisted},
+        {"key_corrected_after_reload", key_corrected},
+        {"event_persisted_after_reload", marker_persisted},
     };
     std::ofstream output(
         project_path / "asset-studio-entity-animation-workflow.json");
@@ -10272,6 +10328,11 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_workflow_position_key_seen = false;
         ui_animation_auto_key_seen = false;
         ui_animation_playhead_seen = false;
+        ui_animation_play_seen = false;
+        ui_animation_playback_advanced = false;
+        ui_animation_marker_seen = false;
+        ui_animation_second_key_seen = false;
+        ui_animation_second_key_original_time.reset();
         ui_animation_probe_enabled = true;
         static_cast<void>(session.select_resource(
             fabric::editor::StudioResourceKind::visual_component,
@@ -10857,6 +10918,47 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                     ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
                     : std::nullopt;
                 push_workflow_mouse(position, type);
+            } else if (entity_animation_workflow_frame >= 30U &&
+                       entity_animation_workflow_frame <= 32U &&
+                       ui_animation_play_seen) {
+                const auto type = entity_animation_workflow_frame == 31U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 32U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_play_screen, type);
+            } else if (entity_animation_workflow_frame >= 37U &&
+                       entity_animation_workflow_frame <= 39U &&
+                       ui_animation_play_seen) {
+                const auto type = entity_animation_workflow_frame == 38U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 39U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_play_screen, type);
+            } else if (entity_animation_workflow_frame >= 41U &&
+                       entity_animation_workflow_frame <= 44U &&
+                       ui_animation_second_key_seen) {
+                const bool moved = entity_animation_workflow_frame >= 43U;
+                const ImVec2 position{
+                    ui_animation_second_key_screen.x -
+                        (moved ? 32.0F : 0.0F),
+                    ui_animation_second_key_screen.y};
+                const auto type = entity_animation_workflow_frame == 42U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 44U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(position, type);
+            } else if (entity_animation_workflow_frame >= 46U &&
+                       entity_animation_workflow_frame <= 48U &&
+                       ui_animation_marker_seen) {
+                const auto type = entity_animation_workflow_frame == 47U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONDOWN}
+                    : entity_animation_workflow_frame == 48U
+                    ? std::optional<Uint32>{SDL_MOUSEBUTTONUP}
+                    : std::nullopt;
+                push_workflow_mouse(ui_animation_marker_screen, type);
             }
         }
         if (vector_canvas_e2e && vector_canvas_e2e_frame == 21U &&
@@ -12206,7 +12308,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 workflow_animation_id = session.selected_resource()->id.value;
             }
             ++entity_animation_workflow_frame;
-            if (entity_animation_workflow_frame >= 31U) {
+            if (entity_animation_workflow_frame >= 52U) {
                 const bool saved = session.save();
                 fabric::editor::ProjectSession reloaded;
                 const bool entity_created = saved &&
@@ -12245,14 +12347,44 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                                         return key.time > 0.5F;
                                     });
                         });
+                std::optional<float> corrected_key_time;
+                if (animation_created) {
+                    const auto position_track = std::ranges::find_if(
+                        reloaded.selected_animation()->tracks,
+                        [](const auto& track) {
+                            return track.binding.component_id == "transform" &&
+                                track.binding.property_id == "position" &&
+                                track.keys.size() >= 2U;
+                        });
+                    if (position_track !=
+                        reloaded.selected_animation()->tracks.end())
+                        corrected_key_time = position_track->keys[1U].time;
+                }
+                const bool key_corrected = corrected_key_time &&
+                    ui_animation_second_key_original_time &&
+                    *corrected_key_time > 0.0F &&
+                    *corrected_key_time <
+                        *ui_animation_second_key_original_time - 0.01F;
+                const bool marker_persisted = animation_created &&
+                    corrected_key_time &&
+                    std::ranges::any_of(
+                        reloaded.selected_animation()->markers,
+                        [&](const auto& marker) {
+                            return marker.id.starts_with("event-") &&
+                                std::abs(marker.time - *corrected_key_time) <
+                                    0.001F;
+                        });
                 entity_animation_workflow_complete =
                     ui_entity_from_visual_seen && ui_entity_animate_seen &&
                     ui_animation_create_seen && ui_workflow_position_key_seen &&
                     ui_animation_auto_key_seen && ui_animation_playhead_seen &&
-                    entity_created && animation_created && key_persisted;
+                    ui_animation_play_seen && ui_animation_playback_advanced &&
+                    ui_animation_second_key_seen && ui_animation_marker_seen &&
+                    entity_created && animation_created && key_persisted &&
+                    key_corrected && marker_persisted;
                 write_entity_animation_workflow_probe(
                     initial_project, entity_created, animation_created,
-                    key_persisted);
+                    key_persisted, key_corrected, marker_persisted);
                 write_frame_capture(
                     initial_project, window,
                     "asset-studio-entity-animation-workflow.ppm");
