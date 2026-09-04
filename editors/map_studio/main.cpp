@@ -911,6 +911,13 @@ int run(const std::filesystem::path& project_root,
     std::string instance_property_value;
     int instance_property_kind = 2;
     int instance_resource_kind = 3;
+    std::string path_follower_id;
+    float path_follower_progress = 0.0F;
+    float path_follower_speed = 0.0F;
+    bool path_follower_loop = true;
+    bool path_follower_orient = true;
+    float path_follower_rotation_offset = 0.0F;
+    std::string path_follower_bound_instance;
     std::string transformation_preview_id;
     std::string transformation_preview_result;
     ImVec2 canvas_pan{0.0F, 0.0F};
@@ -2403,6 +2410,62 @@ int run(const std::filesystem::path& project_root,
                         if (prefab != map.prefabs.end())
                             selected_entity = prefab->entity.id;
                     }
+                }
+                if (instance != map.instances.end()) {
+                    ImGui::SeparatorText("Path follower");
+                    if (path_follower_bound_instance != instance->id) {
+                        path_follower_bound_instance = instance->id;
+                        if (instance->path_follower) {
+                            path_follower_id = instance->path_follower->path.id.value;
+                            path_follower_progress = instance->path_follower->progress;
+                            path_follower_speed = instance->path_follower->speed;
+                            path_follower_loop = instance->path_follower->loop;
+                            path_follower_orient = instance->path_follower->orient_to_path;
+                            path_follower_rotation_offset = instance->path_follower->rotation_offset_degrees;
+                        } else {
+                            path_follower_id.clear();
+                            path_follower_progress = 0.0F;
+                            path_follower_speed = 0.0F;
+                            path_follower_loop = true;
+                            path_follower_orient = true;
+                            path_follower_rotation_offset = 0.0F;
+                        }
+                    }
+                    if (session.manifest()) {
+                        draw_resource_picker(
+                            "Path asset", session.project_root() /
+                                session.manifest()->directories.assets / "paths",
+                            ".textured-path.json", path_follower_id, &resource_catalog);
+                    }
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::DragFloat("Progress", &path_follower_progress, 0.01F, 0.0F, 1.0F);
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::DragFloat("Speed (world units/s)", &path_follower_speed, 0.1F, -4096.0F, 4096.0F);
+                    ImGui::Checkbox("Loop", &path_follower_loop);
+                    ImGui::Checkbox("Orient to tangent", &path_follower_orient);
+                    ImGui::SetNextItemWidth(180.0F);
+                    ImGui::DragFloat("Rotation offset (degrees)", &path_follower_rotation_offset, 1.0F);
+                    const bool path_enabled = !path_follower_id.empty();
+                    ImGui::BeginDisabled(!path_enabled);
+                    if (ImGui::Button("Apply path follower")) {
+                        fabric::project::PathFollowerState follower{
+                            .path = {{.value = path_follower_id}, "texturedPath"},
+                            .progress = path_follower_progress,
+                            .speed = path_follower_speed,
+                            .loop = path_follower_loop,
+                            .orient_to_path = path_follower_orient,
+                            .rotation_offset_degrees = path_follower_rotation_offset};
+                        status = session.set_instance_path_follower(selected_id, std::move(follower))
+                            ? "Path follower configured" : "Path follower rejected";
+                    }
+                    ImGui::EndDisabled();
+                    ImGui::SameLine();
+                    if (ImGui::Button("Remove path follower")) {
+                        status = session.set_instance_path_follower(selected_id, std::nullopt)
+                            ? "Path follower removed" : "Path follower removal rejected";
+                    }
+                    draw_disabled_reason(!path_enabled,
+                        "Choose a textured path before applying the follower.");
                 }
                 const auto transformations = load_transformations(
                     session.project_root(), *session.manifest());
