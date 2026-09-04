@@ -19,6 +19,7 @@
 #include "animation_publish_probe.hpp"
 #include "animation_timeline_workspace.hpp"
 #include "behavior_workspace.hpp"
+#include "entity_artwork_inspector.hpp"
 #include "entity_hierarchy_workspace.hpp"
 #include "entity_node_properties.hpp"
 #include "entity_rig_inspector.hpp"
@@ -68,6 +69,8 @@ using fabric::asset_studio::AnimationTimelineProbe;
 using fabric::asset_studio::AnimationWorkspaceState;
 using fabric::asset_studio::BehaviorWorkspaceProbe;
 using fabric::asset_studio::BehaviorWorkspaceState;
+using fabric::asset_studio::EntityArtworkInspectorProbe;
+using fabric::asset_studio::EntityArtworkInspectorState;
 using fabric::asset_studio::EntityRigInspectorProbe;
 using fabric::asset_studio::EntityHierarchyProbe;
 using fabric::asset_studio::ResourceDragPayload;
@@ -111,10 +114,10 @@ ImVec2 ui_override_texture_screen{};
 ImVec2 ui_override_cancel_screen{};
 ImVec2 ui_override_confirm_screen{};
 bool ui_override_kind_seen = false;
+bool ui_override_guided_mode_seen = false;
 bool ui_override_texture_seen = false;
 bool ui_override_cancel_seen = false;
 bool ui_override_confirm_seen = false;
-bool ui_override_force_modal = false;
 bool ui_texture_probe_enabled = false;
 bool ui_texture_canvas_seen = false;
 bool ui_texture_crop_applied = false;
@@ -2084,6 +2087,7 @@ void write_ui_override_probe(const std::filesystem::path& project_path) {
         {"cancel_preserved_override", ui_override_cancel_preserved},
         {"confirm_applied", ui_override_confirm_applied},
         {"kind_widget_seen", ui_override_kind_seen},
+        {"kind_widget_seen_in_guided_mode", ui_override_guided_mode_seen},
         {"texture_item_seen", ui_override_texture_seen},
         {"cancel_button_seen", ui_override_cancel_seen},
         {"confirm_button_seen", ui_override_confirm_seen}};
@@ -2839,9 +2843,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
                     EntityRigInspectorProbe& entity_rig_probe,
                     TexturedPathUiState& path_ui,
                     ProjectSettingsUiState& project_settings,
-                    std::optional<std::pair<std::size_t,
-                                            fabric::project::EntityDrawableKind>>&
-                        pending_drawable_kind,
+                    EntityArtworkInspectorState& entity_artwork_state,
                     bool& request_open,
                     bool& request_png,
                     bool& request_svg,
@@ -5380,40 +5382,7 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             if (!session.selected_entity()->nodes.empty()) {
             const auto& entity = *session.selected_entity();
             auto node = entity.nodes[canvas.selected_node];
-            const auto commit_entity_node =
-                [&](fabric::project::EntityNode changed) {
-                    if (session.set_selected_entity_node(
-                            canvas.selected_node, std::move(changed))) {
-                        status = "Entity node changed.";
-                    } else {
-                        status = "Entity change rejected; inspect diagnostics.";
-                    }
-                };
             ImGui::SeparatorText(node.name.c_str());
-            if (node.drawable.material &&
-                ImGui::CollapsingHeader("Appearance effects")) {
-                const auto loaded = fabric::project::load_material(
-                    session.project_root(), *session.manifest(),
-                    fabric::project::material_document_path(
-                        *session.manifest(), node.drawable.material->id));
-                if (loaded.ok() && loaded.asset->shader) {
-                    auto appearance = *loaded.asset;
-                    bool appearance_changed = draw_surface_effect_stack(
-                        *appearance.shader, "entity-material-effects");
-                    appearance_changed |= ImGui::SliderFloat(
-                        "Appearance opacity", &appearance.shader->opacity,
-                        0.0F, 1.0F);
-                    appearance_changed |= ImGui::SliderFloat(
-                        "Appearance intensity", &appearance.shader->intensity,
-                        0.0F, 4.0F);
-                    if (appearance_changed &&
-                        !session.set_referenced_material(
-                            node.drawable.material->id,
-                            std::move(appearance))) {
-                        status = "Appearance change rejected; inspect diagnostics.";
-                    }
-                }
-            }
             const fabric::asset_studio::EntityNodePropertiesProbe
                 properties_probe{
                     .enabled = animation_graph_probe.enabled,
@@ -5424,410 +5393,37 @@ void draw_workspace(fabric::editor::ProjectSession& session,
             fabric::asset_studio::draw_entity_node_properties(
                 session, canvas.selected_node, node, entity_advanced_mode,
                 status, &properties_probe);
-            ImGui::BeginDisabled(node.locked);
-            ImGui::SeparatorText("Artwork");
-            const auto drawable_label = std::string(
-                fabric::project::to_string(node.drawable.kind));
-            const auto apply_drawable_kind =
-                [&](fabric::project::EntityNode& changed,
-                    const fabric::project::EntityDrawableKind kind) {
-                    changed.drawable.kind = kind;
-                    if (kind == fabric::project::EntityDrawableKind::none) {
-                        changed.drawable.resource.reset();
-                        changed.drawable.material.reset();
-                        changed.drawable.component_instance.reset();
-                        return true;
-                    }
-                    const auto resource_kind = kind ==
-                            fabric::project::EntityDrawableKind::texture
-                        ? fabric::editor::StudioResourceKind::texture
-                        : kind == fabric::project::EntityDrawableKind::vector
-                        ? fabric::editor::StudioResourceKind::vector
-                        : fabric::editor::StudioResourceKind::visual_component;
-                    const auto first = std::ranges::find_if(
-                        session.resources(), [&](const auto& resource) {
-                            return resource.kind == resource_kind;
-                        });
-                    if (first == session.resources().end()) return false;
-                    const char* expected = kind ==
-                            fabric::project::EntityDrawableKind::texture
-                        ? "texture"
-                        : kind == fabric::project::EntityDrawableKind::vector
-                        ? "vector" : "visualComponent";
-                    const bool reference_exists = changed.drawable.resource &&
-                        std::ranges::any_of(
-                            session.resources(), [&](const auto& resource) {
-                                return resource.kind == resource_kind &&
-                                    resource.id == changed.drawable.resource->id;
-                            });
-                    if (!changed.drawable.resource ||
-                        changed.drawable.resource->expected_type != expected ||
-                        !reference_exists)
-                        changed.drawable.resource =
-                            fabric::project::ResourceReference{first->id, expected};
-                    if (kind == fabric::project::EntityDrawableKind::visual_component) {
-                        changed.drawable.material.reset();
-                        if (!changed.drawable.component_instance)
-                            changed.drawable.component_instance =
-                                fabric::project::VisualComponentInstance{};
-                    } else {
-                        changed.drawable.component_instance.reset();
-                    }
-                    return true;
-                };
-            if (node.drawable.kind !=
-                    fabric::project::EntityDrawableKind::none &&
-                node.drawable.resource) {
-                const auto expected_kind = node.drawable.kind ==
-                        fabric::project::EntityDrawableKind::texture
-                    ? fabric::editor::StudioResourceKind::texture
-                    : node.drawable.kind ==
-                          fabric::project::EntityDrawableKind::vector
-                    ? fabric::editor::StudioResourceKind::vector
-                    : fabric::editor::StudioResourceKind::visual_component;
-                const bool reference_exists = std::ranges::any_of(
-                    session.resources(), [&](const auto& resource) {
-                        return resource.kind == expected_kind &&
-                            resource.id == node.drawable.resource->id;
-                    });
-                if (!reference_exists) {
-                    ImGui::TextColored({0.95F, 0.65F, 0.25F, 1.0F},
-                                       "Missing %s: %s",
-                                       studio_resource_kind_label(expected_kind).data(),
-                                       node.drawable.resource->id.value.c_str());
-                    if (ImGui::Button("Repair with first compatible resource")) {
-                        if (apply_drawable_kind(node, node.drawable.kind))
-                            commit_entity_node(node);
-                        else
-                            status = "No compatible resource is available for repair.";
-                    }
-                }
-            }
-            if ((entity_advanced_mode || ui_override_probe_enabled) &&
-                ImGui::BeginCombo("Drawable type", drawable_label.c_str())) {
-                for (const auto kind : {
-                         fabric::project::EntityDrawableKind::none,
-                         fabric::project::EntityDrawableKind::texture,
-                         fabric::project::EntityDrawableKind::vector,
-                         fabric::project::EntityDrawableKind::visual_component}) {
-                    const auto label = std::string(fabric::project::to_string(kind));
-                    const auto resource_kind = kind ==
-                            fabric::project::EntityDrawableKind::texture
-                        ? fabric::editor::StudioResourceKind::texture
-                        : kind == fabric::project::EntityDrawableKind::vector
-                        ? fabric::editor::StudioResourceKind::vector
-                        : fabric::editor::StudioResourceKind::visual_component;
-                    const auto first = std::ranges::find_if(
-                        session.resources(), [&](const auto& resource) {
-                            return resource.kind == resource_kind;
-                        });
-                    const bool available = kind ==
-                            fabric::project::EntityDrawableKind::none ||
-                        first != session.resources().end();
-                    ImGui::BeginDisabled(!available);
-                    if (ImGui::Selectable(label.c_str(),
-                                          node.drawable.kind == kind)) {
-                        const auto has_overrides =
-                            node.drawable.component_instance &&
-                            !node.drawable.component_instance->overrides.empty();
-                        if (has_overrides &&
-                            kind != fabric::project::EntityDrawableKind::visual_component) {
-                            pending_drawable_kind =
-                                std::pair{canvas.selected_node, kind};
-                            ImGui::OpenPopup("Discard incompatible overrides?");
-                        } else {
-                            if (!apply_drawable_kind(node, kind))
-                                status = "Drawable kind unavailable; inspect diagnostics.";
-                            else
-                                commit_entity_node(node);
-                        }
-                    }
-                    if (ui_override_probe_enabled &&
-                        kind == fabric::project::EntityDrawableKind::texture) {
-                        const auto minimum = ImGui::GetItemRectMin();
-                        const auto maximum = ImGui::GetItemRectMax();
-                        ui_override_texture_screen = {(minimum.x + maximum.x) * 0.5F,
-                                                      (minimum.y + maximum.y) * 0.5F};
-                        ui_override_texture_seen = true;
-                    }
-                    ImGui::EndDisabled();
-                    draw_disabled_reason(!available,
-                                         "Add an indexed resource of this drawable kind first.");
-                }
-                ImGui::EndCombo();
-            }
-            if (ui_override_probe_enabled) {
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_override_kind_screen = {(minimum.x + maximum.x) * 0.5F,
-                                           (minimum.y + maximum.y) * 0.5F};
-                ui_override_kind_seen = true;
-            }
-            if (ui_override_force_modal) {
-                ImGui::OpenPopup("Discard incompatible overrides?");
-                ui_override_force_modal = false;
-            }
-            if (ImGui::BeginPopupModal("Discard incompatible overrides?", nullptr,
-                                       ImGuiWindowFlags_AlwaysAutoResize)) {
-                const auto valid = pending_drawable_kind.has_value() &&
-                    pending_drawable_kind->first < entity.nodes.size();
-                std::size_t override_count = 0U;
-                if (valid) {
-                    const auto& pending_node =
-                        entity.nodes[pending_drawable_kind->first];
-                    if (pending_node.drawable.component_instance)
-                        override_count = pending_node.drawable.component_instance->overrides.size();
-                    ImGui::Text("Change drawable kind and discard %zu override(s)?",
-                                override_count);
-                    ImGui::TextDisabled(
-                        "Overrides belong to the current visual component and cannot be applied to the new kind.");
-                }
-                ImGui::BeginDisabled(!valid);
-                if (ImGui::Button("Discard overrides and change")) {
-                    auto changed = entity.nodes[pending_drawable_kind->first];
-                    if (apply_drawable_kind(changed, pending_drawable_kind->second) &&
-                        session.set_selected_entity_node(
-                            pending_drawable_kind->first, std::move(changed))) {
-                        status = "Drawable changed; incompatible overrides discarded.";
-                        pending_drawable_kind.reset();
-                        ImGui::CloseCurrentPopup();
-                    }
-                }
-                if (ui_override_probe_enabled) {
-                    const auto minimum = ImGui::GetItemRectMin();
-                    const auto maximum = ImGui::GetItemRectMax();
-                    ui_override_confirm_screen = {(minimum.x + maximum.x) * 0.5F,
-                                                  (minimum.y + maximum.y) * 0.5F};
-                    ui_override_confirm_seen = true;
-                }
-                ImGui::EndDisabled();
-                draw_disabled_reason(!valid,
-                                     "Select a valid drawable kind before discarding overrides.");
-                ImGui::SameLine();
-                if (ImGui::Button("Cancel")) {
-                    pending_drawable_kind.reset();
-                    ImGui::CloseCurrentPopup();
-                }
-                if (ui_override_probe_enabled) {
-                    const auto minimum = ImGui::GetItemRectMin();
-                    const auto maximum = ImGui::GetItemRectMax();
-                    ui_override_cancel_screen = {(minimum.x + maximum.x) * 0.5F,
-                                                 (minimum.y + maximum.y) * 0.5F};
+            const EntityArtworkInspectorProbe artwork_probe{
+                .enabled = ui_override_probe_enabled,
+                .record_kind = [&](const float x, const float y) {
+                    ui_override_kind_screen = {x, y};
+                    ui_override_kind_seen = true;
+                    ui_override_guided_mode_seen = !entity_advanced_mode;
+                },
+                .record_texture = [&](const float x, const float y) {
+                    ui_override_texture_screen = {x, y};
+                    ui_override_texture_seen = true;
+                },
+                .record_cancel = [&](const float x, const float y) {
+                    ui_override_cancel_screen = {x, y};
                     ui_override_cancel_seen = true;
-                    ui_override_modal_seen = true;
-                }
-                ImGui::EndPopup();
-            }
-            if (node.drawable.kind !=
-                fabric::project::EntityDrawableKind::none) {
-                const auto resource_kind = node.drawable.kind ==
-                        fabric::project::EntityDrawableKind::texture
-                    ? fabric::editor::StudioResourceKind::texture
-                    : node.drawable.kind ==
-                            fabric::project::EntityDrawableKind::vector
-                    ? fabric::editor::StudioResourceKind::vector
-                    : fabric::editor::StudioResourceKind::visual_component;
-                const char* expected = node.drawable.kind ==
-                        fabric::project::EntityDrawableKind::texture
-                    ? "texture"
-                    : node.drawable.kind ==
-                            fabric::project::EntityDrawableKind::vector
-                    ? "vector" : "visualComponent";
-                std::string artwork_id = node.drawable.resource
-                    ? node.drawable.resource->id.value : std::string{};
-                if (draw_project_resource_picker(
-                        "Artwork", session.resources(), resource_kind,
-                        artwork_id, false)) {
-                    node.drawable.resource = fabric::project::ResourceReference{
-                        {.value = artwork_id}, expected};
-                    if (node.drawable.kind ==
-                        fabric::project::EntityDrawableKind::visual_component)
-                        node.drawable.component_instance =
-                            fabric::project::VisualComponentInstance{};
-                    commit_entity_node(node);
-                }
-                const auto artwork = std::ranges::find_if(
-                    session.resources(), [&](const auto& resource) {
-                        return resource.kind == resource_kind &&
-                            resource.id.value == artwork_id;
-                    });
-                ImGui::BeginDisabled(artwork == session.resources().end());
-                if (ImGui::Button("Open artwork") &&
-                    artwork != session.resources().end())
+                },
+                .record_confirm = [&](const float x, const float y) {
+                    ui_override_confirm_screen = {x, y};
+                    ui_override_confirm_seen = true;
+                },
+                .record_modal = [&] { ui_override_modal_seen = true; },
+            };
+            fabric::asset_studio::draw_entity_artwork_inspector(
+                session, canvas.selected_node, node, entity_advanced_mode,
+                entity_artwork_state, status, draw_project_resource_picker,
+                studio_resource_kind_label, resource_kind_for_contract,
+                draw_surface_effect_stack,
+                [&](const fabric::editor::StudioResource& artwork) {
                     select_and_preview_resource(
-                        session, *artwork, preview, status, "Opened artwork: ");
-                ImGui::EndDisabled();
-                draw_disabled_reason(artwork == session.resources().end(),
-                                     "Choose an existing artwork resource first.");
-                ImGui::SameLine();
-                if (ImGui::Button("Clear drawable")) {
-                    node.drawable = {};
-                    commit_entity_node(node);
-                }
-            }
-            if (node.drawable.kind ==
-                    fabric::project::EntityDrawableKind::texture ||
-                node.drawable.kind ==
-                    fabric::project::EntityDrawableKind::vector) {
-                std::string material_id = node.drawable.material
-                    ? node.drawable.material->id.value : std::string{};
-                if (draw_project_resource_picker(
-                        "Material", session.resources(),
-                        fabric::editor::StudioResourceKind::material,
-                        material_id, true)) {
-                    node.drawable.material = material_id.empty()
-                        ? std::optional<fabric::project::ResourceReference>{}
-                        : std::optional<fabric::project::ResourceReference>{
-                            fabric::project::ResourceReference{
-                                {.value = material_id}, "material"}};
-                    commit_entity_node(node);
-                }
-            }
-            if (entity_advanced_mode && node.drawable.kind ==
-                    fabric::project::EntityDrawableKind::visual_component &&
-                node.drawable.resource) {
-                const auto component = fabric::project::load_visual_component(
-                    session.project_root(), *session.manifest(),
-                    fabric::project::visual_component_document_path(
-                        *session.manifest(), node.drawable.resource->id));
-                if (component.ok()) {
-                    auto instance = node.drawable.component_instance.value_or(
-                        fabric::project::VisualComponentInstance{});
-                    const auto variant_name = [&] {
-                        if (!instance.variant_id) return std::string{"Default"};
-                        const auto found = std::ranges::find(
-                            component.asset->variants, *instance.variant_id,
-                            &fabric::project::VisualComponentVariant::id);
-                        return found == component.asset->variants.end()
-                            ? std::string{"Missing: "} + *instance.variant_id
-                            : found->name;
-                    }();
-                    if (ImGui::BeginCombo("Variant", variant_name.c_str())) {
-                        if (ImGui::Selectable("Default", !instance.variant_id)) {
-                            instance.variant_id.reset();
-                            node.drawable.component_instance = instance;
-                            commit_entity_node(node);
-                        }
-                        for (const auto& variant : component.asset->variants) {
-                            if (ImGui::Selectable(variant.name.c_str(),
-                                    instance.variant_id == variant.id)) {
-                                instance.variant_id = variant.id;
-                                node.drawable.component_instance = instance;
-                                commit_entity_node(node);
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
-                    const auto anchor_name = [&] {
-                        if (!instance.anchor_id) return std::string{"Default"};
-                        const auto found = std::ranges::find(
-                            component.asset->anchors, *instance.anchor_id,
-                            &fabric::project::VisualComponentAnchor::id);
-                        return found == component.asset->anchors.end()
-                            ? std::string{"Missing: "} + *instance.anchor_id
-                            : found->name;
-                    }();
-                    if (ImGui::BeginCombo("Anchor", anchor_name.c_str())) {
-                        if (ImGui::Selectable("Default", !instance.anchor_id)) {
-                            instance.anchor_id.reset();
-                            node.drawable.component_instance = instance;
-                            commit_entity_node(node);
-                        }
-                        for (const auto& anchor : component.asset->anchors) {
-                            if (ImGui::Selectable(anchor.name.c_str(),
-                                    instance.anchor_id == anchor.id)) {
-                                instance.anchor_id = anchor.id;
-                                node.drawable.component_instance = instance;
-                                commit_entity_node(node);
-                            }
-                        }
-                        ImGui::EndCombo();
-                    }
-                    ImGui::Text("%zu override(s)", instance.overrides.size());
-                    for (std::size_t override_index = 0;
-                         override_index < instance.overrides.size();
-                         ++override_index) {
-                        ImGui::PushID(static_cast<int>(override_index));
-                        ImGui::TextUnformatted(
-                            instance.overrides[override_index].parameter_id.c_str());
-                        auto override = instance.overrides[override_index];
-                        bool override_changed = false;
-                        if (auto* value = std::get_if<float>(&override.value))
-                            override_changed = ImGui::InputFloat("Value", value);
-                        else if (auto* value = std::get_if<std::int64_t>(
-                                     &override.value))
-                            override_changed = ImGui::InputScalar(
-                                "Value", ImGuiDataType_S64, value);
-                        else if (auto* value = std::get_if<bool>(&override.value))
-                            override_changed = ImGui::Checkbox("Value", value);
-                        else if (auto* value = std::get_if<std::string>(
-                                     &override.value))
-                            override_changed = ImGui::InputText("Value", value);
-                        else if (auto* value = std::get_if<fabric::core::Vec2>(
-                                     &override.value))
-                            override_changed = ImGui::InputFloat2(
-                                "Value", &value->x);
-                        else if (auto* value = std::get_if<fabric::core::Color>(
-                                     &override.value))
-                            override_changed = ImGui::ColorEdit4(
-                                "Value", &value->red);
-                        else if (auto* value = std::get_if<
-                                     fabric::project::ResourceReference>(
-                                     &override.value)) {
-                            if (const auto kind = resource_kind_for_contract(
-                                    value->expected_type)) {
-                                auto id = value->id.value;
-                                if (draw_project_resource_picker(
-                                        "Value", session.resources(), *kind, id, false)) {
-                                    value->id = {.value = id};
-                                    override_changed = true;
-                                }
-                            } else {
-                                ImGui::TextDisabled(
-                                    "Unsupported resource contract: %s",
-                                    value->expected_type.c_str());
-                            }
-                        }
-                        if (override_changed) {
-                            instance.overrides[override_index] = std::move(override);
-                            node.drawable.component_instance = instance;
-                            commit_entity_node(node);
-                        }
-                        if (ImGui::SmallButton("Remove override")) {
-                            instance.overrides.erase(
-                                instance.overrides.begin() +
-                                static_cast<std::ptrdiff_t>(override_index));
-                            node.drawable.component_instance = instance;
-                            commit_entity_node(node);
-                            ImGui::PopID();
-                            break;
-                        }
-                        ImGui::PopID();
-                    }
-                    if (ImGui::BeginCombo("Add override", "Choose parameter...")) {
-                        for (const auto& parameter : component.asset->parameters) {
-                            const bool exists = std::ranges::any_of(
-                                instance.overrides, [&](const auto& value) {
-                                    return value.parameter_id == parameter.id;
-                                });
-                            ImGui::BeginDisabled(exists);
-                            if (ImGui::Selectable(parameter.name.c_str())) {
-                                instance.overrides.push_back(
-                                    {parameter.id, parameter.default_value});
-                                node.drawable.component_instance = instance;
-                                commit_entity_node(node);
-                            }
-                            ImGui::EndDisabled();
-                            draw_disabled_reason(exists,
-                                                 "This component parameter already has an override.");
-                        }
-                        ImGui::EndCombo();
-                    }
-                }
-            }
-            ImGui::EndDisabled();
-            draw_disabled_reason(node.locked,
-                                 "Unlock the node to edit its properties.");
+                        session, artwork, preview, status, "Opened artwork: ");
+                },
+                &artwork_probe);
             }
         }
         if (selected != nullptr &&
@@ -7539,8 +7135,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
     EntityRigInspectorProbe entity_rig_probe;
     TexturedPathUiState textured_path_ui;
     ProjectSettingsUiState project_settings;
-    std::optional<std::pair<std::size_t, fabric::project::EntityDrawableKind>>
-        pending_drawable_kind;
+    EntityArtworkInspectorState entity_artwork_state;
     bool request_open = false;
     bool request_png = false;
     bool request_svg = false;
@@ -7576,6 +7171,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
         ui_override_cancel_preserved = false;
         ui_override_confirm_applied = false;
         ui_override_kind_seen = false;
+        ui_override_guided_mode_seen = false;
         ui_override_texture_seen = false;
         ui_override_cancel_seen = false;
         ui_override_confirm_seen = false;
@@ -8673,9 +8269,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                 push_button(point, SDL_MOUSEBUTTONUP);
             };
             if (ui_override_frame == 4U && !ui_override_modal_seen) {
-                pending_drawable_kind = std::pair{
+                entity_artwork_state.pending_drawable_kind = std::pair{
                     std::size_t{0U}, fabric::project::EntityDrawableKind::texture};
-                ui_override_force_modal = true;
+                entity_artwork_state.force_discard_modal = true;
             }
             if (ui_override_frame == 1U && ui_override_kind_seen)
                 push_click(ui_override_kind_screen);
@@ -8686,9 +8282,9 @@ int run_asset_studio(const std::filesystem::path& initial_project,
             else if (ui_override_frame == 4U && ui_override_cancel_seen)
                 push_click(ui_override_cancel_screen);
             else if (ui_override_frame == 6U && ui_override_cancel_preserved) {
-                pending_drawable_kind = std::pair{
+                entity_artwork_state.pending_drawable_kind = std::pair{
                     std::size_t{0U}, fabric::project::EntityDrawableKind::texture};
-                ui_override_force_modal = true;
+                entity_artwork_state.force_discard_modal = true;
             } else if (ui_override_frame == 7U && ui_override_confirm_seen)
                 push_button(ui_override_confirm_screen, SDL_MOUSEBUTTONDOWN);
             else if (ui_override_frame == 8U && ui_override_confirm_seen)
@@ -9524,7 +9120,7 @@ int run_asset_studio(const std::filesystem::path& initial_project,
                        entity_rig_probe,
                        textured_path_ui,
                        project_settings,
-                       pending_drawable_kind,
+                       entity_artwork_state,
                        request_open, request_png, request_svg,
                        actions, command_palette_open,
                        command_palette_rendered,

@@ -97,7 +97,8 @@ if(DEFINED OVERRIDE_ARTIFACT)
     foreach(REQUIRED_RESULT
             "\"confirmation_modal_seen\": true"
             "\"cancel_preserved_override\": true"
-            "\"confirm_applied\": true")
+            "\"confirm_applied\": true"
+            "\"kind_widget_seen_in_guided_mode\": true")
         string(FIND "${OVERRIDE_RESULT}" "${REQUIRED_RESULT}" RESULT_POSITION)
         if(RESULT_POSITION LESS 0)
             message(FATAL_ERROR "Asset Studio override probe is missing ${REQUIRED_RESULT}")

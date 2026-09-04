@@ -100,6 +100,14 @@ travail du nœud sélectionné, applique les contrôles communs et délègue cha
 validation à `ProjectSession`. Artwork, matériaux et overrides restent une
 surface distincte afin que l'extraction ne recrée pas un inspecteur universel.
 
+`EntityArtworkInspector` constitue la troisième frontière. Le choix du type de
+drawable reste visible en mode guidé : une Entity vide ne doit pas exiger de
+connaître le mode avancé pour recevoir son premier artwork. Le module porte la
+réparation des références, la confirmation destructive des overrides, le
+matériau, l'apparence, les variantes, ancres et valeurs typées. Il reçoit les
+adaptateurs de sélection et d'ouverture de ressource sans posséder la preview
+GPU ni l'état du shell.
+
 ## Alternatives rejetées
 
 - Réécriture complète immédiate : elle ferait varier simultanément structure,

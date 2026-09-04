@@ -112,6 +112,11 @@ Progression suivante : les propriétés communes du nœud Entity — identité,
 verrouillage, visibilité, transform et parentage avancé — sont extraites dans
 `EntityNodeProperties`. Artwork et overrides forment la prochaine frontière.
 
+Progression suivante : `EntityArtworkInspector` regroupe artwork, matériau,
+apparence, variante, ancre et overrides. Le type de drawable devient une action
+guidée toujours visible afin que le parcours créer un nœud → choisir son rendu
+ne dépende plus du mode avancé.
+
 ### Preuves de sortie
 
 - Tous les E2E existants restent verts pendant chaque déplacement.
