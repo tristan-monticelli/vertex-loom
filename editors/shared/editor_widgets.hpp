@@ -199,6 +199,26 @@ inline bool draw_searchable_id_picker(
     return changed;
 }
 
+inline bool draw_id_picker(
+    const char* label,
+    const std::span<const std::string> values,
+    std::string& selected_id,
+    const char* empty_label) {
+    std::vector<SearchableIdOption> options;
+    options.reserve(values.size());
+    for (const auto& value : values) {
+        options.push_back({.id = value, .label = value});
+    }
+    return draw_searchable_id_picker(
+        label, options, selected_id,
+        SearchableIdPickerOptions{
+            .width = 220.0F,
+            .empty_label = empty_label,
+            .search_hint = "Search identifier...",
+            .no_matches_label = "No matching identifier.",
+        });
+}
+
 inline const char* workspace_label(
     const editor::EditorWorkspace workspace) noexcept {
     switch (workspace) {

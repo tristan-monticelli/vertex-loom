@@ -17,6 +17,7 @@
 #include "fabric/render/raster_image.hpp"
 #include "fabric/runtime/preview_runtime.hpp"
 #include "editor_widgets.hpp"
+#include "mechanic_workspace.hpp"
 #include "resource_picker.hpp"
 #include "scene_workspace.hpp"
 
@@ -53,6 +54,7 @@
 namespace {
 
 using fabric::editor_ui::draw_disabled_reason;
+using fabric::editor_ui::draw_id_picker;
 using fabric::editor_ui::draw_field_errors;
 using fabric::editor_ui::draw_command_palette;
 using fabric::editor_ui::draw_document_navigation;
@@ -64,7 +66,10 @@ using fabric::editor_ui::focus_first_field_error;
 using fabric::editor_ui::SearchableIdOption;
 using fabric::editor_ui::SearchableIdPickerOptions;
 using fabric::map_studio::draw_resource_picker;
+using fabric::map_studio::draw_mechanic_workspace;
 using fabric::map_studio::draw_scene_workspace;
+using fabric::map_studio::MechanicWorkspaceProbe;
+using fabric::map_studio::MechanicWorkspaceState;
 using fabric::map_studio::SceneWorkspaceState;
 
 bool ui_map_workspace_seen = false;
@@ -72,16 +77,6 @@ float ui_map_layers_x = 0.0F;
 float ui_map_canvas_x = 0.0F;
 float ui_map_inspector_x = 0.0F;
 float ui_map_canvas_width = 0.0F;
-bool ui_mechanic_graph_probe_enabled = false;
-bool ui_mechanic_graph_canvas_seen = false;
-bool ui_mechanic_graph_link_seen = false;
-bool ui_mechanic_graph_source_seen = false;
-bool ui_mechanic_graph_target_seen = false;
-bool ui_mechanic_graph_source_clicked = false;
-bool ui_mechanic_graph_target_clicked = false;
-ImVec2 ui_mechanic_graph_source_screen{};
-ImVec2 ui_mechanic_graph_target_screen{};
-fabric::project::MechanicConnection ui_mechanic_expected_connection;
 
 std::vector<fabric::project::EntityTransformation> load_transformations(
     const std::filesystem::path& root,
@@ -419,25 +414,6 @@ std::string property_value_text(const fabric::project::MapPropertyValue& value) 
     }, value);
 }
 
-bool draw_id_picker(const char* label,
-                    const std::span<const std::string> values,
-                    std::string& selected_id,
-                    const char* empty_label) {
-    std::vector<SearchableIdOption> options;
-    options.reserve(values.size());
-    for (const auto& value : values) {
-        options.push_back({.id = value, .label = value});
-    }
-    return draw_searchable_id_picker(
-        label, options, selected_id,
-        SearchableIdPickerOptions{
-            .width = 220.0F,
-            .empty_label = empty_label,
-            .search_hint = "Search identifier...",
-            .no_matches_label = "No matching identifier.",
-        });
-}
-
 bool draw_typed_resource_id_picker(
     const char* label,
     const std::span<const fabric::editor::StudioResource> resources,
@@ -476,118 +452,6 @@ bool draw_typed_resource_id_picker(
     return changed;
 }
 
-bool draw_mechanic_node_picker(
-    const char* label,
-    const std::span<const fabric::project::MechanicNodeDefinition> nodes,
-    std::string& selected_id) {
-    const auto selected = std::ranges::find_if(
-        nodes, [&](const auto& node) { return node.id == selected_id; });
-    const std::string preview = selected != nodes.end()
-        ? selected->id
-        : selected_id.empty() ? std::string{"Choose a mechanic node..."}
-                              : std::string{"Missing: "} + selected_id;
-    bool changed = false;
-    ImGui::SetNextItemWidth(240.0F);
-    if (ImGui::BeginCombo(label, preview.c_str())) {
-        static std::unordered_map<ImGuiID, std::string> filters;
-        auto& filter = filters[ImGui::GetID(label)];
-        ImGui::SetNextItemWidth(-1.0F);
-        ImGui::InputTextWithHint("##mechanic-node-search", "Search node ID or type...",
-                                 &filter);
-        bool found = false;
-        for (const auto& node : nodes) {
-            std::string haystack = node.id + " " + node.type;
-            std::ranges::transform(haystack, haystack.begin(), [](const unsigned char value) {
-                return static_cast<char>(std::tolower(value));
-            });
-            std::string needle = filter;
-            std::ranges::transform(needle, needle.begin(), [](const unsigned char value) {
-                return static_cast<char>(std::tolower(value));
-            });
-            if (!needle.empty() && haystack.find(needle) == std::string::npos)
-                continue;
-            found = true;
-            const bool is_selected = node.id == selected_id;
-            const std::string item_label = node.id + " (" + node.type + ")##mechanic-node-option-" +
-                node.id;
-            if (ImGui::Selectable(item_label.c_str(), is_selected)) {
-                selected_id = node.id;
-                changed = true;
-            }
-            if (is_selected) ImGui::SetItemDefaultFocus();
-        }
-        if (!found) ImGui::TextDisabled("No matching mechanic node.");
-        if (selected == nodes.end() && !selected_id.empty())
-            ImGui::TextDisabled("Missing node reference: %s", selected_id.c_str());
-        ImGui::EndCombo();
-    }
-    return changed;
-}
-
-bool draw_mechanic_port_picker(
-    const char* label,
-    const std::span<const fabric::project::MechanicNodeDefinition> nodes,
-    const std::string_view node_id,
-    std::string& selected_id,
-    const fabric::project::MechanicPortDirection direction) {
-    const auto node = std::ranges::find_if(
-        nodes, [&](const auto& candidate) { return candidate.id == node_id; });
-    const fabric::project::MechanicPortDefinition* selected = nullptr;
-    if (node != nodes.end()) {
-        const auto selected_it = std::ranges::find_if(node->ports, [&](const auto& port) {
-            return port.id == selected_id && port.direction == direction;
-        });
-        if (selected_it != node->ports.end()) selected = &*selected_it;
-    }
-    const std::string preview = selected != nullptr
-        ? selected->id + " (" + std::string{fabric::project::to_string(selected->type)} + ")"
-        : selected_id.empty() ? std::string{"Choose a mechanic port..."}
-                              : std::string{"Missing: "} + selected_id;
-    bool changed = false;
-    ImGui::SetNextItemWidth(240.0F);
-    if (ImGui::BeginCombo(label, preview.c_str())) {
-        static std::unordered_map<ImGuiID, std::string> filters;
-        auto& filter = filters[ImGui::GetID(label)];
-        ImGui::SetNextItemWidth(-1.0F);
-        ImGui::InputTextWithHint("##mechanic-port-search", "Search port ID, name or type...",
-                                 &filter);
-        bool found = false;
-        if (node != nodes.end()) {
-            for (const auto& port : node->ports) {
-                if (port.direction != direction) continue;
-                std::string haystack = port.id + " " + port.name + " " +
-                    std::string{fabric::project::to_string(port.type)};
-                std::ranges::transform(haystack, haystack.begin(), [](const unsigned char value) {
-                    return static_cast<char>(std::tolower(value));
-                });
-                std::string needle = filter;
-                std::ranges::transform(needle, needle.begin(), [](const unsigned char value) {
-                    return static_cast<char>(std::tolower(value));
-                });
-                if (!needle.empty() && haystack.find(needle) == std::string::npos)
-                    continue;
-                found = true;
-                const bool is_selected = port.id == selected_id;
-                const std::string item_label = port.id + " (" + port.name + ", " +
-                    std::string{fabric::project::to_string(port.type)} + ")##mechanic-port-option-" +
-                    port.id;
-                if (ImGui::Selectable(item_label.c_str(), is_selected)) {
-                    selected_id = port.id;
-                    changed = true;
-                }
-                if (is_selected) ImGui::SetItemDefaultFocus();
-            }
-        }
-        if (!found) ImGui::TextDisabled("No matching mechanic port for this node.");
-        if (node == nodes.end())
-            ImGui::TextDisabled("Choose a mechanic node first.");
-        else if (selected == nullptr && !selected_id.empty())
-            ImGui::TextDisabled("Missing port reference: %s", selected_id.c_str());
-        ImGui::EndCombo();
-    }
-    return changed;
-}
-
 std::string collision_shape_text(const fabric::project::CollisionShape& shape) {
     std::string result;
     switch (shape.kind) {
@@ -619,617 +483,6 @@ struct TransformEditorState {
     std::string instance_id;
     fabric::core::Transform value{};
 };
-
-struct MechanicEditorState {
-    std::string open_id;
-    std::string new_id;
-    std::string new_name;
-    std::string selected_node;
-    std::string new_node_id;
-    int new_node_kind{};
-    std::string from_node;
-    std::string from_port;
-    std::string to_node;
-    std::string to_port;
-    std::string canvas_connection_source;
-    bool pending_canvas_connection{};
-    fabric::editor::RotatingPlatformPresetRequest platform;
-    int platform_activation{};
-    int platform_direction{};
-    std::string platform_visual_entity;
-    fabric::physics::MechanicPreviewCharacterConfig preview_character;
-    float preview_character_speed{3.0F};
-};
-
-void draw_mechanic_value_editor(
-    fabric::editor::MechanicSession& session,
-    const fabric::project::MechanicNodeDefinition& node,
-    const fabric::project::MechanicNodeProperty& property,
-    std::string& status) {
-    ImGui::PushID(property.id.c_str());
-    auto value = property.value;
-    bool changed = false;
-    const std::string numeric_label = property.id +
-        " (declared units)##numeric-" + property.id;
-    std::visit([&](auto& item) {
-        using Value = std::decay_t<decltype(item)>;
-        if constexpr (std::is_same_v<Value, bool>) {
-            changed = ImGui::Checkbox(property.id.c_str(), &item);
-        } else if constexpr (std::is_same_v<Value, std::int64_t>) {
-            auto edited = static_cast<int>(item);
-            if (ImGui::InputInt(numeric_label.c_str(), &edited) &&
-                ImGui::IsItemDeactivatedAfterEdit()) {
-                item = edited;
-                changed = true;
-            }
-            ImGui::SetItemTooltip("Integer value interpreted using the mechanic property schema.");
-        } else if constexpr (std::is_same_v<Value, float>) {
-            changed = ImGui::DragFloat(numeric_label.c_str(), &item, 0.1F) &&
-                      ImGui::IsItemDeactivatedAfterEdit();
-            ImGui::SetItemTooltip("Real value interpreted using the mechanic property schema.");
-        } else if constexpr (std::is_same_v<Value, std::string>) {
-            changed = ImGui::InputText(property.id.c_str(), &item) &&
-                      ImGui::IsItemDeactivatedAfterEdit();
-        } else if constexpr (std::is_same_v<Value, fabric::core::Vec2>) {
-            changed = ImGui::DragFloat2(numeric_label.c_str(), &item.x, 0.1F) &&
-                      ImGui::IsItemDeactivatedAfterEdit();
-            ImGui::SetItemTooltip("Vector value interpreted using the mechanic property schema.");
-        } else {
-            changed = ImGui::InputText(property.id.c_str(), &item.id.value) &&
-                      ImGui::IsItemDeactivatedAfterEdit();
-        }
-    }, value);
-    if (changed) {
-        status = session.set_node_property(
-            {.value = node.id}, property.id, std::move(value))
-            ? "Mechanic property changed"
-            : "Mechanic property rejected";
-    }
-    ImGui::PopID();
-}
-
-void draw_mechanic_editor(fabric::editor::MechanicSession& session,
-                          const fabric::editor::MapSession& map_session,
-                          MechanicEditorState& state,
-                          std::string& status,
-                          fabric::editor::ProjectSession& resource_catalog) {
-    ImGui::Begin("Mechanics");
-    if (!map_session.map()) {
-        ImGui::TextDisabled("Open a map before editing mechanics.");
-        ImGui::End();
-        return;
-    }
-
-    std::filesystem::path directory;
-    if (map_session.manifest()) {
-        directory = map_session.project_root() /
-            map_session.manifest()->directories.assets / "mechanics";
-        std::error_code error;
-        if (std::filesystem::exists(directory, error)) {
-            ImGui::TextDisabled("Project mechanics:");
-            for (std::filesystem::directory_iterator iterator{directory, error}, end;
-                 !error && iterator != end; iterator.increment(error)) {
-                if (!iterator->is_regular_file(error)) continue;
-                auto filename = iterator->path().filename().string();
-                constexpr std::string_view suffix = ".mechanic.json";
-                if (!filename.ends_with(suffix)) continue;
-                filename.resize(filename.size() - suffix.size());
-                ImGui::SameLine();
-                if (ImGui::SmallButton(filename.c_str())) state.open_id = filename;
-            }
-        }
-    }
-
-    draw_resource_picker("Mechanics:", directory, ".mechanic.json",
-                         state.open_id, &resource_catalog);
-    ImGui::SameLine();
-    ImGui::BeginDisabled(state.open_id.empty());
-    if (ImGui::Button("Open")) {
-        status = session.open(map_session.project_root(), *map_session.map(),
-                              {.value = state.open_id})
-            ? "Mechanic opened" : "Mechanic could not be opened";
-        state.selected_node.clear();
-    }
-    ImGui::EndDisabled();
-    draw_disabled_reason(state.open_id.empty(),
-                         "Choose an existing mechanic graph first.");
-    ImGui::SetNextItemWidth(140.0F);
-    ImGui::InputText("New id", &state.new_id);
-    focus_first_field_error(session.errors(), "id", "mechanic-create");
-    ImGui::SameLine();
-    draw_resource_name_field("New name", state.new_name, 160.0F);
-    focus_first_field_error(session.errors(), "name", "mechanic-create");
-    ImGui::SameLine();
-    ImGui::BeginDisabled(state.new_id.empty() || state.new_name.empty());
-    if (ImGui::Button("Create")) {
-        fabric::project::MechanicGraph graph;
-        graph.document.id = {.value = state.new_id};
-        graph.document.name = state.new_name;
-        const bool created = session.create(
-            map_session.project_root(), *map_session.map(), graph);
-        status = created ? "Mechanic created" : "Mechanic creation rejected";
-        if (created) {
-            static_cast<void>(resource_catalog.refresh_resources());
-            state.open_id = state.new_id;
-            state.new_id.clear();
-            state.new_name.clear();
-            state.selected_node.clear();
-        }
-    }
-    ImGui::EndDisabled();
-    draw_disabled_reason(state.new_id.empty() || state.new_name.empty(),
-                         "Enter both a mechanic id and a mechanic name.");
-
-    if (ImGui::CollapsingHeader("Create rotating platform preset")) {
-    ImGui::SetNextItemWidth(150.0F);
-    ImGui::InputText("Platform id", &state.platform.id.value);
-    focus_first_field_error(session.errors(), "id", "platform-create");
-    ImGui::SameLine();
-    draw_resource_name_field("Platform name", state.platform.name, 170.0F);
-    focus_first_field_error(session.errors(), "name", "platform-create");
-    ImGui::Combo("Activation", &state.platform_activation,
-                 "Presence sensor\0Map event\0");
-    if (state.platform_activation == 1) {
-        std::vector<std::string> event_ids;
-        event_ids.reserve(map_session.map()->events.size());
-        for (const auto& event : map_session.map()->events)
-            event_ids.push_back(event.id.value);
-        draw_id_picker("Activation event", event_ids, state.platform.event_id.value,
-                       "Choose a map event...");
-    }
-    if (map_session.manifest()) {
-        const auto directory = map_session.project_root() /
-            map_session.manifest()->directories.entities;
-        draw_resource_picker("Visual entity (optional):", directory, ".entity.json",
-                             state.platform_visual_entity, &resource_catalog);
-    }
-    ImGui::DragFloat2("Platform position (world units)",
-                      &state.platform.position.x, 0.1F);
-    draw_technical_tooltip("Initial platform position in map world space.");
-    ImGui::DragFloat2("Platform size (world units)", &state.platform.size.x,
-                      0.1F, 0.01F, 256.0F);
-    draw_technical_tooltip("Platform dimensions used by the rotating body.");
-    ImGui::DragFloat("Speed (deg/s)",
-                     &state.platform.speed_degrees_per_second, 1.0F, 0.0F, 3600.0F);
-    draw_technical_tooltip("Angular velocity applied to the platform.");
-    ImGui::Combo("Direction", &state.platform_direction,
-                 "Counter-clockwise (+1)\0Clockwise (-1)\0");
-    ImGui::DragFloat("Acceleration (deg/s2)",
-                     &state.platform.acceleration_degrees_per_second_squared,
-                     1.0F, 0.0F, 7200.0F);
-    draw_technical_tooltip("Angular acceleration used to reach the target speed.");
-    ImGui::DragFloat("Maximum torque (force)", &state.platform.maximum_torque,
-                     1.0F, 0.0F, 100000.0F);
-    draw_technical_tooltip("Maximum force available to drive the platform.");
-    ImGui::Checkbox("Angular limits", &state.platform.limit_enabled);
-    if (state.platform.limit_enabled) {
-        ImGui::DragFloat("Minimum angle (degrees)", &state.platform.minimum_angle_degrees,
-                         1.0F, -178.0F, 178.0F);
-        draw_technical_tooltip("Lower angular limit when limits are enabled.");
-        ImGui::DragFloat("Maximum angle (degrees)", &state.platform.maximum_angle_degrees,
-                         1.0F, -178.0F, 178.0F);
-        draw_technical_tooltip("Upper angular limit when limits are enabled.");
-    }
-    if (state.platform_activation == 0) {
-        ImGui::DragFloat2("Sensor center (world units)",
-                          &state.platform.sensor_center.x, 0.1F);
-        draw_technical_tooltip("Center of the sensor activation area.");
-        ImGui::DragFloat2("Sensor size (world units)", &state.platform.sensor_size.x,
-                          0.1F, 0.01F, 256.0F);
-        draw_technical_tooltip("Dimensions of the sensor activation area.");
-    }
-    if (ImGui::Button("Create rotating platform")) {
-        state.platform.activation = state.platform_activation == 0
-            ? fabric::editor::RotatingPlatformActivation::sensor
-            : fabric::editor::RotatingPlatformActivation::event;
-        state.platform.direction = state.platform_direction == 0 ? 1 : -1;
-        state.platform.visual_entity = state.platform_visual_entity.empty()
-            ? std::nullopt
-            : std::optional<fabric::project::ResourceReference>{
-                  {{.value = state.platform_visual_entity}, "entity"}};
-        const auto built = fabric::editor::build_rotating_platform_preset(
-            *map_session.manifest(), *map_session.map(), state.platform);
-        if (!built.ok()) {
-            status = built.errors.empty() ? "Platform preset rejected"
-                                          : built.errors.front().message;
-        } else if (session.create(map_session.project_root(), *map_session.map(),
-                                  *built.graph)) {
-            state.open_id = state.platform.id.value;
-            state.selected_node = "platform";
-            status = "Rotating platform created from Studio preset";
-        } else {
-            status = session.errors().empty()
-                ? "Platform could not replace the current dirty graph"
-                : session.errors().front().message;
-        }
-    }
-    }
-
-    if (!session.has_graph()) {
-        for (const auto& error : session.errors())
-            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F}, "%s: %s",
-                               error.field.c_str(), error.message.c_str());
-        ImGui::End();
-        return;
-    }
-    if (state.pending_canvas_connection) {
-        status = session.connect({state.from_node, state.from_port,
-                                  state.to_node, state.to_port})
-            ? "Ports connected from canvas"
-            : "Canvas connection rejected (types, direction or cycle)";
-        state.pending_canvas_connection = false;
-        if (status == "Ports connected from canvas")
-            state.canvas_connection_source.clear();
-    }
-    const auto& graph = *session.graph();
-    if (session.has_recovery()) {
-        ImGui::TextColored({1.0F, 0.75F, 0.25F, 1.0F},
-                           "A newer valid mechanic autosave is available.");
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Recover graph"))
-            status = session.accept_recovery() ? "Mechanic autosave recovered"
-                                                : "Mechanic recovery failed";
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Dismiss graph recovery")) {
-            session.decline_recovery();
-            status = "Mechanic recovery dismissed";
-        }
-    }
-    ImGui::SeparatorText(graph.document.name.c_str());
-    ImGui::TextColored(session.dirty() ? ImVec4{1.0F, 0.75F, 0.25F, 1.0F}
-                                       : ImVec4{0.45F, 0.9F, 0.55F, 1.0F},
-                       session.dirty() ? "dirty" : "saved");
-    ImGui::SameLine();
-    if (ImGui::Button("Save graph"))
-        status = session.save() ? "Mechanic saved" : "Mechanic save failed";
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!session.can_undo());
-    if (ImGui::Button("Undo graph")) static_cast<void>(session.undo());
-    ImGui::EndDisabled();
-    draw_disabled_reason(!session.can_undo(),
-                         "No mechanic changes are available to undo.");
-    ImGui::SameLine();
-    ImGui::BeginDisabled(!session.can_redo());
-    if (ImGui::Button("Redo graph")) static_cast<void>(session.redo());
-    ImGui::EndDisabled();
-    draw_disabled_reason(!session.can_redo(),
-                         "No undone mechanic changes are available to redo.");
-
-    ImGui::Columns(2, "mechanic-columns", true);
-    ImGui::SeparatorText("Graph");
-    ImGui::TextDisabled(
-        "Choose Connect from output, then click a compatible destination.");
-    if (ImGui::BeginChild("Mechanic graph canvas", {0.0F, 260.0F},
-                          ImGuiChildFlags_Borders)) {
-        if (ui_mechanic_graph_probe_enabled)
-            ui_mechanic_graph_canvas_seen = true;
-        const ImVec2 origin = ImGui::GetCursorScreenPos();
-        constexpr float card_width = 174.0F;
-        constexpr float card_height = 78.0F;
-        constexpr float cell_width = 202.0F;
-        constexpr float cell_height = 126.0F;
-        const int columns = std::max(1, static_cast<int>(
-            ImGui::GetContentRegionAvail().x / cell_width));
-        std::vector<ImVec2> positions;
-        positions.reserve(graph.nodes.size());
-        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
-            positions.push_back({
-                14.0F + static_cast<float>(static_cast<int>(index) % columns) *
-                    cell_width,
-                14.0F + static_cast<float>(static_cast<int>(index) / columns) *
-                    cell_height});
-        }
-        auto* draw = ImGui::GetWindowDrawList();
-        const ImU32 line_color = ImGui::GetColorU32(ImGuiCol_PlotLines);
-        for (const auto& connection : graph.connections) {
-            if (ui_mechanic_graph_probe_enabled &&
-                connection == ui_mechanic_expected_connection)
-                ui_mechanic_graph_link_seen = true;
-            const auto source = std::ranges::find(
-                graph.nodes, connection.from_node,
-                &fabric::project::MechanicNodeDefinition::id);
-            const auto target = std::ranges::find(
-                graph.nodes, connection.to_node,
-                &fabric::project::MechanicNodeDefinition::id);
-            if (source == graph.nodes.end() || target == graph.nodes.end())
-                continue;
-            const auto source_index = static_cast<std::size_t>(
-                std::distance(graph.nodes.begin(), source));
-            const auto target_index = static_cast<std::size_t>(
-                std::distance(graph.nodes.begin(), target));
-            const bool same_column =
-                positions[source_index].x == positions[target_index].x;
-            if (same_column) {
-                const bool downward = positions[target_index].y >
-                    positions[source_index].y;
-                const ImVec2 start{
-                    origin.x + positions[source_index].x + card_width * 0.5F,
-                    origin.y + positions[source_index].y +
-                        (downward ? card_height : 0.0F)};
-                const ImVec2 end{
-                    origin.x + positions[target_index].x + card_width * 0.5F,
-                    origin.y + positions[target_index].y +
-                        (downward ? 0.0F : card_height)};
-                const float bend = std::max(28.0F, std::abs(end.y - start.y) * 0.4F);
-                const float direction = downward ? 1.0F : -1.0F;
-                draw->AddBezierCubic(start,
-                    {start.x, start.y + direction * bend},
-                    {end.x, end.y - direction * bend}, end, line_color, 2.0F);
-                draw->AddTriangleFilled(end,
-                    {end.x - 5.0F, end.y - direction * 9.0F},
-                    {end.x + 5.0F, end.y - direction * 9.0F}, line_color);
-            } else {
-                const ImVec2 start{
-                    origin.x + positions[source_index].x + card_width,
-                    origin.y + positions[source_index].y + card_height * 0.5F};
-                const ImVec2 end{
-                    origin.x + positions[target_index].x,
-                    origin.y + positions[target_index].y + card_height * 0.5F};
-                const float bend =
-                    std::max(36.0F, std::abs(end.x - start.x) * 0.4F);
-                draw->AddBezierCubic(start, {start.x + bend, start.y},
-                                     {end.x - bend, end.y}, end,
-                                     line_color, 2.0F);
-                draw->AddTriangleFilled(end, {end.x - 8.0F, end.y - 5.0F},
-                                        {end.x - 8.0F, end.y + 5.0F}, line_color);
-            }
-        }
-        for (std::size_t index = 0; index < graph.nodes.size(); ++index) {
-            const auto& node = graph.nodes[index];
-            const auto output = std::ranges::find(
-                node.ports, fabric::project::MechanicPortDirection::output,
-                &fabric::project::MechanicPortDefinition::direction);
-            const auto input = std::ranges::find(
-                node.ports, fabric::project::MechanicPortDirection::input,
-                &fabric::project::MechanicPortDefinition::direction);
-            ImGui::SetCursorScreenPos(
-                {origin.x + positions[index].x, origin.y + positions[index].y});
-            ImGui::PushID(node.id.c_str());
-            std::string label = node.type + "\n" + node.id;
-            if (input != node.ports.end()) label += "\nin: " + input->id;
-            if (output != node.ports.end()) label += "\nout: " + output->id;
-            if (ImGui::Button(label.c_str(), {card_width, card_height})) {
-                state.selected_node = node.id;
-                if (ui_mechanic_graph_probe_enabled &&
-                    node.id == ui_mechanic_expected_connection.to_node)
-                    ui_mechanic_graph_target_clicked = true;
-                if (!state.canvas_connection_source.empty() &&
-                    state.canvas_connection_source != node.id) {
-                    const auto source = std::ranges::find(
-                        graph.nodes, state.canvas_connection_source,
-                        &fabric::project::MechanicNodeDefinition::id);
-                    if (source != graph.nodes.end()) {
-                        const auto source_port = std::ranges::find(
-                            source->ports,
-                            fabric::project::MechanicPortDirection::output,
-                            &fabric::project::MechanicPortDefinition::direction);
-                        const auto target_port = std::ranges::find_if(
-                            node.ports, [&](const auto& port) {
-                                return source_port != source->ports.end() &&
-                                    port.direction ==
-                                        fabric::project::MechanicPortDirection::input &&
-                                    port.type == source_port->type;
-                            });
-                        if (source_port != source->ports.end() &&
-                            target_port != node.ports.end()) {
-                            state.from_node = source->id;
-                            state.from_port = source_port->id;
-                            state.to_node = node.id;
-                            state.to_port = target_port->id;
-                            state.pending_canvas_connection = true;
-                        } else status = "No compatible mechanic input on target.";
-                    }
-                }
-            }
-            if (ui_mechanic_graph_probe_enabled &&
-                node.id == ui_mechanic_expected_connection.to_node) {
-                ui_mechanic_graph_target_seen = true;
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_mechanic_graph_target_screen = {
-                    (minimum.x + maximum.x) * 0.5F,
-                    (minimum.y + maximum.y) * 0.5F};
-            }
-            ImGui::BeginDisabled(output == node.ports.end());
-            if (state.canvas_connection_source == node.id) {
-                if (ImGui::SmallButton("Cancel connection"))
-                    state.canvas_connection_source.clear();
-            } else if (ImGui::SmallButton("Connect from output")) {
-                state.canvas_connection_source = node.id;
-                state.selected_node = node.id;
-                if (ui_mechanic_graph_probe_enabled &&
-                    node.id == ui_mechanic_expected_connection.from_node)
-                    ui_mechanic_graph_source_clicked = true;
-            }
-            ImGui::EndDisabled();
-            if (ui_mechanic_graph_probe_enabled &&
-                node.id == ui_mechanic_expected_connection.from_node) {
-                ui_mechanic_graph_source_seen = true;
-                const auto minimum = ImGui::GetItemRectMin();
-                const auto maximum = ImGui::GetItemRectMax();
-                ui_mechanic_graph_source_screen = {
-                    (minimum.x + maximum.x) * 0.5F,
-                    (minimum.y + maximum.y) * 0.5F};
-            }
-            ImGui::PopID();
-        }
-    }
-    ImGui::EndChild();
-    for (const auto& node : graph.nodes) {
-        const auto label = node.id + " [" + node.type + "]";
-        if (ImGui::Selectable(label.c_str(), state.selected_node == node.id))
-            state.selected_node = node.id;
-    }
-    ImGui::Combo("Node type", &state.new_node_kind,
-                 "body\0pivot\0joint\0motor\0sensor\0constraint\0event\0");
-    ImGui::InputText("Node id", &state.new_node_id);
-    ImGui::BeginDisabled(state.new_node_id.empty());
-    if (ImGui::Button("Add node")) {
-        status = session.add_node(
-            static_cast<fabric::project::MechanicNodeKind>(state.new_node_kind),
-            state.new_node_id) ? "Mechanic node added" : "Mechanic node rejected";
-        if (status == "Mechanic node added") {
-            state.selected_node = state.new_node_id;
-            state.new_node_id.clear();
-        }
-    }
-    ImGui::EndDisabled();
-    draw_disabled_reason(state.new_node_id.empty(),
-                         "Enter a unique node id before adding a node.");
-
-    ImGui::SeparatorText("Connections");
-    for (std::size_t index = 0; index < graph.connections.size(); ++index) {
-        const auto& connection = graph.connections[index];
-        ImGui::PushID(static_cast<int>(index));
-        ImGui::TextWrapped("%s.%s -> %s.%s", connection.from_node.c_str(),
-                           connection.from_port.c_str(), connection.to_node.c_str(),
-                           connection.to_port.c_str());
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Disconnect")) {
-            status = session.disconnect(index) ? "Connection removed"
-                                               : "Connection removal rejected";
-            ImGui::PopID();
-            break;
-        }
-        ImGui::PopID();
-    }
-    static_cast<void>(draw_mechanic_node_picker(
-        "From node", graph.nodes, state.from_node));
-    static_cast<void>(draw_mechanic_port_picker(
-        "From port", graph.nodes, state.from_node, state.from_port,
-        fabric::project::MechanicPortDirection::output));
-    static_cast<void>(draw_mechanic_node_picker(
-        "To node", graph.nodes, state.to_node));
-    static_cast<void>(draw_mechanic_port_picker(
-        "To port", graph.nodes, state.to_node, state.to_port,
-        fabric::project::MechanicPortDirection::input));
-    if (ImGui::Button("Connect ports")) {
-        status = session.connect({state.from_node, state.from_port,
-                                  state.to_node, state.to_port})
-            ? "Ports connected" : "Connection rejected (types, direction or cycle)";
-    }
-
-    ImGui::NextColumn();
-    ImGui::SeparatorText("Inspector");
-    const auto selected = std::find_if(graph.nodes.begin(), graph.nodes.end(),
-        [&](const auto& node) { return node.id == state.selected_node; });
-    if (selected != graph.nodes.end()) {
-        const auto selected_node = *selected;
-        ImGui::Text("%s [%s]", selected_node.id.c_str(), selected_node.type.c_str());
-        for (const auto& property : selected_node.properties)
-            draw_mechanic_value_editor(session, selected_node, property, status);
-        if (ImGui::Button("Remove selected node")) {
-            status = session.remove_node({.value = selected_node.id})
-                ? "Mechanic node removed" : "Mechanic node removal rejected";
-            if (status == "Mechanic node removed") state.selected_node.clear();
-        }
-        ImGui::TextDisabled("Ports:");
-        for (const auto& port : selected_node.ports)
-            ImGui::BulletText("%s · %s · %s", port.id.c_str(),
-                port.direction == fabric::project::MechanicPortDirection::input
-                    ? "input" : "output",
-                std::string{fabric::project::to_string(port.type)}.c_str());
-    } else {
-        ImGui::TextDisabled("Select a node to edit its properties.");
-    }
-
-    ImGui::SeparatorText("Simulation");
-    const auto& simulation = session.simulation();
-    ImGui::BeginDisabled(!simulation.valid());
-    if (ImGui::Button(simulation.playing() ? "Pause" : "Play")) {
-        if (simulation.playing()) session.pause(); else session.play();
-    }
-    ImGui::SameLine();
-    ImGui::BeginDisabled(simulation.playing());
-    if (ImGui::Button("Step 1/60"))
-        status = session.step_once() ? "Simulation advanced one fixed step"
-                                     : "Simulation step rejected";
-    ImGui::EndDisabled();
-    draw_disabled_reason(simulation.playing(),
-                         "Pause the simulation before advancing a single step.");
-    ImGui::SameLine();
-    if (ImGui::Button("Reset"))
-        status = session.reset_preview() ? "Simulation reset"
-                                         : "Simulation reset failed";
-    ImGui::EndDisabled();
-    draw_disabled_reason(!simulation.valid(),
-                         "Load a valid mechanic graph before starting the simulation.");
-    ImGui::Text("Fixed steps: %zu", simulation.step_count());
-    ImGui::SeparatorText("Preview character");
-    ImGui::DragFloat2("Character position (world units)",
-                      &state.preview_character.position.x,
-                      0.1F);
-    draw_technical_tooltip("Preview character position in map world space.");
-    ImGui::DragFloat2("Character size (world units)", &state.preview_character.size.x,
-                      0.05F, 0.05F, 16.0F);
-    draw_technical_tooltip("Preview character collider dimensions.");
-    ImGui::DragFloat("Character friction (coefficient)",
-                     &state.preview_character.friction,
-                     0.05F, 0.0F, 4.0F);
-    draw_technical_tooltip("Friction coefficient used by the preview controller.");
-    if (ImGui::Button("Place / reset character"))
-        status = session.place_preview_character(state.preview_character)
-            ? "Preview character placed" : "Preview character rejected";
-    ImGui::SameLine();
-    if (ImGui::Button("Move left"))
-        static_cast<void>(session.set_preview_character_velocity(
-            {-state.preview_character_speed, 0.0F}));
-    ImGui::SameLine();
-    if (ImGui::Button("Stop character"))
-        static_cast<void>(session.set_preview_character_velocity({0.0F, 0.0F}));
-    ImGui::SameLine();
-    if (ImGui::Button("Move right"))
-        static_cast<void>(session.set_preview_character_velocity(
-            {state.preview_character_speed, 0.0F}));
-    ImGui::DragFloat("Character speed (world units/s)", &state.preview_character_speed,
-                     0.1F, 0.0F, 20.0F);
-    draw_technical_tooltip("Horizontal velocity used by the preview movement buttons.");
-    if (const auto character = simulation.preview_character_state())
-        ImGui::BulletText("character  pos %.2f, %.2f  vel %.2f, %.2f",
-                          character->position.x, character->position.y,
-                          character->velocity.x, character->velocity.y);
-
-    ImGui::SeparatorText("Mechanic debug overlay");
-    for (const auto& signal : simulation.signal_states()) {
-        bool manually_active = signal.manually_active;
-        const auto label = signal.kind == fabric::physics::MechanicSignalKind::sensor
-            ? "Inject sensor: " + signal.node_id
-            : "Inject event: " + signal.event_id.value;
-        if (ImGui::Checkbox(label.c_str(), &manually_active)) {
-            const auto applied = signal.kind ==
-                    fabric::physics::MechanicSignalKind::sensor
-                ? session.set_preview_sensor_active(
-                      {.value = signal.node_id}, manually_active)
-                : session.set_preview_event_active(signal.event_id,
-                                                   manually_active);
-            status = applied ? "Preview activation signal changed"
-                             : "Preview activation signal rejected";
-        }
-        ImGui::SameLine();
-        ImGui::TextDisabled("state: %s · physical overlaps: %zu",
-                            signal.active ? "active" : "inactive",
-                            signal.physical_overlap_count);
-    }
-    for (const auto& activation : simulation.activation_states())
-        ImGui::BulletText("%s  %s  source %s", activation.node_id.c_str(),
-                          activation.active ? "active" : "inactive",
-                          activation.source_node_id
-                              ? activation.source_node_id->c_str() : "always");
-    for (const auto& event : simulation.debug_events())
-        ImGui::TextDisabled("step %zu  %s  %s", event.step,
-            event.node_id.c_str(),
-            event.transition == fabric::physics::MechanicActivationTransition::begin
-                ? "begin" : "end");
-    for (const auto& body : simulation.body_states())
-        ImGui::BulletText("%s  pos %.2f, %.2f  rot %.2f deg",
-                          body.node_id.c_str(), body.position.x, body.position.y,
-                          body.rotation_degrees);
-    for (const auto& error : session.preview_errors())
-        ImGui::TextColored({1.0F, 0.62F, 0.25F, 1.0F}, "%s: %s",
-                           error.field.c_str(), error.message.c_str());
-    ImGui::Columns(1);
-    ImGui::End();
-}
 
 enum class CanvasGizmoMode { translate, rotate, scale };
 
@@ -2148,7 +1401,8 @@ int run(const std::filesystem::path& project_root,
     fabric::editor::MechanicSession mechanic_session;
     fabric::editor::SceneSession scene_session;
     fabric::editor::SessionTransitionGuard transition_guard;
-    MechanicEditorState mechanic_editor;
+    MechanicWorkspaceState mechanic_editor;
+    MechanicWorkspaceProbe mechanic_probe;
     SceneWorkspaceState scene_editor;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
@@ -2244,17 +1498,11 @@ int run(const std::filesystem::path& project_root,
     std::size_t mechanic_e2e_frame = 0U;
     bool mechanic_e2e_capture_written = false;
     if (mechanic_e2e) {
-        ui_mechanic_graph_probe_enabled = true;
-        ui_mechanic_graph_canvas_seen = false;
-        ui_mechanic_graph_link_seen = false;
-        ui_mechanic_graph_source_seen = false;
-        ui_mechanic_graph_target_seen = false;
-        ui_mechanic_graph_source_clicked = false;
-        ui_mechanic_graph_target_clicked = false;
+        mechanic_probe.enabled = true;
         const bool opened = session.map() && mechanic_session.open(
             project_root, *session.map(), {.value = "rotating-platform"});
         if (opened && !mechanic_session.graph()->connections.empty()) {
-            ui_mechanic_expected_connection =
+            mechanic_probe.expected_connection =
                 mechanic_session.graph()->connections.front();
             mechanic_e2e_complete = mechanic_session.disconnect(0U) &&
                 mechanic_session.save();
@@ -2485,10 +1733,10 @@ int run(const std::filesystem::path& project_root,
     while (running) {
         if (mechanic_e2e &&
             (mechanic_e2e_frame == 2U || mechanic_e2e_frame == 4U) &&
-            ui_mechanic_graph_source_seen && ui_mechanic_graph_target_seen) {
+            mechanic_probe.source_seen && mechanic_probe.target_seen) {
             const ImVec2 target = mechanic_e2e_frame == 2U
-                ? ui_mechanic_graph_source_screen
-                : ui_mechanic_graph_target_screen;
+                ? mechanic_probe.source_screen
+                : mechanic_probe.target_screen;
             SDL_Event motion{};
             motion.type = SDL_MOUSEMOTION;
             motion.motion.windowID = SDL_GetWindowID(window);
@@ -4037,8 +3285,8 @@ int run(const std::filesystem::path& project_root,
                 editor_context.set_selection(std::move(stable_selection)));
         }
 
-        draw_mechanic_editor(mechanic_session, session, mechanic_editor, status,
-                             resource_catalog);
+        draw_mechanic_workspace(mechanic_session, session, mechanic_editor,
+                                status, resource_catalog, &mechanic_probe);
         draw_scene_workspace(scene_session, project_root, window, scene_editor,
                              status, package_errors, resource_catalog,
                              choose_folder);
@@ -4178,7 +3426,7 @@ int run(const std::filesystem::path& project_root,
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        if (mechanic_e2e && ui_mechanic_graph_link_seen &&
+        if (mechanic_e2e && mechanic_probe.link_seen &&
             !mechanic_e2e_capture_written) {
             write_frame_capture(project_root, window,
                                 "map-studio-mechanic-graph-e2e.ppm");
@@ -4190,18 +3438,18 @@ int run(const std::filesystem::path& project_root,
             const bool reopened = saved && session.map() && reloaded.open(
                 project_root, *session.map(), {.value = "rotating-platform"});
             mechanic_e2e_complete = mechanic_e2e_complete && reopened &&
-                ui_mechanic_graph_canvas_seen && ui_mechanic_graph_link_seen &&
+                mechanic_probe.canvas_seen && mechanic_probe.link_seen &&
                 mechanic_e2e_capture_written && reloaded.simulation().valid() &&
                 std::ranges::find(reloaded.graph()->connections,
-                                  ui_mechanic_expected_connection) !=
+                                  mechanic_probe.expected_connection) !=
                     reloaded.graph()->connections.end() &&
                 reloaded.step_once();
             if (!mechanic_e2e_complete)
                 fail_e2e("mechanic canvas connection did not reload and simulate: " +
-                    std::to_string(ui_mechanic_graph_canvas_seen) + "," +
-                    std::to_string(ui_mechanic_graph_source_clicked) + "," +
-                    std::to_string(ui_mechanic_graph_target_clicked) + "," +
-                    std::to_string(ui_mechanic_graph_link_seen));
+                    std::to_string(mechanic_probe.canvas_seen) + "," +
+                    std::to_string(mechanic_probe.source_clicked) + "," +
+                    std::to_string(mechanic_probe.target_clicked) + "," +
+                    std::to_string(mechanic_probe.link_seen));
             running = false;
         }
         if (scene_e2e || transformation_e2e) running = false;
