@@ -2446,7 +2446,18 @@ int run(const std::filesystem::path& project_root,
                     ImGui::SetNextItemWidth(180.0F);
                     ImGui::DragFloat("Rotation offset (degrees)", &path_follower_rotation_offset, 1.0F);
                     const bool path_enabled = !path_follower_id.empty();
-                    ImGui::BeginDisabled(!path_enabled);
+                    bool path_reference_valid = path_enabled;
+                    if (path_enabled && session.manifest()) {
+                        const auto path_document = fabric::project::textured_path_document_path(
+                            *session.manifest(), {.value = path_follower_id});
+                        const auto loaded_path = fabric::project::load_textured_path(
+                            session.project_root(), *session.manifest(), path_document);
+                        path_reference_valid = loaded_path.ok();
+                        if (!path_reference_valid)
+                            ImGui::TextColored({0.95F, 0.42F, 0.38F, 1.0F},
+                                "Path is missing or invalid; choose another asset.");
+                    }
+                    ImGui::BeginDisabled(!path_reference_valid);
                     if (ImGui::Button("Apply path follower")) {
                         fabric::project::PathFollowerState follower{
                             .path = {{.value = path_follower_id}, "texturedPath"},
@@ -2464,8 +2475,9 @@ int run(const std::filesystem::path& project_root,
                         status = session.set_instance_path_follower(selected_id, std::nullopt)
                             ? "Path follower removed" : "Path follower removal rejected";
                     }
-                    draw_disabled_reason(!path_enabled,
-                        "Choose a textured path before applying the follower.");
+                    draw_disabled_reason(!path_reference_valid,
+                        path_enabled ? "The selected path document is missing or invalid."
+                                     : "Choose a textured path before applying the follower.");
                 }
                 const auto transformations = load_transformations(
                     session.project_root(), *session.manifest());
