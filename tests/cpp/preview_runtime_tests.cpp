@@ -536,6 +536,28 @@ fabric::project::MapDocument map_with_path_follower() {
     return result;
 }
 
+fabric::project::MapDocument map_with_animated_path_follower() {
+    auto result = map_with_path_follower();
+    result.instances.front().properties.push_back({
+        "animation", fabric::project::ResourceReference{
+            {.value = "runtime-path-animation"}, "animation"}});
+    return result;
+}
+
+fabric::project::AnimationClip path_progress_animation() {
+    return {.document = {.schema_version = 1,
+                         .type = "animation",
+                         .id = {.value = "runtime-path-animation"},
+                         .name = "Runtime Path Progress"},
+            .duration = 1.0F,
+            .loop = true,
+            .tracks = {{{.node_id = "root",
+                         .component_id = "pathFollower",
+                         .property_id = "progress"},
+                        fabric::project::AnimationInterpolation::linear,
+                        {{0.0F, 0.75F}, {1.0F, 0.75F}}}}};
+}
+
 fabric::project::TexturedPath runtime_path() {
     return {.document = {.schema_version = 1,
                          .type = "texturedPath",
@@ -1708,6 +1730,39 @@ TEST_CASE("preview runtime advances map path followers") {
     std::error_code ignored;
     std::filesystem::remove_all(root, ignored);
     std::filesystem::remove_all(package, ignored);
+}
+
+TEST_CASE("preview runtime evaluates animation progress on path followers") {
+    const auto root = std::filesystem::temp_directory_path() /
+        ("fabric-preview-animated-path-" + std::to_string(
+            std::chrono::steady_clock::now().time_since_epoch().count()));
+    REQUIRE(fabric::project::create_project(root, manifest()).ok());
+    REQUIRE(fabric::project::publish_native_vector_asset(root, manifest(), vector_asset()).ok());
+    REQUIRE(fabric::project::publish_entity(root, manifest(), entity()).ok());
+    const auto source = std::filesystem::path{__FILE__}.parent_path().parent_path() /
+        "fixtures/valid-project/assets/textures/beam-thread.png";
+    REQUIRE(fabric::project::publish_texture_asset(
+        root, manifest(), {.document = {.schema_version = 1,
+                                        .type = "texture",
+                                        .id = {.value = "runtime-texture"},
+                                        .name = "Runtime Texture"},
+                             .source = "assets/textures/runtime-texture.png",
+                             .width = 2048,
+                             .height = 2048}, source).ok());
+    REQUIRE(fabric::project::publish_textured_path(root, manifest(), runtime_path()).ok());
+    REQUIRE(fabric::project::publish_animation(
+        root, manifest(), path_progress_animation()).ok());
+    REQUIRE(fabric::project::publish_map(
+        root, manifest(), map_with_animated_path_follower()).ok());
+    fabric::runtime::PreviewRuntime runtime;
+    REQUIRE(runtime.load({.project_root = root, .map_id = {.value = "preview"},
+                          .mode = fabric::runtime::RuntimeMode::smoke_test}));
+    REQUIRE(runtime.run());
+    REQUIRE(runtime.last_frame_packets().size() == 1U);
+    CHECK(runtime.last_frame_packets().front().fill_vertices.front().x ==
+          Catch::Approx(6.5F).margin(0.05F));
+    std::error_code ignored;
+    std::filesystem::remove_all(root, ignored);
 }
 
 TEST_CASE("published Preview Runtime evaluates one attached behavior for player AI and map") {

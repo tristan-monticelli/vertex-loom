@@ -1635,8 +1635,10 @@ bool PreviewRuntime::load(const PreviewRuntimeOptions& options) {
                 if (instance.path_follower->orient_to_path)
                     follower_simulation.instance_transform.rotation_degrees =
                         std::atan2(sample.tangent.y, sample.tangent.x) *
-                            57.29577951308232F +
+                        57.29577951308232F +
                         instance.path_follower->rotation_offset_degrees;
+                follower_simulation.initial_instance_transform =
+                    follower_simulation.instance_transform;
             }
         }
         for (std::size_t node_index = 0; node_index < resolved_entity.nodes.size(); ++node_index) {
@@ -2498,6 +2500,31 @@ bool PreviewRuntime::run() {
                 scale = resolved_node->transform.scale;
             }
             const bool path_following = impl_->path_followers.contains(instance_id);
+            auto path_transform = path_following
+                ? simulation->second.instance_transform : core::Transform{};
+            if (path_following) {
+                const auto follower = impl_->path_followers.find(instance_id);
+                const auto path = follower == impl_->path_followers.end()
+                    ? impl_->textured_paths.end()
+                    : impl_->textured_paths.find(follower->second.path.id.value);
+                if (follower != impl_->path_followers.end() &&
+                    path != impl_->textured_paths.end() && evaluation && evaluation->ok()) {
+                    for (const auto& property : evaluation->properties) {
+                        if (property.binding.component_id != "pathFollower" ||
+                            property.binding.property_id != "progress") continue;
+                        if (const auto* value = std::get_if<float>(&property.value)) {
+                            const auto sample = project::sample_textured_path(
+                                path->second, *value);
+                            path_transform.position = sample.position;
+                            if (follower->second.orient_to_path)
+                                path_transform.rotation_degrees =
+                                    std::atan2(sample.tangent.y, sample.tangent.x) *
+                                        57.29577951308232F +
+                                    follower->second.rotation_offset_degrees;
+                        }
+                    }
+                }
+            }
             if (!position && !rotation_degrees && !scale && !color && !opacity &&
                 !image_position && !image_scale && !image_rotation_degrees &&
                 !image_pivot && !path_following)
@@ -2543,13 +2570,13 @@ bool PreviewRuntime::run() {
                 ? target_scale.y / base.scale.y : 1.0F;
             const auto path_position_delta = path_following
                 ? core::Vec2{
-                    simulation->second.instance_transform.position.x -
+                    path_transform.position.x -
                         simulation->second.initial_instance_transform.position.x,
-                    simulation->second.instance_transform.position.y -
+                    path_transform.position.y -
                         simulation->second.initial_instance_transform.position.y}
                 : core::Vec2{};
             const auto path_rotation_delta = path_following
-                ? simulation->second.instance_transform.rotation_degrees -
+                ? path_transform.rotation_degrees -
                     simulation->second.initial_instance_transform.rotation_degrees
                 : 0.0F;
             const auto radians = (target_rotation - base.rotation_degrees +
