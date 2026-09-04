@@ -280,7 +280,7 @@ bool draw_surface_effect_stack(
             shine != shader.effects.end())
             shader.shine = shine->amount;
     };
-    if (guided_surface && !shader.effects.empty()) {
+    if (guided_surface) {
         ImGui::SeparatorText("Quick look");
         ImGui::TextDisabled(
             "Preserve the source or recolor it with your selected color.");
