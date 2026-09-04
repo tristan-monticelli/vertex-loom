@@ -1692,7 +1692,7 @@ TEST_CASE("animation prompt publishes and indexes a clip") {
         1U, start));
     CHECK(session.selected_animation()->tracks.front().keys.size() == 1U);
     REQUIRE(session.set_selected_animation_key(
-        position_binding, 0.0F, fabric::core::Vec2{9.0F, 8.0F},
+        position_binding, 0.25F, fabric::core::Vec2{9.0F, 8.0F},
         fabric::project::AnimationInterpolation::linear, start));
     REQUIRE(session.selected_animation()->tracks.front().keys.size() == 1U);
     CHECK(std::get<fabric::core::Vec2>(
