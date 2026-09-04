@@ -406,6 +406,21 @@ std::optional<fabric::project::MechanicValue> parse_mechanic_override_value(
     return std::nullopt;
 }
 
+std::optional<fabric::core::ResourceId> instance_mechanic_id(
+    const fabric::project::MapDocument& map,
+    const std::string_view instance_id) {
+    const auto instance = std::ranges::find(
+        map.instances, instance_id, &fabric::project::MapInstance::id);
+    if (instance == map.instances.end() || !instance->prefab)
+        return std::nullopt;
+    const auto prefab = std::ranges::find(
+        map.prefabs, instance->prefab->id.value,
+        &fabric::project::PrefabDefinition::id);
+    if (prefab == map.prefabs.end() || !prefab->mechanic)
+        return std::nullopt;
+    return prefab->mechanic->id;
+}
+
 void draw_value_parse_error(
     const std::optional<fabric::project::MapPropertyValue>& value,
     const std::string_view field,
@@ -571,9 +586,8 @@ int run(const std::filesystem::path& project_root,
     PublishWorkspaceProbe publish_probe;
     SceneWorkspaceState scene_editor;
     enum class ActiveWorkspace { map, scene, mechanic, publish };
-    ActiveWorkspace active_workspace = mechanic_e2e
-        ? ActiveWorkspace::mechanic
-        : scene_e2e ? ActiveWorkspace::scene : ActiveWorkspace::map;
+    ActiveWorkspace active_workspace = scene_e2e
+        ? ActiveWorkspace::scene : ActiveWorkspace::map;
     fabric::render::OpenGLVectorRenderer map_renderer;
     std::unordered_map<std::string, MapTexture> map_textures;
     if (!map_renderer.initialize()) {
@@ -666,6 +680,7 @@ int run(const std::filesystem::path& project_root,
     };
     bool mechanic_e2e_complete = false;
     bool mechanic_authoring_verified = false;
+    bool mechanic_connection_removed = false;
     std::size_t mechanic_e2e_frame = 0U;
     std::size_t publish_e2e_frame = 0U;
     std::optional<ImVec2> mechanic_resize_drag_origin;
@@ -680,12 +695,11 @@ int run(const std::filesystem::path& project_root,
         if (opened && !mechanic_session.graph()->connections.empty()) {
             mechanic_probe.expected_connection =
                 mechanic_session.graph()->connections.front();
-            mechanic_e2e_complete = mechanic_session.disconnect(0U) &&
-                mechanic_session.save();
+            mechanic_e2e_complete = true;
             mechanic_editor.open_id = "rotating-platform";
         }
         if (!mechanic_e2e_complete)
-            fail_e2e("mechanic fixture could not remove its first connection");
+            fail_e2e("mechanic fixture could not open its reference graph");
         publish_editor.destination_parent = project_root.parent_path();
         publish_probe.enabled = true;
     }
@@ -864,7 +878,9 @@ int run(const std::filesystem::path& project_root,
     std::string trigger_property_value;
     int trigger_property_kind = 2;
     int trigger_resource_kind = 3;
-    std::vector<std::string> selected_instances;
+    std::vector<std::string> selected_instances = mechanic_e2e
+        ? std::vector<std::string>{"rotating-platform-instance"}
+        : std::vector<std::string>{};
     std::string active_layer_id = placement_e2e ? "instances" : "";
     std::string new_layer_id;
     std::string new_layer_name;
@@ -923,7 +939,10 @@ int run(const std::filesystem::path& project_root,
         }));
     }
     std::string known_scene_document;
-    std::string known_mechanic_document;
+    std::string known_mechanic_document =
+        mechanic_e2e && mechanic_session.graph()
+        ? mechanic_session.graph()->document.id.value
+        : std::string{};
     bool command_palette_open = ui_accessibility_test;
     bool command_palette_rendered = false;
     bool running = true;
@@ -991,73 +1010,77 @@ int run(const std::filesystem::path& project_root,
                 }
             }
         }
+        if (mechanic_e2e && mechanic_e2e_frame == 2U &&
+            mechanic_probe.instance_action_seen) {
+            push_left_click(mechanic_probe.instance_action_screen);
+        }
         if (mechanic_e2e &&
-            (mechanic_e2e_frame == 2U || mechanic_e2e_frame == 4U) &&
+            (mechanic_e2e_frame == 5U || mechanic_e2e_frame == 7U) &&
             mechanic_probe.source_seen && mechanic_probe.target_seen) {
-            const ImVec2 target = mechanic_e2e_frame == 2U
+            const ImVec2 target = mechanic_e2e_frame == 5U
                 ? mechanic_probe.source_screen
                 : mechanic_probe.target_screen;
             push_left_click(target);
         }
         if (mechanic_e2e && mechanic_probe.spatial_handle_seen &&
-            mechanic_e2e_frame >= 6U && mechanic_e2e_frame <= 8U) {
+            mechanic_e2e_frame >= 9U && mechanic_e2e_frame <= 11U) {
             ImVec2 target = mechanic_probe.spatial_handle_screen;
-            if (mechanic_e2e_frame >= 7U) target.x += 32.0F;
+            if (mechanic_e2e_frame >= 10U) target.x += 32.0F;
             push_mouse_position(target);
-            if (mechanic_e2e_frame == 6U || mechanic_e2e_frame == 8U) {
-                push_left_button(mechanic_e2e_frame == 6U
+            if (mechanic_e2e_frame == 9U || mechanic_e2e_frame == 11U) {
+                push_left_button(mechanic_e2e_frame == 9U
                                      ? SDL_MOUSEBUTTONDOWN
                                      : SDL_MOUSEBUTTONUP,
                                  target);
             }
         }
         if (mechanic_e2e && mechanic_probe.body_handle_seen &&
-            mechanic_e2e_frame == 10U) {
+            mechanic_e2e_frame == 13U) {
             push_left_click(mechanic_probe.body_handle_screen);
         }
         if (mechanic_e2e && mechanic_probe.resize_handle_seen &&
-            mechanic_e2e_frame >= 12U && mechanic_e2e_frame <= 14U) {
+            mechanic_e2e_frame >= 15U && mechanic_e2e_frame <= 17U) {
             if (!mechanic_resize_drag_origin)
                 mechanic_resize_drag_origin = mechanic_probe.resize_handle_screen;
             ImVec2 target = *mechanic_resize_drag_origin;
-            if (mechanic_e2e_frame >= 13U) {
+            if (mechanic_e2e_frame >= 16U) {
                 target.x += 32.0F;
                 target.y -= 16.0F;
             }
             push_mouse_position(target);
-            if (mechanic_e2e_frame == 12U || mechanic_e2e_frame == 14U) {
-                push_left_button(mechanic_e2e_frame == 12U
+            if (mechanic_e2e_frame == 15U || mechanic_e2e_frame == 17U) {
+                push_left_button(mechanic_e2e_frame == 15U
                                      ? SDL_MOUSEBUTTONDOWN
                                      : SDL_MOUSEBUTTONUP,
                                  target);
             }
         }
         if (mechanic_e2e && mechanic_probe.rotation_handle_seen &&
-            mechanic_e2e_frame >= 16U && mechanic_e2e_frame <= 18U) {
+            mechanic_e2e_frame >= 19U && mechanic_e2e_frame <= 21U) {
             if (!mechanic_rotation_drag_origin)
                 mechanic_rotation_drag_origin = mechanic_probe.rotation_handle_screen;
             ImVec2 target = *mechanic_rotation_drag_origin;
-            if (mechanic_e2e_frame >= 17U) {
+            if (mechanic_e2e_frame >= 20U) {
                 target.x += 24.0F;
                 target.y += 12.0F;
             }
             push_mouse_position(target);
-            if (mechanic_e2e_frame == 16U || mechanic_e2e_frame == 18U) {
-                push_left_button(mechanic_e2e_frame == 16U
+            if (mechanic_e2e_frame == 19U || mechanic_e2e_frame == 21U) {
+                push_left_button(mechanic_e2e_frame == 19U
                                      ? SDL_MOUSEBUTTONDOWN
                                      : SDL_MOUSEBUTTONUP,
                                  target);
             }
         }
         if (mechanic_e2e && mechanic_probe.joint_handle_seen &&
-            mechanic_e2e_frame >= 20U && mechanic_e2e_frame <= 22U) {
+            mechanic_e2e_frame >= 23U && mechanic_e2e_frame <= 25U) {
             if (!mechanic_joint_drag_origin)
                 mechanic_joint_drag_origin = mechanic_probe.joint_handle_screen;
             ImVec2 target = *mechanic_joint_drag_origin;
-            if (mechanic_e2e_frame >= 21U) target.x += 32.0F;
+            if (mechanic_e2e_frame >= 24U) target.x += 32.0F;
             push_mouse_position(target);
-            if (mechanic_e2e_frame == 20U || mechanic_e2e_frame == 22U) {
-                push_left_button(mechanic_e2e_frame == 20U
+            if (mechanic_e2e_frame == 23U || mechanic_e2e_frame == 25U) {
+                push_left_button(mechanic_e2e_frame == 23U
                                      ? SDL_MOUSEBUTTONDOWN
                                      : SDL_MOUSEBUTTONUP,
                                  target);
@@ -1568,8 +1591,40 @@ int run(const std::filesystem::path& project_root,
                     ? "Selected instances moved" : "Selection contains a locked instance";
             }
             if (selected_instances.size() == 1U) {
-                ImGui::SameLine();
                 const fabric::core::ResourceId selected_id{selected_instances.front()};
+                const auto contextual_mechanic = instance_mechanic_id(
+                    map, selected_id.value);
+                if (contextual_mechanic) {
+                    if (ImGui::Button("Edit instance mechanic")) {
+                        static_cast<void>(editor_context.navigate(
+                            map.document.id,
+                            fabric::editor::EditorWorkspace::map,
+                            selected_id));
+                        const bool opened = mechanic_session.open_prefab_instance(
+                            session.project_root(), map, selected_id);
+                        status = opened
+                            ? "Instance mechanic opened"
+                            : "Instance mechanic could not be opened";
+                        if (opened) {
+                            mechanic_editor.open_id =
+                                contextual_mechanic->value;
+                            static_cast<void>(editor_context.open_document(
+                                *contextual_mechanic,
+                                fabric::editor::EditorWorkspace::logic));
+                            active_workspace = ActiveWorkspace::mechanic;
+                            if (mechanic_probe.enabled)
+                                mechanic_probe.instance_action_clicked = true;
+                        }
+                    }
+                    if (mechanic_probe.enabled) {
+                        const auto minimum = ImGui::GetItemRectMin();
+                        const auto maximum = ImGui::GetItemRectMax();
+                        mechanic_probe.instance_action_screen = {
+                            (minimum.x + maximum.x) * 0.5F,
+                            (minimum.y + maximum.y) * 0.5F};
+                        mechanic_probe.instance_action_seen = true;
+                    }
+                }
                 if (ImGui::Button("Duplicate selected")) {
                     status = session.duplicate_instance(selected_id)
                         ? "Instance duplicated" : "Instance duplication rejected";
@@ -2467,6 +2522,12 @@ int run(const std::filesystem::path& project_root,
                         if (opened)
                             mechanic_editor.open_id =
                                 prefab->mechanic->id.value;
+                        if (opened) {
+                            static_cast<void>(editor_context.open_document(
+                                prefab->mechanic->id,
+                                fabric::editor::EditorWorkspace::logic));
+                            active_workspace = ActiveWorkspace::mechanic;
+                        }
                     }
                     const auto graph = session.prefab_mechanic_graph(
                         {.value = selected_prefab});
@@ -2774,10 +2835,28 @@ int run(const std::filesystem::path& project_root,
         glClearColor(0.04F, 0.05F, 0.08F, 1.0F);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        if (mechanic_e2e && mechanic_probe.instance_action_clicked &&
+            !mechanic_connection_removed) {
+            mechanic_connection_removed = mechanic_session.disconnect(0U);
+            mechanic_e2e_complete = mechanic_e2e_complete &&
+                mechanic_connection_removed;
+            if (!mechanic_connection_removed)
+                fail_e2e("contextual mechanic could not prepare connection gesture");
+        }
+        if (mechanic_e2e && mechanic_probe.instance_action_seen &&
+            mechanic_e2e_frame == 1U) {
+            write_frame_capture(project_root, window,
+                                "map-studio-mechanic-entry-e2e.ppm");
+        }
+        if (mechanic_e2e && mechanic_probe.source_seen &&
+            mechanic_e2e_frame == 4U) {
+            write_frame_capture(project_root, window,
+                                "map-studio-mechanic-source-e2e.ppm");
+        }
         if (mechanic_e2e && mechanic_probe.link_seen &&
             mechanic_probe.rotation_handle_moved &&
             mechanic_probe.joint_handle_moved &&
-            mechanic_e2e_frame >= 23U &&
+            mechanic_e2e_frame >= 26U &&
             !mechanic_e2e_capture_written) {
             write_frame_capture(project_root, window,
                                 "map-studio-mechanic-graph-e2e.ppm");
@@ -2790,7 +2869,7 @@ int run(const std::filesystem::path& project_root,
             publish_e2e_capture_written = true;
         }
         if (mechanic_e2e && !mechanic_authoring_verified &&
-            ++mechanic_e2e_frame == 25U) {
+            ++mechanic_e2e_frame == 28U) {
             const bool saved = mechanic_session.save();
             fabric::editor::MechanicSession reloaded;
             const bool reopened = saved && session.map() && reloaded.open(
@@ -2871,7 +2950,26 @@ int run(const std::filesystem::path& project_root,
                     }
                 }
             }
+            const bool navigated_back = editor_context.go_back();
+            const auto* restored_map = editor_context.active_document();
+            const bool map_selection_restored = navigated_back &&
+                restored_map != nullptr &&
+                restored_map->workspace ==
+                    fabric::editor::EditorWorkspace::map &&
+                restored_map->selection_id == fabric::core::ResourceId{
+                    .value = "rotating-platform-instance"};
+            const bool navigated_forward = editor_context.go_forward();
+            const auto* restored_mechanic = editor_context.active_document();
+            const bool mechanic_context_restored = navigated_forward &&
+                restored_mechanic != nullptr &&
+                restored_mechanic->workspace ==
+                    fabric::editor::EditorWorkspace::logic &&
+                restored_mechanic->id.value == "rotating-platform";
             mechanic_e2e_complete = mechanic_e2e_complete && reopened &&
+                mechanic_connection_removed &&
+                mechanic_probe.instance_action_seen &&
+                mechanic_probe.instance_action_clicked &&
+                map_selection_restored && mechanic_context_restored &&
                 mechanic_probe.canvas_seen && mechanic_probe.link_seen &&
                 mechanic_probe.spatial_canvas_seen &&
                 mechanic_probe.spatial_handle_seen &&
@@ -2890,6 +2988,14 @@ int run(const std::filesystem::path& project_root,
                 reloaded.step_once();
             if (!mechanic_e2e_complete)
                 fail_e2e("mechanic canvas connection did not reload and simulate: " +
+                    std::to_string(mechanic_probe.instance_action_seen) + "," +
+                    std::to_string(mechanic_probe.instance_action_clicked) + "," +
+                    std::to_string(mechanic_probe.instance_action_screen.x) + "," +
+                    std::to_string(mechanic_probe.instance_action_screen.y) + "," +
+                    std::to_string(mechanic_probe.source_screen.x) + "," +
+                    std::to_string(mechanic_probe.source_screen.y) + "," +
+                    std::to_string(map_selection_restored) + "," +
+                    std::to_string(mechanic_context_restored) + "," +
                     std::to_string(mechanic_probe.canvas_seen) + "," +
                     std::to_string(mechanic_probe.source_clicked) + "," +
                     std::to_string(mechanic_probe.target_clicked) + "," +

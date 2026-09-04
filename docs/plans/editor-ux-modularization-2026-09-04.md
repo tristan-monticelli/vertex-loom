@@ -122,6 +122,11 @@ corps sa rotation ; l'E2E glisse ces deux poignées, recharge leurs valeurs puis
 poursuit jusqu'au paquet exécuté. La couronne d'un joint complète le même
 parcours en déplaçant son pivot relié sans quitter le canevas ; ce geste et son
 round-trip sont désormais inclus dans l'E2E Mechanics.
+Le parcours part maintenant de l'instance mécanique sélectionnée dans Map :
+l'action contextuelle ouvre directement sa preview Mechanics avec overrides,
+ajoute le document à l'historique et préserve la sélection Map pour le retour.
+Deux captures E2E distinctes prouvent l'action visible puis le document logique
+résolu sans recherche de prefab.
 Behavior Graph remonte maintenant le signal de test au-dessus du canevas,
 surligne les cartes visitées et fournit breakpoints éphémères, pause,
 pas-à-pas de trace, reprise et reset. Son E2E effectue ajout, connexion,

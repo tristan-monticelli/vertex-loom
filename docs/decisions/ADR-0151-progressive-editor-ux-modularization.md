@@ -107,6 +107,11 @@ qu’un seul propriétaire. Le séquencement, les preuves et l'ordre des commits
 sont décrits dans le
 [plan de refactoring UX](../plans/editor-ux-modularization-2026-09-04.md).
 
+La navigation contextuelle Map → Mechanics résout la mécanique depuis
+l'instance sélectionnée, ouvre sa preview paramétrée par la commande de session
+existante et active le document logique dans `EditorContext`. Elle ne crée pas
+un second propriétaire de l'ouverture ou des overrides.
+
 Le harnais du parcours Entity→Animation délègue sa preuve publiée à un module
 sans UI. Après les gestes et le reload, ce module crée uniquement la map hôte
 du test, ferme un paquet déterministe, charge ce paquet avec `PreviewRuntime`

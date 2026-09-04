@@ -50,6 +50,9 @@ struct MechanicWorkspaceState {
 
 struct MechanicWorkspaceProbe {
     bool enabled{};
+    bool instance_action_seen{};
+    bool instance_action_clicked{};
+    ImVec2 instance_action_screen{};
     bool canvas_seen{};
     bool spatial_canvas_seen{};
     bool spatial_handle_seen{};

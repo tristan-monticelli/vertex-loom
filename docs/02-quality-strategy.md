@@ -215,9 +215,13 @@ exige la connexion `monster-ai-to-emit-event`, pose un breakpoint par clic,
 exécute le signal IA `attack` depuis la barre de debug, attend une action, la
 pause et le surlignage de trace, puis conserve le canevas final dans
 `asset-studio-behavior-graph-e2e.ppm`.
-Le test `map_studio_mechanic_e2e` retire la liaison `platform.body` vers
-`anchor.body` de la fixture, ouvre le canevas Mechanics et la recrée par clics
-sur `Connect from output` puis la carte cible. Le même scénario glisse ensuite
+Le test `map_studio_mechanic_e2e` part de l'instance mécanique sélectionnée
+dans Map, clique `Edit instance mechanic`, exige le document et la preview
+paramétrée de cette instance, puis retire la liaison `platform.body` vers
+`anchor.body` et la recrée par clics sur `Connect from output` puis la carte
+cible. Les captures `map-studio-mechanic-entry-e2e.ppm` et
+`map-studio-mechanic-source-e2e.ppm` rendent cette navigation observable. Le
+même scénario glisse ensuite
 le capteur `presence` d'une unité monde dans le canevas spatial, sélectionne le
 corps `platform`, agrandit sa poignée de taille et glisse sa poignée de
 rotation. Il saisit ensuite la couronne du joint `hinge` pour déplacer le pivot

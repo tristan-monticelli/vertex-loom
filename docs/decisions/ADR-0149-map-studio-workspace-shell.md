@@ -39,6 +39,13 @@ généré et affiché avant validation. Les identifiants techniques restent
 Le placement préremplit aussi un identifiant unique depuis la ressource choisie
 et laisse l'auteur le remplacer seulement si nécessaire.
 
+Quand une unique instance sélectionnée référence un prefab mécanique, le
+panneau de contenu expose immédiatement `Edit instance mechanic`. Cette action
+ouvre la mécanique avec les overrides et le transform de l'instance, puis
+bascule vers son document Mechanics dans l'historique commun. Elle ne demande
+ni de retrouver le prefab dans une section repliée, ni de choisir à nouveau la
+mécanique. Le retour de navigation restaure la map et sa sélection stable.
+
 ## Conséquences
 
 Les contrats MapDocument et les fichiers existants restent inchangés. La

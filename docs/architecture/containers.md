@@ -127,6 +127,12 @@ La couronne d'un joint relié conserve la sélection du joint mais route sa
 translation vers la position de son pivot, propriétaire contractuel de
 l'ancrage.
 
+Depuis la sélection Map, le shell résout la référence
+instance → prefab → mécanique, demande à `MechanicSession` d'ouvrir la preview
+de cette instance, puis navigue vers le document logique dans `EditorContext`.
+La map et sa sélection restent dans l'historique ; aucun workspace ne duplique
+le chargement des overrides ou du transform d'instance.
+
 La factory de plateforme tournante vit dans `fabric_editor` et assemble un
 graphe générique validé ; `fabric_physics` ne connaît pas ce preset. La preview
 évalue les signaux capteur ou événement, applique direction et accélération au
