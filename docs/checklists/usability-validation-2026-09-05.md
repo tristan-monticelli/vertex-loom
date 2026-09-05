@@ -80,6 +80,22 @@ que le résultat Studio → Preview → paquet reste identique.
 - Tant que la fiche n’est pas remplie, l’utilisabilité reste `non prouvée` dans
   le tableau maître de l’audit.
 
+## Preuve automatisée disponible
+
+Le sous-ensemble E2E correspondant aux tâches a été exécuté le 5 septembre
+2026 : 9/9 tests passent en 45,08 s.
+
+| Tâche | Tests associés | Niveau de preuve |
+| --- | --- | --- |
+| U01 | `asset_studio_ui_beam_e2e`, `asset_studio_ui_button_e2e` | UI et persistance de fixture |
+| U02 | `asset_studio_entity_e2e`, `asset_studio_entity_animation_workflow_e2e` | composition, sélection et rechargement |
+| U03 | `asset_studio_animation_e2e`, `asset_studio_entity_animation_workflow_e2e` | timeline, clés et runtime |
+| U04 | `map_studio_placement_e2e`, `map_studio_close_e2e` | placement et fermeture/rechargement ; PathFollower reste à exercer par geste dédié |
+| U05 | `asset_studio_behavior_e2e`, `package_install_smoke` | comportement et paquet autonome |
+
+Cette exécution confirme la non-régression des parcours automatisés ; elle ne
+remplit pas la fiche P01–P05 et ne remplace donc pas les sessions humaines.
+
 ## Décision après sessions
 
 Pour chaque échec, classer la cause avant de corriger :
