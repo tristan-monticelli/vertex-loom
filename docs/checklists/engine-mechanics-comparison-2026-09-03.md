@@ -26,6 +26,11 @@ contrat sérialisable, un panneau qui affiche ce contrat et un parcours qu'un
 utilisateur peut accomplir de bout en bout. La présence d'une capture PPM ne
 prouve pas que les données visibles ont été créées par l'interface.
 
+La validation humaine est suivie séparément dans
+[`usability-validation-2026-09-05.md`](usability-validation-2026-09-05.md) ; tant
+que ses sessions ne sont pas remplies, aucune capacité ne reçoit une preuve
+d'utilisabilité humaine par inférence.
+
 Le niveau de preuve utilisé désormais est :
 
 - `L4` : action réelle dans l'UI, sauvegarde/rechargement, résultat visuel et
